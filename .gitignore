@@ -1,0 +1,23 @@
+# Original game data: never committed
+/vendor/
+
+# Build output
+/build/
+/out/
+
+# Ghidra project databases (we commit exported text instead)
+*.gpr
+*.rep/
+*.lock
+*.lock~
+
+# Tool output
+/tools/out/
+__pycache__/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+/ghidra/project/

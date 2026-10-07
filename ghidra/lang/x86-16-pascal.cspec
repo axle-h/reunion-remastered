@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Borland Pascal 7.0, real mode. Based on Ghidra's x86-16.cspec.
+
+     Procedures push arguments left to right and the callee pops them; only
+     BP, SP, SS and DS survive a call. Because the first argument sits at the
+     highest stack offset, ApplySymbols.java assigns parameter storage
+     explicitly for every prototype it knows; the models below give the right
+     clobber/return behaviour for everything else. -->
+<compiler_spec>
+  <data_organization>
+    <absolute_max_alignment value="0" />
+    <machine_alignment value="2" />
+    <default_alignment value="1" />
+    <default_pointer_alignment value="2" />
+    <pointer_size value="2" />
+    <wchar_size value="2" />
+    <short_size value="2" />
+    <integer_size value="2" />
+    <long_size value="4" />
+    <long_long_size value="4" />
+    <float_size value="4" />
+    <double_size value="8" />
+    <long_double_size value="10" />
+  </data_organization>
+
+  <global>
+    <range space="ram"/>
+  </global>
+  <stackpointer register="SP" space="ram"/>
+
+  <default_proto>
+    <prototype name="__pascal16far" extrapop="unknown" stackshift="4">
+      <input>
+        <pentry minsize="1" maxsize="500" align="2">
+          <addr offset="4" space="stack"/>
+        </pentry>
+      </input>
+      <output>
+        <pentry minsize="1" maxsize="2"><register name="AX"/></pentry>
+        <pentry minsize="3" maxsize="4"><addr space="join" piece1="DX" piece2="AX"/></pentry>
+        <pentry minsize="5" maxsize="6"><addr space="join" piece1="DX" piece2="BX" piece3="AX"/></pentry>
+      </output>
+      <unaffected>
+        <register name="SP"/>
+        <register name="BP"/>
+        <register name="SS"/>
+        <register name="DS"/>
+        <register name="CS"/>
+        <register name="DF"/>
+      </unaffected>
+      <killedbycall>
+        <register name="AX"/>
+        <register name="BX"/>
+        <register name="CX"/>
+        <register name="DX"/>
+        <register name="SI"/>
+        <register name="DI"/>
+        <register name="ES"/>
+      </killedbycall>
+    </prototype>
+  </default_proto>
+
+  <prototype name="__pascal16near" extrapop="unknown" stackshift="2">
+    <input>
+      <pentry minsize="1" maxsize="500" align="2">
+        <addr offset="2" space="stack"/>
+      </pentry>
+    </input>
+    <output>
+      <pentry minsize="1" maxsize="2"><register name="AX"/></pentry>
+      <pentry minsize="3" maxsize="4"><addr space="join" piece1="DX" piece2="AX"/></pentry>
+      <pentry minsize="5" maxsize="6"><addr space="join" piece1="DX" piece2="BX" piece3="AX"/></pentry>
+    </output>
+    <unaffected>
+      <register name="SP"/>
+      <register name="BP"/>
+      <register name="SS"/>
+      <register name="DS"/>
+      <register name="CS"/>
+      <register name="DF"/>
+    </unaffected>
+    <killedbycall>
+      <register name="AX"/>
+      <register name="BX"/>
+      <register name="CX"/>
+      <register name="DX"/>
+      <register name="SI"/>
+      <register name="DI"/>
+      <register name="ES"/>
+    </killedbycall>
+  </prototype>
+</compiler_spec>

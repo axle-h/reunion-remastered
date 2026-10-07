@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+  <language processor="x86"
+            endian="little"
+            size="16"
+            variant="Borland Pascal Real Mode"
+            version="1.0"
+            slafile="x86-pascal.sla"
+            processorspec="x86-16-real.pspec"
+            id="x86:LE:16:Borland Pascal Real Mode">
+    <description>Intel x86 16-bit real mode, Borland Pascal 7 conventions, CS kept across far calls</description>
+    <compiler name="Borland Pascal 7" spec="x86-16-pascal.cspec" id="pascal"/>
+    <external_name tool="gdis.disassembler.options.file" name="x86-16.gdis"/>
+  </language>
+</language_definitions>

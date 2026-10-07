@@ -1,0 +1,188 @@
+# Reunion (REUNION.PRG) symbol list, applied to the Ghidra project by
+# ghidra/scripts/ApplySymbols.java. See ghidra/README.md for the format.
+#
+# Addresses use Ghidra's numbering (load segment 1000h): file segment + 1000h.
+
+@unit 48c7 System
+@unit 4a81 System
+
+# ---------------------------------------------------------------------------
+# System unit (Borland Pascal 7.0 runtime library), segment 48c7
+# ---------------------------------------------------------------------------
+
+# Startup and termination
+48c7:0000 InitSystem                // Unit init: heap/overlay vars, save 19 interrupt vectors, hook INT 00/23/24/3F, open Input/Output
+48c7:00b1 DetectCPU                 // Sets Test8086 (0 = 8086, 1 = 286, 2 = 386+)
+48c7:010f RunError                  // Run-time error AX at caller's address
+48c7:0116 Halt                      // Exit with code AX: run ExitProc chain, close Input/Output, restore vectors, print "Runtime error" if ErrorAddr set
+48c7:01f0 PrintCStr                 // Writes zero-terminated string at CS:BX to stdout
+48c7:01fe PrintDec                  // Writes AX as decimal (3 digits)
+48c7:0218 PrintHexWord
+48c7:021f PrintHexByte
+48c7:022a PrintHexDigit
+48c7:0232 PrintChar                 // INT 21h AH=06h
+48c7:1b8b ClearBss                  // Zeroes DS:75EE..A544 (all uninitialised globals)
+
+# Heap
+48c7:028a GetMem(size: word): pointer             // Run-time error 203 on failure
+48c7:029f FreeMem(p: pointer; size: word)          // Run-time error 204 on invalid pointer
+48c7:02e7 MemAvail(): longint
+48c7:0303 MaxAvail(): longint
+48c7:0323 HeapWalk                  // Free-list walker used by MemAvail/MaxAvail (callback in BX)
+48c7:0353 HeapAlloc                 // GetMem core: AX = size; returns DX:AX, CF on failure
+48c7:041e HeapFree                  // FreeMem core
+48c7:047d HeapMerge                 // Joins adjacent free blocks
+48c7:04dc HeapSizeToParas
+
+# I/O error state
+48c7:04ed IOResult(): integer
+48c7:04f4 CheckIO                   // {$I+} check after every I/O call: run-time error InOutRes if non-zero
+
+# Text files
+48c7:0549 AssignText(var f: TextRec; const name: string)
+48c7:05c7 ResetText(var f: TextRec)
+48c7:05cc RewriteText(var f: TextRec)
+48c7:05d4 OpenText                  // Shared body of Reset/Rewrite(Text); DX = mode
+48c7:061d FlushText(var f: TextRec)
+48c7:0621 CloseText(var f: TextRec)
+48c7:065d TextCallFunc              // Calls the TextRec function pointer at offset BX
+48c7:06fc TextReadBuf
+48c7:075a TextWriteBlanks
+48c7:07a9 TextWriteBuf
+48c7:0800 ReadLn(var f: TextRec)
+48c7:0840 WriteLn(var f: TextRec)
+48c7:0861 TextIOEnd(var f: TextRec)   // Ends a Read/Write statement: flushes if FlushFunc set
+48c7:087c TextInOut                 // Calls TextRec.InOutFunc
+48c7:088a TextFlush                 // Calls TextRec.FlushFunc
+48c7:0898 ReadChar(var f: TextRec): char
+48c7:0929 ReadStr(var f: TextRec; var s: string; maxLen: word)        // Leaves f on the stack for the next Read item
+48c7:0964 WriteStr(var f: TextRec; const s: string; width: integer)   // Leaves f on the stack for the next Write item
+
+# Untyped/typed files
+48c7:0991 AssignFile(var f: FileRec; const name: string)
+48c7:09cc ResetFile(var f: FileRec; recSize: word)       // Opens with FileMode
+48c7:09d5 RewriteFile(var f: FileRec; recSize: word)
+48c7:0a4d CloseFile(var f: FileRec)
+48c7:0a72 FileCheckOpen             // InOutRes := 103 unless f is open
+48c7:0ab7 BlockRead(var f: FileRec; var buf: byte; count: word; result: ^word)    // result may be nil
+48c7:0abe BlockWrite(var f: FileRec; var buf: byte; count: word; result: ^word)
+48c7:0b1f Seek(var f: FileRec; pos: longint)
+48c7:1ab4 FilePos(var f: FileRec): longint
+48c7:1acb FileSize(var f: FileRec): longint
+48c7:1afb FileGetPosAndSize         // DX:AX = position, BX:CX = size
+
+# Memory
+48c7:0b4f MoveFwd(const src: byte; var dst: byte; count: word)    // Forward-only copy (no overlap handling)
+48c7:1b40 Move(const src: byte; var dst: byte; count: word)
+48c7:1b64 FillChar(var dst: byte; count: word; value: byte)
+
+# 32-bit integer arithmetic (register arguments)
+48c7:0b67 LongMul(a: longint @DX:AX; b: longint @BX:CX): longint @DX:AX
+48c7:0ba4 LongDivMod(a: longint @DX:AX; b: longint @BX:CX): longint @DX:AX    // Quotient in DX:AX, remainder in BX:CX; run-time error 200 on /0
+48c7:0c4a LongShr(a: longint @DX:AX; n: byte @CL): longint @DX:AX
+48c7:0c63 LongShl(a: longint @DX:AX; n: byte @CL): longint @DX:AX
+
+# Strings (temporaries are left on the stack between helper calls)
+48c7:0c7c StrLoad(var tmp: string; const src: string)               // tmp := src; pops only src
+48c7:0c96 StrStore(const src: string; var dst: string; maxLen: word) // dst := src truncated to maxLen
+48c7:0cba Copy(const s: string; index: integer; count: integer): string
+48c7:0cfb StrConcat(var tmp: string; const src: string)             // tmp := tmp + src; pops only src
+48c7:0d27 Pos(const sub: string; const s: string): integer
+48c7:0d6d StrCompare(const a: string; const b: string)              // Result in flags
+48c7:0d98 CharToStr(c: char): string
+48c7:0dc5 Insert(const src: string; var s: string; maxLen: word; index: integer)
+48c7:0e24 Delete(var s: string; index: integer; count: integer)
+
+# Sets (32-byte temporaries)
+48c7:0e98 SetLoad                   // Expands a packed set constant into a 32-byte temp
+48c7:0ec2 SetInitWord
+48c7:0ed8 SetAddElem
+48c7:0f2d SetStore                  // Packs a 32-byte set into a smaller variable
+48c7:0f4d SetMemberHelper
+48c7:0f6d SetUnion
+48c7:0f89 SetDiff
+48c7:0fc3 SetEqual
+
+# 6-byte Real arithmetic. Operands: DX:BX:AX and DI:SI:CX; result DX:BX:AX.
+48c7:10df RealSubCore
+48c7:10e3 RealAddCore
+48c7:11a6 RealMulCore
+48c7:12a2 RealZero
+48c7:12a9 RealDivCore
+48c7:1320 RealCmpCore
+48c7:1337 RealCmpMagCore
+48c7:134a LongToRealCore
+48c7:1386 RealToLongCore            // CH = 1 to round, 0 to truncate
+48c7:13f4 RealAdd(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX
+48c7:13fa RealSub(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX
+48c7:1400 RealSqr(a: real @DX:BX:AX): real @DX:BX:AX
+48c7:1406 RealMul(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX
+48c7:140c RealDiv(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX    // Run-time error 200 on /0
+48c7:1416 RealCmp(a: real @DX:BX:AX; b: real @DI:SI:CX)       // Result in flags
+48c7:141a RealCmpEq(a: real @DX:BX:AX; b: real @DI:SI:CX)     // Result in flags (=, <>)
+48c7:141e Trunc(a: real @DX:BX:AX): longint @DX:AX
+48c7:1426 Round(a: real @DX:BX:AX): longint @DX:AX
+48c7:1440 RealAddKeep               // Near helpers that preserve the second operand
+48c7:144a RealSubKeep
+48c7:1454 RealMulKeep
+48c7:145e RealDivKeep
+48c7:1468 Int(a: real @DX:BX:AX): real @DX:BX:AX
+48c7:14b9 Frac(a: real @DX:BX:AX): real @DX:BX:AX
+48c7:14cd Sqrt(a: real @DX:BX:AX): real @DX:BX:AX
+48c7:152c Cos(a: real @DX:BX:AX): real @DX:BX:AX     // Tentative: computes sin(pi/2 - x)
+48c7:184b RealPolyHelper
+48c7:1864 RealPoly                  // Polynomial evaluation, coefficients at CS:DI, CX terms
+
+# Random numbers. Borland LCG: RandSeed := RandSeed * 08088405h + 1
+48c7:18b3 Random(range: word): word
+48c7:1910 RandNext
+48c7:1948 Randomize                 // RandSeed from DOS time (INT 21h AH=2Ch)
+
+# Number <-> string
+48c7:1955 LongToDigits
+48c7:1971 ULongToDigits
+48c7:1991 DigitsToLong              // Decimal or $hex
+48c7:1a38 StrLong(value: longint; width: integer; var s: string; maxLen: word)   // Str(value:width, s)
+48c7:1a83 ValLong(const s: string; var code: integer): longint                  // Val(s, value, code)
+
+# Characters
+48c7:1b78 UpCase(c: char): char
+
+# ---------------------------------------------------------------------------
+# System unit variables, data segment 4a81
+# ---------------------------------------------------------------------------
+4a81:759e OvrCodeList: word
+4a81:75a0 OvrHeapSize: word
+4a81:75a2 OvrDebugPtr: pointer
+4a81:75a6 OvrHeapOrg: word
+4a81:75a8 OvrHeapPtr: word
+4a81:75aa OvrHeapEnd: word
+4a81:75ac OvrLoadList: word
+4a81:75ae OvrDosHandle: word
+4a81:75b0 OvrEmsHandle: word
+4a81:75b2 HeapOrg: pointer
+4a81:75b6 HeapPtr: pointer
+4a81:75ba HeapEnd: pointer
+4a81:75be FreeList: pointer
+4a81:75c2 FreeZero: pointer
+4a81:75c6 HeapError: pointer
+4a81:75ca ExitProc: pointer
+4a81:75ce ExitCode: integer
+4a81:75d0 ErrorAddr: pointer
+4a81:75d4 PrefixSeg: word
+4a81:75d6 StackLimit: word
+4a81:75d8 InOutRes: integer
+4a81:75da RandSeed: longint
+4a81:75de SelectorInc: word
+4a81:75e0 Seg0040: word
+4a81:75e2 SegA000: word
+4a81:75e4 SegB000: word
+4a81:75e6 SegB800: word
+4a81:75e8 Test8086: byte
+4a81:75e9 Test8087: byte
+4a81:75ea FileMode: byte
+4a81:75ec CrLf: array[0..1] of char
+4a81:a2f6 Input: TextRec
+4a81:a3f6 Output: TextRec
+4a81:a4f6 SavedVectors: array[0..18] of pointer    // Vectors 00,02,1B,21,23,24,34-3F,75 saved at startup
+4a81:a542 HeapAllocSize: word
