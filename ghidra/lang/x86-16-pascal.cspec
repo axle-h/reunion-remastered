@@ -90,4 +90,11 @@
       <register name="ES"/>
     </killedbycall>
   </prototype>
+
+  <!-- Ghidra's x86-16 analyzers assign the stock convention names; in this
+       program they all mean the Borland Pascal ones. -->
+  <modelalias name="__cdecl16far" parent="__pascal16far"/>
+  <modelalias name="__stdcall16far" parent="__pascal16far"/>
+  <modelalias name="__cdecl16near" parent="__pascal16near"/>
+  <modelalias name="__stdcall16near" parent="__pascal16near"/>
 </compiler_spec>

@@ -102,12 +102,15 @@ The goal is a database where most functions have names, prototypes and types.
    BP/SP/SS/DS preserved) and fixes a SLEIGH issue that made every `PUSH CS`
    after a far call resolve to the wrong segment. Prototypes in
    `symbols.txt` use Pascal syntax and get exact stack/register storage.
-3. **Inline constants.** String constants live in code segments before the
-   procedure that uses them. Script: mark them as data so they stop being
-   disassembled as code (we already hit this at `1b8a:0045`).
-4. **Data segment.** Type the globals in `4a81`: game state, ship/planet/
-   building arrays (e.g. the 27-byte records seen in `1b8a:006e`), palette,
-   buffers. This is the bulk of the reverse-engineering work.
+3. **Inline constants.** *(done)* `MarkConstants.java` finds the 694 string
+   constants stored in code segments from their `PUSH CS` references and
+   marks them as Pascal strings; they decompile as named string references.
+4. **Data segment.** *(in progress)* DS is set throughout the code, so all
+   1,355 referenced globals resolve and have cross-references. The layout is
+   mapped in `docs/globals.md`, and the first ~25 variables are named (date,
+   credits, mouse, screen). Next: the shared game-state block
+   (`8a8a–a2e0`) and the large tables in the typed constants, e.g. the 27-byte
+   records at `011f`. This is the bulk of the reverse-engineering work.
 5. **Unit map.** *(first pass done)* `docs/segments.md`.
 6. **Export script** that writes names entered in the Ghidra GUI back to
    `symbols.txt`, so GUI work isn't lost on rebuild.
@@ -118,7 +121,7 @@ Python tools in `tools/` that decode each format to PNG/WAV/JSON. They:
 - give early, visible progress,
 - become the reference the C loaders are tested against.
 
-Order: `PIC` + palette → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves.
+Order: `PIC` + palette *(done: `tools/pic.py`, all 458 images; see docs/formats/pic.md)* → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves.
 
 ### Phase 3: platform layer (`src/platform/`)
 Replace everything that touched DOS hardware:

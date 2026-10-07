@@ -27,6 +27,9 @@ public class ApplySymbols extends GhidraScript {
     static final String CC_FAR = "__pascal16far";
     static final String CC_NEAR = "__pascal16near";
 
+    static final java.util.regex.Pattern QUALIFIED_NAME =
+        java.util.regex.Pattern.compile("[A-Za-z_]\\w*(::[A-Za-z_]\\w*)*");
+
     DataTypeManager dtm;
     CategoryPath cat = new CategoryPath("/Pascal");
     Map<Integer, String> unitBySeg = new HashMap<>();
@@ -45,6 +48,7 @@ public class ApplySymbols extends GhidraScript {
             return;
         }
         definePascalTypes();
+        fixEntryStack();
 
         List<String> lines = Files.readAllLines(Path.of(args[0]));
         for (int i = 0; i < lines.size(); i++) {
@@ -62,6 +66,23 @@ public class ApplySymbols extends GhidraScript {
         int conv = applyDefaultConvention();
         println("ApplySymbols: " + applied + " applied, " + errors + " errors, "
             + conv + " functions switched to Pascal convention");
+    }
+
+    // The MZ loader records the header's initial SS:SP as fixed register
+    // values at the entry point. The decompiler then treats every push in the
+    // main program as a write to a fixed address, so drop those values.
+    void fixEntryStack() throws Exception {
+        for (Address entry : currentProgram.getSymbolTable().getExternalEntryPointIterator()) {
+            Function f = getFunctionAt(entry);
+            if (f == null)
+                continue;
+            ProgramContext ctx = currentProgram.getProgramContext();
+            for (String r : new String[] { "SP", "SS" }) {
+                Register reg = currentProgram.getRegister(r);
+                for (AddressRange range : f.getBody())
+                    ctx.remove(range.getMinAddress(), range.getMaxAddress(), reg);
+            }
+        }
     }
 
     // Everything was compiled by Borland Pascal, so any function without an
@@ -156,7 +177,8 @@ public class ApplySymbols extends GhidraScript {
             throw new Exception("bad address " + addrText);
 
         int seg = ((SegmentedAddress) addr).getSegment();
-        String nameEnd = decl.split("[(:\\s]", 2)[0];
+        java.util.regex.Matcher m = QUALIFIED_NAME.matcher(decl);
+        String nameEnd = m.lookingAt() ? m.group() : "";
         String rest = decl.substring(nameEnd.length()).strip();
         Namespace ns = namespaceFor(nameEnd, seg);
         String name = nameEnd.contains("::") ? nameEnd.substring(nameEnd.lastIndexOf("::") + 2) : nameEnd;

@@ -34,7 +34,9 @@ if [[ ${1:-} == --apply ]]; then
 else
     "${headless[@]}" -import "$binary" -overwrite \
         -processor "x86:LE:16:Borland Pascal Real Mode" -cspec pascal \
+        -preScript SetDataSegment.java 4a81 \
+        -postScript MarkConstants.java "$project/constants.txt" \
         -postScript ApplySymbols.java "$here/symbols.txt" >"$log" 2>&1
 fi
 
-grep -E 'ApplySymbols|symbols\.txt:|ERROR' "$log" || true
+grep -E 'SetDataSegment:|MarkConstants:|ApplySymbols:|symbols\.txt:|ERROR' "$log" || true

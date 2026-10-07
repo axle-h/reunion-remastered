@@ -3,8 +3,110 @@
 #
 # Addresses use Ghidra's numbering (load segment 1000h): file segment + 1000h.
 
+# Unit names are ours (the originals are unknown) and tentative; see
+# docs/segments.md for the evidence behind each.
+@unit 1390 PlanetList
+@unit 1413 BaseEff
+@unit 1430 GrWarUnits
+@unit 1537 GrWar
+@unit 18e0 Launch
+@unit 1991 Advisor
+@unit 1a3e SaveLoad
+@unit 1b8a Sim
+@unit 1fd2 Pub
+@unit 20d4 SpWar
+@unit 22ca ShipMove
+@unit 24eb Protect
+@unit 2527 Droids
+@unit 2583 Cargo
+@unit 264a Credits
+@unit 2693 Protect2
+@unit 26eb Cheat
+@unit 26fe ShipInfo
+@unit 2841 Colonize
+@unit 28cd Satellite
+@unit 29b9 Intel
+@unit 2b8d Groups
+@unit 2d66 Research
+@unit 2e4b AlienTalk
+@unit 2ef2 Surface
+@unit 321d Title
+@unit 32b4 Shop
+@unit 34b0 Message
+@unit 357b PlanetInfo
+@unit 3955 RecConv
+@unit 398f TextFile
+@unit 3a1b GfxPath
+@unit 3abd Command
+@unit 3c64 Anim
+@unit 3d38 VecLoad
+@unit 3e17 Vec3D
+@unit 3fab Hire
+@unit 4049 RawText
+@unit 405f Gfx
+@unit 424a Music
+@unit 4265 AdlibMusic
+@unit 428e Adlib
+@unit 431a Sound
+@unit 43d5 SoundDrv
+@unit 46ca Gus
+@unit 4719 Ems
+@unit 474f Xms
+@unit 4758 Mouse
+@unit 47da Blit
+@unit 484a MinMax
+@unit 4857 Crt
+@unit 48b9 Dos
 @unit 48c7 System
 @unit 4a81 System
+
+# ---------------------------------------------------------------------------
+# Main program and unit initialisation (called from Main in this order)
+# ---------------------------------------------------------------------------
+1000:01a1 Main                      // Program entry: unit inits, then the main program body
+4857:000d Init
+484a:00c0 Init
+4719:0325 Init
+46ca:04b8 Init
+43d5:04b7 Init
+431a:09c1 Init
+4265:027c Init
+424a:0193 Init
+405f:1e78 Init
+4049:0159 Init
+3d38:0dd7 Init
+3a1b:09b2 Init
+34b0:0c8e Init
+2ef2:329e Init
+2b8d:1d6f Init
+29b9:1d23 Init
+28cd:0ea4 Init
+1a3e:14b5 Init
+1537:3a71 Init
+
+# ---------------------------------------------------------------------------
+# Game logic
+# ---------------------------------------------------------------------------
+1b8a:0000 AdvanceHour               // Advances Hour/Day/Month/Year (30-day months); runs the protection check
+24eb:00a5 CheckToken                // Obfuscated copy-protection check: compares the longint at DS:6564 with 505FCh / 13 (= 25358)
+4758:042d Poll                      // Snapshots buttons and position (Buttons, ClickX/Y, ButtonsChanged)
+26eb:0000 Apply                     // Money cheat: +10,000 credits, or 1,000,000 credits plus boosts
+
+# ---------------------------------------------------------------------------
+# Graphics core
+# ---------------------------------------------------------------------------
+405f:0856 LoadFile(const name: string; var buf: pointer; var size: word)   // Reads a whole file into a new heap block; halts with "Cannot Open <name>"
+405f:0bef LoadPic(const name: string; dest: pointer; unused: word; rows: word; x: word; y: word; stride: word; fade: boolean; pal: pointer; firstColour: word; lastColour: word; colourOffset: word; fadeFirst: word; fadeLast: word)   // Decodes <name>.pic (SpidyGfx RLE) into dest; copies palette entries first..last to pal[colourOffset+i] >> 2; optional fade of the old palette while decoding. See docs/formats/pic.md
+405f:0f23 LoadPicScreen(const name: string; dest: pointer; rows: word; pal: pointer)   // LoadPic with stride 320, offset 40h, colours 0..B0h, fade 0..BEh (parameter order unverified)
+405f:0f7a ShowGrafikaPic(const name: string)   // Loads grafika\<name> (320x151) into a temp buffer and blits it to the screen
+
+# ---------------------------------------------------------------------------
+# AdLib music (GRWAR\*.PIC are obfuscated AdLib tunes, not pictures)
+# ---------------------------------------------------------------------------
+4265:000c LoadMusicFile(const name: string)   // Reads grwar\<name>.pic, un-obfuscates it (reverse bytes, +2Fh) into the buffer at DS:89C2
+4265:01d6 PlayMusic(const name: string)       // Stops, loads and starts an AdLib tune via 428e
+4265:0242 InitMusic                           // Detects AdLib (428e:000c); allocates the 31,700-byte tune buffer
+428e:0716 OplWrite                            // Asm: AL = register, AH = value; port in CS:0823
 
 # ---------------------------------------------------------------------------
 # System unit (Borland Pascal 7.0 runtime library), segment 48c7
@@ -186,3 +288,33 @@
 4a81:a3f6 Output: TextRec
 4a81:a4f6 SavedVectors: array[0..18] of pointer    // Vectors 00,02,1B,21,23,24,34-3F,75 saved at startup
 4a81:a542 HeapAllocSize: word
+
+# ---------------------------------------------------------------------------
+# Globals (data segment 4a81). Names are ours; see docs/globals.md.
+# ---------------------------------------------------------------------------
+4a81:91ec Gfx::ScreenSeg: word              // Set from SegA000 at startup; destination segment for the blitters
+4a81:95be Sim::Credits: longint             // Money (the cheat sets 1,000,000)
+4a81:95de Sim::Year: word                   // Game date: Hour > 23 advances Day, Day > 30 Month, Month > 12 Year
+4a81:95e0 Sim::Month: word
+4a81:95e2 Sim::Day: word
+4a81:95e4 Sim::Hour: word
+4a81:89ac RawText::SzFace: pointer          // text\sz_face.raw (1968 bytes)
+4a81:89b0 RawText::SzTalal: pointer         // text\sz_talal.raw (7595 bytes)
+4a81:89b4 RawText::SzFaj: pointer           // text\sz_faj.raw (5184 bytes)
+4a81:89c2 AdlibMusic::TuneBuf: pointer      // Un-obfuscated AdLib tune (31,700 bytes)
+4a81:8a64 Mouse::Regs: array[0..9] of word  // Dos.Registers record passed to Intr($33)
+4a81:8a78 Mouse::Present: boolean
+4a81:8a79 Mouse::Buttons: byte              // Snapshot taken by Mouse poll (4758:042d)
+4a81:8a7c Mouse::ClickX: integer
+4a81:8a7e Mouse::ClickY: integer
+4a81:8a81 Mouse::ButtonsChanged: boolean
+4a81:8a8a Mouse::HotspotCount: integer
+4a81:8a8c Mouse::Hotspots                   // array[1..HotspotCount] of 27-byte records: x: integer, y: byte, w: integer, h: byte, ...
+4a81:9182 Mouse::CursorState: word          // 0 hidden, 1 shown, 2 being redrawn
+4a81:9186 Mouse::CursorSaveX: integer       // Where the background under the cursor was saved
+4a81:9188 Mouse::CursorSaveY: integer
+4a81:918a Mouse::X: integer
+4a81:918c Mouse::Y: integer
+4a81:9198 Mouse::CursorShape: word          // Index into the 256-byte cursor images at DS:9602
+4a81:919e Mouse::CursorFrozen: boolean      // Cursor isn't redrawn while set
+4a81:9c02 Blit::CursorBackground            // 11x11 pixels saved from under the cursor

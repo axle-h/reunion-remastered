@@ -6,7 +6,7 @@ imported executable, so the database can always be rebuilt and every change is
 reviewable in git.
 
 ```sh
-ghidra/rebuild.sh           # import vendor/.../REUNION.PRG, auto-analyse, apply symbols.txt (~20 s)
+ghidra/rebuild.sh           # import vendor/.../REUNION.PRG, set DS, auto-analyse, mark constants, apply symbols.txt (~15 s)
 ghidra/rebuild.sh --apply   # re-apply symbols.txt to the existing project
 ```
 
@@ -87,9 +87,12 @@ They get the right order once they're prototyped.
 
 | Script | Purpose |
 |---|---|
-| `ApplySymbols.java <symbols.txt>` | Apply names, prototypes, types, comments |
+| `SetDataSegment.java <seg>` | Pre-analysis: DS = data segment throughout the code, so globals resolve and get xrefs; marks the data block non-executable |
+| `MarkConstants.java [report]` | Marks string constants stored in code segments (found from `PUSH CS` references) as Pascal strings |
+| `ApplySymbols.java <symbols.txt>` | Apply names, prototypes, types, comments; fixes the entry point's stack |
 | `Decompile.java <out.c> <target>…` | Write decompiled C; target = address, segment, or `all` |
 | `DumpSeg.java <out.txt> <seg>…` | Disassembly of every function in a segment, with caller counts |
+| `GlobalsReport.java <out.csv> <seg>` | Every code reference into the data segment (feed to `tools/globals_map.py`) |
 | `SegmentReport.java <out.md>` | Per-segment table (size, functions, call counts, port I/O, INTs) |
 
 Run any of them against the existing project with:

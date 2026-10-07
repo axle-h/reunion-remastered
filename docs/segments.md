@@ -32,11 +32,11 @@ dependency order, with `System` last. So the low-level units sit at the end
 | `18e0` | `08e0` | 2832 | 2 | Launch/landing checks for ships and fighters | "You haven't hired a pilot!", "No hyperdrive in this unit!" |
 | `1991` | `0991` | 2768 | 9 | Advisor dialogue | `kerdes1.sp`, `valasz1.sp`, `ajanlas.sp` (question/answer/offer) |
 | `1a3e` | `0a3e` | 5312 | 20 | Save/load and options (music, effects) | `save\spidysav.`, "Select slot", "Music 1" |
-| `1b8a` | `0b8a` | 17536 | 14 | **Time/turn simulation**: date advance, production, events | Date counters at DS:95DE–95E4; "is ready for production", disease, meteor, radiation events |
+| `1b8a` | `0b8a` | 17536 | 14 | **Time/turn simulation**: date advance, production, events | `Sim::AdvanceHour` (`Year/Month/Day/Hour` at DS:95DE–95E4); "is ready for production", disease, meteor, radiation events |
 | `1fd2` | `0fd2` | 4128 | 18 | Pub: pirates and aliens | `grafika\kocsma` (pub), `pirate.txt`, `.loc` dialogue |
 | `20d4` | `10d4` | 8032 | 21 | Space battle | `war\spwar`, `spvict`/`splost` |
 | `22ca` | `12ca` | 8720 | 16 | Ship groups: movement, docking, landing | "Docking", "Launch", "Transfer", "Change destination" |
-| `24eb` | `14eb` | 960 | 1 | **Copy protection** (manual word and password) | "What is the word at the bottom of page", "Lamer detected" |
+| `24eb` | `14eb` | 960 | 1 | **Copy protection** (manual word and password) | "What is the word at the bottom of page", "Lamer detected"; `CheckToken` runs every game hour |
 | `2527` | `1527` | 1472 | 3 | Droids *?* | `grafika\szamok`, "addroid", "Back to surface" |
 | `2583` | `1583` | 3184 | 6 | Cargo transfer between planet and ship | "Transfer to planet", "Storage space on planet" |
 | `264a` | `164a` | 1168 | 2 | Credits text | "PROGRAMMED BY: ISTVAN KISS" … |
@@ -63,10 +63,10 @@ dependency order, with `System` last. So the low-level units sit at the end
 | `3e17` | `2e17` | 6464 | 8 | 3D vector rendering *?* | No strings, register-heavy, calls graphics core |
 | `3fab` | `2fab` | 2528 | 5 | Hiring staff (pilots, builders, fighters, developers) | "My scholarly level:", "I work for you" |
 | `4049` | `3049` | 352 | 6 | Loads raw text tables | `text\sz_face.raw`, `sz_talal.raw`, `sz_faj.raw` |
-| `405f` | `305f` | 7856 | 52 | **Graphics core**: palette, vsync, `.pic` loader, `ICON.ALL`, fatal errors | Ports 3C8h/3C9h/3DAh, "Cannot Open ICON\ICON.ALL" (619 call sites) |
-| `424a` | `324a` | 432 | 6 | Music selection *?* | `main1`, `main2` |
-| `4265` | `3265` | 656 | 7 | Ground-war picture loader | `grwar\*.pic` |
-| `428e` | `328e` | 2240 | 11 | Asm: picture decompression *?* | No frames, INT 21h, vsync |
+| `405f` | `305f` | 7856 | 52 | **Graphics core**: palette, vsync, `.pic` loader (`LoadPic` `405f:0bef`), `ICON.ALL`, fatal errors | Ports 3C8h/3C9h/3DAh, "Cannot Open ICON\ICON.ALL" (619 call sites) |
+| `424a` | `324a` | 432 | 6 | Music selection *?* (GUS MODs vs AdLib) | `main1`, `main2`; calls `4265` and `43d5` |
+| `4265` | `3265` | 656 | 7 | **AdLib music** loader | `grwar\*.pic` are obfuscated AdLib tunes, not pictures (see docs/formats/pic.md) |
+| `428e` | `328e` | 2240 | 11 | Asm: **AdLib (OPL2) music player** | `OplWrite` at `428e:0716`; AdLib detection at `428e:000c` |
 | `431a` | `331a` | 2992 | 18 | Sound effects and setup | `sound\*.smp`, `save\setup.spd`, "Sound Blaster detected" |
 | `43d5` | `33d5` | 12112 | 18 | **Sound driver**: GUS GF1 registers (hard-coded ports 322h–327h), PIT timer | Likely source of crashes on newer systems |
 | `46ca` | `36ca` | 1264 | 25 | Gravis Ultrasound configuration | `ULTRASND` environment variable |
