@@ -107,10 +107,10 @@ The goal is a database where most functions have names, prototypes and types.
    marks them as Pascal strings; they decompile as named string references.
 4. **Data segment.** *(in progress)* DS is set throughout the code, so all
    1,355 referenced globals resolve and have cross-references. The layout is
-   mapped in `docs/globals.md`, and the first ~25 variables are named (date,
-   credits, mouse, screen). Next: the shared game-state block
-   (`8a8a–a2e0`) and the large tables in the typed constants, e.g. the 27-byte
-   records at `011f`. This is the bulk of the reverse-engineering work.
+   mapped in `docs/globals.md`. About 180 globals and tables are named with 24
+   record types (`ghidra/types.pas`): game state, screens, groups,
+   buildings, galaxy, products, races, staff. Next: the remaining record
+   fields and naming functions unit by unit.
 5. **Unit map.** *(first pass done)* `docs/segments.md`.
 6. **Export script** that writes names entered in the Ghidra GUI back to
    `symbols.txt`, so GUI work isn't lost on rebuild.
@@ -121,7 +121,7 @@ Python tools in `tools/` that decode each format to PNG/WAV/JSON. They:
 - give early, visible progress,
 - become the reference the C loaders are tested against.
 
-Order: `PIC` + palette *(done: `tools/pic.py`, all 458 images; see docs/formats/pic.md)* → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves.
+Order: `PIC` + palette → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves *(all done: `tools/*.py`, one doc per format in docs/formats/; `.SPD` are ProTracker modules, `ICON.ALL` and `ANIM.DEF` also decoded)*.
 
 ### Phase 3: platform layer (`src/platform/`)
 Replace everything that touched DOS hardware:

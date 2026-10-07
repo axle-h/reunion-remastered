@@ -34,7 +34,7 @@
 @unit 32b4 Shop
 @unit 34b0 Message
 @unit 357b PlanetInfo
-@unit 3955 RecConv
+@unit 3955 Scale
 @unit 398f TextFile
 @unit 3a1b GfxPath
 @unit 3abd Command
@@ -87,6 +87,7 @@
 # ---------------------------------------------------------------------------
 # Game logic
 # ---------------------------------------------------------------------------
+2b8d:1c9f FindPlanetForce(system, planet, moon: integer): integer   // Index of the planet-force group at that location, 0 if none
 1b8a:0000 AdvanceHour               // Advances Hour/Day/Month/Year (30-day months); runs the protection check
 24eb:00a5 CheckToken                // Obfuscated copy-protection check: compares the longint at DS:6564 with 505FCh / 13 (= 25358)
 4758:042d Poll                      // Snapshots buttons and position (Buttons, ClickX/Y, ButtonsChanged)
@@ -293,11 +294,11 @@
 # Globals (data segment 4a81). Names are ours; see docs/globals.md.
 # ---------------------------------------------------------------------------
 4a81:91ec Gfx::ScreenSeg: word              // Set from SegA000 at startup; destination segment for the blitters
-4a81:95be Sim::Credits: longint             // Money (the cheat sets 1,000,000)
-4a81:95de Sim::Year: word                   // Game date: Hour > 23 advances Day, Day > 30 Month, Month > 12 Year
-4a81:95e0 Sim::Month: word
-4a81:95e2 Sim::Day: word
-4a81:95e4 Sim::Hour: word
+4a81:95be Game::Credits: longint             // Money (the cheat sets 1,000,000)
+4a81:95de Game::Year: word                   // Game date: Hour > 23 advances Day, Day > 30 Month, Month > 12 Year
+4a81:95e0 Game::Month: word
+4a81:95e2 Game::Day: word
+4a81:95e4 Game::Hour: word
 4a81:89ac RawText::SzFace: pointer          // text\sz_face.raw (1968 bytes)
 4a81:89b0 RawText::SzTalal: pointer         // text\sz_talal.raw (7595 bytes)
 4a81:89b4 RawText::SzFaj: pointer           // text\sz_faj.raw (5184 bytes)
@@ -309,7 +310,6 @@
 4a81:8a7e Mouse::ClickY: integer
 4a81:8a81 Mouse::ButtonsChanged: boolean
 4a81:8a8a Mouse::HotspotCount: integer
-4a81:8a8c Mouse::Hotspots                   // array[1..HotspotCount] of 27-byte records: x: integer, y: byte, w: integer, h: byte, ...
 4a81:9182 Mouse::CursorState: word          // 0 hidden, 1 shown, 2 being redrawn
 4a81:9186 Mouse::CursorSaveX: integer       // Where the background under the cursor was saved
 4a81:9188 Mouse::CursorSaveY: integer
@@ -318,3 +318,294 @@
 4a81:9198 Mouse::CursorShape: word          // Index into the 256-byte cursor images at DS:9602
 4a81:919e Mouse::CursorFrozen: boolean      // Cursor isn't redrawn while set
 4a81:9c02 Blit::CursorBackground            // 11x11 pixels saved from under the cursor
+
+# ---------------------------------------------------------------------------
+# Sound effects (.SMP = headerless VOC type-1 block, see docs/formats/smp.md)
+# ---------------------------------------------------------------------------
+431a:0353 PlaySfx(const name: string)       // SOUND\<name>.SMP
+431a:0468 PlayWarSnd(n: integer)            // SOUND2\WARSND<n>.SMP
+431a:05ca PlayGrSnd(n: integer)             // SOUND3\GRSND<n>.SMP
+431a:0712 PreloadSelectSfx                  // SELECT1..3.SMP
+43d5:02ab GusUploadSample                   // Uploads a sample to GUS RAM; rate = 1000000 / (256 - time constant), sign flip (XOR 80h)
+
+# ---------------------------------------------------------------------------
+# Planet surface maps (see docs/formats/map.md)
+# ---------------------------------------------------------------------------
+2ef2:03e7 LoadMap                           // Reads MAP\MAP<planet>_<n>.MAP into the layers at DS:78EC/78F0/78F4
+2ef2:1924 BlitTile                          // 16x16 tile blit (10 bytes of arguments)
+2ef2:1c3c DrawFootprint                     // Draws terrain or overlay per cell
+
+# ---------------------------------------------------------------------------
+# Text files (see docs/formats/text.md)
+# ---------------------------------------------------------------------------
+398f:03ae ReadTextLine(const name: string; line: integer; var s: string)   // Reads line <line> of text\<name> and decodes it
+398f:0864 DecodeLine(var s: string)         // s[i] := (s[i] + 5780h - i*4Fh) mod E0h - 20h
+398f:046f ShowBuildingInfo(skip: integer)   // 6-line block from text\sz_felsz.txt
+398f:0552 DrawReply(const s: string; x, y, colour: integer; f1, f2: boolean; var code, lines: integer)
+398f:07fe CountLines(const s: string): integer   // Number of '|' line breaks + 1
+4049:0011 LoadSzFace                        // text\sz_face.raw -> SzFace
+4049:0083 LoadSzTalal                       // text\sz_talal.raw -> SzTalal
+4049:00f3 LoadSzFaj                         // text\sz_faj.raw -> SzFaj
+
+# ---------------------------------------------------------------------------
+# Shared game state and screen/input state (record types in types.pas)
+# ---------------------------------------------------------------------------
+4a81:75ee Main::I: longint                    // FOR loop variable of the main program body (all `i` loops in Main)
+4a81:7ae4 Game::CurSystem: integer             // Selected star system 1..8. Copied from TGroup.System (+13h); indexes the body tables at DS:4752/4732
+4a81:7ae6 Game::CurPlanet: array[1..8] of integer  // Selected planet per system. Copied from TGroup.Planet (+14h)
+4a81:7af6 Game::CurMoon: array[1..8] of integer    // Selected moon per system, 0 = the planet itself. Copied from TGroup.Moon (+15h)
+4a81:7b08 Game::CurBody: ^TBody                // Set by 357b:3253 from CurSystem/CurPlanet/CurMoon: DS:4752[sys]^[body], 65-byte records
+4a81:7b0c Game::CurBodyIsColony: word          // 1 if CurBody^.Owner = 1 and CurBody^.Colony <> 0 (357b:3253) ? boolean stored as word
+4a81:8a8c Mouse::Hotspots: array[1..66] of THotspot  // Pascal base is DS:8A71 (element 0). 66 records end at 9181, just before CursorState. Hit test 4758:05bc returns 20+index
+4a81:918e Mouse::BtnDown: boolean             // Raw button state. Mouse::Poll copies it to Buttons. Never written by Pascal code (callback?)
+4a81:918f Mouse::BtnRight: boolean            // ? Copied to DS:8A7A while a button is down (8A7A=1 opens cockpit in 26fe)
+4a81:9190 Mouse::BtnOther: boolean            // ? Copied to DS:8A7B while a button is down
+4a81:919a Mouse::SavedCursorShape: word       // 357b:29cd saves CursorShape here before changing it
+4a81:9602 Mouse::CursorImages: array[0..5] of array[0..255] of byte  // 16x16 cursor bitmaps, CursorShape*256 (47da:065f). Filled by 321d
+4a81:91a0 Game::IdeaTimer: array[1..35] of integer  // Hours until invention k becomes available (status 0 -> 1). -1 = not scheduled. Decremented by 1b8a:3d07; set by 29b9:136e
+4a81:91e6 Cheat::Used: boolean                // Big cheat (1,000,000 credits and boosts) already applied
+4a81:91e7 Cheat::Requested: boolean           // Main loop calls Cheat::Apply when set. Never set by Pascal code (keyboard handler?)
+4a81:91e8 Game::BattleFlag: boolean            // ? Cleared at the start of a ground (1537:0200) or space (20d4:01d3) battle and checked during it
+4a81:91ea Game::StoryStage: integer            // 1..6. Raised by story events in Main and 1b8a:3d07. Selects the developer skill caps (DS:57EB + stage*12) and the advisor's lines
+4a81:95a0 Game::SelInvention: integer          // Invention selected on the research screen (screen 3)
+4a81:95a2 Game::CurResearch: integer           // Invention under development, 0 = none. Cleared when it's ready for production
+4a81:95a4 Game::StaffExp: array[1..4] of word  // Experience of the hired pilot, builder, fighter and developer. Grows at random (1b8a:3b83) up to a cap per hired person. Pilot exp+1 = travel speed; the cheat sets 70
+4a81:95ac Game::DevSkill: array[1..4] of word  // Developer's level in the 4 research fields. Compared with each invention's requirements (1b8a:04d8) and shown on screen 3. The cheat sets 6
+4a81:95b4 Game::ProductionRate: word           // Production points per hour subtracted from each item's remaining work (1b8a:0705). Also the divisor for the shop's time estimate. Starts at 10
+4a81:95b6 Game::StaffHired: array[1..4] of word  // Hired candidate (1..3, 0 = none) for 1 pilot, 2 builder, 3 fighter, 4 developer. Name = DS:57F8 + 19*(type*3+n)
+4a81:95c6 Game::HomeStock: array[1..6] of longint  // Resource stocks of New Earth (system 1, planet 5). Other bodies keep theirs in TBody.Stock. Saved as 24 bytes
+4a81:95e6 Game::CurrentScreen: integer         // Index into the 25-byte screen table at DS:50FB (see below). Main dispatches on it. A negative value is negated
+4a81:95e8 Game::PrevScreen: integer            // Screen being left. Main frees its buffers when CurrentScreen <> PrevScreen. Set to CurrentScreen after the switch
+4a81:95ea Game::MenuCommand: integer           // Command id of the clicked menu-bar button (word at DS:7C64 + 21*hotspot). 0 if none. Screens test it (e.g. 0Fh New Group, 28h Hire, 3Bh Colonise)
+4a81:95ec Game::HotspotHit: integer            // Hotspot under the mouse (4758:05bc): 1..12 menu bar, 13 top-right corner, 14 clock (skip to next hour), 20+k = Mouse::Hotspots[k], 999 = forced
+4a81:95ee Game::PrevHotspotHit: integer        // HotspotHit of the previous poll
+4a81:95f0 Game::PressHotspot: integer          // HotspotHit when the button went down
+4a81:95f2 Game::ReleaseHotspot: integer        // HotspotHit when the button went up. The click is cancelled if it differs from PressHotspot
+4a81:95f4 Game::ScreenEntered: boolean         // Set for the first pass through a screen after a switch. Handlers do their setup when it's set
+4a81:95f5 Game::ScreenSwitch: boolean          // Code sets CurrentScreen and this to switch screens without a click
+4a81:95f6 Game::Ticks: word                    // Frame counter. Main advances one game hour when it passes 100 (95 while 8A7A is set). Clicking the clock sets it to the limit
+4a81:95f8 Game::ClockRunning: boolean          // Ticks only advance while set. Cleared by many screens to pause time
+4a81:95fe Game::MusicTrack: integer            // 0 off, 1 "Music 1", 2 "Music 2" (options, 1a3e:0008). Saved in the setup file?
+4a81:9600 Game::SoundFx: integer               // 0 no device, 1 off, 2 on (toggled as 3-x). With 2, menu clicks play per-command samples
+4a81:9276 Game::Hero: integer                  // 1 or 2, chosen at the title screen (321d:026f). Built into picture names (grafika\deathsz<n>)
+4a81:9278 Game::HeroSpriteX: integer           // 45h for hero 1, 1 for hero 2. X offset into the command centre sprite sheet (3abd:163f)
+4a81:927a Game::SatButtons: integer            // Bit mask of the satellite menu buttons shown (28cd:03fb). Redrawn when it changes; -1 forces a redraw
+4a81:927c Game::ShipInfoButtons: integer       // The same for the ship info menu (28cd:0542); -1 forces a redraw
+4a81:9272 Blit::CursorHook: pointer           // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
+4a81:927e Groups::UpdateSatMenu: pointer      // = 28cd:03fb (Satellite)
+4a81:9282 Groups::IntelHook: pointer          // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
+4a81:9286 Game::FindBuildingProc: pointer      // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
+4a81:928a Game::FindPlanetForceProc: pointer   // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
+4a81:928e Game::GrWarProc: pointer             // = 1537:11f2 (GrWar)
+4a81:9292 Game::GfxPathProc: pointer           // = 3a1b:09a3 (GfxPath)
+4a81:9296 Ems::RestoreProc: pointer           // = 4719:0317 (Ems)
+4a81:926e Music::MainThemeOn: boolean         // ? Set when main1/main2 is playing; 424a:017e restarts the theme if clear
+4a81:929a Gfx::Palette: array[0..255] of array[0..2] of byte  // Current VGA palette (RGB 0..63). Passed to Gfx::LoadPic and set with 405f:0089
+4a81:959a Gfx::ReadPos: word                  // ? Read position in a buffer, advanced by 405f:09f3
+4a81:959c Gfx::FlashStep: integer             // Palette flash (alert): counts down 61..0 and writes DAC 3C9h (405f:1c21)
+4a81:959e Gfx::FlashCount: integer            // Flashes left; reloads FlashStep
+4a81:95fa Gfx::Charset: pointer               // ? = Ems block + 5EF0h (10,368 bytes). grafika\charset1 loaded at +80h (321d:026f); 405f:14c1 draws glyphs from it
+4a81:a202 Surface::BufA: pointer              // 24FFh bytes, freed when leaving screen 20 (planet surface)
+4a81:a206 Surface::BufB: pointer              // DS:17E4[planetType]*320 bytes
+4a81:a20a Surface::BufC: pointer              // F000h bytes. Also freed by Colonise (2841)
+4a81:a20e Surface::BufD: pointer              // DS:17FA[planetType]*320 bytes, may be nil
+4a81:a21a Game::ColonySetupCount: integer      // Number of used ColonySetups (< 10, checked in 28cd:062b)
+4a81:a21c Game::ColonySetups: array[1..10] of TColonySetup  // Colonies under construction (2841:0060 adds; 1b8a:25b5 counts down and removes). Ends at A2BB
+4a81:a2bc Game::Buildings: ^array[1..1000] of TBuilding  // = Ems block + 2840h. 14,000 bytes saved
+4a81:a2c0 Game::BuildingCount: integer         // < 1000
+4a81:a2c2 Game::ShownGroupCount: integer       // Copy of GroupCount or PlanetForceCount for the list on screen (ship info, 26fe)
+4a81:a2c4 Game::GroupCount: integer            // Groups in list 0 (fleets), max 32
+4a81:a2c6 Game::PlanetForceCount: integer      // Groups in list 1 (planet forces, one per colony). Colonise (2841) adds one
+4a81:a2c8 Game::SelGroup: integer              // Selected group in list GroupList, 0 = none
+4a81:a2ca Game::SelGroup0: integer             // Last selection in list 0
+4a81:a2cc Game::SelGroup1: integer             // Last selection in list 1
+4a81:a2ce Game::GroupList: integer             // 0 = fleets, 1 = planet forces
+4a81:a2d0 Game::Groups: ^array[0..1] of array[1..32] of TGroup  // Start of the Ems block. 2840h bytes saved
+4a81:a2d4 Game::GroupsEnabled: boolean         // "New group" available. Set when invention 4 or 6 is ready
+4a81:a2d6 Game::GroupKindAllowed: array[1..4] of boolean  // 1 army (invention 10), 2 trade (inv. 6), 3 secret forces (story), 4 satellite carrier (inv. 4)
+4a81:a2da Game::MinMemAvail: longint           // Lowest MemAvail seen (3a1b:0864, 357b, 3c64, 3d38)
+4a81:a2de Ems::Buffer: pointer                // GetMem(8770h). Conventional-memory copy of the EMS block holding Groups, Buildings and Charset
+
+# ---------------------------------------------------------------------------
+# Animations (.ANI, see docs/formats/ani.md)
+# ---------------------------------------------------------------------------
+3c64:0010 LoadWarAnim(id: word)             // war\war\sa<id>.ani
+3c64:011e FreeWarAnim(id: word)
+3c64:019c LoadMainAnim(id: word)            // anim\main<id>.ani
+3c64:028d FreeMainAnim(id: word)
+3c64:031d LoadGrAnim(id: word)              // war\grwar\granim<id>.ani
+3c64:0415 FreeGrAnim(id: word)
+3c64:0496 DrawAnimKeyed(frame: word; dest: pointer)                  // Draws frame 1, then the delta frame
+3c64:0516 DrawAnimFrame(frame: word; dest: pointer; var ok: boolean) // Delta against the previous frame
+3c64:057c DecodeAnimFrame(frame: pointer; dest: pointer; colourOffset: byte)   // 00-7F literal, 80/81-BF skip, C0/C1-FF run; +40h
+405f:0a78 OpenDataFile(const name: string)
+405f:0af8 ReadChunk(var buf: pointer; var size: word)   // Reads a word n, allocates n+13 bytes
+405f:0bd6 CloseDataFile
+
+# ---------------------------------------------------------------------------
+# Initialised tables (typed constants, DS 0000-759D; record types in types.pas)
+# ---------------------------------------------------------------------------
+4a81:013a Pub::People: array[1..10] of TPubPerson   // folded 011f; 1b8a:006e, 1fd2:01ef, Main 1000:1271
+4a81:0248 Pub::MenuData                              // 10 consts: array[1..n] of TMenu, n = 5,11,3,5,6,11,7,6,7,6
+4a81:03da Pub::MenuLists: array[1..10] of pointer   // folded 03d6; ^array of TMenu per person (1fd2:0788)
+4a81:0402 Pub::CurMenu: TMenu                       // copied from MenuLists (1fd2:0788), then extended
+4a81:0408 Pub::ItemQty: array[1..12] of byte        // folded 0407; multiplied by ItemPrice (1fd2:05fe)
+4a81:0414 Pub::ItemPrice: array[10..13] of longint  // folded 03ec; 10000, 14000, 20000, 7000
+4a81:0424 Pub::Deals: array[1..10] of TPubDeal      // folded 040c; Sim 1b8a:006e
+4a81:0514 Pub::Anims: array[1..9] of TPubAnim       // folded 0500; 1fd2:0ec1
+4a81:00c2 Advisor::Menus: array[1..3] of TMenu      // folded 00bc; 1991:08de
+4a81:00d4 Advisor::CurMenu: TMenu
+4a81:0c2e Alien::MenuData                           // lists of 4-byte menus (count + 3), 2e4b
+4a81:0ce2 Alien::MenuLists: array[1..9] of pointer  // folded 0cde; 2e4b:0780
+4a81:0d0a Alien::CurMenu: array[0..3] of byte
+4a81:1a3a Surface::Tileset: array[1..11] of integer   // SurfaceType -> FELSZ/FANIM sheet and map template (1,8,2,7,10,3,9,5,4,6,11)
+4a81:1a50 Galaxy::SurfaceColonisable: array[1..11] of boolean  // folded 1a4f; 1390:0047, 357b
+4a81:1a5c Galaxy::AmnestyMoons: array[1..7] of TMoonList
+4a81:1a9c Galaxy::AmnestyNames: array[1..32] of TBodyName
+4a81:1c3c Galaxy::AmnestyBodies: array[1..32] of TBody
+4a81:245c Galaxy::PhoenixMoons: array[1..5] of TMoonList
+4a81:248a Galaxy::PhoenixNames: array[1..12] of TBodyName
+4a81:2526 Galaxy::PhoenixBodies: array[1..12] of TBody
+4a81:2832 Galaxy::MirachMoons: array[1..5] of TMoonList
+4a81:2860 Galaxy::MirachNames: array[1..18] of TBodyName
+4a81:294a Galaxy::MirachBodies: array[1..18] of TBody
+4a81:2ddc Galaxy::AntaresMoons: array[1..3] of TMoonList
+4a81:2df8 Galaxy::AntaresNames: array[1..7] of TBodyName
+4a81:2e54 Galaxy::AntaresBodies: array[1..7] of TBody
+4a81:301c Galaxy::OrionisMoons: array[1..3] of TMoonList
+4a81:3038 Galaxy::OrionisNames: array[1..13] of TBodyName
+4a81:30e2 Galaxy::OrionisBodies: array[1..13] of TBody
+4a81:3430 Galaxy::LyraeMoons: array[1..7] of TMoonList
+4a81:3470 Galaxy::LyraeNames: array[1..23] of TBodyName
+4a81:359c Galaxy::LyraeBodies: array[1..23] of TBody
+4a81:3b74 Galaxy::RigelMoons: array[1..2] of TMoonList
+4a81:3b86 Galaxy::RigelNames: array[1..5] of TBodyName
+4a81:3bc8 Galaxy::RigelBodies: array[1..5] of TBody
+4a81:3d0e Galaxy::SunMoons: array[1..8] of TMoonList
+4a81:3d56 Galaxy::SunNames: array[1..32] of TBodyName      // Mercury..Neptune, Moon, Phobos, ... Triton, Nereid
+4a81:3ef6 Galaxy::SunBodies: array[1..32] of TBody
+4a81:4716 Galaxy::Names: array[1..8] of pointer           // folded 4712; -> <Sys>Names (34b0:0bbe, 357b)
+4a81:4736 Galaxy::MoonLists: array[1..8] of pointer       // folded 4732; -> <Sys>Moons (1390:02b6)
+4a81:4756 Galaxy::Bodies: array[1..8] of pointer          // folded 4752; -> <Sys>Bodies (41 uses)
+4a81:4776 Galaxy::PlanetCount: array[1..8] of integer     // folded 4774; 7,5,5,3,3,7,2,8
+4a81:4786 Galaxy::MoonCount: array[1..8] of integer       // 25,7,13,4,10,16,3,24 (P+M = array sizes above)
+4a81:4796 Galaxy::BodyIcon: array[1..8,1..8] of byte      // folded 478d; copied into the planet-list hotspot (357b:23db). Meaning?
+4a81:47d6 Galaxy::PlanetStatus: array[1..8,1..8] of shortint  // folded 47cd; -1 unknown, 0 known, 1, -2/-3/-4 events (1b8a:0cba)
+4a81:4816 Galaxy::SystemStatus: array[1..8] of shortint   // folded 4815; 1 open, 0 known, -1 unknown (cheat sets -1 -> 0)
+4a81:0d96 Surface::MapTemplates: array[1..11, 1..12, 0..19] of byte  // folded 0c92 (2ef2:03e7: t*0F0h + row*14h + col)
+4a81:17e6 Surface::FelszHeight: array[1..11] of integer   // FELSZ<t>.PIC sheet height in pixels (Main allocates height*320)
+4a81:17fc Surface::FanimHeight: array[1..11] of integer   // FANIM<t>.PIC sheet height, 0 = none
+4a81:1812 Surface::FelszTileCount: array[1..11] of integer // Tiles in FELSZ<t> (20 per row); higher tile numbers are FANIM tiles
+4a81:1828 Surface::FanimTileCount: array[1..11] of integer // Tiles in FANIM<t>
+4a81:1841 Surface::CategoryRows: array[1..9, 1..3] of shortint  // folded 183e; info-panel row for Production/Workers/Energy by building Category (2ef2:0a9d)
+4a81:185c Gfx::HeroCharset: string    // 'ABC..Z a..z ?![]'"+-:;., 1234567890 ' (75 chars, string[255]), 321d
+4a81:195c Sat::AnimPath: array[1..74] of TSatStep  // folded 1959; 34b0:0953 'grafika\sat'
+4a81:5dac Research::Products: array[1..35] of TProduct   // folded 5d77; fields seen as DAT_5d88(+11) / 5d8c(+15) / 5d92(+1B) + i*35h
+4a81:64f0 Advisor::Hints: array[1..9] of TAdvisorHint  // folded 64ec; 1991:02c9 checks Products[Product].State
+4a81:6bc6 Research::ShipProduct: array[1..4] of byte     // folded 6bc5; Hunter 10, Starfighter 16, Destroyer 23, Cruiser 33
+4a81:6bca Research::GroundProduct: array[1..4] of byte   // folded 6bc9; Trooper 17, Battle tank 21, Aircraft 26, Missile launcher 32
+4a81:0808 Cargo::Items: array[1..13] of shortint         // folded 0807; product ids, -1 unused (2583:0494)
+4a81:0816 Cargo::ItemSpace: array[1..13] of longint      // folded 0812; storage units per item
+4a81:084a Cargo::UnitSpace: array[1..4] of longint       // folded 0846; 500, 2000, 1000, 8000
+4a81:6592 Surface::BuildingTypes: array[1..25] of TBuildingType  // folded 6553; 2ef2:0a9d, 2841, Main
+4a81:6528 Colony::StarterBuildings: array[1..6] of TStarterBuilding  // folded 651e; Nuclear, Windtrap, Builder Plant, Mine, Radar, Building (2841)
+4a81:6518 Races::Hostile: array[1..12] of boolean        // folded 6517; indexed by body Owner (1390:0047)
+4a81:6564 Protect::PageIndex: longint                    // already in globals.md; indexes the table below
+4a81:6568 Protect::PageCodes: array[1..21] of integer    // folded 6566 (264a:034a)
+4a81:6bba Protect::Key1: longint                         // 6bba..6bc1, 24eb/264a/2841/2e4b
+4a81:6bbe Protect::Key2: longint
+4a81:6bce Races::Races: array[2..12] of TRace   // folded 6a06; Status at 6a21, ForceCount at 6a2c, Force fields at 6a12..6a1c + k*1Bh
+4a81:579c Staff::Price: array[1..4,1..3] of longint     // folded 578c; 4500, 25000, 120000 for the pilots
+4a81:57cc Staff::Level: array[1..4,1..3] of integer     // folded 57c4; 10/20/40 "scholarly level", saved by 1a3e
+4a81:57e4 Staff::Ability: array[1..4,1..3] of byte     // folded 57e0; 30/70/90
+4a81:57f0 Staff::DevSkills: array[0..6,1..3,1..4] of byte  // folded 57eb; developer Math/Physics/Elect/A.Int per training grade (DAT_91ea), compared with research needs at 95ac..95b2; first 12 bytes saved
+4a81:5844 Staff::Names: array[1..4,1..3] of string[18]  // 'Bruce Jordan'..'Klaatoo' (manual pp. "Commanders"); also seen as 57f8/580b/586a/58dc + n*13h
+4a81:5780 Staff::FacePics: array[1..4] of string[6]     // folded 5779; 'faces1'..'faces4' (1991:0355)
+4a81:5928 Groups::TypeNames: array[1..5] of string[13]
+4a81:596e Groups::DefaultNames: array[1..5] of string[16]
+4a81:59c4 Names::Satellites: array[1..4] of string[11]
+4a81:59f4 Names::ShipClasses: array[1..4] of string[9]
+4a81:5a1c Names::GroundUnits: array[1..5] of string[8]
+4a81:5a4a Names::Ratings: array[1..5] of string[9]
+4a81:5a7c Names::Ores: array[1..6] of string[8]
+4a81:5ab2 Names::Races: array[1..12] of string[9]
+4a81:5b2a Names::GroupKinds: array[1..4] of string[8]
+4a81:5b4e Names::Disciplines: array[1..4] of string[7]
+4a81:5b6e Names::Systems: array[1..8] of string[8]
+4a81:5bb6 Names::SystemsShort: array[1..8] of string[6]
+4a81:5bee Gfx::CharsetChars: string
+4a81:489c Ui::ButtonLabels: array[1..77] of string[17]   // folded 488a; 'DISK OPERATIONS' .. 'ALIEN PLANETS'; index from hotspot records at 7c64
+4a81:4e5f Ui::ButtonSounds: array[1..77] of string[8]    // folded 4e56; Main passes 95ea*9+4e56 to 431a:031a; 'disk','maincpu' = SOUND\DISK.SMP, MAINCPU.SMP
+4a81:5114 Ui::Screens: array[1..38] of TScreenInfo       // folded 50fb; Name string[8] ('main','faces','research'.. 'colinfo' = GRAFIKA\*.PIC) + 16 bytes; +9/+A/+B read with 95e6 (Main 1000:0733)
+4a81:4875 Ui::RowOffset: array[1..20] of byte            // folded 4874; 3a1b:0586 (*140h)
+4a81:55de Cc::Doors       // folded 55d7; 3abd:0c70 (frames, w:word, h, x:word, y)
+4a81:5656 Cc::Rooms       // folded 5651; 3abd:0c05
+4a81:5560 SpWar::SpriteRects // folded 555b; 20d4:0a85
+4a81:08d8 Groups::SlotLayouts      // 4 variable-length blobs (at 08d8, 0976, 0a14, 0ab2): count bytes + {string, x:word, y:byte, x2:word, y2:byte, 2 bytes} entries: Laser/Twin/Miss/Plasm/Hunter.., Sloop/Trade ship.., Trooper/Tank.., Sat/SypSt..
+4a81:0b50 Groups::TypeSlots: array[1..5] of TTypeSlots  // folded 0b3b/0b3c (20 bytes); 2b8d, 26fe
+4a81:0bb4 Groups::CatRange: array[1..5] of TCatRange  // folded 0bb2
+4a81:0bbe Groups::SlotA: array[1..5,1..4] of byte  // folded 0bb9
+4a81:0bd2 Groups::SlotB: array[1..5,1..4] of byte  // folded 0bcd
+4a81:05d8 SpWar::ClassA: array[1..4] of longint    // folded 05d4; 800, 2000, 5000, 12000
+4a81:05e8 SpWar::ClassB: array[1..4] of longint    // folded 05e4; 11, 68, 374, 840
+4a81:07b8 SpWar::ClassBytes                        // 07b8..07cb read as 07b7/07bb/07bf/07c3 + class, 20d4
+4a81:085a Protect::WordCodes: array[1..14] of integer  // folded 0858; 2693:0342
+4a81:5cfe Gus::RateTable: array[1..32] of word     // folded 5cfc; 592, 296, 197, ... (sound driver)
+
+# ---------------------------------------------------------------------------
+# Music modules, icons, space-battle animation scripts (docs/formats/)
+# ---------------------------------------------------------------------------
+43d5:000d LoadMusic                         // anim\<name>.spd = ProTracker M.K. module
+20d4:0985 LoadWarAnimDef(n: integer)        // war\anim\anim.def: 25 scripts of 140 (anim, frame, sound, delay) entries
+405f:095a IconAllOpenSize(var size: word)
+405f:09ce IconAllOpen
+405f:09f3 IconAllReadChunk(var len: word; var buf: pointer)
+405f:0a57 IconAllClose
+3a1b:0810 IconAllIndex                      // Builds the index of the 68 40x24 icons in ICON\ICON.ALL
+3a1b:0864 DrawIcon                          // 6 bytes of arguments (x, segment?, icon number)
+
+# ---------------------------------------------------------------------------
+# Save games (docs/formats/save.md) and sprite scaling
+# ---------------------------------------------------------------------------
+1a3e:029c SaveLoadGame                      // Near; Save: boolean. Writes/reads the 41,670-byte save as raw memory blocks
+1a3e:0240 Block(var buf: byte; size: word; save: boolean; parentFrame: word)   // Nested in SaveLoadGame: one BlockWrite/BlockRead
+1a3e:0b93 SaveGame
+1a3e:0b9d LoadGame
+1a3e:0bb1 LoadInit                          // save\init: BuildingCount + Buildings only
+1a3e:0c40 ReadSlotNames
+1a3e:0008 DiskScreen                        // Disk/options screen: save, load, music, effects
+1a3e:146e PressButton(which: integer)
+3955:0000 ScaleRow16(src, dst: pointer)   // Copies a 32-pixel row into <width> pixels by dropping columns
+3955:0034 ScaleRow17(src, dst: pointer)
+3955:0068 ScaleRow18(src, dst: pointer)
+3955:009a ScaleRow19(src, dst: pointer)
+3955:00ca ScaleRow20(src, dst: pointer)
+3955:00f8 ScaleRow21(src, dst: pointer)
+3955:0124 ScaleRow22(src, dst: pointer)
+3955:0150 ScaleRow23(src, dst: pointer)
+3955:017d ScaleRow24(src, dst: pointer)
+3955:01aa ScaleRow25(src, dst: pointer)
+3955:01dd ScaleRow26(src, dst: pointer)
+3955:0215 ScaleRow27(src, dst: pointer)
+3955:024a ScaleRow28(src, dst: pointer)
+3955:027c ScaleRow29(src, dst: pointer)
+3955:02ab ScaleRow30(src, dst: pointer)
+3955:02d3 ScaleRow31(src, dst: pointer)
+3955:02f4 ScaleRow32(src, dst: pointer)
+3955:030e ScaleSprite(src, dst: pointer; size: integer)   // Scales a 32x32 sprite to size x size using RowProcs
+4a81:4830 Scale::RowProcs: array[16..32] of pointer       // ScaleRow16..ScaleRow32
+
+# ---------------------------------------------------------------------------
+# Vector models (docs/formats/vec.md)
+# ---------------------------------------------------------------------------
+3d38:084a LoadVec(n: integer)               // vectors\v<n>.vec
+3d38:0cd6 LoadWireVec(n: integer)
+3d38:0696 ReadObject(model, slot: integer; parentFrame: word): boolean   // Nested
+3d38:01aa DrawFrame
+3d38:0000 DrawObject(slot: integer)
+3e17:1500 Project(a, b, c: integer; src, dst: pointer; scale, count, mode: integer)   // Orthographic projection
+3e17:04d2 PrepareObject(model, slot: integer; verts, faces, normals: pointer; nVerts, nFaces: byte)
+3e17:00cc DrawFaces(bufSeg: word; verts, faces, normals: pointer; count: byte)
+3e17:0000 DrawEdges(bufSeg: word; verts, edges: pointer; count: integer; colour: byte)
+3e17:11f9 FillPoly(bufSeg: word; n: integer; pts: pointer; colour: byte)
+3e17:18db InitCosTable

@@ -48,6 +48,9 @@ public class ApplySymbols extends GhidraScript {
             return;
         }
         definePascalTypes();
+        Path typesFile = Path.of(args[0]).resolveSibling("types.pas");
+        if (Files.exists(typesFile))
+            defineRecords(Files.readString(typesFile));
         fixEntryStack();
 
         List<String> lines = Files.readAllLines(Path.of(args[0]));
@@ -147,6 +150,37 @@ public class ApplySymbols extends GhidraScript {
         text.add(new ArrayDataType(CharDataType.dataType, 80, 1, dtm), "Name", null);
         text.add(new ArrayDataType(CharDataType.dataType, 128, 1, dtm), "Buffer", null);
         add(text);
+    }
+
+    // Parses the record declarations in types.pas (see that file for syntax).
+    void defineRecords(String src) throws Exception {
+        src = src.replaceAll("(?s)\\{.*?\\}", "");
+        StructureDataType rec = null;
+        for (String raw : src.split("\n")) {
+            String line = raw.strip();
+            if (line.isEmpty() || line.equals("type"))
+                continue;
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(\\w+)\\s*=\\s*record").matcher(line);
+            if (m.matches()) {
+                rec = new StructureDataType(cat, m.group(1), 0, dtm);
+                continue;
+            }
+            if (line.startsWith("end")) {
+                if (rec == null)
+                    throw new Exception("types.pas: 'end' without record");
+                DataType dt = add(rec);
+                println("types.pas: " + dt.getName() + " = " + dt.getLength() + " bytes");
+                rec = null;
+                continue;
+            }
+            if (rec == null)
+                throw new Exception("types.pas: unexpected line: " + line);
+            int colon = line.indexOf(':');
+            DataType t = parseType(line.substring(colon + 1).replaceAll(";\\s*$", "").strip());
+            for (String n : line.substring(0, colon).split(","))
+                rec.add(t, n.strip(), null);
+        }
     }
 
     DataType add(DataType dt) {
@@ -382,13 +416,28 @@ public class ApplySymbols extends GhidraScript {
         if (t.startsWith("^"))
             return farPtr(parseType(t.substring(1)));
         if (t.startsWith("array")) {
-            // array[lo..hi] of T
+            // array[lo..hi] of T, or array[a..b, c..d] of T (= array of arrays)
             int lb = t.indexOf('['), rb = t.indexOf(']');
-            String[] range = t.substring(lb + 1, rb).split("\\.\\.");
-            int n = Integer.decode(range[1].strip()) - Integer.decode(range[0].strip()) + 1;
-            DataType elem = parseType(t.substring(t.indexOf(" of ", rb) + 4));
-            return new ArrayDataType(elem, n, elem.getLength(), dtm);
+            String[] dims = t.substring(lb + 1, rb).split(",");
+            DataType dt = parseType(t.substring(t.indexOf(" of ", rb) + 4));
+            for (int i = dims.length - 1; i >= 0; i--) {
+                String[] range = dims[i].split("\\.\\.");
+                int n = Integer.decode(range[1].strip()) - Integer.decode(range[0].strip()) + 1;
+                dt = new ArrayDataType(dt, n, dt.getLength(), dtm);
+            }
+            return dt;
         }
+        if (t.startsWith("string[")) {
+            // string[N]: length byte + N characters
+            int n = Integer.parseInt(t.substring(7, t.indexOf(']')).strip());
+            StructureDataType s = new StructureDataType(cat, "String" + n, 0, dtm);
+            s.add(UnsignedCharDataType.dataType, "len", "length byte");
+            s.add(new ArrayDataType(CharDataType.dataType, n, 1, dtm), "s", null);
+            return add(s);
+        }
+        DataType own = dtm.getDataType(cat, t);
+        if (own != null)
+            return own;
         switch (t) {
             case "pointer": return farPtr(VoidDataType.dataType);
             case "char": return CharDataType.dataType;

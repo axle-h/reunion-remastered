@@ -54,7 +54,7 @@ dependency order, with `System` last. So the low-level units sit at the end
 | `32b4` | `22b4` | 8128 | 26 | Shop/production orders (INFO-BUY) | "Ore needed", "Total price:" |
 | `34b0` | `24b0` | 3248 | 13 | Message boxes; naming new planets | `message.txt`, "Press mouse button" (called from 130 sites) |
 | `357b` | `257b` | 15776 | 29 | Planet info screen | "PLANET'S NAME:", population attitudes |
-| `3955` | `2955` | 928 | 17 | Record converters: copy fields between packed layouts | Asm-like field-by-field copies; probably save-game (de)serialisation |
+| `3955` | `2955` | 928 | 17 | **Sprite scaler**: 32-pixel rows to 16–32 pixels | `ScaleRow16..32` via `Scale::RowProcs` (DS:4830), `ScaleSprite` |
 | `398f` | `298f` | 2240 | 9 | Text file loading/drawing | `text\`, `text\sz_felsz.txt` |
 | `3a1b` | `2a1b` | 2592 | 15 | Graphics file paths / screen helpers | `grafika\`, vsync (3DAh) |
 | `3abd` | `2abd` | 6768 | 25 | **Command centre** (room navigation) | "RESEARCH-DESIGN", "STARMAP", "COMMANDERS", `door1..3` |

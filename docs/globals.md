@@ -34,8 +34,8 @@ used by the main program.
 
 | Address | Name | Notes |
 |---|---|---|
-| `95be` | `Sim::Credits` | longint |
-| `95de–95e4` | `Sim::Year/Month/Day/Hour` | Advanced by `Sim::AdvanceHour`; months have 30 days |
+| `95be` | `Game::Credits` | longint |
+| `95de–95e4` | `Game::Year/Month/Day/Hour` | Advanced by `Sim::AdvanceHour`; months have 30 days |
 | `91ec` | `Gfx::ScreenSeg` | Copy of `SegA000` |
 | `8a64–8a8a` | `Mouse::*` | INT 33h registers, buttons, click position |
 | `8a8c` | `Mouse::Hotspots` | 27-byte records: x, y, w, h, … (count at `8a8a`) |
@@ -43,15 +43,26 @@ used by the main program.
 | `89ac–89b4` | `RawText::*` | Pointers to the loaded `text\sz_*.raw` tables |
 | `6564` | (protection) | Longint compared with 25358 by `Protect::CheckToken` |
 
-## Next candidates
+## Detailed notes
 
-These are used everywhere and should be identified next:
+All variables and tables below are named in `ghidra/symbols.txt`, with record
+types in `ghidra/types.pas`. The evidence behind them (code addresses,
+initial values, manual cross-checks) is in:
 
-| Address | Uses | Clue |
-|---|---|---|
-| `95e6` | 241 | Compared with small constants (1, 3, 12, 20…): current screen or mode? |
-| `7ae4` | 311 | Word; indexed by `75ee` |
-| `7b08` | 139 | Far pointer to a record (first byte compared with 1) |
-| `95ea`, `95ec` | 74, … | `95ea` is loaded from 21-byte records at `7c64` indexed by `95ec` |
-| `95a4–95bc` | ~10 each | Small counters, all boosted by the cheat: staff/ship counts? |
-| `a2c4–a2d0` | ~15 users each | Saved by `SaveLoad`: likely core game state |
+- [globals-evidence.md](globals-evidence.md): shared game state and
+  screen/input state (`Game::*`), plus the screen table at `DS:50FB`
+- [tables-evidence.md](tables-evidence.md): initialised tables (galaxy,
+  products, building types, races, staff, pub, name lists)
+
+The proposals were written with `Sim::` for shared state; in `symbols.txt` that
+became `Game::`, and the building-type record became `TBuildingType` (the
+14-byte placed building is `TBuilding`). The `Surface` view tables at
+`17E6–1828` are tile-sheet sizes, not view coordinates.
+
+## Open questions
+
+- Most `TGroup` fields, `TBody` bytes `+01/+03/+09..+0B`, the `TProduct`
+  and `TBuildingType` unknowns
+- What fills `9C02–A201`
+- `91E7`, `918E–9190` are only written outside the Pascal code, probably by
+  the keyboard or mouse interrupt handler
