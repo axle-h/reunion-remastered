@@ -13,6 +13,7 @@
 #include "diff/dseg_names.h"
 #include "game/dseg.h"
 #include "game/emm.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/mouse.h"
@@ -1611,6 +1612,7 @@ static bool load_image(void)
 bool diff_init(int argc, char *argv[])
 {
     setvbuf(stdout, nullptr, _IOLBF, 0);
+    Fixes_Original();  // compared with the original: none of the port's fixes
     if (argc < 2 || !fs_init(argv[1]) || !load_image())
         return false;
     mem_init();

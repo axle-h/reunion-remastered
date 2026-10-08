@@ -12,6 +12,7 @@
 #include "game/cargo.h"
 #include "game/colonize.h"
 #include "game/droids.h"
+#include "game/fixes.h"
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
@@ -149,6 +150,19 @@ static void show3(const PString *a, const PString *b, const PString *c)
     System_StrConcat(&t, b);
     System_StrConcat(&t, c);
     Message_ShowMessage(ps(&t));
+}
+
+// Jade: Amnesty (system 1) planet 7, the Jaanosians' home world.
+enum : int16_t { JADE_PLANET = 7 };
+
+// The game date is before y-m-d 00:00.
+static bool date_before(int y, int m, int d)
+{
+    if (ds.Game_Year != y)
+        return ds.Game_Year < y;
+    if (ds.Game_Month != m)
+        return ds.Game_Month < m;
+    return ds.Game_Day < d;
 }
 
 static bool at_current_body(int16_t s, int16_t planet, int16_t moon)
@@ -749,9 +763,13 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
 
     // Undiscovered planets (status -2/-3/-4): observatories, fleets in the
     // system and the Psy radar find them, at most one a day.
-    if (*observatories(system) > 0 && moon == 0
+    // Port fix (game/fixes.h): Jade is found by JADE_FOUND_BY at the latest.
+    bool jade_due = fixes.find_jade && system == 1 && planet == JADE_PLANET && moon == 0
+                    && !date_before(JADE_FOUND_BY_YEAR, JADE_FOUND_BY_MONTH, JADE_FOUND_BY_DAY);
+    if ((*observatories(system) > 0 || jade_due) && moon == 0
         && (*planet_status(system, planet) == -2 || *planet_status(system, planet) == -3)
-        && *system_status(system) == 1 && System_Random(0x32) == 1 && !parent->discovered) {
+        && *system_status(system) == 1 && (jade_due || System_Random(0x32) == 1)
+        && !parent->discovered) {
         *planet_status(system, planet) = 0;
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();

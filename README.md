@@ -26,6 +26,10 @@ build/debug/reunion
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to the SDL pref
 directory (`~/.local/share/Reunion/Reunion/screenshots` on Linux).
 
+The port fixes a few things in the original that can make the game
+unwinnable (docs/bugs.md, "Fixed in the port"); `REUNION_ORIGINAL=1` plays
+without those fixes.
+
 Like the original `start.exe`, the port plays the CREDITS and INTRO
 cut-scenes before the game and VICTORY after it is won. `--skip-intro` (or
 `REUNION_SKIP_INTRO=1`) goes straight to the game, as does any autopilot run;

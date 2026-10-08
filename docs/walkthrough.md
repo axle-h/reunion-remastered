@@ -219,6 +219,9 @@ not on loan to the Jaanosians).
    - **Meet the Jaanosians before 2928-04-23** (the guide's 2928-05-05 is not
      safe) **[fixed]**. To meet them, a non-carrier group must arrive at Jade.
    - Jade is hidden until New Earth's observatory finds it (1/50 per day).
+     In about 1 game in 150 that doesn't happen before the deadline and the
+     game can't be won. The port finds Jade on 2928-04-01 if it is still
+     hidden (docs/bugs.md); `REUNION_ORIGINAL=1` turns that off.
    - First contact replaces the deadline with contact + ~2,590–2,808 h, so
      meeting them later pushes the whole war later.
    - First contact makes Communicator researchable (20–39 h).

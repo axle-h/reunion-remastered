@@ -4,6 +4,18 @@ Found while porting. The port reproduces them faithfully (marked `// BUG?` in
 the code) until Phase 7, when each fix goes behind a clear switch.
 `grep -rn 'BUG?' src/` lists them in the code.
 
+## Fixed in the port
+
+Switches in `fixes` (`src/game/fixes.h`). All are on in the game;
+`REUNION_ORIGINAL=1` turns them off, and the differential tests always run
+without them.
+
+| Switch | Original behaviour | Fix |
+|---|---|---|
+| `find_jade` | Jade (Amnesty 7, status −3) is found only by New Earth's observatory, 1 in 50 per day and at most one find a day galaxy-wide (`sim.c`, `Sim_ProcessBodyEvents`). The Jaanosians must be met before their deadline, 6,000–6,399 h after the start (2928-04-23 at the earliest), or Hunter and Laser cannon are never granted and the game can't be won: about 1 game in 150 | If Jade is still hidden on 2928-04-01 it is found that day, with the observatory's message and name prompt. That leaves 551 h before the earliest deadline; the flight from New Earth takes at most 19 h with the slowest pilot (Leg2 150–199, Bruce Jordan at experience 10), and the meetings, Hunter, Laser cannon, Hyperspace drive and Morgrul wave 1 are all timed from first contact (`intel.c`, `Intel_FirstContact`), so a late contact doesn't shorten them |
+
+## Suspected, not fixed
+
 | Where | What |
 |---|---|
 | `431a` `PlayWarSnd` / `PlayGrSnd` | Both use the same "last loaded sample" key, so ground sound *n* right after war sound *n* replays the war sample |

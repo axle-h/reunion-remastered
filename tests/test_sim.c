@@ -6,6 +6,7 @@
 
 #include "game/dseg.h"
 #include "game/ems.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/message.h"
 #include "game/sim.h"
@@ -205,6 +206,46 @@ static uint32_t sim_checksum(void)
     return h;
 }
 
+// Galaxy::PlanetStatus of Jade (Amnesty planet 7): -3 hidden (observatories
+// only), 0 known.
+static int8_t *jade_status(void)
+{
+    return (int8_t *)ds_at(0x47CD + 1 * 8 + 7);
+}
+
+// Fix (game/fixes.h): Jade, still hidden on 2928-04-01, is found that day
+// without an observatory roll; before that date, and with the fix off, it
+// stays hidden (no observatory in Amnesty here, so no roll either).
+static void test_jade_found(void)
+{
+    reset();
+    *(int16_t *)ds_at(0x481C + 1 * 2) = 0;  // no observatory in Amnesty
+    CHECK(*jade_status() == -3);
+
+    fixes.find_jade = true;
+    set_date(2928, 3, 30, 0);
+    Sim_ProcessAllBodyEvents();
+    CHECK(*jade_status() == -3);
+
+    fixes.find_jade = false;
+    set_date(2928, 4, 1, 0);
+    Sim_ProcessAllBodyEvents();
+    CHECK(*jade_status() == -3);
+
+    fixes.find_jade = true;
+    int before = messages;
+    Sim_ProcessAllBodyEvents();
+    CHECK(*jade_status() == 0);
+    CHECK(messages > before);  // the discovery message and the name prompt
+
+    // Later dates too (a game loaded after the date).
+    reset();
+    *(int16_t *)ds_at(0x481C + 1 * 2) = 0;
+    set_date(2931, 1, 1, 0);
+    Sim_ProcessAllBodyEvents();
+    CHECK(*jade_status() == 0);
+}
+
 static void test_golden(void)
 {
     reset();
@@ -246,6 +287,7 @@ int main(int argc, char *argv[])
     test_date();
     test_research();
     test_production();
+    test_jade_found();
     test_golden();
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

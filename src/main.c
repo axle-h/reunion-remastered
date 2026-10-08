@@ -13,6 +13,7 @@
 
 #include "cutscene/cutscene.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/mem.h"
@@ -102,6 +103,7 @@ int main(int argc, char *argv[])
     }
     input_init();
     autopilot_init();
+    Fixes_Init();
 
     const char *data_dir = find_data_dir(argc, argv);
     char *exe = nullptr;
