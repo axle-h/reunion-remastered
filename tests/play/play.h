@@ -30,6 +30,7 @@ typedef struct {
     uint64_t frames;      // retraces played (script frame numbering)
     uint64_t state_hash;  // hash of the emulated memory at the end
     bool failed;          // the policy called play_fail or broke a rule
+    bool tainted;         // play_test_setup was used: not a proof, won't replay
     char failure[256];
 } PlayResult;
 
@@ -56,6 +57,11 @@ void play_mouse(int x, int y, int buttons);
 void play_click(int x, int y);
 // Queues a Crt.ReadKey code (0 then a scan code for extended keys).
 void play_key(int code);
+// Driver tests only, never in a proof run: runs fn(arg) now, with the game
+// stopped, to put the game into a state the test needs (e.g. an enemy fleet
+// arriving). The write barrier allows it; the run is marked tainted and its
+// recording will not replay to the same end.
+void play_test_setup(void (*fn)(void *arg), void *arg);
 // Ends the run as a window close would.
 [[noreturn]] void play_quit(void);
 // Ends the run as failed.

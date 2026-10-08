@@ -48,6 +48,8 @@ static struct {
     int sleep;          // retraces to skip before waking the policy
     uint64_t frame;     // current retrace (script numbering)
     FILE *record;
+    bool tainted;       // play_test_setup changed the game this slice or before
+    bool rebaseline;    // ... this slice: skip the write barrier once
     bool failed;
     char failure[256];
 } ctl;
@@ -125,7 +127,9 @@ static void on_retrace(uint64_t frame)
     uint64_t before = hash_memory();
     SDL_SignalSemaphore(ctl.to_policy);
     SDL_WaitSemaphore(ctl.to_game);
-    if (hash_memory() != before)
+    if (ctl.rebaseline)
+        ctl.rebaseline = false;
+    else if (hash_memory() != before)
         fail_from_game("write barrier: the policy changed game memory at frame %llu",
                        (unsigned long long)frame);
     if (options_panel_open())
@@ -236,6 +240,7 @@ PlayResult play_run(uint32_t seed, PlayPolicy policy, void *arg, const char *rec
     if (ctl.record)
         fclose(ctl.record);
     r.failed = ctl.failed;
+    r.tainted = ctl.tainted;
     SDL_strlcpy(r.failure, ctl.failure, sizeof r.failure);
     return r;
 }
@@ -292,6 +297,17 @@ void play_key(int code)
     input_push_key(code);
     if (ctl.record)
         fprintf(ctl.record, "%llu:key:%d\n", (unsigned long long)ctl.frame, code);
+}
+
+void play_test_setup(void (*fn)(void *arg), void *arg)
+{
+    fn(arg);
+    ctl.tainted = true;
+    ctl.rebaseline = true;
+    play_log("test setup: this run is not a proof");
+    if (ctl.record)
+        fprintf(ctl.record, "# %llu: test setup (game state changed outside input; won't replay)\n",
+                (unsigned long long)ctl.frame);
 }
 
 void play_quit(void)
