@@ -19,6 +19,12 @@ with I/O error 100 (`CheckIO`), so the state is left half-loaded. Every save is
 exactly **41,670 bytes**. Slots are numbered 1..12, so the file name is
 `SPIDYSAV.1` .. `SPIDYSAV.12`.
 
+The port appends a 6-byte trailer to saves of games with one of its cheats on
+(`src/game/options.h`): `"RNCH"`, a version byte (1) and flags (1 = money
+frozen, 2 = ore frozen). The original reads its fixed blocks and ignores the
+rest, so such a save still loads in DOS (unfrozen). Saves of games without a
+cheat on are byte-for-byte the original format.
+
 `3955` (unit "RecConv") plays no part in saving. It is a sprite scaler (see
 below), so no field conversion is applied: every block is a straight memory image.
 

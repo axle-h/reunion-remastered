@@ -194,7 +194,7 @@ type
     _0E, _0F:     byte;
     Speed:        byte;      { +10  20..95 }
     HomeSystem, HomeBody: byte;  { +11 }
-    KnownSystems: array[1..8] of boolean;   { +13 }
+    KnownSystems: array[1..8] of boolean;   { +13  the Intel port reads [1..4] as ship-class and [5..8] as ground-unit weapon flags }
     Status:       shortint;  { +1B  contact state 0/2/4/6 }
     Credits:      longint;   { +1C }
     _20:          array[1..6] of shortint;
@@ -226,4 +226,19 @@ type
 
   TCatRange = record         { 2 bytes }
     Lo, Hi: byte;
+  end;
+
+  { --- Borland units and system --- }
+
+  Registers = record         { 20 bytes; Dos.Registers, passed to Intr }
+    AX, BX, CX, DX, BP, SI, DI, DS, ES, Flags: word;
+  end;
+
+  TEmsBlock = record         { 13 bytes; an EMS-backed buffer (4719) }
+    State:     byte;         { +00  0 none, 1 heap copy, 2 in EMS }
+    Data:      pointer;      { +01  heap copy }
+    Size:      word;         { +05 }
+    Handle:    word;         { +07 }
+    FrameSeg:  word;         { +09  EMS page frame segment }
+    PageCount: word;         { +0B }
   end;

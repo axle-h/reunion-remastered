@@ -25,6 +25,16 @@
       }
     },
     {
+      "name": "trap",
+      "displayName": "Debug with UBSan in trap mode (no runtime library needed; used by tools/soak.sh)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-fsanitize=undefined -fno-sanitize=alignment -fsanitize-trap=all -fno-omit-frame-pointer",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/build/sdl3-prefix"
+      }
+    },
+    {
       "name": "release",
       "displayName": "Release",
       "inherits": "base",
@@ -34,6 +44,7 @@
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
     { "name": "asan", "configurePreset": "asan" },
+    { "name": "trap", "configurePreset": "trap" },
     { "name": "release", "configurePreset": "release" }
   ]
 }

@@ -1,0 +1,157 @@
+// anim: the Anim unit's frame decoder on a hand-made frame, the shaped
+// screen copy, and (with game data) whole animations loaded and drawn the
+// game's way, compared with the assets/ani.h decoder by CRC.
+#include <SDL3/SDL.h>
+#include <stdio.h>
+
+#include "assets/ani.h"
+#include "game/anim.h"
+#include "game/dseg.h"
+#include "game/system.h"
+#include "platform/fs.h"
+
+static bool ok = true;
+#define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
+
+static const FarPtr SCREEN = (FarPtr)0xA0000000;
+
+// The 320x200 screen at A000:0000 as one linear array.
+static uint8_t *scr(void)
+{
+    return far_host(SCREEN);
+}
+
+static void decoder(void)
+{
+    mem_init();
+    // 9-byte magic, width 4, height 2, then: literal 5, skip 2, run 2 x 7,
+    // skip (word) 1, run (word) 2 x 9.
+    static const uint8_t block[] = {'S', 'p', 'i', 'd', 'y', 'A', 'n', 'i', 'm', 4, 0, 2, 0,
+                                    0x05, 0x82, 0xC2, 0x07, 0x80, 0x01, 0x00, 0xC0, 0x02,
+                                    0x00, 0x09,
+                                    0x01};  // never read: the counter is 0 by then
+    FarPtr frame = far_ptr(0x5000, 0x0008);
+    SDL_memcpy(far_host(frame), block, sizeof block);
+    uint8_t *dst = far_host(far_ptr(0x6000, 0));
+    SDL_memset(dst, 0xEE, 16);
+    Anim_DecodeAnimFrame(frame, far_ptr(0x6000, 0), 0x40);
+    static const uint8_t want[10] = {0x45, 0xEE, 0xEE, 0x47, 0x47, 0xEE, 0x49, 0x49, 0xEE, 0xEE};
+    CHECK(SDL_memcmp(dst, want, sizeof want) == 0);
+}
+
+static void wedge(void)
+{
+    mem_init();
+    ds.Gfx_ScreenSeg = 0xA000;
+    FarPtr src = far_ptr(0x5000, 0);
+    uint8_t *s = far_host(src);
+    for (int i = 0; i < 0x8000; i++)
+        s[i] = (uint8_t)(i % 251 + 1);
+    Anim_BlitWedgeToScreen(src);
+    int written = 0;
+    for (int i = 0; i < 64000; i++)
+        written += scr()[i] != 0;
+    CHECK(written == 13409);
+    // First row: 16 pixels at (72, 59) from src + C28h; the source is 160
+    // wide, so the last row (7 pixels at (76, 190)) comes from row 150.
+    CHECK(SDL_memcmp(scr() + 59 * 320 + 72, s + 0xC28, 16) == 0);
+    CHECK(scr()[59 * 320 + 71] == 0 && scr()[59 * 320 + 88] == 0);
+    CHECK(SDL_memcmp(scr() + 190 * 320 + 76, s + 150 * 160 + 76, 7) == 0);
+    CHECK(scr()[58 * 320 + 80] == 0 && scr()[191 * 320 + 80] == 0);
+}
+
+// --- with game data ----------------------------------------------------------------
+
+static void setup(void)
+{
+    mem_init();
+    CHECK(dseg_init());
+    system_init();
+    ds.System_SegA000 = 0xA000;
+    ds.Gfx_ScreenSeg = 0xA000;
+    // The record DS:7E40 points to (InitRoomAnim allocates it).
+    FarPtr rec = System_GetMem(0x349);
+    SDL_memset(far_host(rec), 0, 0x349);
+    *(FarPtr *)ds_at(0x7E40) = rec;
+}
+
+// MAIN8 (320x200, delta frames) straight onto the screen, as the cut-scene
+// player does, against ani_draw_frame on a host copy.
+static void main_anim(void)
+{
+    setup();
+    int32_t before = System_MemAvail();
+    uint8_t frames = *(uint8_t *)ds_at(0x55D7 + 7 * 8);
+    Ani ani;
+    CHECK(ani_load("ANIM\\MAIN8.ANI", &ani));
+    CHECK(ani.width == 320 && ani.height == 200 && frames >= 2 && frames <= ani.count);
+    Anim_LoadMainAnim(8);
+    static uint8_t ref[64000];
+    SDL_memset(ref, 0, sizeof ref);
+    bool same = true;
+    for (int f = 1; f <= frames; f++) {
+        bool drawn = false;
+        Anim_DrawAnimFrame((uint16_t)f, SCREEN, &drawn);
+        CHECK(drawn);
+        ani_draw_frame(&ani, f - 1, ref, 320, 0x40);
+        same = same && SDL_crc32(0, scr(), 64000) == SDL_crc32(0, ref, 64000);
+    }
+    CHECK(same);
+    // The record holds the sizes (stream + 13) and the loaded flag.
+    FarPtr rec = *(FarPtr *)ds_at(0x7E40);
+    uint8_t *r = far_host(rec);
+    CHECK(r[0] == 1);
+    CHECK((size_t)(r[0x231] | r[0x232] << 8) == ani.frames[0].size + 13);
+    // A second load while one is loaded does nothing.
+    int32_t loaded = System_MemAvail();
+    Anim_LoadGrAnim(1);
+    CHECK(System_MemAvail() == loaded);
+    Anim_FreeMainAnim(8);
+    CHECK(r[0] == 0);
+    CHECK(System_MemAvail() == before);
+    CHECK(ds.Game_MinMemAvail <= loaded);
+    // Nothing loaded: ok stays true and nothing is drawn.
+    uint32_t crc = SDL_crc32(0, scr(), 64000);
+    bool drawn = false;
+    Anim_DrawAnimFrame(2, SCREEN, &drawn);
+    CHECK(drawn && SDL_crc32(0, scr(), 64000) == crc);
+    ani_free(&ani);
+}
+
+// SA1 drawn keyed (frame 1, then frame N) into a width-stride buffer.
+static void war_anim(void)
+{
+    setup();
+    const uint8_t *t = ds_at(0x555B + 5 * 1);
+    Ani ani;
+    CHECK(ani_load("WAR\\WAR\\SA1.ANI", &ani));
+    CHECK(t[0] >= 2 && t[0] <= ani.count && t[1] == ani.width && t[2] == ani.height);
+    Anim_LoadWarAnim(1);
+    FarPtr buf = far_ptr(0x9000, 0);
+    size_t n = (size_t)ani.width * (size_t)ani.height;
+    uint8_t *ref = SDL_malloc(n);
+    bool same = true;
+    for (int f = 1; f <= t[0]; f++) {
+        Anim_DrawAnimKeyed((uint16_t)f, buf);
+        ani_draw_frame(&ani, 0, ref, (size_t)ani.width, 0x40);
+        ani_draw_frame(&ani, f - 1, ref, (size_t)ani.width, 0x40);
+        same = same && SDL_crc32(0, far_host(buf), n) == SDL_crc32(0, ref, n);
+    }
+    CHECK(same);
+    Anim_FreeWarAnim(1);
+    SDL_free(ref);
+    ani_free(&ani);
+}
+
+int main(int argc, char *argv[])
+{
+    decoder();
+    wedge();
+    if (argc < 2 || !fs_init(argv[1])) {
+        printf("no game data, skipping the file tests\n");
+        return ok ? 77 : 1;
+    }
+    main_anim();
+    war_anim();
+    return ok ? 0 : 1;
+}

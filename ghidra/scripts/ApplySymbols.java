@@ -271,7 +271,7 @@ public class ApplySymbols extends GhidraScript {
 
     // ---- prototypes ------------------------------------------------------
 
-    record Param(String name, DataType type, List<Register> regs) {}
+    record Param(String name, DataType type, List<Register> regs, boolean keep) {}
 
     void applySignature(Function f, String sig) throws Exception {
         int close = matchingParen(sig, 0);
@@ -285,7 +285,7 @@ public class ApplySymbols extends GhidraScript {
 
         DataType retType = VoidDataType.dataType;
         List<Register> retRegs = null;
-        if (after.startsWith(":")) {
+        if (after.startsWith(":") && !after.substring(1).isBlank()) {
             String[] tr = splitRegs(after.substring(1).strip());
             retType = parseType(tr[0]);
             retRegs = parseRegs(tr[1]);
@@ -293,7 +293,7 @@ public class ApplySymbols extends GhidraScript {
         // Functions returning a string get a pointer to the caller's result
         // buffer, pushed before all other arguments.
         if (isPString(retType)) {
-            params.add(0, new Param("result", farPtr(retType), null));
+            params.add(0, new Param("result", farPtr(retType), null, false));
             retType = VoidDataType.dataType;
         }
 
@@ -321,6 +321,18 @@ public class ApplySymbols extends GhidraScript {
             retSt = new VariableStorage(currentProgram, defaultReturnRegs(retType.getLength()));
         Variable ret = new ReturnParameterImpl(retType, retSt, currentProgram);
 
+        // Cross-check with the callee's own RET n. A string result pointer
+        // stays on the stack for the caller, so it isn't popped.
+        int popped = offset - (far ? 4 : 2);
+        for (Param p : params)
+            if (p.keep() || isPString(derefIfResult(p)))
+                popped -= (p.type().getLength() + 1) & ~1;
+        int purge = f.getStackPurgeSize();
+        if (purge != Function.UNKNOWN_STACK_DEPTH_CHANGE && purge != Function.INVALID_STACK_DEPTH_CHANGE
+                && purge != popped)
+            throw new Exception(f.getName() + ": prototype has " + popped
+                + " bytes of stack arguments but the routine pops " + purge);
+
         f.updateFunction(far ? CC_FAR : CC_NEAR, ret, Arrays.asList(vars),
             Function.FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.USER_DEFINED);
     }
@@ -332,18 +344,27 @@ public class ApplySymbols extends GhidraScript {
             g = g.substring(g.indexOf(' ') + 1).strip();
         }
         int colon = g.indexOf(':');
+        if (colon < 0 && byRef) {
+            // Untyped var/const parameter (like Move's): a far pointer to anything.
+            List<Param> out = new ArrayList<>();
+            for (String n : g.split(","))
+                out.add(new Param(n.strip(), farPtr(VoidDataType.dataType), null, false));
+            return out;
+        }
         if (colon < 0)
             throw new Exception("parameter without type: " + g);
         String[] tr = splitRegs(g.substring(colon + 1).strip());
         DataType t = parseType(tr[0]);
-        List<Register> regs = parseRegs(tr[1]);
+        // "@keep": the routine leaves this argument on the stack for the caller.
+        boolean keep = "keep".equals(tr[1]);
+        List<Register> regs = keep ? null : parseRegs(tr[1]);
         // Strings and anything bigger than 4 bytes (except Real) are passed by
         // reference even when declared by value; the callee makes its copy.
         if (byRef || isPString(t) || (t.getLength() > 4 && !t.getName().equals("Real")))
             t = farPtr(t);
         List<Param> out = new ArrayList<>();
         for (String n : g.substring(0, colon).split(","))
-            out.add(new Param(n.strip(), t, regs));
+            out.add(new Param(n.strip(), t, regs, keep));
         return out;
     }
 
@@ -408,7 +429,12 @@ public class ApplySymbols extends GhidraScript {
     }
 
     boolean isPString(DataType t) {
-        return t.getName().equals("PString");
+        return t != null && t.getName().equals("PString");
+    }
+
+    // The hidden result parameter of a string function: "result: ^string".
+    static DataType derefIfResult(Param p) {
+        return p.name().equals("result") && p.type() instanceof Pointer ptr ? ptr.getDataType() : null;
     }
 
     DataType parseType(String t) throws Exception {
@@ -447,6 +473,8 @@ public class ApplySymbols extends GhidraScript {
             case "Real":
                 return pascal(t);
             case "real": return pascal("Real");
+            case "Text": return pascal("TextRec");
+            case "File": return pascal("FileRec");
         }
         List<DataType> found = new ArrayList<>();
         dtm.findDataTypes(t, found);

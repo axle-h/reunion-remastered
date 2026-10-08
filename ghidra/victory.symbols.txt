@@ -1,0 +1,41 @@
+# VICTORY.PRG symbol list (docs/cutscenes.md, port: src/cutscene/victory.c
+# and cutscene.c). Same format as symbols.txt, for a separate import of
+# GRWAR\VICTORY.PRG with DS = 1d3c. The units match INTRO's
+# (ghidra/intro.symbols.txt) at other addresses.
+
+1000:0161 Main
+1049:0143 Anim                    // as INTRO 1116:01c1
+1049:0309 Shake
+1085:0012 AnimLoad                // frame count from DS:0002 (n * 7 - 5)
+10b4:0000 WaitPos                 // (order, row): no key handling
+10b4:0088 LoadPicBuf
+10b4:00f9 Preload
+10b4:0135 Pic
+10b4:01ce PicCue                  // (name; order, row, inOrder, inRow, fadeOut, fadeIn)
+10b4:0279 ScrollCredits           // CR1-CR3 up the screen
+111e:0074 SetDacAll
+111e:00bb FadeIn
+111e:01c2 FadeOut
+111e:02d5 WhiteToPal
+111e:03fd PalToHalfWhite
+111e:051a WhiteStep
+111e:0612 SetBlack
+111e:0667 WaitRetrace
+111e:0680 WaitFrames
+111e:0ebc Mode13
+111e:0f05 Exit
+1224:0000 TimerReset
+1224:0016 TimerWait
+1235:02ac AllocScreenBuffer
+1264:0007 PlayModGUS
+1264:0254 GetPos
+1512:0000 Copy
+1512:00ca Fill
+
+1d3c:0002 AnimTable: array[1..1] of array[0..6] of byte
+1d3c:06d0 TimerEarly: boolean
+1d3c:06d6 TimerDeadline: longint
+1d3c:07ac Palette: array[0..255] of array[0..2] of byte
+1d3c:0aac TargetPalette: array[0..255] of array[0..2] of byte
+1d3c:0dac ScreenBuffer: pointer
+1d3c:0db4 Skip: boolean

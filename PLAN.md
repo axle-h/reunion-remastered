@@ -114,6 +114,9 @@ The goal is a database where most functions have names, prototypes and types.
 5. **Unit map.** *(first pass done)* `docs/segments.md`.
 6. **Export script** that writes names entered in the Ghidra GUI back to
    `symbols.txt`, so GUI work isn't lost on rebuild.
+7. **Function naming.** *(done)* All ~800 functions are named; 1,171
+   symbols apply with every prototype checked against the routine's `RET n`.
+   Agent proposals are merged with `ghidra/merge_proposals.py`.
 
 ### Phase 2: asset tools (in parallel with Phase 1)
 Python tools in `tools/` that decode each format to PNG/WAV/JSON. They:
@@ -124,6 +127,10 @@ Python tools in `tools/` that decode each format to PNG/WAV/JSON. They:
 Order: `PIC` + palette → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves *(all done: `tools/*.py`, one doc per format in docs/formats/; `.SPD` are ProTracker modules, `ICON.ALL` and `ANIM.DEF` also decoded)*.
 
 ### Phase 3: platform layer (`src/platform/`)
+*(in place: video, timing (70 Hz retrace), input (mouse callback + Crt keys),
+audio (SDL3 + libxmp), fs (DOS paths); C loaders for every format in
+`src/assets/`; 13 tests.)*
+
 Replace everything that touched DOS hardware:
 - **Video:** 320×200 8-bit framebuffer + 256-colour palette, presented via
   SDL with integer/aspect-correct scaling. Palette fades handled in software.
@@ -138,6 +145,11 @@ Replace everything that touched DOS hardware:
   (Borland LCG: `seed = seed * 134775813 + 1`) so behaviour matches the original.
 
 ### Phase 4: port the game
+*(all units ported, ~21k lines of C in src/game/, 50 tests; AdLib music and
+soak testing in progress. Earlier groundwork: data-segment mirror generated from symbols.txt and loaded from the
+original EXE; emulated real-mode memory so far pointers work; see
+docs/port.md.)*
+
 - Work leaf-first: graphics/blitters → loaders → text/UI → subsystems
   (research, production, trade, fleets, combat, diplomacy) → main loop.
 - Start faithful, clean up afterwards. First pass keeps the original data
@@ -151,6 +163,10 @@ Replace everything that touched DOS hardware:
 ### Phase 5: intro, credits, victory
 The three separate programs, ported last as cutscene modules inside the same
 binary.
+See docs/cutscenes.md. Needs: VGA mode 12h (640x480, 16 colours) in the video
+layer alongside 13h; cues driven by the MOD player's order/row position (so the
+audio layer must report it); the launcher's flow (credits, intro, game; game
+exit code 10 shows the victory sequence, 15 restarts).
 
 ### Phase 6: verification
 - **Side-by-side runs** in DOSBox-X (installed) vs the port from identical
@@ -168,6 +184,11 @@ so "original behaviour" stays reproducible.
   hard-coded ports (322h–327h) and reprograms the PIT. Phase 3 replaces all of
   that code, so these should disappear with the port. Confirm by reproducing
   the crashes in DOSBox-X and checking they don't occur in the port.
+  Concrete suspects (docs/sound-original.md): the GUS player hard-codes base
+  220h while detection scans other bases; a failed GUS detection still writes
+  to ports 0–2 (DMA controller); the 1 kHz timer ISR never chains to INT 08h,
+  freezing the BIOS clock; AdLib detection waits on VGA retrace and can hang;
+  the Sound Blaster wait loops never time out.
 - The classic Borland Pascal "Runtime error 200" on fast CPUs is **not** the
   cause: the `Crt` delay-calibration code is absent from all binaries.
 - Timing bugs from CPU-speed dependence, if any turn up.
@@ -176,8 +197,10 @@ so "original behaviour" stays reproducible.
 ## Milestones
 1. Ghidra DB with System RTL named and unit map drafted. *(done)*
 2. All `PIC`/`ANI` assets viewable as PNG.
-3. SDL shell boots and shows the title screen using original loaders.
-4. Main menu → new game → first planet screen playable.
+3. SDL shell boots and shows the title screen using original loaders. *(done)*
+4. Main menu → new game → first planet screen playable. *(boots into a new
+   game; every screen opens; 250k frames run without a crash; soak testing in
+   progress)*
 5. Full game loop playable start to finish.
 6. Verified against original; bug-fix phase begins.
 

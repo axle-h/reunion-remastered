@@ -241,7 +241,22 @@ def layout_for(data, types):
                     f"({sum(b[3] for b in INIT_BLOCKS)})")
 
 
+# The port's cheat trailer (src/game/options.h), only in saves of games with
+# a cheat on: "RNCH", version 1, flags (1 money frozen, 2 ore frozen).
+TRAILER = struct.Struct("<4sBB")
+
+
+def split_trailer(data):
+    """Returns (save bytes, decoded port trailer or None)."""
+    if len(data) > TRAILER.size and data[-TRAILER.size:][:4] == b"RNCH":
+        magic, version, flags = TRAILER.unpack(data[-TRAILER.size:])
+        return data[:-TRAILER.size], {
+            "version": version, "freeze_money": bool(flags & 1), "freeze_ore": bool(flags & 2)}
+    return data, None
+
+
 def parse(data, types, keep_all=False):
+    data, cheats = split_trailer(data)
     kind, blocks = layout_for(data, types)
     values, notes, off = {}, [], 0
     for name, _, typ, n in blocks:
@@ -266,7 +281,10 @@ def parse(data, types, keep_all=False):
             values[name] = lst[:count]
     for name, *_ in blocks:
         del values[name + "@"]
-    return {"kind": kind, "size": len(data), "notes": notes, "blocks": values}
+    result = {"kind": kind, "size": len(data), "notes": notes, "blocks": values}
+    if cheats:
+        result["port_cheats"] = cheats
+    return result
 
 
 def print_layout(blocks, out):
@@ -291,7 +309,7 @@ def main():
     data = args.file.read_bytes()
     try:
         if args.layout:
-            _, blocks = layout_for(data, types)
+            _, blocks = layout_for(split_trailer(data)[0], types)
             print_layout(blocks, sys.stdout)
             return 0
         result = parse(data, types, keep_all=args.all)

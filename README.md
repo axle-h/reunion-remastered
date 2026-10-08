@@ -13,10 +13,38 @@ used from the system when installed (`dnf install SDL3-devel`), otherwise it
 is downloaded and built automatically.
 
 ```sh
-cmake --preset debug          # or: release, asan
+cmake --preset debug          # or: release, asan, trap
 cmake --build --preset debug
 build/debug/reunion
 ```
+
+## Running
+
+`reunion [DATA_DIR]` looks for the game data (the directory holding `GRWAR`,
+`GRAFIKA`, ...) in `DATA_DIR`, else in `$REUNION_DATA`, else in the
+`REUNION_DATA_DIR` CMake setting (default `vendor/Reunion_DOS_EN`).
+Alt+Enter toggles full screen; F12 saves a BMP screenshot to the SDL pref
+directory (`~/.local/share/Reunion/Reunion/screenshots` on Linux).
+
+Like the original `start.exe`, the port plays the CREDITS and INTRO
+cut-scenes before the game and VICTORY after it is won. `--skip-intro` (or
+`REUNION_SKIP_INTRO=1`) goes straight to the game, as does any autopilot run;
+`--cutscene=credits|intro|victory` plays one cut-scene and exits.
+
+Headless runs take a script of mouse clicks, key presses and frame dumps by
+frame number (see `src/platform/autopilot.h`), e.g. start a new game and save
+the command centre:
+
+```sh
+SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy \
+REUNION_AUTOPILOT='40:click:160,60;120:click:80,100;1000:dump:cc.png;1001:quit' \
+build/debug/reunion
+```
+
+`REUNION_AUTOPILOT=random:SEED:FRAMES` plays random clicks and keys instead
+(deterministic per seed). `tools/soak.sh` runs many seeds of that on the
+`trap` preset (UBSan, trapping) and reports crashes and hangs with gdb
+backtraces.
 
 ## Reverse engineering
 

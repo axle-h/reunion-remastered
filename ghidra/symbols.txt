@@ -51,7 +51,7 @@
 @unit 43d5 SoundDrv
 @unit 46ca Gus
 @unit 4719 Ems
-@unit 474f Xms
+@unit 474f SbDriver
 @unit 4758 Mouse
 @unit 47da Blit
 @unit 484a MinMax
@@ -131,6 +131,8 @@
 48c7:029f FreeMem(p: pointer; size: word)          // Run-time error 204 on invalid pointer
 48c7:02e7 MemAvail(): longint
 48c7:0303 MaxAvail(): longint
+48c7:02b9 Mark
+48c7:02cb Release
 48c7:0323 HeapWalk                  // Free-list walker used by MemAvail/MaxAvail (callback in BX)
 48c7:0353 HeapAlloc                 // GetMem core: AX = size; returns DX:AX, CF on failure
 48c7:041e HeapFree                  // FreeMem core
@@ -157,9 +159,9 @@
 48c7:0861 TextIOEnd(var f: TextRec)   // Ends a Read/Write statement: flushes if FlushFunc set
 48c7:087c TextInOut                 // Calls TextRec.InOutFunc
 48c7:088a TextFlush                 // Calls TextRec.FlushFunc
-48c7:0898 ReadChar(var f: TextRec): char
-48c7:0929 ReadStr(var f: TextRec; var s: string; maxLen: word)        // Leaves f on the stack for the next Read item
-48c7:0964 WriteStr(var f: TextRec; const s: string; width: integer)   // Leaves f on the stack for the next Write item
+48c7:0898 ReadChar(var f: TextRec @keep): char
+48c7:0929 ReadStr(var f: TextRec @keep; var s: string; maxLen: word)        // Leaves f on the stack for the next Read item
+48c7:0964 WriteStr(var f: TextRec @keep; const s: string; width: integer)   // Leaves f on the stack for the next Write item
 
 # Untyped/typed files
 48c7:0991 AssignFile(var f: FileRec; const name: string)
@@ -186,10 +188,10 @@
 48c7:0c63 LongShl(a: longint @DX:AX; n: byte @CL): longint @DX:AX
 
 # Strings (temporaries are left on the stack between helper calls)
-48c7:0c7c StrLoad(var tmp: string; const src: string)               // tmp := src; pops only src
+48c7:0c7c StrLoad(var tmp: string @keep; const src: string)               // tmp := src; pops only src
 48c7:0c96 StrStore(const src: string; var dst: string; maxLen: word) // dst := src truncated to maxLen
 48c7:0cba Copy(const s: string; index: integer; count: integer): string
-48c7:0cfb StrConcat(var tmp: string; const src: string)             // tmp := tmp + src; pops only src
+48c7:0cfb StrConcat(var tmp: string @keep; const src: string)             // tmp := tmp + src; pops only src
 48c7:0d27 Pos(const sub: string; const s: string): integer
 48c7:0d6d StrCompare(const a: string; const b: string)              // Result in flags
 48c7:0d98 CharToStr(c: char): string
@@ -221,8 +223,8 @@
 48c7:1400 RealSqr(a: real @DX:BX:AX): real @DX:BX:AX
 48c7:1406 RealMul(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX
 48c7:140c RealDiv(a: real @DX:BX:AX; b: real @DI:SI:CX): real @DX:BX:AX    // Run-time error 200 on /0
-48c7:1416 RealCmp(a: real @DX:BX:AX; b: real @DI:SI:CX)       // Result in flags
-48c7:141a RealCmpEq(a: real @DX:BX:AX; b: real @DI:SI:CX)     // Result in flags (=, <>)
+48c7:1416 RealCmp(a: real @DX:BX:AX; b: real @DI:SI:CX)       // Result in flags (all comparisons)
+48c7:141a LongToReal(a: longint @DX:AX): real @DX:BX:AX
 48c7:141e Trunc(a: real @DX:BX:AX): longint @DX:AX
 48c7:1426 Round(a: real @DX:BX:AX): longint @DX:AX
 48c7:1440 RealAddKeep               // Near helpers that preserve the second operand
@@ -250,6 +252,9 @@
 
 # Characters
 48c7:1b78 UpCase(c: char): char
+48c7:18d0 RandomReal                // Random with no argument: Real in [0, 1)
+48c7:153f Sin
+48c7:0daa StrFromBuf                // String from a character buffer
 
 # ---------------------------------------------------------------------------
 # System unit variables, data segment 4a81
@@ -357,9 +362,9 @@
 4a81:7b08 Game::CurBody: ^TBody                // Set by 357b:3253 from CurSystem/CurPlanet/CurMoon: DS:4752[sys]^[body], 65-byte records
 4a81:7b0c Game::CurBodyIsColony: word          // 1 if CurBody^.Owner = 1 and CurBody^.Colony <> 0 (357b:3253) ? boolean stored as word
 4a81:8a8c Mouse::Hotspots: array[1..66] of THotspot  // Pascal base is DS:8A71 (element 0). 66 records end at 9181, just before CursorState. Hit test 4758:05bc returns 20+index
-4a81:918e Mouse::BtnDown: boolean             // Raw button state. Mouse::Poll copies it to Buttons. Never written by Pascal code (callback?)
-4a81:918f Mouse::BtnRight: boolean            // ? Copied to DS:8A7A while a button is down (8A7A=1 opens cockpit in 26fe)
-4a81:9190 Mouse::BtnOther: boolean            // ? Copied to DS:8A7B while a button is down
+4a81:918e Mouse::BtnDown: boolean             // Any button down; written by the INT 33h callback (4758:0000), copied to Buttons by Mouse::Poll
+4a81:918f Mouse::BtnLeft: boolean             // Callback: button bit 0 (left). Copied to HeldLeft while a button is down
+4a81:9190 Mouse::BtnRight: boolean            // Callback: button bit 1 (right). Copied to HeldRight while a button is down
 4a81:919a Mouse::SavedCursorShape: word       // 357b:29cd saves CursorShape here before changing it
 4a81:9602 Mouse::CursorImages: array[0..5] of array[0..255] of byte  // 16x16 cursor bitmaps, CursorShape*256 (47da:065f). Filled by 321d
 4a81:91a0 Game::IdeaTimer: array[1..35] of integer  // Hours until invention k becomes available (status 0 -> 1). -1 = not scheduled. Decremented by 1b8a:3d07; set by 29b9:136e
@@ -559,7 +564,7 @@
 20d4:0985 LoadWarAnimDef(n: integer)        // war\anim\anim.def: 25 scripts of 140 (anim, frame, sound, delay) entries
 405f:095a IconAllOpenSize(var size: word)
 405f:09ce IconAllOpen
-405f:09f3 IconAllReadChunk(var len: word; var buf: pointer)
+405f:09f3 IconAllReadChunk(var buf: pointer; var len: word)
 405f:0a57 IconAllClose
 3a1b:0810 IconAllIndex                      // Builds the index of the 68 40x24 icons in ICON\ICON.ALL
 3a1b:0864 DrawIcon                          // 6 bytes of arguments (x, segment?, icon number)
@@ -609,3 +614,839 @@
 3e17:0000 DrawEdges(bufSeg: word; verts, edges: pointer; count: integer; colour: byte)
 3e17:11f9 FillPoly(bufSeg: word; n: integer; pts: pointer; colour: byte)
 3e17:18db InitCosTable
+
+# ---------------------------------------------------------------------------
+# Functions: command centre, title, anim, vectors (agent proposals)
+# ---------------------------------------------------------------------------
+321d:000d HeroSelect                        // Hero select: click left half = hero 2, right half = hero 1; select jingles; fades to grafika\hero<n>
+321d:0155 StartMenu                         // Three-button start menu (grafika\options); sets Game::StartChoice to 1, 2 or 3
+321d:026f InitTitleAndMainMenu  // loads charset1/iconmain, builds Game::PressHotspot tables, random Game::Hero (1/2), HeroSpriteX, loads grafika\text and grafika\main panels to screen
+321d:0866 SetMainMenuPalette  // pokes fixed RGB into Gfx::Palette entries 1,34-36,F1-FE
+3abd:005c HandleCommandCentre  // per-frame room handler: on entry draws backdrop/hotspots; dispatches Game::HotspotHit (0x14-0x20) to CurrentScreen switches and panel animations
+3abd:0275 DrawCommandBackdrop  // loads grafika\main into GetMem'd buffer, blits to screen at 3d40, then LoadCommandGfx and palette
+3abd:0352 LoadCommandGfx  // allocs buffers and loads mainface, heroes, maina4, maina5 pics; draws hero portrait and staff icons
+3abd:04b4 ShowHologram(vec: integer)  // loads grafika\holo<Hero> panel, animates open, shows rotating wireframe (LoadWireVec vec) until key/click, then closes
+3abd:08e0 SetupCommandHotspots  // Mouse::HotspotCount=12; builds staff hotspots 1-4 plus RESEARCH-DESIGN, MESSAGE, COMMANDERS, INFO-BUY, STARMAP, SPACE-LOCAL, SHIP-INFO, PLANET-MAIN
+3abd:0ba1 InitRoomAnim  // GetMem 349h/230h anim buffers, clears current anim state
+3abd:0bdc FreeRoomAnim  // StopMainAnim and FreeMem the two anim buffers
+3abd:0c05 StartMainAnim(anim: integer)  // stops current, sets anim id, frame=1, random delay 100-299, reads speed/count from table
+3abd:0c55 StopMainAnim  // if anim loaded: Anim::FreeMainAnim, clear id
+3abd:0c70 TickRoomAnim  // delay countdown then plays next frame of main anim into window with staff overlay; picks random new anim at end
+3abd:0e5d StepMainAnim  // advances frame (wrap) and draws it directly to screen (used by death/ending loops)
+3abd:0ed5 FreeGrRoomAnim  // StopGrAnim and FreeMem the two anim buffers
+3abd:0efe StopGrAnim  // if anim loaded: Anim::FreeGrAnim, clear id
+3abd:0f19 TickGrAnim  // advances war (granim) animation with per-frame delay, loops by repeat count, asks Game::GrWarProc for next anim
+3abd:102c OpenPanelMaina1  // loads grafika\maina1 and slides 6 strips into place while ticking ambient anims
+3abd:1122 OpenPanelMaina2  // loads grafika\maina2 and slides 4 strips in while ticking ambient anims
+3abd:1221 OpenPanelMaina3And4  // slides in maina4 (16 steps, direction by 7E28) then maina3 strips
+3abd:1395 TickPanelDoorAnim  // timed maina4 door/frame animation with random period, redraws staff icon, also ticks room anim
+3abd:14c5 TickAmbientLights  // cycles two small animated sprites from maina5 and randomizes palette-index blink colours
+3abd:163f DrawHeroPortrait  // blits hero sprite (Game::HeroSpriteX) from heroes buffer to screen
+3abd:167d DrawHeroPortraitToBuffer  // same but into DAT_7e10 offscreen buffer
+3abd:16bc DrawStaffIcon(slot: integer)  // draws staff-member icon for slot if production rate>0 and not excluded
+3abd:1794 DrawAllStaffIcons  // loops DrawStaffIcon 1..4
+3abd:17dd ShowDeathEnding  // loads grafika\deathsz / death<Hero> pics, plays ending anim, Halt
+3abd:1a47 FadeOutAndHalt  // fades palette out and System::Halt
+3c64:0666 BlitWedgeToScreen(src: pointer)  // rep movs of growing-width rows (8,13,17,21...) from src+C28 into Gfx::ScreenSeg at 3d40+: triangular/shaped region copy ?
+3d38:00e5 SortByDepth(parentFrame: word)  // selection sort of index array at 8652 by key in 85ec table (depth)
+3d38:03b3 DrawBlueFrame  // builds blue palette ramp C0..EF, calls DrawFrame, blits 73x72 result to screen
+3d38:0413 DrawWireObject(idx: integer)  // Vec3D::Project of object idx then Vec3D::DrawEdges
+3d38:0490 DrawWireScene  // draws all DAT_7e50 wire objects, then advances the three rotation angles (mod 438h)
+3d38:04f9 SetWirePalette  // Palette[41h]=(0,38h,0) and uploads it
+3d38:051c AllocVecBuffers  // GetMem projected-point, point, edge and face buffers for 17 objects
+3d38:05d8 FreeVecBuffers  // frees buffers of AllocVecBuffers
+3d38:0a00 AllocWireBuffers  // like AllocVecBuffers without face buffers
+3d38:0a96 FreeWireBuffers  // frees buffers of AllocWireBuffers
+3d38:0b2e ReadVecObject(n, slot: integer; parentFrame: word): boolean  // reads one record (points/6B, edges/2B, faces/14h) from open file, divides coords by 10; false at -1 terminator; n unused ?
+3e17:13d6 FillSpans(a, firstY, lastY, color: integer)  // fills scanlines firstY..lastY between left/right edge tables with a 2-byte colour pattern ?
+3e17:1438 TraceEdge(y0, x0, y1, x1: integer; table: pointer)  // rasterises polygon edge into edge table (Bresenham-like, jump table for steep/shallow) ?
+
+# ---------------------------------------------------------------------------
+# Functions: simulation, pub, advisor, hiring, research, cargo (agent proposals)
+# ---------------------------------------------------------------------------
+1b8a:006e ProcessPubTimers  // hourly: counts down Pub::People wait timers and applies pub deal/pirate results (deliveries, "You got N t of ...", pirate.txt messages)
+1b8a:04d8 ProgressResearch  // hourly: advances current research CurResearch by staff exp vs requirements; "The X is ready for production"
+1b8a:0705 ProgressProduction  // hourly: subtracts ProductionRate from item work remaining, completes items, refreshes production screens
+1b8a:0cba ProcessBodyEvents  // nested; per-body random events: disease, starvation, revolt, meteorite, building explosion, discoveries (satellite/observatory/Psy radar), mining/living messages
+1b8a:206e ProcessAllBodyEvents  // hourly: loops systems/planets/moons calling ProcessBodyEvents, then redraws screen 8
+1b8a:2178 UpdateBuildings  // hourly: counts buildings per kind, random damage to Health, destroyed-building handling and screen refresh
+1b8a:25b5 UpdateColonySetups  // hourly: counts down Game::ColonySetups timers, finishes/removes completed entries
+1b8a:26cf MineBody  // nested; adds mined resources into body/planet stores below cap (random 30% chance when no miner flag)
+1b8a:2837 MineAllBodies  // hourly: loops systems/planets/moons calling MineBody
+1b8a:2a0e ProcessTravellingGroups  // hourly: groups in flight (status 4-6): arrival at jump, exploration reports ("Your ships explored...", new alien race met)
+1b8a:3546 CheckEnemyAttacks  // hourly: scans alien fleets/colonies; "ATTENTION! Enemy fleet approaching", "is under attack by"
+1b8a:3b83 GrowStaffExperience  // hourly: random +1 staff experience (pilot/builder/fighter/developer) up to level cap; applies training result
+1b8a:3d07 ProcessStoryTimers  // hourly: decrements IdeaTimer (ideas become available) and fires story-stage events (Game::StoryStage)
+1fd2:0000 DrawPubSprite  // near; blits pub person idx (Pub::People record 1Bh) animation frame from background
+1fd2:00d9 LoadPubGraphics  // loads grafika\pirates, kocsma, kocsmaan; draws all person sprites; sets palette
+1fd2:01ef SetupPubHotspots  // 10 hotspots from Pub::People positions/names (disables absent persons)
+1fd2:02f4 LoadPersonPortrait  // loads grafika\beszed and alien\kocsmb/alien pics for the person being talked to
+1fd2:04f0 SetupTalkHotspot  // single "Talking" hotspot over the dialogue box; resets hover state
+1fd2:0544 ReadQuestionCode  // reads kerdes<N>.loc line, extracts 2-char numeric code into DAT 776A
+1fd2:05fe ShowReply  // reads valasz<N>.loc reply, builds price offers for deals (item qty*price), draws reply text
+1fd2:0788 BuildQuestionMenu  // copies person's Pub::MenuLists entry to CurMenu, adds conditional topics, loads question lines
+1fd2:09ea DrawQuestionMenu  // draws wrapped question lines with highlight, clears leftover area
+1fd2:0a8b UpdateQuestionHover  // maps mouse click Y/X to menu line, redraws on change
+1fd2:0b30 UpdateTopicAvailability  // computes which dialogue topics are available (story flags via 29b9:1461)
+1fd2:0c2b AddToDate  // adds a duration to a date with carry (24h, 30d, 12m)
+1fd2:0c95 StartPubDealWindows  // sets start/end dates of Pub::Deals 1..10 = now + their offsets
+1fd2:0d2b DateToHours(year, month, day, hour: longint): longint // near; packs a date into a comparable number
+1fd2:0d75 FindActiveDeal  // returns index of Pub::Deals entry whose [start,end] window contains now, else 0
+1fd2:0e5f PlayRandomPubSound  // picks random "local<1..8>" sound different from last, if sound idle
+1fd2:0ec1 AnimatePubPerson  // near; steps Pub::Anims[idx] frame countdown and blits next frame
+1fd2:0fc2 UpdatePubAnimations  // per-tick: random sound plus AnimatePubPerson for each pub person
+1991:0000 AdvisorScreen  // advisor dialogue screen: picks answer by topic and game state
+1991:02c9 FindAdvisorItem(flag: boolean): integer // index (1..9) of advisor-related invention of the current kind (status 5 if flag else 1..4)
+1991:0355 LoadAdvisorPictures  // loads grafika\you and advisor face pictures
+1991:0487 DrawAdvisorQuestion  // reads kerdes1.sp line and draws it
+1991:0580 ShowAdvisorAnswer  // loads/word-wraps answer text for DAT 7720 (valasz1.sp) and draws it
+1991:08de LoadAdvisorMenu  // copies CurMenu from table and loads rkerdes1.sp option lines
+1991:0946 DrawAdvisorMenu  // draws option lines with highlight, blanks unused
+1991:09e8 PollAdvisorMenu  // mouse loop selecting a menu option
+1991:0a8b SetupAdvisorHotspots  // single "Talking" hotspot
+3fab:0032 HireScreen  // hiring staff screen (pilot, builder, fighter, developer) with candidate select/hire
+3fab:0321 LoadHireBackground  // loads grafika\ staff picture, sets palette
+3fab:03ba DrawCandidateFrames  // draws/highlights the 3 candidate frames
+3fab:048f DrawCandidateInfo  // draws "My scholarly level" / abilities / description of selected candidate
+3fab:092b SetupHireHotspots  // 3 candidate hotspots with names
+2d66:0029 ResearchScreen  // research and design screen: select invention, start/stop development or analysis
+2d66:0299 SetupResearchHotspots  // 35 invention hotspots (5 columns), names or Unknown
+2d66:03e9 DrawInventionInfo  // draws selected invention name, status text, progress, skill requirements
+2d66:074c DrawDeveloperSkills  // draws developer skill values and name, update icons
+2d66:0891 AnimateSelectionFrame  // flashes selection border pixels on selected invention
+2d66:0966 ResetSelectionFrame  // redraws selection border to steady colors, resets blink counter
+2d66:0a1a DrawInventionIcons  // draws status icon for each of 35 inventions
+2d66:0b5c DrawIconFrame(seg, dest: word; frame: byte)  // blits 32x14 icon frame from CDS picture
+2d66:0bae AnimateCurrentResearch  // advances progress animation on the invention being researched
+2d66:0caa PlayIconTransitionOut(inv, kind: integer)  // animates icon frames for state change (frames 0..10)
+2d66:0d7b PlayIconTransitionIn(inv, kind: integer)  // animates icon frames for state change (frames 10..20)
+2583:0029 CargoScreen  // cargo transfer between planet and ship, main handler
+2583:0494 InitCargoScreen  // sets current body from group, collects store list, computes capacities (DAT 7816 etc)
+2583:07a6 SetupCargoHotspots  // 38 hotspots for item rows
+2583:0894 FlashCargoRow(row: integer)  // highlights row, short delay, unhighlights
+2583:08b1 DrawCargoNames(row: integer)  // draws resource and item names (row 1..6 resources, then items)
+2583:09c6 DrawCargoAmounts  // draws amounts for planet and ship, used/total space, "Storage space on planet"
+
+# ---------------------------------------------------------------------------
+# Functions: ground and space battles (agent proposals)
+# ---------------------------------------------------------------------------
+1430:000f UnitAssignScreen  // GrWarUnits screen 0x13 handler: add/remove units to the ground-battle force via hotspots (20 slots of 0x27 bytes)
+1430:033c UnitAssignDrawScreen  // loads war\grbeoszt/gricon pics, draws totals, calls DrawUnitList
+1430:0479 CollectAvailableForces  // sums troops/attack/defence per unit type 1..4 from groups, buildings, planet stores; builds the two 20-slot unit lists
+1430:0c14 SetupUnitHotspots  // 40 hotspots: 20 "Remove unit", 20 "Add sub..." buttons
+1430:0d3c DrawUnitList  // draws each assigned unit slot (count, strength, icon) and the force totals
+1537:0029 EnterGroundBattle  // loads war\grwar, grf<surface>, gricon pics, allocs buffers, runs GrWarProc anim; called from screen 0x20 on entry
+1537:0200 InitBattleUnits  // zeroes grid, compacts empty slots, places both armies at start positions, inits the two commanders/bases
+1537:053a SetupBattleHotspots  // 4 hotspots: battlefield, "Move", "Attack", side strip
+1537:05ee SetHotspotFlags(flag: byte) // sets hotspot byte +1 (_1A) on every hotspot, clears HotspotHit
+1537:0642 DrawSelectedUnitInfo  // prints unit class name, "Pcs"/"Str" or "Dmg" and "Colony" for the selected unit
+1537:08a4 DrawUnitSprite(frame, sheet, x, y, mode: integer) // near; blits 16x16 sprite from gricon sheet; mode 1..4 = normal/flipped/shadow variants (47da_02da/0456/04d8/056d)
+1537:0961 DrawEffectSprite(frame, sheet, x, y, variant: integer) // near; blits 16x16 sprite from gricon2 (effects) sheet
+1537:09c2 DrawProjectile(x, y, kind: integer) // near; blits a 16x10 projectile sprite from gricon2
+1537:0a0c DrawSelectionMarkers  // draws selection/target cursor sprites around the selected unit (and its attack target)
+1537:0ca0 DrawBaseSprites  // draws the two command bases/buildings on the battlefield and marks their grid cells
+1537:0d85 BattleTick  // if not paused runs BattleRound; ends battle (EndGroundBattle) when finished
+1537:0da8 RenderBattle  // redraws background, all units, effects, projectiles and animation to the screen
+1537:11f2 PickBattleAnim(): integer  // random id 1..14 of a war animation whose two unit types are both present; this is Game::GrWarProc
+1537:12aa DistManhattanTiles(unit, enemy, side: integer): integer // (|dx|+|dy|-5)>>4 + 1; side 2 swaps unit/enemy
+1537:13c7 DistEuclidTiles(unit, enemy, side: integer): longint // hypot-like distance in tiles, +1; side 2 swaps
+1537:14ff DistSquaredTiles(unit, enemy, side: integer): longint // (dx^2+dy^2)>>8 + 1
+1537:1652 IsAdjacent(unit, enemy, side: integer): boolean // DistEuclidTiles < 2
+1537:1674 IsInArtilleryBand(unit, enemy, side: integer): boolean // DistSquaredTiles in 4..16
+1537:16a3 InWeaponRange(weapon, unit, enemy, side: integer): boolean // weapon 1..4 range check using the three distance functions
+1537:1725 DirectionToward(selfX, selfY, targetX, targetY: integer): integer // 4-way direction 1..4
+1537:177e DirectionToward16(selfX, selfY, targetX, targetY: integer): integer // 16-way direction for projectile sprites
+1537:188f StartUnitEffect(side, unit, effect: integer) // sets unit's effect id, timer from table, delay 3
+1537:18d3 FindUnitNearPoint(x, y, side: integer): integer // nearest live unit to screen point (side 3 = both; +100 if side 2); 0x15 = base; 0 if too far
+1537:1b80 FindNearestEnemy(unit, side: integer): integer // index of closest living enemy unit, 0 if none
+1537:1c05 BattleRound  // one AI/combat turn for all units: targeting, movement, attacks, damage, projectiles, sounds
+1537:2a19 ApplyGroundLosses  // scales surviving unit counts back into groups, buildings and planet stores after the battle
+1537:312c EndGroundBattle  // frees buffers, applies losses, shows grvict/grlost screen with casualty tables
+1537:3369 AnimateResultScreen  // advances the granim.ani frames on the grlost screen (every 13 ticks)
+1537:33da FloodFillStep(x, y: integer; parentFrame: word) // nested in FindPath: visits a grid cell, queues it, tracks closest-to-goal cell
+1537:34d4 FindPath(sx, sy, a, b, c, d: integer; var dir: word) // flood-fill BFS path search on the 16x9 battle grid from (sx,sy) towards (a,b)/(c,d); dir 1..4 or 0
+20d4:002d EnterSpaceBattle  // loads war\spwar, sphatter, spants, spface<pilot> pics and buffers; entry of space battle screen
+20d4:01d3 InitSpaceFleets  // builds attacker/defender ship lists (12-byte records, max 500) from groups, buildings and planet stores
+20d4:076f InitSpaceFleets_NextBody // Ghidra split of 01d3: add planet-store ships of next body (loop label, not a real function)
+20d4:07dd InitSpaceFleets_AddStores // Ghidra split of 01d3 (loop label, not a real function)
+20d4:093e InitSpaceFleets_LoopTest // Ghidra split of 01d3 (loop label, not a real function)
+20d4:0949 InitSpaceFleets_Finish // Ghidra split of 01d3: restore CurPlanet, save initial counts (not a real function)
+20d4:0969 ClearHotspots  // Mouse::HotspotCount := 0
+20d4:0a14 FreeWarAnims  // frees all loaded war animations of the current script
+20d4:0a85 PlayWarAnimScript  // per-tick player of war\anim\anim.def scripts: curtain wipe, frames, sounds, picks next script
+20d4:0c44 PlayWarAnimScript_Restart // Ghidra split of 0a85 (not a real function)
+20d4:0dc6 PlayWarAnimScript_Wait // Ghidra split of 0a85: decrement delay (not a real function)
+20d4:0dcc DrawPilotFace  // near: blits the spface pilot portrait to the screen
+20d4:0df2 DrawShipDot1(srcOfs, dstOfs: integer)   // near: copy 1-pixel ship sprite into the battle buffer
+20d4:0e0d DrawShipDot2(srcOfs, dstOfs: integer)   // near: copy 2-pixel ship sprite
+20d4:0e28 DrawShipDot4(srcOfs, dstOfs: integer)   // near: copy small plus-shaped ship sprite (rows at +0, +0xa0, +0x141)
+20d4:0e57 DrawShipDot7(srcOfs, dstOfs: integer)   // near: copy bigger ship sprite (3 rows)
+20d4:0e89 DrawExplosion(srcOfs, dstOfs: integer)   // near: 7x7 sprite from spants, '@' = transparent
+20d4:0efd StepSpaceBattle  // one frame: moves ships, random hits between sides, draws all to screen, detects end
+20d4:17f0 ApplySpaceLosses  // near: scales surviving ship counts back into groups, buildings and planet stores
+20d4:1de8 EndSpaceBattle  // applies losses, shows spvict/splost screen with ship tables
+4a81:764e GrWarUnits::AttackerSlotCount: integer  // count of 0x27-byte unit records at 4a81:7646 (max 20)
+4a81:7650 GrWarUnits::DefenderSlotCount: integer  // count for list at 4a81:764a
+4a81:7642 GrWar::BattleGrids: pointer  // 2 x 0xc6 battle state blocks (0xb-wide grid at +0xc, units at +0x30c)
+4a81:7652 GrWar::Projectiles: pointer  // 0x708 bytes, 2 sides x 50 x 0x12-byte projectile records
+4a81:770a GrWar::PlayerWon: boolean  // selects grvict vs grlost in EndGroundBattle
+4a81:77aa SpWar::AttackerShipCount: integer  // used by 20d4:01d3, max 500, list at 779e
+4a81:77ac SpWar::DefenderShipCount: integer  // list at 77a2
+4a81:7789 SpWar::PlayerWon: boolean  // selects spvict vs splost
+
+# ---------------------------------------------------------------------------
+# Functions: planet info, planet list, messages (agent proposals)
+# ---------------------------------------------------------------------------
+1390:000b SetupScrollBarHotspot()  // one hotspot "Scroll bar" at 134,55 size 12x140
+1390:0047 AddListEntry(sys, planet, moon, bodyIdx: integer; parentFrame: word)  // tests body flags vs list Mode; appends 8-byte entry {sys,planet?,moon,kind} (+ kind 4 header when moon>0); nested of BuildList
+1390:02b6 BuildList()  // loops systems 1..8 and their planets/moons calling AddListEntry; sets entry count
+1390:03e9 ListKindCaption(mode, kind: integer; parentFrame: word): string  // "Colony on"/"Miner station on"/"Accomodable"/"Mineable"/"Aliens on"/"Enemy colony on"/"Friendly colony on"
+1390:04cc DrawList()  // draws visible rows (caption + "<System> system planet <name>") from TopIndex;
+1390:0735 RefreshList()  // BuildList then DrawList
+1390:0741 DrawScrollBarThumb()  // thumb size/position from count and top index
+1390:07c0 DragScrollBar()  // while mouse button held, maps ClickY to top index, redraws list
+34b0:0001 AddMessageLogEntry(kind: integer; const text, voice: string)  // appends 53-byte entry to message log (7ade/7ae2, max 15), plays voice, redraws log if screen 0Bh
+34b0:011a ShowMessageLine(lineNo: integer)  // reads line from message.txt, shows via MessageBox (logged)
+34b0:0158 ShowMessage(const text: string)  // MessageBox, logged, no voice
+34b0:0197 ShowMessageNoLog(const text: string)  // MessageBox, not logged
+34b0:01df ShowKitalalLine(lineNo: integer)  // line from kitalal.txt wrapped in quotes then ShowMessage (alien speech?)
+34b0:0237 MessageBox(const text, voice: string; logIt: boolean; buf: pointer; edit: boolean; maxLen: byte)  // '|' = line break, '&' = edit-field position; saves background, waits for click or runs text input into buf
+34b0:087f DrawSatSpriteCell(cell: integer; parentFrame: word)  // nested of PlaySatelliteAnim; blits 12x23 cell (10 per row sheet) from sprite buffer
+34b0:08e1 SaveSatBackground(parentFrame: word)  // nested of PlaySatelliteAnim; copies 12x23 screen area to buffer
+34b0:090a RestoreSatBackground(parentFrame: word)  // nested of PlaySatelliteAnim; copies buffer back to screen
+34b0:0953 PlaySatelliteAnim(satNo: integer)  // loads grafika\szatelit + grafika\sat<N>, animates 74-step Sat::AnimPath
+34b0:0bbe PromptPlanetName(sys, planet: integer)  // "The new planet's name in <sys> system: xxxxxxxx" MessageBox with edit into Names buffer (max 9)
+34b0:0c14 DrawMessageLog()  // draws logged messages list, entry kind 1/99 bold
+357b:0031 SetupPlanetInfoHotspots()  // 3 hotspots normal, 1 for alien mode (7b06)
+357b:0359 DrawPlanetInfoText()  // planet description text: surface type, atmosphere, tech level, colony/alien status strings
+357b:10d9 DrawPlanetInfoScreen()  // loads grafika bg + planets\napr, draws planet pic (134b/1429) and text (0359)
+357b:134b LoadPlanetFajPic(n: integer; setPalette: boolean)  // loads planets\faj<n> 58x43 pic to screen, optional palette set
+357b:1429 LoadPlanetPlanetPic(n: integer; setPalette: boolean)  // loads planets\planet<n> 96x51 pic to screen
+357b:1515 DrawAlienInfoScreen()  // grafika\aliennfo + alien<owner> pic, race text from RawText::SzFaj, then stores
+357b:1671 DrawStoresList()  // resources/products names and amounts from CurBody^.Stores
+357b:1825 DrawPlanetSurfaceBackdrop()  // loads planets\nagy<SurfaceType> full-screen
+357b:18cc SetupSystemViewHotspots()  // body icon hotspots (planets/moons), group and fleet hotspots for system view
+357b:235a InitSystemView()  // allocates 3 buffers, loads assets (23db), orbit positions (3010), palette
+357b:23db LoadSystemViewAssets()  // loads planets\hatter1-4, napr<N> sprite sheets, inits per-body orbit records at 7b28 (18 bytes each)
+357b:26ee ReloadSystemView()  // 23db + 3010 + palette
+357b:270b DrawOrbitingPlanet(parentFrame: word)  // nested of RenderSystemView; scales planet sprite and blits at orbit position
+357b:27e9 DrawOrbitingMoon(parentFrame: word)  // nested of RenderSystemView; scales moon sprite, blits, status marker
+357b:29cd RenderSystemView()  // composes one animation frame of system view (bodies, markers, fleets) then blits to screen
+357b:3010 UpdateOrbitPositions()  // real-number orbit math for each body
+357b:3253 SelectCurBody()  // sets Game::CurBody and CurBodyIsColony from CurSystem/CurPlanet/CurMoon
+357b:32f1 IsCurrentBody(sys, planet, moon: integer): boolean  // compares to CurSystem/CurPlanet/CurMoon
+357b:332c GetBodyName(sys, planet, moon: integer): string  // name of planet (moon=0) or the moon
+357b:33b3 GetBodyFullName(sys, planet, moon: integer): string  // "<planet><sep><moon>"
+357b:346d GetBodyLongName(sys, planet, moon: integer): string  // "<Sys> system planet <p> moon <m>"
+357b:355e GetBodyLocationName(sys, planet, moon: integer): string  // "<Sys> system <p> <m>"
+357b:3644 PowerAllBuildings(parentFrame: word)  // nested of BalanceBuildingPower; sets Flag=1 for intact buildings on body, sums energy supply (kinds 11,4,5,25)
+357b:3746 SumEnergyDemand(parentFrame: word)  // nested; totals PageCodes[5] of powered buildings
+357b:3846 SumOutputs(parentFrame: word)  // nested; totals weighted production/consumption of powered buildings
+357b:3a05 UnpowerBuilding(parentFrame: word)  // nested; clears Flag of one building (by lowest priority field 0Bh)
+357b:3ae5 ApplyBuildingEfficiency(parentFrame: word)  // nested; stores per-building W9/WB/BD scaled by supply ratio
+357b:3cc0 BalanceBuildingPower(sys, planet, moon: integer)  // power/supply balancing for a body: turn off buildings until supply covers demand, apply efficiencies
+357b:3d77 RandomizeProtectPage()  // if Protect::Key2 = 1F5Fh then PageIndex := Random(20)+1 (copy protection)
+4a81:7612 PlanetList::Count: integer  // number of list entries
+4a81:7614 PlanetList::Top: integer  // first visible entry (1-based)
+4a81:7616 PlanetList::Mode: integer  // 1 colonies/miner, 2 accomodable/mineable, 3 aliens
+4a81:760e PlanetList::Entries: pointer  // array of 8-byte entries
+4a81:7b06 PlanetInfo::AlienMode: word  // 0 normal, 1, 3 (word everywhere, e.g. 1413:0133); selects 1 hotspot layout / skips planet pics (357b:0031, 134b)
+4a81:7ade Message::Log: pointer  // array of 53-byte entries {kind: integer; text: string[50]}
+4a81:7ae2 Message::LogCount: integer  // entries used in Message::Log (max 15)
+
+# ---------------------------------------------------------------------------
+# Functions: fleets, ship movement, ship info, satellites (agent proposals)
+# ---------------------------------------------------------------------------
+2b8d:0002 GroupsScreen  // screen 0x16 handler: group detail (name, location, slot categories, ship slots, prev/next group, page up/down)
+2b8d:0773 NewGroupScreen  // screen 0x15 handler: create a group, cycle Kind (Change type) and rename; MenuCommand 0x3a cancels it
+2b8d:08bc LoadGroupsGfx  // allocates 0x2300 bytes and loads grafika\benyil (slot icons)
+2b8d:092b DrawGroupPanel(full: boolean)  // draws kind, name, location/status text ("Fly to", "In orbit", "In the dock of") and, when full, the slot sprites and counts
+2b8d:11bf SetupGroupsHotspots  // fills Mouse hotspots (Change name, Previous/Next group, Page up/down, slot buttons); sets 789a/789b flags and draws slot sprites
+2b8d:15ec DrawNewGroupNameAndType  // prints group name and type name on the New Group screen
+2b8d:1659 SetupNewGroupHotspots  // two hotspots: Change name, Change type
+2b8d:16d0 ClearGroup  // resets the selected TGroup: Kind 1, "New Group", at 1:5:0, Status 1, all slot counts, cargo and items zeroed
+2b8d:17fd InitGroupOfKind  // ClearGroup then picks Kind (by SelGroup, or 5 for planet forces), name from TypeNames and default slot contents from TypeSlots
+2b8d:1996 NextSlotCategory  // DAT 7890 := next category 1..4 that the group's Kind uses (TypeSlots.Used)
+2b8d:19f7 PrevSlotCategory  // same, going backwards
+2b8d:1a62 FirstSlotCategory  // DAT 7890 := first used category 1..4
+2b8d:1abb IsGroupEmpty(list, group: integer): boolean  // true if the group holds no units in its two ship categories; used before Launch/Dock/Move
+2b8d:1bad IsGroupEmptyOfCargo(list, group: integer): boolean  // ? like IsGroupEmpty over the other two categories (0bf1..0bf9 tables); gates menu command 0x25 in 28cd:03fb
+2b8d:1d09 InitPlanetForce  // sets PlanetForceCount 1, GroupCount 0, list 1, SelGroup 1 and initialises that one planet-force group (InitGroupOfKind)
+4a81:7890 Groups::SlotCategory: integer  // currently shown slot category 1..4, cycled by 2b8d:1996/19f7/1a62
+4a81:78a4 Groups::PlanetForceMode: boolean  // := PrevScreen=0x14; screen 0x16 edits a planet force (no prev/next group)
+4a81:789b Groups::AtHomePlanet: boolean  // group is at system 1 planet 5 moon 0 (set in 2b8d:11bf)
+4a81:789a Groups::CanChangeSlots: boolean  // ? body is a colony and group Status is 1 or 7 (set in 2b8d:11bf)
+22ca:0105 GroupScreen  // screen 0x11 handler: group at a planet (dock/orbit view, Launch/Docking, Transfer, Move/Change destination, Ships, Group)
+22ca:065e SetupGroupScreenHotspots  // 6 hotspots: Planet main, Launch/Docking, Transfer, Move/Change destination, Ships, Group
+22ca:08d4 InitOrbitView  // loads planets\muszi + nagy0 background, blits it, allocates animation buffers (group Status != 1)
+22ca:09f9 InitDockView(surfaceType: integer)  // same for a docked group (Status 1), background planets\nagy<surfaceType>
+22ca:0b32 RedrawBackdrop  // reloads planets\nagy0 and blits it (screen 0x11 refresh)
+22ca:0bbc LaunchAnimation(surfaceType: integer)  // plays the dock-to-orbit animation with palette fades and sound
+22ca:0fd3 DockingAnimation(surfaceType: integer)  // plays the orbit-to-dock animation
+22ca:132c BlitViewport(src: pointer)  // huge unrolled copy of the 320-wide planet view (rows 0x31..) from src to the screen
+22ca:1d78 DrawButtonAnimFrame(frame: integer)  // draws one 0x27x0x15 animation frame of the Ships/hangar button
+22ca:1db0 DrawDockDoorFrame(frame: integer)  // draws one 0x2bx0x2f animation frame of the dock doors
+22ca:1de8 AnimateBlinkLight  // near; every 6th tick draws a random 0x12x0x18 blink sprite
+22ca:1e2f AnimateSpinner  // near; advances 4-frame 0x10x0xa sprite every 8 ticks
+22ca:1e78 AnimateLights  // near; randomly toggles 6 small lights and redraws them
+22ca:1fb5 AnimateStarfield  // draws the moving star field while the group is travelling (Status > 3)
+22ca:20f3 InitStarfield  // allocates 1101 stars (x,y,depth,speed) with random positions
+22ca:21ef AnimateGroupView  // per-tick animation: lights, blink, spinner, starfield
+4a81:77fa ShipMove::AnimSheet: pointer  // sprite sheet from planets\muszianm (0x9100 bytes)
+4a81:77fe ShipMove::Backdrop: pointer  // 0xbcc0 byte off-screen copy of the view; star field is drawn into it
+4a81:780e ShipMove::Stars: pointer  // 1101 star records of 7 bytes (x,y,depth,speed)
+26fe:001b ShipInfoScreen  // screen 0x10 handler: grid of up to 32 group icons, select group, switch ship/planet-force list
+26fe:02e6 InitShipInfoScreen  // loads grafika\ship<list+1> and ship3, allocates buffers, draws icons and selection
+26fe:03c3 DrawGroupIcon(icon, slot: integer)  // draws one group slot (1..32) icon on screen and refreshes its selection marker
+26fe:04d4 DrawAllGroupIcons  // draws icons for all shown groups and blanks the remaining slots
+26fe:056d DrawGroupIconBuffered(icon, slot: integer)  // as DrawGroupIcon but into the off-screen copy (used during list switch)
+26fe:0693 SwitchGroupList  // reloads background for the other list, renders icons off-screen and plays a wipe-in transition
+26fe:093b DrawGroupInfo  // right-hand panel: name, location, destination, "Time remaining:", unit counts per category
+26fe:0f2a DrawGroupFlightInfo  // short variant of DrawGroupInfo for travelling groups (Status 4..6), used on screen 0x11
+26fe:10e8 DrawSelectionMarker  // draws selection marker for SelGroup on screen
+26fe:1147 EraseSelectionMarker  // draws the unselected marker for SelGroup on screen
+26fe:11a6 DrawSelectionMarkerBuffered  // same as 10e8 but in the off-screen copy
+26fe:1209 EraseSelectionMarkerBuffered  // same as 1147 but in the off-screen copy
+26fe:1278 SetupShipInfoHotspots  // Change mode + 32 icon hotspots + 32 name hotspots
+4a81:787e ShipInfo::Backdrop: pointer  // 0xbcc0 byte screen image of grafika\ship<n>
+4a81:7882 ShipInfo::Sprites: pointer  // grafika\ship3 sprite sheet (0x5000 bytes)
+4a81:7886 ShipInfo::Buffer: pointer  // 0xfb40 byte off-screen copy used by SwitchGroupList
+18e0:00e8 MapScreen  // screen 7 handler: system/planet/moon selection map (hotspots 0x15.. systems, 0x27.. planets)
+18e0:07ec DestinationScreen  // screen 0x12 handler: choose a destination for the selected group, checks hyperdrive/pilot (messages 0x77e, 0x7be)
+28cd:0000 DeployStockSatellite  // menu 0x46: puts a satellite from Products[2].Stock on the body (Satellite := 1 or $E2)
+28cd:0050 CheckStoryLocations  // near; after a deployment triggers story events at 3:2:1 and 7:1:0
+28cd:0117 DeploySatellite  // menu 0x14: type 1 (Satellite); sets Body.Satellite, consumes one via DeductSatellites
+28cd:018d DeploySpySat  // menu 0x43: type 2 (Spy Sat); Body.Satellite := 2
+28cd:01d6 DeploySpyShip  // menu 0x44: type 3 (Spy Ship); Body._09 := 1
+28cd:021f DeploySolarSat  // menu 0x45: type 4 (Solar sat); Body._0B++
+28cd:0254 ColonizeBody  // menu 10: takes ownership, InfoLevel+10, consumes one trade ship (TakeShips)
+28cd:02ec AcquireBody  // called after paying in screen 2841 (0x3b): Owner := 1, InfoLevel+10, random Miner 1..2
+28cd:0367 SetupGroupScreenMenu  // builds menu 0x11 for screen 0x11 (Transfer, 0x2e, 0x29, body actions)
+28cd:03fb UpdateGroupsMenu  // builds menu 0x16 buttons for the groups screens and stores bitmask in SatButtons; = Groups::UpdateSatMenu
+28cd:0542 UpdateShipInfoMenu  // builds menu 0x10 for ShipInfoScreen and stores bitmask in ShipInfoButtons
+28cd:062b AddBodyActionItems(system, planet, moon: integer; var any: boolean)  // adds menu items 0x46,0x14,0x43,0x44,0x45,10,5 when applicable; any := true if one was added
+28cd:0948 HandleBodyActions  // executes the menu commands above (10,0x46,0x14,0x43,0x44,0x45,5) and refreshes the menu
+28cd:0a98 CountSatellites(system, planet, moon, satType: integer): longint  // sum of satellites of that type in carrier groups (Kind 4) docked/orbiting there
+28cd:0b2c DeductSatellites(system, planet, moon, satType: integer; amount: longint)  // removes amount satellites of that type from carrier groups at the location (selected group first)
+28cd:0c81 CountTradeShips(system, planet, moon: integer): longint  // total ships in trade groups (Kind 2) at the location
+28cd:0d27 TakeTradeShips(system, planet, moon: integer; amount: longint)  // removes amount ships from trade groups at the location (selected group first)
+
+# ---------------------------------------------------------------------------
+# Functions and globals: sound drivers, music, timer (agent proposals)
+# ---------------------------------------------------------------------------
+424a:000f PlayTrack(const name: string)   // 'main1'/'main2'/'no' sets Music::MainThemeOn; stops current; AdlibMusic::PlayMusic if 89be=1, SoundDrv::LoadMusic if 89be=2
+424a:0095 StopMusic                       // 89be=1: 4265:022d StopAdlib; 89be=2: 43d5:020d StopGusMod
+424a:00b2 InitMusicDevices                // GUS type -> 43d5:023e GusEnable; AdLib/SB types 2,3,4,6 -> AdlibMusic::InitMusic; sets 89be (1 AdLib, 2 GUS) and Game::MusicTrack
+424a:0137 ApplyMusicTrack                 // Game::MusicTrack: 0 stop, 1 PlayTrack(str@424a:012B), 2 PlayTrack(str@424a:0131)
+424a:017e RestartMainTheme                // if not Music::MainThemeOn -> ApplyMusicTrack; then MainThemeOn := true
+4265:022d StopAdlib                       // if AdLib present (89c0) -> 428e:0029 via 4265:0296
+4265:0290 StartAdlibTune                  // calls 428e:0012 (ES:SI = TuneBuf, hooks INT 1Ch, starts playing)
+4265:0296 StopAdlibTune                   // calls 428e:0029 (unhook INT 1Ch, silence)
+428e:000c DetectAdlib                     // far stub -> 428e:003a. Out: CF set + AX=-1 if none; CF clear, AX = port (also CS:0823)
+428e:0012 StartPlayer                     // far stub. In: ES:SI = tune buffer (header 0x33 bytes, instrument table 12 bytes each at +33h, patterns at +633h); runs 021d, hooks INT 1Ch
+428e:0029 StopPlayer                      // far stub. If playing (CS:0743): restore INT 1Ch (01f2) + silence
+428e:003a DetectAdlibWrapper              // calls PortScan 065d; CF/AX result as DetectAdlib
+428e:0056 AsmEpilogue                     // pop es / pop ds / retf shared exit of stubs
+428e:0059 TimerTickIsr                    // INT 1Ch handler (18.2 Hz): speed counter CS:873/875 -> row/volume/frequency passes; chains old INT 1Ch (CS:086F)
+428e:008c AdvanceRow                      // decode next 9 channel cells of the current row (instrument/effect 0,1,2,A,B,C,F, note-cut 80h); 64 rows then next order
+428e:01f2 StopPlayerInternal              // restore INT 1Ch if hooked (CS:0744), SilenceAll, clear CS:0743
+428e:021d StartPlayerInternal             // ES:SI = tune; sets pointers CS:880..886, OPL init (regs 01h,08h,BDh), clears state, saves/sets INT 1Ch to 428e:0059 (INT 21h 35h/25h)
+428e:02c0 SilenceAll                      // writes 28 OPL regs to key-off/zero and clears per-channel state arrays
+428e:039c SetInstrument                   // AL = instrument, AH = channel(0..8): programs the 11 OPL operator/feedback registers from 12-byte instrument at CS:882 + 12*AL, skips if unchanged (CS:89A)
+428e:065d ScanAdlibPorts                  // tries ports 218h,288h,318h,388h (table CS:0745, ends -1): OPL timer test (reg 4/2, status AND E0h = 00h then C0h) using VGA retrace waits as delays. Out: AX = port or -1
+431a:000d LoadSbDriver(const name: string)   // reads grwar\alfa1.pic-style file (<=6000 B), un-obfuscates (reverse + XOR) into buffer DS:8A5C/8A5E; Halt('Cannot Open...') if missing; not for GUS
+431a:017f SbBreakLoop                        // CT-VOICE fn 9 (474f:0083) if non-GUS
+431a:0192 IsSbPlaying                        // AL = (89cc status word <> 0); 1 while a VOC is playing
+431a:01a8 StopAndFreeSample                  // SB only: CT-VOICE stop (474f:0026) and FreeMem the 89c6 buffer
+431a:01e6 FreeSampleIfIdle                   // SB only: free sample buffer when not playing
+431a:0209 LoadSample(const name: string; offset, size: word)   // GUS -> 43d5:027a (upload to GF1 RAM); SB -> read file (from offset, size 0 = whole file) into new 89c6 buffer
+431a:031a PlayButtonSfx(const name: string)  // PlaySfx(name) then StartSample; used for UI button sounds
+431a:03a8 StartSample                        // SB: CT-VOICE fn 6 on buffer 89c6; GUS: 43d5:0420 (unless upload busy 89f6)
+431a:03e8 AllocWarSndBuf                     // waits until not playing, frees sample, allocs 0x7594 (30100) bytes at 89d6 (SB), resets cache 89da/89dc
+431a:0424 FreeWarSndBuf                      // SB: stop + FreeMem(89d6, 0x7594)
+431a:059e StopSbVoice                        // CT-VOICE fn 8 (474f:0026) terminate current voice
+431a:08aa FreeSelectSfx                      // frees the 3 preloaded SELECTn buffers, then stops voice (SB)
+431a:0903 PlaySelectSfx                      // starts preloaded select sample (index in param, longint-sized on stack, retf 4); SB: 474f:003a; GUS branch is dead code
+43d5:020d StopGusMod                         // if GUS ready (89f0) and mod loaded (89f8): FreeMem module buffer, StopPlayer (1d3f), 89f8:=false
+43d5:023e GusEnable                          // resets all 20 voices, GusInitPlayer (2b4e), ResetPlayerState (2aae), voice 5 reset, mixer ctrl; 89f0:=1
+43d5:027a LoadGusSample(const name: string)  // calls GusUploadSample(DRAM base 5cf8:5cfa, name)
+43d5:0420 PlayUploadedSample                 // GusPlaySample(base=5cf8:5cfa, len=89f4)
+43d5:0438 GusPlaySample(base, len: longint)  // voice 5: pan 8, vol EFFh, mode 0, freq=89f2 Hz, addr regs (end = base+len-30h), start voice
+43d5:1d3f StopPlayer                         // asm: mixer out 220h,3; PIT ch0 divisor 0 (18.2 Hz); restore INT 08h vector; stop 20 voices (reg0=3, reg0Dh=3)
+43d5:1df7 TimerIsr                           // asm INT 08h handler at ~1000 Hz, see summary
+43d5:2a26 SetModuleBuffer                    // asm: AX,BX -> CS:053A,053C (far pointer pieces of the module/pattern buffer; AX=?, BX=?)
+43d5:2a30 SetModuleSeg                       // asm: BX -> CS:053C
+43d5:2a36 GetModuleOfs                       // asm: AX := CS:053A
+43d5:2a3b GetModuleSeg                       // asm: AX := CS:053C
+43d5:2a40 StartPlayer                        // asm: save INT 08h, install 43d5:1df7, PIT ch0 divisor 04A9h (~1000 Hz), reset accumulators, out 220h,1
+43d5:2aae ResetPlayerState                   // asm: zero 400 bytes of voice state, speed:=6, master volume:=40h
+43d5:2b4e GusInitPlayer                      // asm: build period->GF1 frequency table (369DE4h/period/30), full GF1 reset on ports 220h/323h/325h, 32 voices cleared, reg 4Ch=7, pan/volume init for 20 voices
+43d5:2c5d ParseModAndUpload                  // asm: BX = DOS file handle; reads M.K. header (43Ch bytes via 2f34), copies order list, computes 31 sample records, uploads 8-bit sample data to GUS DRAM (ports 323h-327h), sets 4 channel pans
+43d5:2f34 DosReadHandle                      // asm: INT 21h AH=3Fh using handle CS:053E (CX/DX/DS preset by caller)
+43d5:2f50 GusDelay                           // asm: 50h dummy IN's from DRAM port (4a81:8A4A), ~short busy delay
+46ca:0010 GusWriteRegByte                    // asm: AL = GF1 reg, BL = value; OUT [8A48],AL; OUT [8A48+2],BL
+46ca:001b GusWriteRegWord                    // asm: AL = GF1 reg, BX = value; OUT [8A48],AL; OUT [8A48+1],BX (16-bit)
+46ca:0025 GusWriteAddress                    // asm: AL = reg, BX:SI = 32-bit position; writes high part (reg) and low fraction (reg+1)
+46ca:0046 GusReadRegByte                     // asm: AL = GF1 reg (|80h for read), returns AL = value from [8A48+2]
+46ca:004f GusSelectVoice                     // asm: AL = voice; OUT [8A46],AL unless equal to cache 8A39
+46ca:005e GusReadModifyVoiceCtl              // asm: reg0 := (reg0 AND BL) OR BH (voice control)
+46ca:0071 GusReadModifyRampCtl               // asm: reg0Dh := (reg0Dh AND BL) OR BH (volume ramp control)
+46ca:0084 GusProbe                           // asm: DRAM write/invert/readback test over banks (reg 43h/44h, data port 8A4A); AX=0 absent
+46ca:00d2 GusGetActiveVoices                 // asm: reads reg 8Eh, AL = value AND 1Fh
+46ca:00e7 GusDetect: boolean                 // scans base 200h..2A0h step 10h (ULTRASND parse is dead code), fills port vars 8A3C..8A4A, runs GusProbe
+46ca:01e0 GusReset                           // asm: AL = active voices count; full GF1 reset sequence (reg 4Ch), sets 8A33 and Hz-per-FC divisor 8A3A from table 5CFC
+46ca:02e0 GusSetMixerControl(value: integer) // OUT [8A3C], (value+5Bh) xor 50h (called with -3)
+46ca:02f5 GusResetVoice(voice: byte)         // stops voice, zeroes mode/freq/volume/ramp, pan 8, addresses 0
+46ca:036a GusSetPan(voice, pan: byte)        // reg 0Ch
+46ca:0383 GusSetVolume(voice, volume: word)  // reg 09h = volume shl 4 (16-bit)
+46ca:039f GusSetFrequency(voice, hz: word)   // reg 01h = hz / 8A3A (Hz per FC unit for current voice count)
+46ca:03c0 GusStartVoice(voice: byte)         // reg0 AND FCh (clear stop bits)
+46ca:03d8 GusStopVoice(voice: byte)          // reg0 AND FCh OR stop bits ?
+46ca:03f0 GusSetVoiceMode(voice, mode: byte) // reg0 AND 83h OR mode (loop/bidir/16-bit)
+46ca:0409 GusSetAddresses(voice: byte; pos, loopStart, loopEnd: longint)  // regs 0Ah, 02h, 04h
+46ca:043f GusStopRamp(voice: byte)           // reg 0Dh AND FCh OR stop ?
+46ca:0457 GusSetRampMode(voice, mode: byte)  // reg 0Dh AND A7h OR mode
+46ca:0470 GusSetRampRate(voice, scale, rate: byte)   // reg 06h = scale shl 6 or rate
+46ca:048f GusSetRampRange(voice: byte; startVol, endVol: word)  // regs 07h/08h = value shr 4
+4a81:89cf Sound::DeviceType: byte          // setup.spd byte 0: 1 GUS, 2/3/6 SB family, 4 AdLib only
+4a81:89ce Sound::Enabled: boolean          // effects usable (types 1,2,3,6 and driver detected)
+4a81:89cc Sound::SbStatus: word            // CT-VOICE status word (nonzero = playing)
+4a81:89c6 Sound::SampleBuf: pointer        // loaded .SMP buffer (SB)
+4a81:89ca Sound::SampleSize: word
+4a81:89d6 Sound::WarSndBuf: pointer        // 0x7594-byte buffer for WARSNDn.SMP (SB)
+4a81:89dc Sound::LastWarSnd: integer       // cache: PlayWarSnd reloads only if n differs
+4a81:89be Music::Backend: byte             // 0 none, 1 AdLib, 2 GUS MOD
+4a81:89c0 AdlibMusic::Present: boolean
+4a81:89c1 AdlibMusic::Inited: boolean
+4a81:89f0 SoundDrv::GusReady: boolean
+4a81:89f2 SoundDrv::SampleRate: word       // Hz of last uploaded sample (1000000/(256-TC)); init E210h
+4a81:89f4 SoundDrv::SampleLen: word
+4a81:89f6 SoundDrv::UploadBusy: boolean
+4a81:89f8 SoundDrv::ModLoaded: boolean
+4a81:89fa SoundDrv::ModBuf: pointer        // pattern buffer, (patterns+1)*400h+30h bytes
+4a81:8a33 Gus::ActiveVoices: byte
+4a81:8a36 Gus::Detected: boolean
+4a81:8a39 Gus::CurVoice: byte              // cache of last selected voice (FFh = none)
+4a81:8a3a Gus::HzPerFc: word               // from table at 5CFC indexed by voice count
+4a81:8a3c Gus::PortMixer: word             // GUS base (200h..2A0h)
+4a81:8a46 Gus::PortVoice: word             // base+102h
+4a81:8a48 Gus::PortRegSel: word            // base+103h (data lo +1, data hi +2)
+4a81:8a4a Gus::PortDram: word              // base+107h
+4a81:8a60 Sb::DriverEntry: pointer         // far entry of CT-VOICE driver blob (BX = function no.)
+
+# ---------------------------------------------------------------------------
+# Functions: graphics core, blitters, toolbar, line editor (agent proposals)
+# ---------------------------------------------------------------------------
+4049:0153 Nop   // empty procedure (called once)
+4049:0160 SetPaletteRange(first, last: integer; pal: pointer)   // cli; OUT 3C8h=first; rep outsb of (last-first+1)*3 bytes from pal[first*3] to 3C9h (pal indexed by colour number)
+405f:002f GetPalette(var pal: pointer)   // reads all 256 DAC entries (3C8h index, 3x IN 3C9h) into pal[0..767]
+405f:0074 SetPalette(pal: pointer)   // SetPaletteRange(0,255,pal)
+405f:0089 FadeIn(first, last: integer; pal: pointer)   // FadeInSteps(first,last,pal,5)
+405f:00a2 FadeOut(first, last: integer; pal: pointer)   // FadeOutSteps(first,last,pal,5)
+405f:00bb FadeInSteps(first, last: integer; pal: pointer; steps: integer)   // reads current DAC; for s=0..steps: entry := pal[i]*s div steps for i in first..last, wait vretrace (06e6), write range; finally SetPalette(pal) (all 256). No-op loop if steps<0
+405f:01c2 FadeOutSteps(first, last: integer; pal: pointer; steps: integer)   // as FadeInSteps but entry := pal[i]*(steps-s) div steps (target colours fade to black); no final SetPalette
+405f:02d5 FadeFromWhite(first, last: integer; pal: pointer; steps: integer)   // entry := 63-(63-pal[i])*s div steps, s=0..steps: white -> pal; vretrace each step
+405f:03fd FadeToWhite(first, last: integer; pal: pointer; steps: integer)   // entry := 63-(63-pal[i])*(steps-s) div steps: pal -> white; vretrace each step
+405f:053a WhitenPalette(first, last: integer; level: integer; pal: pointer)   // one-shot: entry := 63-(63-pal[i])*level div 15 for first..last, written with SetPaletteRange (level 15 = unchanged, 0 = all white)
+405f:0638 BlankPalette(pal: pointer; first, last: integer)   // zeros pal[first..last], waits vretrace, writes that range to the DAC
+405f:068d WaitScanlines(n: longint)   // n times: wait for 3DAh bit0 to go 0 then 1 (display-enable toggles = one per scanline ~63us); skipped if n<=0
+405f:06e6 WaitVRetrace   // waits while 3DAh bit3 set, then until set again (start of next vertical retrace)
+405f:06ff WaitFrames(n: longint)   // n x WaitVRetrace (n<=0 does nothing)
+405f:0758 PollKeyAbort(parentFrame: word)   // nested: if Crt.KeyPressed sets Gfx flag 89b8 := 1; if KeyPressed again then consumes ReadKey
+405f:077f WaitFramesOrClick(n: longint)   // unless key flag 89b8 set: up to n vretraces while Mouse::BtnDown (waits for release), then up to n more (counter continues) until a mouse button goes down; polls keys each frame (PollKeyAbort logic)
+4a81:89b8 Gfx::KeyAbort: boolean   // set when a key was pressed during WaitFramesOrClick; if already set the wait returns at once
+405f:1014 SetVideoMode13   // INT 10h AX=0013h via Intr, then misc-output 3C2h := (3CCh & 3Fh) | 40h (400-line sync polarity)
+405f:103d SetTextMode   // INT 10h AX=0003h
+405f:1056 DrawText6x8(const s: string; x, y, width: integer; colour: byte)   // NEAR, ret 0Ch. Fixed-pitch 6x8 text on the screen at x,y (offset y*320+x), padded with blank glyph to width chars (clipped by width via padding only); glyph = Pos(ch, Gfx::CharsetChars)-based cell in Gfx::Charset (+80h, 20 glyphs per row, 16 bytes/glyph col stride, 320-byte rows); every glyph pixel is written as pixel+colour (byte wrap), no transparency; hides mouse cursor if it overlaps
+405f:11e8 DrawStatusText(const s: string)   // DrawText6x8(s,16,37,18,colour 34h)
+405f:1218 DrawTextF9(const s: string; x, y, width: integer)   // DrawText6x8 with colour F9h (-7)
+405f:124b DrawTextFC(const s: string; x, y, width: integer)   // DrawText6x8 with colour FCh (-4); used by text input
+405f:127e DrawTextF1(const s: string; x, y, width: integer)   // DrawText6x8 with colour F1h (-15)
+405f:12b1 DrawTextF4(const s: string; x, y, width: integer)   // DrawText6x8 with colour F4h (-12)
+405f:12e4 DrawTextB0(const s: string; x, y, width: integer)   // DrawText6x8 with colour B0h (-80)
+405f:1317 DrawTextB3(const s: string; x, y, width: integer)   // DrawText6x8 with colour B3h (-77)
+405f:134c DrawGameDate   // builds "Year-Month-Day-Hour" (Game::Year/Month/Day/Hour, '-' separators) and DrawText6x8 at (224,37) width 13 colour 34h
+405f:140a DrawCredits   // Game::Credits as text at (144,37) width 10 colour 34h
+405f:143a FlashCredits   // draws Credits at (144,37) in colour FCh, WaitFrames(6), redraws in colour 34h
+405f:14c1 TypeText(const s: string; x, y, width: integer; colour: byte)   // NEAR, ret 0Ch. Plays sfx 'kiiro', clears width cells, pads/truncates s to width, then draws chars one at a time (pixel+colour, 6x8 glyphs as DrawText6x8) with a click sound (Sound 431a:03a8) and WaitScanlines(300) after each non-space (typewriter effect)
+405f:17a2 TypeTextF9(const s: string; x, y, width: integer)   // TypeText with colour F9h
+405f:17d5 TypeTextFC(const s: string; x, y, width: integer)   // TypeText with colour FCh
+405f:1808 HLine(x1, x2, y: integer; colour: byte)   // screen (Gfx::ScreenSeg) horizontal line, 1-based coords, offset (y-1)*320+x1-1, x2-x1+1 pixels
+405f:1836 VLine(x, y1, y2: integer; colour: byte)   // screen vertical line, 1-based, step 320, y2-y1+1 pixels
+405f:1869 DrawRectOutline(x1, y1, x2, y2: integer; colour: byte)   // 1-based screen rectangle outline (2 HLine + 2 VLine), mouse cursor hidden around it
+405f:18be DrawDitherRect(x1, y1, x2, y2: integer; colour: byte)   // 0-based screen coords; writes colour only where (x+y) is even (checkerboard), cursor hidden
+405f:1933 FatalExit   // FadeOut(0,255,Gfx::Palette,5), SetTextMode, Halt
+405f:1999 OutOfMemoryExit   // SetTextMode, writes "Not enough memory. Please run w..." to Output, Halt
+405f:1c21 PaletteFlashTick   // per-frame: while Gfx::FlashStep>0 sets DAC colour 0 to R=60-2*|FlashStep-31|, G=B=0 (also zeroes Gfx::Palette[0]) and decrements; at 0 with FlashCount>0 decrements FlashCount and reloads FlashStep=61
+405f:1c82 DrawLine(seg: word; x1, y1, x2, y2: integer; colour: byte)   // Bresenham line into segment seg, row stride var 4a81:5cee (320), offset y*320+x via y*256+y*64; vertical/horizontal fast paths; jump-table via bp-2 (Ghidra could not follow)
+405f:1d7c DrawLineCopy(destSeg: word; x1, y1, x2, y2: integer; srcSeg: word)   // same Bresenham as DrawLine (stride var 4a81:5cf0) but each pixel is copied from srcSeg at the same offset into destSeg (line-shaped copy between buffers)
+4a81:5cee Gfx::LineStride: integer   // row step used by DrawLine (320)
+4a81:5cf0 Gfx::LineStrideCopy: integer   // row step used by DrawLineCopy (320)
+47da:0000 CopyBytes(const src; var dest; count: word)   // forward word-wise move (odd byte first), no overlap handling; like Move
+47da:0025 CopyRect(const src; var dest; width, rows: integer)   // copies rows of width bytes with both strides 320; if dest segment = A000 hides cursor per row via Blit::CursorHook (sets 4a81:9270 = row index), CursorHook finished with 999
+47da:00de CopyRectStrided(const src; var dest; width, rows, srcStride, destStride: integer)   // width x rows copy with explicit strides, no cursor hook
+47da:0135 Copy16x16(const src; var dest)   // 16x16 block copy, stride 320 both sides, cursor hook per row (dest assumed screen offset)
+47da:01b6 InterlaceReveal(const src; var dest; width, rows: integer)   // transition: pass 1 top->bottom copies even rows and fills odd rows with colour 40h; pass 2 bottom->top copies the odd rows; waits one vretrace per 2 steps
+47da:02ae CopyRowTransparent(const src; var dest; count: word; key: byte)   // row copy, src bytes equal to key are skipped (dest keeps its value)
+47da:02da BlitTransparent(const src; var dest; width, rows: integer; key: byte)   // width x rows copy, stride 320 both, colour `key` transparent
+47da:0329 BlitTransparentStrided(const src; var dest; width, rows, srcStride, destStride: integer; key: byte)   // as BlitTransparent with explicit strides
+47da:0384 BlitOverBackground(const src; var dest; width, rows: integer)   // stride 320; copies src pixel only if src<>40h and dest pixel < 60h (does not overwrite UI colours)
+47da:0427 CopyColumnTransparentDown(const src; var dest; count: word; key: byte)   // NEAR helper: src sequential, dest step +320, key skipped
+47da:0456 BlitTransposed(const src; var dest; size: integer; key: byte)   // size x size, src stride 320: src row i becomes dest column i (dest[j*320+i]=src[i*320+j]), colour key transparent
+47da:04ac CopyRowTransparentReverse(const src; var dest; count: word; key: byte)   // NEAR helper: dest step -1, key skipped
+47da:04d8 BlitRotate180(const src; var dest; size: integer; key: byte)   // size x size rotated 180 degrees (dest[(n-1-i)*320+n-1-j]=src[i*320+j]), key transparent
+47da:053e CopyColumnTransparentUp(const src; var dest; count: word; key: byte)   // NEAR helper: dest step -320, key skipped
+47da:056d BlitAntiTranspose(const src; var dest; size: integer; key: byte)   // size x size, dest[(n-1-j)*320+(n-1-i)]=src[i*320+j] (rotate 90 + flip), key transparent
+47da:05d1 FillBytes(var dest; count: word; value: byte)   // word-wise fill (like FillChar)
+47da:05f2 FillRect(x, y, width, height: integer; colour: byte)   // fills on Gfx::ScreenSeg, offset y*320+x, no cursor handling
+47da:0630 FillRectAt(var dest; width, height: integer; colour: byte)   // fills width x height at dest, row stride 320
+47da:065f DrawCursorImage(screenOfs: word; width, rows: integer; imageOfs: word)   // draws width x rows part of Mouse::CursorImages[imageOfs..] (row stride 16) on ScreenSeg, colour 0 transparent, screen stride 320
+47da:06a1 SaveCursorBackground(screenOfs: word; width, rows: integer)   // copies width x rows from ScreenSeg (stride 320) into packed Blit::CursorBackground
+47da:06cf RestoreCursorBackground(screenOfs: word; width, rows: integer)   // inverse of SaveCursorBackground
+4a81:9270 Blit::HookRow: integer   // row index passed to Blit::CursorHook (999 = end of blit)
+398f:0000 InputLine(var s: string; x, y, width: integer; canCancel: boolean)   // blocking line editor: BeginInput, loop InputTick+WaitVRetrace until Enter (non-empty) or Esc (if canCancel: restores the original text), then EndInput
+398f:0059 BeginInput(var s: string; x, y, width: integer)   // saves backup copy (GetMem 3Ch), draws s with DrawTextFC, sets cursor position (x+len*6, y+8) and state 7c4a=1
+398f:011a EndInput   // if active: erases cursor underline, redraws text, frees backup, 7c4a=0
+398f:0179 InputTick   // one frame: cursor underline (DrawLine 5px at y+8, blink counter 1..20, colour FDh/FCh); one key: Backspace deletes, Enter (non-empty) finishes, Esc cancels/restores, accepts space, a-z, A-Z, 0-9 (appends or overwrites last char when at width); redraws
+3a1b:0000 WaitVRetrace   // NEAR copy of Gfx WaitVRetrace
+3a1b:0019 SetToolbarAndShow(screen: integer)   // SetToolbar(screen) then ShowToolbar; HotspotHit := 0
+3a1b:0030 SetToolbar(screen: integer)   // loads toolbar slot ids (up to 12, count at table+4 of 25-byte record per screen), clears the rest, page flag from screen, then RedrawToolbar
+3a1b:00bf RedrawToolbar   // rebuilds the 12-icon bar buffer: per slot copies 48x32 background cell from ICON buffer, DrawIcon of icon id, stores label (Ui::ButtonLabels); adds page arrows when slot 7 used
+3a1b:0366 AddToolbarIcon(id: integer)   // puts id into first free slot, draws its cell+icon+label, if it is slot 7 turns on the second page and redraws arrow cells
+3a1b:0586 ScrollToolbarNext   // 21-step vertical scroll of the 32-row bar from panel offset 320 (steps Ui::RowOffset*320), each step waits 40 scanlines + vretrace (updates screen 1 widgets); toggles page flags
+3a1b:0643 ScrollToolbarPrev   // reverse of ScrollToolbarNext, starting at offset 0x2940
+3a1b:0704 ShowToolbar   // InterlaceReveal of the current page (offset 1 or 0x2941) to screen row 0, cursor hidden, then Sound 431a:01e6
+3a1b:0780 ShowToolbarInstant   // CopyRect 320x32 of page 1 to screen row 0, cursor hidden
+3a1b:07ca ToolbarHasIcon(id: integer): boolean   // true if id occurs in the used slots
+3a1b:0932 ShowScreenBackdrop   // GetMem 48320, LoadPicScreen('grafika\'+current screen's pic name,151 rows), CopyRect to screen, FreeMem
+3a1b:09a3 FreeToolbarBuffer   // Game::GfxPathProc target: releases the EMS/heap block holding the icon buffer (4719:0253)
+
+# ---------------------------------------------------------------------------
+# Functions and globals: planet surface, colonising, droids, shop (agent proposals)
+# ---------------------------------------------------------------------------
+2ef2:004a EnterSurface   // Screen setup: loads designer.pic, planets\radar/epul/fanim/felsz<type> sheets into BufA..BufD, allocates the 3 map layers, LoadMap, computes radar geometry
+2ef2:062f RegisterBuildingAnims(system, planet, moon: integer)   // For every building on that body: places unplaced ones (20d4:0c44), registers an animation with damage stage (Health+39)/40 capped at 3 (20d4:07dd)
+2ef2:0791 SetupSurfaceHotspots   // 11 hotspots: Terrain, Radar, Invention up/down/Info, Left/Right/Up/Down scroll, Build, Destroy
+2ef2:0a9d DrawBuildingInfo   // Info panel: mode 3 = type info (Cost, Production, Workers, Energy), mode 4 = existing building (Status Active/Passive, Working %); ends with TextFile::ShowBuildingInfo. Else loads the picture panel
+2ef2:0e00 DrawBuildingInfoTail   // Ghidra fragment of 0a9d (mode 4 Production/Workers/Energy/Working lines)
+2ef2:112c ShowBuildingInfoView   // Loads epulet\epulet<kind> picture, clears map area, draws frame (12af) and shows the picture
+2ef2:1204 ShowBuildingPicture   // Like 112c but only replaces the building picture
+2ef2:12af DrawSurfaceFrame   // Ten blits of the border pieces from BufA to the screen
+2ef2:1404 DrawSurfaceFrameTail   // Ghidra fragment of 12af (last blit + RET)
+2ef2:1441 SetupInfoHotspots   // 4 hotspots: See surface x2, Invention up/down
+2ef2:1472 SetupInfoHotspotsTail   // Ghidra fragment of 1441
+2ef2:151b SetupSimpleInfoHotspots   // 2 hotspots: See surface x2
+2ef2:1589 DrawModeButtons   // Draws the idle Build and Destroy buttons from BufA (screen 0,50 and 2Dh,50)
+2ef2:15de BlinkModeButton   // Called per frame: counter DS:791C mod 20; in mode 2 (build) / 6 (destroy) alternates the button graphic at phases 1 and 11
+2ef2:16c3 DrawKindArrows   // Invention up/down arrows (32x12 at y=64 and y=97); disabled variant at first (1) / last (25) building kind
+2ef2:1765 DrawBackdropTile  // Near. Blits one 16x16 terrain tile of the FELSZ sheet (pattern chosen by surface type) clipped to the 77x64 preview window; tile unused. Callee-visible RET 6 (prototype rejected: DrawBackdropTile: prototype has 8 bytes of stack arguments but the routine pops 6)
+2ef2:18cd DrawBuildingTile  // Near. Blits 16x16 tile (number-1 in 20-wide sheet) from BufC to screen y*320+x. RET 6 (prototype rejected: DrawBuildingTile: prototype has 8 bytes of stack arguments but the routine pops 6)
+2ef2:198a BlitTileInner(src: pointer; tile: word; x, y: integer)   // Like BlitTile but copies only the inner 14x14 pixels (+1,+1) of the tile, used for highlight cells
+2ef2:19f7 DrawBuildingPreview(kind: integer)   // Draws building name, terrain backdrop (5x4 tiles) and the footprint tiles of type kind in the preview window
+2ef2:1b98 DrawBuildingTiles(kind, x, y: integer)   // Draws all footprint tiles of building type kind with BufC at screen position x,y (used by Colonize)
+2ef2:1da3 DrawMapView   // Redraws the 14x9 visible tile window: terrain (BufB/BufD), buildings (BufC), placement cursor footprint highlight; toggles blink DS:791E
+2ef2:22df UpdateModeForCell(x, y: integer)   // Adjusts Mode: browse + own building under cell -> mode 4 select; build mode footprint blocked -> back to 1; destroy mode picks building or back to 1
+2ef2:2463 AddBuilding(kind, system, planet, moon, x, y: byte)   // Appends a TBuilding (Health 100+Random(60), Output=surfaceFactor*40+Random(80)) if the type is allowed on that surface; x,y=FFh = unplaced
+2ef2:2581 BuildOnCurrentPlanet(kind, x, y: integer)   // Player builds: sound, AddBuilding on current body, MarkFootprint, DrawFootprint, UpdateRadar
+2ef2:25fd MarkFootprint(index, kind, x, y, mode: integer)   // Writes the footprint of kind into the occupancy layer (78F0) and building-index layer (78F4); mode 0 = tile pattern+1, else marker mode-24h
+2ef2:270b FootprintFits(x, y: integer; var ok: boolean; parentFrame: word)   // Nested in FindBuildSpot: ok = all cells of the footprint are free in the occupancy layer
+2ef2:27a5 FindBuildSpot(kind, system, planet, moon: integer; var x, y: integer; var found: boolean)   // Spiral search from the map centre for a free spot big enough for kind
+2ef2:29b1 AutoPlaceBuilding(kind, system, planet, moon: integer)   // If that body is on screen: FindBuildSpot + AddBuilding + redraw; otherwise AddBuilding unplaced (FFh,FFh)
+2ef2:2a64 PlaceBuilding(index: integer)   // Finds a free spot for existing building index and stores its X,Y
+2ef2:2ac5 DeleteBuilding(index: integer)   // Removes building index by shifting the array down (14-byte records) and decrementing BuildingCount
+2ef2:2b1a CountBuildings(kind, system, planet, moon: integer; activeOnly: boolean): integer   // Completed buildings (Health=0) of that kind on the body; with activeOnly only those with Flag set
+2ef2:2b9e CountBuildingsByKind(system, planet, moon: integer)   // Fills longint table DS:791C [Flag 0/1][kind 1..25] with counts of completed buildings on the body
+2ef2:2c52 RebuildRadar   // Renders the radar minimap bitmap (needs an active radar building, kind 11h) from the tile layer + radar colours and draws it with the viewport box; handles 2x scale for small maps
+2ef2:312f DrawRadar   // Blits the cached radar bitmap and the viewport rectangle
+4a81:78da Surface::Mode: integer   // 1 browse, 2 placing a building, 3 type info, 4 existing building selected, 6 destroy (2ef2:15de, 22df, 0791 captions)
+4a81:78dc Surface::SelKind: integer   // Building type 1..25 selected (index into BuildingTypes)
+4a81:78e0 Surface::SelBuilding: integer   // Index in Game::Buildings of the selected/created building
+4a81:78e2 Surface::TileSet: integer   // Surface::Tileset[SurfaceType]: number of the FELSZ/FANIM/radar/epulet sheet
+4a81:78e4 Surface::MapVariant: integer   // N in MAP\MAP<type>_<N>.MAP (LoadMap)
+4a81:78ea Surface::CanBuild: boolean   // ? 0 = hotspot captions 'No effect'; set = Invention up/down/Info and Build live
+4a81:78ec Surface::TileLayer: pointer   // 60x60 bytes, [x*3Ch+y-3Dh]: terrain tile number (LoadMap)
+4a81:78f0 Surface::OccupyLayer: pointer   // bytes: 0 free, tile+1 = building cell, FFh blocked terrain
+4a81:78f4 Surface::BuildingLayer: pointer   // words [x*78h+y*2-7Ah]: index of the building covering the cell
+4a81:78f8 Surface::MapWidth: word   // first byte of the .MAP file
+4a81:78fa Surface::MapHeight: word   // second byte of the .MAP file
+4a81:78fc Surface::ScrollX: integer   // Left column of the 14x9 visible window
+4a81:78fe Surface::ScrollY: integer   // Top row of the visible window
+4a81:790a Surface::RadarBuf: pointer   // Saved background bitmap of the radar area
+4a81:790e Surface::RadarColors: pointer   // 2080 bytes loaded from planets\radar<t>: 2x2 colours for each tile
+4a81:7912 Surface::RadarOfs: word   // RadarY*320+RadarX
+4a81:7914 Surface::RadarX: integer
+4a81:7916 Surface::RadarY: integer
+4a81:7918 Surface::RadarDouble: boolean   // map smaller than 46x31: radar drawn at 2x scale
+2841:0060 ColonizeScreen   // Colony set-up: choose up to 6 starter buildings (hotspots 18h..1Dh), checks credits/skill, MenuCommand 3Bh = Colonise (creates planet force group 'forces', pays), 3Ah = cancel
+2841:04c6 SetupColonizeHotspots   // 9 hotspots: Change/Previous/Next people + 6 starter-building slots from Colony::StarterBuildings
+2841:062d DrawColonizeScreen   // Loads grafika\koloniz and planets\epul<t>, draws the 6 candidate buildings with cost or 'Sorry', total cost 100000 label
+2841:0893 CheckKey1   // Copy-protection tail check: calls 405F:1933 when Protect::Key1 = 91h
+2527:001f DroidsScreen   // Droid shop for the current colony: MenuCommand 19h adds a droid (_0A) if capacity (buildings kinds 19h+4) allows and stock>0; hotspot 15h returns to surface (screen 14h)
+2527:01e5 DrawDroidsScreen   // Draws droid count picture, stock digits, capacity digits and the 6 ore store numbers / per-ore usage
+2527:0578 SetupDroidsHotspots   // One hotspot 'Back to surface'
+1413:000a BaseEffScreen   // ? Colony tech-level screen: MenuCommand 26h/27h raise/lower TechLevel (0..7); hotspots 15h/17h switch info page (needs InfoLevel), 16h -> screen 10h, 2Eh -> screen 7
+32b4:0057 ShopScreen   // Production orders screen (INFO-BUY): product list, info/picture toggle, quantity editing (MenuCommands 1Ah..20h), buys with Credits and queues in Product._1D
+32b4:074d ShowSelectPanel   // Loads grafika\select and blits it (list mode background)
+32b4:07c8 ShowInfoPanel   // Loads grafika\info and blits it (info mode background)
+32b4:083a ShowProductPicture(itemChanged: boolean)   // Loads info\info<n> picture of the selected product and blits it, sets palette ramp F1..F6
+32b4:098f InitProductPicture   // First-time variant of 083A (calls AllocVecBuffers first)
+32b4:0aac DrawProductList   // Draws up to 13 visible product names from DS:79EA; selected one inverted
+32b4:0b57 DrawProductInfo(itemChanged: boolean)   // Clears the info area, draws the description (SzTalal lines) and ore texts, wire frame
+32b4:0c50 BuildProductList   // Fills the list (DS:7AB6) with products whose State = 5 (done); preselects Game::SelInvention when coming from screen 3
+32b4:0ca6 FormatOreNeeded(ore: integer; parentFrame: word): string   // Nested in UpdateOrderOres: ore name + total needed (ordered qty * per-piece) right aligned
+32b4:0d21 UpdateOrderOres   // Clamps ordered quantity to ore stock, computes OreNeeded[1..6], flags ores that would run out with one more piece, builds the 'Ore needed : N pieces' text
+32b4:0f78 FormatOnePieceOre(ore: integer; parentFrame: word): string   // Nested in SetupOnePieceOreText: ore name + per-piece amount
+32b4:1003 SetupOnePieceOreText   // Builds 'Ore needed: One piece' header and 6 ore lines
+32b4:10bd DrawOreTexts   // Draws header + 6 ore lines in normal colour
+32b4:1141 DrawOreTextsMarked   // Draws ore lines, ones flagged in DS:7A2D.. in highlight colour; plays warning (06FF) if any flagged
+32b4:12a7 FormatOreStock(ore: integer; parentFrame: word): string   // Nested in ShowOreStock: ore name + amount in the stock table DS:7A12
+32b4:1314 ShowOreStock   // Builds and draws the 'Ores in stock' block
+32b4:1474 DrawOrderSummary   // Quantity being ordered, hours needed ((qty*time + rate-1) div ProductionRate), stock and total price
+32b4:1666 DrawQueueSummary   // Same fields for the already queued quantity (Product._1D)
+32b4:18a1 DrawNotProducible   // Product with nothing queued: clears fields, prints why it cannot be built (hint texts) or stock
+32b4:1a29 DrawQueueNumbers   // Number-only variant of DrawQueueSummary (no labels); possibly unused
+32b4:1b4a DrawQueueTime   // Only the time estimate field of DrawQueueSummary; possibly unused
+32b4:1bf2 SetupShopHotspots   // 2 hotspots: See info/See picture, Select
+32b4:1ca3 SetupShopListHotspots   // 6 hotspots: info/picture, list, Scroll up x2, Scroll down x2
+32b4:1de0 ScrollListUp   // Top of visible list -1; selection follows if it falls off the bottom
+32b4:1e00 ScrollListDown   // Top of visible list +1 if more entries; selection follows
+32b4:1e23 HandleListClick   // Mouse click in the list column: selects row or autoscrolls while button held, then redraws product info
+4a81:79e8 Shop::Sel: integer   // Selected position in the product list
+4a81:79ea Shop::Top: integer   // First visible list position
+4a81:7ab4 Shop::Count: integer   // Number of listed products; DS:7AB6.. = byte list of product indices (1-based, count+1 bytes)
+4a81:79ec Shop::Qty: longint   // Quantity being ordered (+/-1, +/-10 buttons)
+4a81:79fa Shop::ListMode: boolean   // Set after MenuCommand 1Fh / hotspot 16h: product list shown (with picture of the thing). 79FB = quantity edit active, 79FC = info (vs picture) toggle
+4a81:7a12 Shop::OreStock: array[1..6] of longint   // Snapshot of Game ore stocks while ordering (at DS:7A16..)
+4a81:7a34 Shop::OreHeader: string[30]   // 'Ore needed ...' line; DS:7A54.. six string[15] ore lines
+
+# ---------------------------------------------------------------------------
+# Functions: Crt, Dos, mouse, EMS, SB driver thunks, save/load screen (agent proposals)
+# ---------------------------------------------------------------------------
+4857:0000 CtrlBreakHalt  // prototype rejected: unknown type Halt(255) after Ctrl-Break (called from CheckCtrlBreak)
+4857:003b DetectVideo()  // Crt startup: reads video mode (INT 10h AH=0Fh), sets WindMin/WindMax, TextAttr (A2E8) ; hooks INT 1Bh; calibrates Delay counter (A2EE)
+4857:00a3 SetTextModeEga()  // part of startup: forces mode 3 if not mono/CGA text, clears BIOS cursor-emulation bit (40:87), loads 8x8 font via INT 10h AX=1112h ?
+4857:00f0 GetVideoState()  // reads mode/columns/rows -> LastMode, WindMin (A2EA) / WindMax (A2EC), CheckSnow flag (A2E5)
+4857:0138 CtrlBreakIntHandler  // INT 1Bh ISR (iret): sets DS:A2F4 = 1 if Crt initialised (A2E2)
+4857:014e CheckCtrlBreak()  // if A2F4 set: flush keyboard buffer (INT 16h), echo ^C, Halt
+4857:0177 TextMode(mode: integer)
+4857:018c Window(x1, y1, x2, y2: byte)  // bounds-checks against WindMin/WindMax (A2F0), stores WindMin/WindMax
+4857:01cc ClrScr()  // INT 10h AX=0600h scroll window then GotoXY(1,1)
+4857:02c8 DelayLoop  // inner busy loop of Delay (cx = iterations, compares es:[di] tick byte)
+4857:02d6 Sound(hz: word)  // PIT ch.2 divisor 1234DDh/hz via ports 43h/42h, speaker on via port 61h
+4857:0301 NoSound()
+4857:0308 KeyPressed(): boolean  // pending scancode in A2F3 or INT 16h AH=1
+4857:031a ReadKey(): char  // INT 16h AH=0; extended keys return 0 then scancode on next call (A2F3)
+4857:033c AssignCrt(var f: Text)  // sets TextRec mode/buffer/OpenFunc=CrtOpen
+4857:0367 CrtOpen(var f: TextRec): integer  // InOutFunc; picks CrtRead (input) or CrtWrite/CrtFlush
+4857:039f CrtRead(var f: TextRec): integer  // ReadLn line editor: Backspace, ^S, ^D, ^F, ^Z, Esc, Enter handling
+4857:044c CrtWrite(var f: TextRec): integer  // writes TextRec buffer chars via CrtWriteChar (or direct-video 05ac)
+4857:047d CrtClose(var f: TextRec): integer  // returns 0
+4857:0482 CrtWriteCrLf()
+4857:0489 CrtWriteChar  // register call, AL = char; handles BEL BS CR LF, wraps and scrolls
+4857:04e2 CrtScrollUp  // INT 10h AX=0601h in window
+4857:0503 GetCursorPos  // INT 10h AH=3
+4857:050a SetCursorPos  // INT 10h AH=2 (DX=row,col)
+4857:0614 CallInt10  // register thunk: saves SI/DI/BP/ES around INT 10h
+48b9:0000 GetEnv(const name: string): string  // uppercases name, scans the environment block (PSP:2Ch). Used with 'ULTRASND'
+48b9:0079 Intr(intNo: byte; var regs: Registers)  // self-modifying INT; Registers = AX,BX,CX,DX,BP,SI,DI,DS,ES,Flags
+48c7:020a PrintDecDigit  // register call: AL = AL div CL printed as digit, returns AL = remainder (helper for PrintDec)
+484a:0000 Max(a, b: longint): longint
+484a:003a Min(a, b: longint): longint
+484a:0074 SwapInt(var a, b: integer)
+484a:009a SwapWord(var a, b: word)
+4719:0009 DetectEms(var blk: TEmsBlock): boolean  // INT 21h AH=35h vector 67h, compares device name at ES:0Ah with 'EMMXXXX0'
+4719:00a5 EmsFreePages(var blk: TEmsBlock): word  // INT 67h AH=42h (unallocated pages); stores status in DS:8A4C
+4719:00ce EmsAlloc(var blk: TEmsBlock; pages: word)  // AH=41h page frame -> blk+9; AH=43h allocate -> blk+7
+4719:0128 EmsMapPage(var blk: TEmsBlock; physPage: byte; logPage: word)  // AH=44h
+4719:015e EmsFree(var blk: TEmsBlock)  // AH=45h release handle
+4719:0188 EmsMoveToEms(var blk: TEmsBlock; size: word; src: pointer)  // if EMS present and big enough: allocate (16K pages), map, copy src into the frame, FreeMem src; else keep heap copy (state 1)
+4719:0253 EmsRelease(var blk: TEmsBlock)  // FreeMem (state 1) or EmsFree (state 2); state := 0
+4719:0290 EmsMapAll(var blk: TEmsBlock)  // maps all logical pages into physical pages 0..n-1
+4719:02cf EmsNop(var blk: TEmsBlock)  // empty
+4719:02d6 EmsMapGameData  // maps DS:8A4E block and points Game::Groups, Game::Buildings, Gfx::Charset into the page frame (Buildings = Groups+1 array, Charset follows)
+4719:0317 EmsReleaseGameData  // = Ems::RestoreProc; releases DS:8A4E block
+474f:0000 SbSetPort(port: word)   // fn 1
+474f:0013 SbSetIrq(irq: word)     // fn 2
+474f:0026 SbStopVoice()           // fn 8
+474f:0030 SbInit()                // fn 3
+474f:003a SbPlayVoc(vocData: pointer)  // fn 6; does nothing if the segment (high word) is 0
+474f:0058 SbSetStatusAddr(addr: pointer)  // fn 5
+474f:0070 SbSetSpeaker(on: word)  // fn 4
+474f:0083 SbBreakLoop()           // fn 9
+4758:0000 MouseCallback  // INT 33h user handler (AX=0Ch, mask 7Fh, set at 4758:0314); ends with IRET (see notes below)
+4758:012d CursorBlitHook  // = Blit::CursorHook; called by the blitters around a draw to hide/redraw the software cursor if it overlaps (rect in DS:9270...)
+4758:01aa CursorDraw  // state 1: draws 11x11 cursor sprite (CursorShape*256 from CursorImages) at X,Y clipped to 320x200 via 47da:065f
+4758:0231 CursorSaveBackground  // state 2: saves screen under cursor (47da:06a1); CursorSaveX/Y := X/Y
+4758:0294 CursorRestoreBackground  // state 3: restores saved background at CursorSaveX/Y (47da:06cf)
+4758:0314 InitMouse  // INT 33h AX=0 reset (sets Mouse::Present), AX=0Fh mickeys 24/16, AX=7/8 range x 0..318, y 0..198, AX=0Ch install MouseCallback, Cursor at 160,70
+4758:03e4 ShowCursor  // if CursorState<>0 and not frozen: CursorState:=2, save bg, draw, CursorState:=0 (0 = visible)
+4758:040a HideCursor  // if CursorState=0 and not frozen: restore background, CursorState:=1
+4758:04c0 SetMousePos(x, y: word)  // INT 33h AX=4
+4758:04e5 GridCell(var col, row: integer; left, top, right, bottom, cellW, cellH: word)  // tests ClickX/ClickY against the rect; col,row := 1-based cell, or 0,0 outside
+4758:05bc HitTest(var hit: word)  // for the last click: 1..6 menu bar buttons (grid 48x33 at 0,0; row 1), 13 top-right corner, 14 clock, 20+k hotspot k (last match), else 0
+4758:06a5 HitTestCursor(var hit: integer)  // same hotspot scan using the live X,Y; 20+k or 0
+4758:0749 ClearHotspots(first, last: integer)
+4758:079d SetHotspot(index, x: integer; y: byte; w: integer; h: byte; const caption: string; repeat_, flag: byte)  // fills 27-byte record; caption string[18]; last 2 params are the bytes at record start and start+1 (Repeat_, _1A) ?
+1a3e:0d39 DrawSlotNames  // draws the 12 slot names, the selected one (DS:7732) highlighted, 405f:1317 vs 12e4
+1a3e:0da2 DrawDiskFrame(frame: integer)  // near; draws main animation frame (disk.ani) via DrawAnimKeyed into buffer 772E and blits to screen
+1a3e:0de6 DrawKnob(step: integer)  // near; draws the sliding handle sprite (from diskbr buffer 772A) moving up with step  ?
+1a3e:0e64 RestoreKnobBackground(step: integer)  // near; restores the background from buffer 7726 under the handle  ?
+1a3e:0ee5 DiskScreenInit  // GetMem buffers, loads grafika\disk and grafika\diskbr pics, draws first frame, buttons and slots, fades palette
+1a3e:103b SetupDiskHotspots  // 5 hotspots: Music 1, Music 2, Stop music, Effects on/off, Select slot
+1a3e:113b DiskScreenOpenAnim  // plays frames 0..21 then handle slide-in
+1a3e:1197 DiskScreenCloseAnim  // reverse of the open animation
+1a3e:11ea DrawOptionButton(idx: integer; on: boolean; parentFrame: word)  // near; restores the button graphic at idx (1..6) from the off/on pic
+1a3e:12d3 DrawOptionButtons  // refreshes the 6 buttons from Game::MusicTrack, DS:89BE (music available), Game::SoundFx=2
+1a3e:1366 DrawPressedButton(idx: integer; pressed: boolean; parentFrame: word)  // near; used by PressButton
+4a81:9184 Mouse::DrawState: word  // 1 = drawing, 2 = saving background, 3 = restoring (set in 01AA/0231/0294)
+4a81:9192 Mouse::HotspotUnder: word  // result of HitTestCursor in callback
+
+# ---------------------------------------------------------------------------
+# Functions: intelligence, alien races, alien talk, credits, copy protection (agent proposals)
+# ---------------------------------------------------------------------------
+264a:01b8 ShowCredits  // credits screen (CurrentScreen 10): fades palette, draws the 14 credit text lines (PROGRAMMED BY ISTVAN KISS ...)
+264a:034a EnforceManualCheck  // PROTECTION scheme A verifier (see header); remove in port
+2693:0000 ArmDateQuestion  // PROTECTION scheme B step 1: picks QuestionIndex = Random(14)+1 if unanswered; remove in port
+2693:0085 AskDateQuestion  // PROTECTION scheme B step 2: "Security check / Please type the date" prompt using valami.txt, hashes answer; remove
+2693:0342 EnforceDateCheck  // PROTECTION scheme B colony-step enforcement (resets lives / scribbles names / random DS writes); remove
+2693:04aa VerifyDateAnswer  // PROTECTION scheme B daily validation of AnswerKey vs WordCodes[QuestionIndex]; remove
+2693:0538 HaltIfDateCheckFailed  // PROTECTION: if Lives == 107h -> fade out and System.Halt (405f:1933); remove
+2693:0563 ShowProtectionWarning  // PROTECTION: message box with the string '!!!!!!!!!' (34b0:0158); remove
+4a81:0876 Protect2::QuestionIndex: longint  // init 8615h = not armed; 1..14 once armed by 2693:0000 (disguised store); index into valami.txt/WordCodes
+4a81:087a Protect2::AnswerHash: longint  // scratch hash of the typed date (2693:0085); also cleared by 2693:04aa
+4a81:0882 Protect2::AnswerKey: longint  // init 3421h = unanswered; hash+3421h after answering; compared with WordCodes[QuestionIndex]
+4a81:088a Protect2::Lives: longint  // init 10Ah; -1 per answered prompt; Halt at 107h; correct answer -> ~479h / D7Dh+rand
+4a81:088e Protect2::ScribbleDone: boolean  // set after the one-shot random-memory-scribble in 2693:0342
+2e4b:0000 StartAlienScene(scene: integer)  // sets CurrentScreen=21h (alien visit cutscene) with scene id stored at 78C8 (1,2,7,9,10 seen)
+2e4b:0044 PlayAlienScene(scene: integer)  // screen-21h handler: loads PICS\PIC<n>, plays Command room anim; scenes 1,2,9 (satrobb1..3 sfx), 10 (tractor sfx)
+2e4b:03a5 StartAlienTalk(race: integer)  // sets CurrentScreen=22h (conversation) for race n, stores race number string at 78B8
+2e4b:0400 DrawAlienTalkScreen  // loads PICS\ATVEZETO backdrop, SZEK<n> chair, SAJAT<hero> own portrait and ALIEN\ALIEN<n> alien portrait
+2e4b:0622 SetupTalkHotspots  // one hotspot "Talking" (6,86h, D2h x 3Fh) for the reply/question area, resets hover state
+2e4b:0675 LoadQuestionAnswerId  // reads line of TEXT\KERDES<race>.AT, builds 2-char id from its first 2 chars, ValLong -> 78C2
+2e4b:0700 DrawAlienReply  // reads line of VALASZ<race>.AT (78C0), clears area and TextFile::DrawReply at (6,86h)
+2e4b:0780 BuildQuestionMenu  // loads the question texts of Alien::CurMenu from KERDES<race>.AT into 3x256 buffer, builds line->question map at 78D0+
+2e4b:088d DrawQuestionMenu  // draws the question list (highlighting 78B4), then clears the unused rows
+2e4b:092e HandleTalkMouse  // converts mouse Y to hovered question row, redraws when hover changes
+2e4b:09d3 VerifyManualAnswer  // PROTECTION scheme A: Key2 vs PageCodes[PageIndex] check, resets Key1 or Key2; remove in port
+4a81:78c8 AlienTalk::Scene: integer  // scene id set by 2e4b:0000
+4a81:78ca AlienTalk::Race: integer  // race number set by 2e4b:03a5, used for file names KERDES<n>.AT / VALASZ<n>.AT
+4a81:78c4 AlienTalk::QuestionBuf: pointer  // GetMem(300h): 3 pascal strings of 256 bytes with the current menu's questions
+4a81:78d0 AlienTalk::MenuLineCount: integer  // total text lines in the menu; line->question index bytes follow at 78D2
+29b9:0000 FirstContact(race: integer; const msg: string)  // first contact with race: shows msg, sets Status (4 default; 2 for races 3,7-10,12; 6 for 4,11) and schedules story timers
+29b9:0217 ClearBody(system, planet, moon: integer; full: boolean)  // resets a TBody (Owner, colony, stores; full also population/resistance/tech/attitude)
+29b9:0316 DispatchForce(race, force, system, planet, moon: integer; nextMission: byte)  // SetForceTarget + arrival timer Random(100-Speed)+5 + NextMission
+29b9:0379 DispatchForceNow(race, force, system, planet, moon: integer; mission: byte; unused: integer)  // DispatchForce then Mission := NextMission (launch immediately)
+29b9:03b3 ScheduleForceLaunch(race, force, delay, mission: integer)  // arms the story launch timer 5D40 (hours) for race's force; fires DispatchForceNow
+29b9:03d2 SpaceBattleWon(system, planet: integer)  // after the player wins a space battle: races (Status 2) with active forces there land at home (ForceLands) or retreat (SendForceHome) ?
+29b9:0487 SpaceBattleLost(system, planet: integer)  // player lost: his stationary groups there are disbanded (or sent home), Status-6 race forces land/retreat ?
+29b9:059e ClearBodyFull(system, planet, moon: integer)  // ClearBody(full=true); used after the ground war is won
+29b9:05b5 PurgeBody(system, planet, moon: integer)  // ClearBody(full) + remove every building and planet force group on that body
+29b9:0666 DestroyBody(system, planet, moon: integer)  // leaves planet screens, PurgeBody; if Earth (1,5,0) switches to screen 23h (game over)
+29b9:06d4 ClaimBodyForRace(owner, system, planet, moon: integer)  // makes body owned by alien race: colony flag, population Random(3000)+2000, garrison stores per race table
+29b9:08f5 ClaimBodyForPlayer(system, planet, moon: integer)  // makes body the player's colony and creates/selects its planet-force group named "<body> forces"
+29b9:0a60 ForceLands(race, force: integer)  // adds the race force's unit counts to the garrison (Stores 1..8) of the body it targets, clears Active
+29b9:0b93 DisbandGroup(list, group: integer)  // removes a group; for fleets (list 0) first merges its units into the planet force of that body (Groups::IntelHook)
+29b9:0d5a SendForceHome(race, force: integer)  // SetForceTarget to the race home system/body
+29b9:0d87 SendGroupHome(group: integer)  // SetGroupTarget(group, 1, 5, 0): send a fleet to Earth
+29b9:0dab SetForceTarget(race, force, system, planet, moon: integer)  // sets a race force destination, travel time (6-10 same body, 20-29 same system, 50-69 else), Active=2
+29b9:0e66 SetGroupTarget(group, system, planet, moon: integer)  // sets a player fleet destination: Leg1/Jump/Leg2 and Status 4 (in system) or 6 (hyperspace)
+29b9:0f53 ClearForce(race, force: integer)  // zeroes one TRaceForce record (near call)
+29b9:0fe4 EliminateRace(race: integer)  // race destroyed: Status=FFh, clears all bodies it owns and all its forces
+29b9:1179 AnnihilateSystem4  // removes everything in system 4: buildings, bodies, race forces and player groups there ?
+29b9:136e ScheduleIdea(idea, delayBase, delayRandom: integer)  // if product state 0 and IdeaTimer == -1: IdeaTimer[idea] := delayBase+Random(delayRandom)
+29b9:13ab GrantInvention(idea: integer)  // if state 0: Progress=0, State=5 (done); refreshes research screen
+29b9:1409 OfferInventionForAnalysis(idea: integer)  // if state 0: State=3 (can be analysed); refreshes research screen
+29b9:1461 IsRaceActive(race: integer): boolean  // Status is 2 or 4 ?
+29b9:1501 ShowRaceBodyInfo(system, planet, moon, body: integer; parentFrame: word)  // nested in ShowRaceIntel: message box describing a body owned by the race
+29b9:185e ShowRaceArmyInfo(parentFrame: word)  // nested: "Information on: <race> ... The N army power is ..." lists force unit counts with satellite names
+29b9:1aed ShowRaceWeaponInfo(parentFrame: word)  // nested: "Information on: <race> Their weapons are: ..." from force weapon flags
+29b9:1c49 ShowRaceIntel(race, kind: integer)  // intel report on a race: kind 1/3 = its bodies, 2 = army power, 4 = weapons
+4a81:5d40 Intel::LaunchTimer: integer  // hours until the scheduled race force launch (2693-independent story script, Sim)
+4a81:5d42 Intel::LaunchRace: integer  // race of the scheduled launch (29b9:03b3)
+4a81:5d44 Intel::LaunchForce: integer  // force index of the scheduled launch
+4a81:5d46 Intel::LaunchMission: integer  // mission value passed along (always 2)
+
+# ---------------------------------------------------------------------------
+# Mouse poll state (from the Mouse port)
+# ---------------------------------------------------------------------------
+4a81:8a7a Mouse::HeldLeft: boolean          // BtnLeft while a button is down (1 opens the cockpit in ShipInfo)
+4a81:8a7b Mouse::HeldRight: boolean         // BtnRight while a button is down
+4a81:8a85 Mouse::Released: boolean          // A button was released this poll
+4a81:8a86 Mouse::Pressed: boolean           // A button was pressed this poll
+4a81:89d0 Sound::SbPort: word               // From save\setup.spd
+4a81:89d2 Sound::SbIrq: word
+4a81:89d4 Sound::SbDma: word
+4a81:89ba Gfx::SavedExitProc: pointer     // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
+405f:1a62 ExitHandler                       // ExitProc: shows the error screen and waits for a key
+
+# ---------------------------------------------------------------------------
+# UI state (from the TextFile/GfxPath/Ems ports)
+# ---------------------------------------------------------------------------
+4a81:7c62 GfxPath::PageFlagA: byte          // Toolbar page flags
+4a81:7c63 GfxPath::PageFlagB: byte
+4a81:7d72 GfxPath::IconIndex                // Index of the icons in ICON\ICON.ALL
+4a81:7dfa GfxPath::ToolbarBlock: TEmsBlock
+4a81:8a4c Ems::Status: word                 // Last EMS status
+4a81:8a4e Ems::GameData: TEmsBlock          // Block holding Groups, Buildings and Charset
+4a81:54ca GfxPath::IconAllSize: word        // Size of ICON\ICON.ALL
+4a81:4e06 GfxPath::CommandIcon              // Icon number per menu command id
+4a81:789c Groups::PlanetForceList: pointer  // Far pointer to the planet-force group list
+4a81:78a6 Groups::IconBuffer: pointer
+4a81:7802 ShipMove::BlinkCounter: word
+4a81:7804 ShipMove::SpinnerCounter: word
+4a81:780c ShipMove::InRestrictedArea: boolean
+4a81:78aa Research::FrameCounter: word      // Selection-frame animation counter
+4a81:78ac Research::IconBuffer: pointer     // Icon picture buffer
+4a81:78b0 Research::ProgressFrame: word
+4a81:899c Hire::Candidate: word
+4a81:899e Hire::StaffKind: word
+4a81:89a0 Hire::InfoShown: boolean
+4a81:5daa Game::StartChoice: integer        // Start menu choice set by Title::StartMenu: 1 new game, 2 load, 3 quit (Halt); SaveLoad::DiskScreen treats 2 as its first showing
+4a81:7e29 Command::ShowHologramOnEntry: boolean
+4a81:7e36 Command::WarAnimBuffer: pointer
+4a81:7e3a Command::BackdropShown: boolean
+4a81:788a Colonize::ColonyCost: longint
+4a81:7fd4 Vec3D::SineTable                  // Built at start-up; shared with the system view's orbits
+4a81:78e6 Surface::AnimTileFrame: integer
+4a81:78e8 Surface::AnimTileOffset: word     // Offset of the animated-tile frame in BufD
+4a81:7904 Surface::RadarStale: word         // FFFFh forces a radar redraw
+4a81:791a Surface::FelszTiles: word         // Tiles in the current FELSZ sheet; higher numbers come from BufD
+4a81:791e Surface::BlinkOn: boolean
+4a81:7732 SaveLoad::SelectedSlot: integer
+4a81:7734 SaveLoad::SlotTable: pointer
+
+# ---------------------------------------------------------------------------
+# Globals reported by the Intel, AlienTalk, battle and Launch ports
+# ---------------------------------------------------------------------------
+4a81:5d4e Intel::Race2Timer1: word          // Race 2 story timers, done flags at 5D50/5D56/5D5A/5D5E
+4a81:5d50 Intel::Race2Done1: boolean
+4a81:5d54 Intel::Race2Timer2: word
+4a81:5d56 Intel::Race2Done2: boolean
+4a81:5d58 Intel::Race2Timer3: word
+4a81:5d5a Intel::Race2Done3: boolean
+4a81:5d5c Intel::Race2Timer4: word
+4a81:5d5e Intel::Race2Done4: boolean
+4a81:5d76 Intel::Race4Timer: word
+4a81:5d78 Intel::Race4Done: boolean
+4a81:5d82 Intel::Race5Timer: word
+4a81:5d84 Intel::Race5Done: boolean
+4a81:5d96 Intel::Race7to10Timer: word
+4a81:5d98 Intel::Race7to10Done: boolean
+4a81:78b4 AlienTalk::SelectedLine: word
+4a81:78b6 AlienTalk::Locked: boolean
+4a81:78bc AlienTalk::MenuNumber: word
+4a81:78be AlienTalk::QuestionLine: word
+4a81:78c0 AlienTalk::ReplyLine: word
+4a81:78c2 AlienTalk::AnswerId: word
+4a81:0d0e AlienTalk::PortraitByRace         // Alien portrait number per race
+4a81:787c Launch::DestinationActive: boolean
+4a81:7bc4 Launch::SystemViewTable           // 18 entries of 6 bytes {type, index}
+4a81:7c36 Launch::SelectedEntry: word
+4a81:7c40 Launch::SavedScreen: word
+4a81:7c42 Launch::SavedSystem: word
+4a81:7c44 Launch::SavedPlanet: word
+4a81:7628 GrWar::Buffer1: pointer           // Ground-battle picture buffers
+4a81:762c GrWar::Buffer2: pointer
+4a81:7630 GrWar::Buffer3: pointer
+4a81:7634 GrWar::Buffer4: pointer
+4a81:7638 GrWar::Buffer5: pointer

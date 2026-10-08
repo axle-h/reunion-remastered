@@ -46,6 +46,10 @@ in the original source:
   are passed as far pointers.
 - A function returning `string` gets a hidden first `result` pointer.
 - `@REG` or `@HI:LO` puts a parameter or result in registers, for asm routines.
+- `@keep` marks an argument the routine leaves on the stack for the caller
+  (Borland's string and Text helpers do this).
+- Every prototype is checked against the routine's own `RET n`: if the
+  argument sizes don't add up, the line is reported as an error and skipped.
 - Default results: 1 byte in `AL`, 2 in `AX`, 4 in `DX:AX`, `real` in `DX:BX:AX`.
 - Near or far is detected from the routine's `RET`/`RETF`.
 
@@ -95,7 +99,16 @@ They get the right order once they're prototyped.
 | `GlobalsReport.java <out.csv> <seg>` | Every code reference into the data segment (feed to `tools/globals_map.py`) |
 | `SegmentReport.java <out.md>` | Per-segment table (size, functions, call counts, port I/O, INTs) |
 
-Run any of them against the existing project with:
+The cut-scene programs (CREDITS, INTRO, VICTORY.PRG) have their own symbol
+lists, `credits.symbols.txt`, `intro.symbols.txt` and `victory.symbols.txt`
+(names only), for separate imports of those executables; see
+docs/cutscenes.md.
+
+To merge a file of proposed symbols (e.g. from an agent): `ghidra/merge_proposals.py FILE`.
+It appends the new lines, applies them, and reduces any rejected prototype to
+a plain name.
+
+Run any of the scripts against the existing project with:
 
 ```sh
 ~/ghidra/support/analyzeHeadless ghidra/project reunion -process REUNION.PRG \

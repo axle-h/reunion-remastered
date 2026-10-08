@@ -1,0 +1,99 @@
+# INTRO.PRG symbol list (docs/cutscenes.md, port: src/cutscene/intro.c and
+# cutscene.c). Same format as symbols.txt, for a separate import of
+# GRWAR\INTRO.PRG with DS = 1e62 (the constant the System init loads).
+# Names only; the routines take Pascal-order arguments as noted.
+
+@unit 1000 IntroMain
+@unit 10d9 Strips
+@unit 1116 Anim
+@unit 116c AnimFile
+@unit 119b Script
+@unit 11fb Vga
+@unit 1212 Gfx
+@unit 1342 Timer
+@unit 1353 Ems
+@unit 1382 GusPlayer
+@unit 1630 Blit
+@unit 1d3a System
+
+1000:0031 PlayModGUSorSB          // (name) Sound Blaster MOD player
+1000:0285 Main
+10d9:00cb CopyPlane               // every 4th byte to one plane
+10d9:00f1 Strips                  // (name; outOrder, outRow, fadeOut, inOrder, inRow, fadeIn)
+10d9:037f FadeOutAt               // (order, row, n)
+1116:0000 AnimAlloc
+1116:0050 AnimFree
+1116:0079 AnimSelect              // (n): current anim, frame 0, Random(200)
+1116:009e AnimStep                // next frame; anim 7 keyed through the buffer
+1116:0130 AnimStepTo              // (frame): keyed, scripted order
+1116:01c1 Anim                    // (n, order, row, delayMs, usePal)
+1116:0391 AnimScripted            // frame order from DS:0023
+1116:04ab Shake                   // (count, frames, amp)
+116c:0010 AnimLoad                // intro\anim<n>.ani, frame count from DS:0041 + 7n
+116c:00f1 AnimUnload
+116c:0159 AnimDrawKeyed           // frame 1, then frame n
+116c:01b6 AnimDraw
+116c:01f7 DecodeAniFrame
+119b:0000 WaitPos                 // (order, row): key skips the block, ESC exits
+119b:00e1 LoadPicBuf              // (name) intro\<name> into the buffer, palette into the target
+119b:0152 Preload                 // (name, order, row)
+119b:018e Pic                     // (name, order, row, fadeOut, fadeIn)
+119b:0227 ScrollPic               // (name, order, row)
+119b:0366 Flyby                   // (order, row)
+11fb:0170 SetDac                  // (pal, hi, lo)
+1212:002f ReadDac
+1212:0074 SetDacAll
+1212:0089 FadeIn5
+1212:00a2 FadeOut5
+1212:00bb FadeIn                  // (lo, hi, pal, n)
+1212:01c2 FadeOut
+1212:02d5 WhiteToPal
+1212:03fd PalToHalfWhite
+1212:052c HalfWhiteToPal
+1212:065b PalToWhite
+1212:0798 WhiteStep               // (lo, hi, n, i, pal)
+1212:0890 SetBlack                // (pal, lo, hi)
+1212:08e5 WaitRetrace
+1212:08fe WaitFrames              // (n: longint)
+1212:0964 LoadFile
+1212:0a6b LoadFileEnd
+1212:0b4e OpenFile
+1212:0bdf ReadAniFrame
+1212:0c9e CloseFile
+1212:0cb7 LoadPic                 // as REUNION's 405f:0bef
+1212:1003 LoadPalette
+1212:113a Mode13
+1212:116c Mode12
+1212:118c Mode3
+1212:11a3 Exit                    // FadeOut(35), mode 3, music off, Halt
+1212:1254 NotEnoughMemory
+1342:0000 TimerReset
+1342:0016 TimerWait               // (ms: longint): deadline += ms; sets DS:07b4 if early
+1342:0057 TimerLeft
+1353:02ac AllocScreenBuffer       // EMS if available
+1353:02d4 FreeScreenBuffer
+1382:0007 PlayModGUS              // (name)
+1382:0209 StopMusic
+1382:0254 GetPos                  // (var order, var row): 1-based
+1382:2602 PosSetter
+1630:0000 Copy                    // (src, dst, count)
+1630:0025 CopyRect                // (src, dst, w, h), stride 320
+1630:00ca CopyKeyed
+1630:00f6 CopyRectKeyed           // (src, dst, w, h, key)
+1630:0145 Fill
+1d3a:028a GetMem
+1d3a:029f FreeMem
+1d3a:02e7 MemAvail
+1d3a:0b62 Move
+1d3a:0f92 Random
+
+1e62:0002 AttrTable: array[0..15] of word
+1e62:0023 MonitorFrames: array[0..33] of byte
+1e62:0041 AnimTable: array[1..24] of array[0..6] of byte   // frames, width, height
+1e62:074e MusicEnd: boolean
+1e62:07b4 TimerEarly: boolean
+1e62:07d2 UseGus: boolean
+1e62:0890 Palette: array[0..255] of array[0..2] of byte
+1e62:0b90 TargetPalette: array[0..255] of array[0..2] of byte
+1e62:0e90 ScreenBuffer: pointer
+1e62:0e98 Skip: boolean

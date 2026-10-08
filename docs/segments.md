@@ -68,10 +68,10 @@ dependency order, with `System` last. So the low-level units sit at the end
 | `4265` | `3265` | 656 | 7 | **AdLib music** loader | `grwar\*.pic` are obfuscated AdLib tunes, not pictures (see docs/formats/pic.md) |
 | `428e` | `328e` | 2240 | 11 | Asm: **AdLib (OPL2) music player** | `OplWrite` at `428e:0716`; AdLib detection at `428e:000c` |
 | `431a` | `331a` | 2992 | 18 | Sound effects and setup | `sound\*.smp`, `save\setup.spd`, "Sound Blaster detected" |
-| `43d5` | `33d5` | 12112 | 18 | **Sound driver**: GUS GF1 registers (hard-coded ports 322h–327h), PIT timer | Likely source of crashes on newer systems |
+| `43d5` | `33d5` | 12112 | 18 | **GUS MOD player**: GF1 registers (hard-coded base 220h), 1 kHz PIT timer ISR that never chains to INT 08h | Likely source of crashes on newer systems; see docs/sound-original.md |
 | `46ca` | `36ca` | 1264 | 25 | Gravis Ultrasound configuration | `ULTRASND` environment variable |
 | `4719` | `3719` | 864 | 12 | EMS | `EMMXXXX0` |
-| `474f` | `374f` | 144 | 8 | XMS driver calls | Calls through the far pointer at DS:8A60 |
+| `474f` | `374f` | 144 | 8 | **Sound Blaster driver thunks** | Far calls into the CT-VOICE-style driver loaded from `GRWAR\ALFA1.PIC` (entry at DS:8A60) |
 | `4758` | `3758` | 2080 | 13 | **Mouse**: INT 33h, software cursor, hotspots | `Intr($33)`, 11×11 cursor, 27-byte hotspot records at DS:8A71 |
 | `47da` | `37da` | 1792 | 21 | **Blitters**: transparent/flipped/rotated copies, fills | 320-byte stride, 236 call sites |
 | `484a` | `384a` | 208 | 5 | Longint `Min`/`Max`, `Swap` | |

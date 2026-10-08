@@ -8,7 +8,7 @@ The other 16 `.PIC` files aren't images:
 
 | Files | Contents |
 |---|---|
-| `GRWAR/*.PIC` (14) | Obfuscated AdLib (OPL2) music for the player in segment `428e`. Loaded by `4265:000c`: read whole file (max 31,700 bytes), reverse the byte order, add `2Fh` to every byte |
+| `GRWAR/*.PIC` (14) | 12 obfuscated AdLib (OPL2) tunes for the player in segment `428e` ([audio.md](../audio.md#adlib-music)). Loaded by `4265:000c`: read whole file (max 31,700 bytes), reverse the byte order, add `2Fh` to every byte. `ALFA1`/`ALFA2` are not tunes (`ALFA1` is the Sound Blaster driver, reversed and XORed) |
 | `CREDITS/PAL3.PIC`, `PAL4.PIC` | Bare 768-byte 8-bit RGB palettes (used by `CREDITS.PRG`) |
 
 ## Layout
