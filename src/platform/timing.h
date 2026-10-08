@@ -21,6 +21,11 @@ void timing_set_quit_handler(void (*fn)(void));
 // the screen is shown and the loop takes real time. Mouse_Update calls it.
 void timing_idle_poll(void);
 
+// Forgets the previous boot's sub-frame state (audio samples owed to the
+// frame clock, idle polls), so every boot of a scripted run plays the same
+// as the first boot of a fresh process. The retrace count goes on.
+void timing_reset(void);
+
 // Retrace count since start-up (the original's frame counter equivalent).
 uint64_t timing_frames(void);
 

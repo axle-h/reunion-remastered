@@ -633,9 +633,9 @@ uint16_t System_Random(uint16_t range)
 // minute, DH second, DL hundredths).
 void System_Randomize(void)
 {
-    // Soak tests (random autopilot) must replay exactly.
+    // Scripted runs (soak tests, fixtures) must replay exactly.
     uint32_t fixed;
-    if (autopilot_random_seed(&fixed)) {
+    if (autopilot_seed(&fixed)) {
         ds.System_RandSeed = (int32_t)fixed;
         return;
     }

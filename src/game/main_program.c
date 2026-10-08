@@ -386,6 +386,8 @@ static bool wait_retrace(void)
     return timing_wait_retrace();
 }
 
+uint64_t Game_EventWaitFrames;
+
 // Phase A: frames until a press, a release or a screen switch.
 static bool wait_for_event(void)
 {
@@ -404,6 +406,7 @@ static bool wait_for_event(void)
         Options_ApplyCheats();  // port addition
         if (!wait_retrace())
             return false;
+        Game_EventWaitFrames++;  // port addition
         Gfx_PaletteFlashTick();
         FRAME_COUNT = (int32_t)((uint32_t)FRAME_COUNT + 1);
         animate_screens();

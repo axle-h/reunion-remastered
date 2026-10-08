@@ -28,16 +28,24 @@ void timing_idle_poll(void)
         timing_wait_retrace();
 }
 
+// Audio samples owed to the frame clock (fractional).
+static double mix_pending;
+
+void timing_reset(void)
+{
+    mix_pending = 0;
+    idle_polls = 0;
+}
+
 // Unpaced autopilot runs drive the mixer from the frame clock (the device
 // stays paused), so sounds last the same number of frames as in real time.
 static void mix_one_retrace(void)
 {
-    static double pending;
     int16_t buf[2 * 1024];
     audio_set_paused(true);
-    pending += AUDIO_RATE * RETRACE_NS / 1e9;
-    int n = (int)pending;
-    pending -= n;
+    mix_pending += AUDIO_RATE * RETRACE_NS / 1e9;
+    int n = (int)mix_pending;
+    mix_pending -= n;
     audio_mix(buf, n);
 }
 

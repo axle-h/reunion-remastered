@@ -4,6 +4,7 @@
 #include <opl3.h>
 #include <xmp.h>
 
+#include "platform/autopilot.h"
 #include "platform/fs.h"
 
 enum : int {
@@ -152,7 +153,10 @@ bool audio_init(void)
     OPL3_Reset(&opl, AUDIO_RATE);
     opl_active = false;
     timer_tick = nullptr;
-    SDL_ResumeAudioStreamDevice(stream);
+    // Scripted runs mix from the frame clock only (timing.c), so they replay
+    // exactly: the device must not pull audio on its own in real time.
+    if (!autopilot_active())
+        SDL_ResumeAudioStreamDevice(stream);
     return true;
 }
 

@@ -5,20 +5,26 @@
 #include "platform/input.h"
 #include "platform/video.h"
 
-enum : int { MAX_EVENTS = 4096, CLICK_FRAMES = 4 };
+enum : int { CLICK_FRAMES = 4 };
 
-typedef enum { EV_CLICK, EV_RCLICK, EV_MOVE, EV_KEY, EV_DUMP, EV_QUIT } EventKind;
+typedef enum { EV_CLICK, EV_RCLICK, EV_MOVE, EV_MOUSE, EV_KEY, EV_DUMP, EV_QUIT } EventKind;
 
 typedef struct {
     uint64_t frame;
     EventKind kind;
-    int x, y;
-    char path[512];
+    int x, y, buttons;
+    int order;   // position in the script
+    char *path;  // EV_DUMP
 } Event;
 
-static Event events[MAX_EVENTS];
-static int event_count;
+// Sorted by frame (stably, so same-frame events keep their order); `next` is
+// the first one not played yet.
+static Event *events;
+static int event_count, event_cap, next_event;
 static bool active;
+static bool have_seed;
+static uint32_t seed;
+static void (*controller)(uint64_t frame);
 static bool initialised;
 // A click in progress: release at this frame.
 static uint64_t release_at;
@@ -55,14 +61,20 @@ static bool parse_event(const char *s, Event *ev)
         ev->kind = kind[0] == 'c' ? EV_CLICK : kind[0] == 'r' ? EV_RCLICK : EV_MOVE;
         return true;
     }
+    if (SDL_strcmp(kind, "mouse") == 0) {
+        ev->kind = EV_MOUSE;
+        return SDL_sscanf(rest, "%d,%d,%d", &ev->x, &ev->y, &ev->buttons) == 3;
+    }
     if (SDL_strcmp(kind, "key") == 0) {
         ev->kind = EV_KEY;
         return SDL_sscanf(rest, "%d", &ev->x) == 1;
     }
     if (SDL_strcmp(kind, "dump") == 0) {
         ev->kind = EV_DUMP;
-        SDL_strlcpy(ev->path, rest, sizeof ev->path);
-        return ev->path[0] != 0;
+        if (!*rest)
+            return false;
+        ev->path = SDL_strdup(rest);
+        return true;
     }
     if (SDL_strcmp(kind, "quit") == 0) {
         ev->kind = EV_QUIT;
@@ -101,34 +113,88 @@ static int rnd_below(int n)
     return (int)(rnd_next() % (uint64_t)n);
 }
 
+static void free_events(void)
+{
+    for (int i = 0; i < event_count; i++)
+        SDL_free(events[i].path);
+    event_count = 0;
+    next_event = 0;
+}
+
+static bool add_event(const char *tok)
+{
+    if (event_count == event_cap) {
+        int cap = event_cap ? event_cap * 2 : 256;
+        Event *e = SDL_realloc(events, (size_t)cap * sizeof *e);
+        if (!e)
+            return false;
+        events = e;
+        event_cap = cap;
+    }
+    Event ev = {0};
+    if (!parse_event(tok, &ev))
+        return false;
+    ev.order = event_count;
+    events[event_count++] = ev;
+    return true;
+}
+
+static int by_frame(const void *a, const void *b)
+{
+    const Event *x = a, *y = b;
+    if (x->frame != y->frame)
+        return x->frame < y->frame ? -1 : 1;
+    return x->order - y->order;  // keep the script's order
+}
+
 void autopilot_set_script(const char *script)
 {
     initialised = true;
-    event_count = 0;
+    free_events();
     pressed = false;
     have_base = false;
+    have_seed = false;
     rnd.on = false;
     active = script && *script;
     if (!active)
         return;
-    char *copy = SDL_strdup(script);
+    char *copy = nullptr;
+    if (script[0] == '@') {
+        copy = SDL_LoadFile(script + 1, nullptr);
+        if (!copy)
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: %s: %s", script + 1, SDL_GetError());
+    } else {
+        copy = SDL_strdup(script);
+    }
+    if (!copy)
+        return;
     char *save = nullptr;
-    for (char *tok = SDL_strtok_r(copy, ";", &save); tok; tok = SDL_strtok_r(nullptr, ";", &save)) {
-        while (*tok == ' ' || *tok == '\n')
+    for (char *tok = SDL_strtok_r(copy, ";\n", &save); tok; tok = SDL_strtok_r(nullptr, ";\n", &save)) {
+        while (*tok == ' ' || *tok == '\r')
             tok++;
-        if (!*tok)
+        if (!*tok || *tok == '#')
             continue;
         if (SDL_strncmp(tok, "random:", 7) == 0) {
             if (!parse_random(tok))
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: bad event '%s'", tok);
             continue;
         }
-        if (event_count < MAX_EVENTS && parse_event(tok, &events[event_count]))
-            event_count++;
-        else
+        unsigned long s32;
+        if (SDL_sscanf(tok, "seed:%lu", &s32) == 1) {
+            seed = (uint32_t)s32;
+            have_seed = true;
+            continue;
+        }
+        if (!add_event(tok))
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: bad event '%s'", tok);
     }
     SDL_free(copy);
+    SDL_qsort(events, (size_t)event_count, sizeof *events, by_frame);
+}
+
+void autopilot_set_controller(void (*fn)(uint64_t frame))
+{
+    controller = fn;
 }
 
 bool autopilot_init(void)
@@ -143,12 +209,22 @@ bool autopilot_active(void)
     return active;
 }
 
-bool autopilot_random_seed(uint32_t *seed)
+bool autopilot_random_seed(uint32_t *out)
 {
     autopilot_init();
     if (active && rnd.on)
-        *seed = rnd.seed;
+        *out = rnd.seed;
     return active && rnd.on;
+}
+
+bool autopilot_seed(uint32_t *out)
+{
+    autopilot_init();
+    if (active && have_seed)
+        *out = seed;
+    else if (active && rnd.on)
+        *out = rnd.seed;
+    return active && (have_seed || rnd.on);
 }
 
 // Keys a player might press: ReadKey codes, 0x100 + scan code = extended.
@@ -218,10 +294,10 @@ void autopilot_frame(uint64_t frame)
         input_set_mouse(mouse_x, mouse_y, 0, 0);
         pressed = false;
     }
-    for (int i = 0; i < event_count; i++) {
-        const Event *ev = &events[i];
-        if (ev->frame != frame)
-            continue;
+    while (next_event < event_count && events[next_event].frame < frame)
+        next_event++;  // set before the script's base frame: never played
+    for (; next_event < event_count && events[next_event].frame == frame; next_event++) {
+        const Event *ev = &events[next_event];
         switch (ev->kind) {
         case EV_CLICK:
         case EV_RCLICK:
@@ -235,6 +311,12 @@ void autopilot_frame(uint64_t frame)
             mouse_x = ev->x;
             mouse_y = ev->y;
             input_set_mouse(ev->x, ev->y, 0, 0);
+            break;
+        case EV_MOUSE:
+            mouse_x = ev->x;
+            mouse_y = ev->y;
+            input_set_mouse(ev->x, ev->y, ev->buttons & 1, (ev->buttons >> 1) & 1);
+            pressed = false;
             break;
         case EV_KEY:
             input_push_key(ev->x);
@@ -250,4 +332,6 @@ void autopilot_frame(uint64_t frame)
     }
     if (rnd.on)
         random_frame(frame);
+    if (controller)
+        controller(frame);
 }

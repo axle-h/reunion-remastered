@@ -329,16 +329,18 @@ void Gfx_BlankPalette(FarPtr pal, int16_t first, int16_t last)
 
 // --- waits ---------------------------------------------------------------------
 
+// Scanlines waited for that don't make a whole retrace yet.
+static int32_t scanlines_pending;
+
 // 405f:068d: the original counts display-enable toggles (one per scanline);
 // whole frames' worth become retrace waits and the rest carries over.
 void Gfx_WaitScanlines(int32_t n)
 {
-    static int32_t pending;
     if (n <= 0)
         return;
-    pending += n;
-    while (pending >= SCANLINES_PER_FRAME) {
-        pending -= SCANLINES_PER_FRAME;
+    scanlines_pending += n;
+    while (scanlines_pending >= SCANLINES_PER_FRAME) {
+        scanlines_pending -= SCANLINES_PER_FRAME;
         gfx_wait_retrace();
     }
 }
@@ -1124,6 +1126,7 @@ void Gfx_PaletteFlashTick(void)
 // 405f:1e78
 void Gfx_Init(void)
 {
+    scanlines_pending = 0;  // port: every boot starts the same (tests replay boots)
     ds.Game_MinMemAvail = 0x009BF9B0;
     SAVED_EXIT_PROC = ds.System_ExitProc;
     ds.System_ExitProc = far_ptr(0x405F, 0x1A62);  // Gfx_ExitHandler
