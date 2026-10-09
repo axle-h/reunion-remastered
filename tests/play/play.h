@@ -10,15 +10,21 @@
 //
 // Rules the fixture enforces:
 // - Input only: every input goes through play_mouse()/play_key(), which also
-//   record it. The emulated memory is hashed around each policy slice and any
-//   change fails the run (write barrier).
+//   record it. The emulated memory is compared before and after each policy
+//   slice and any change fails the run (write barrier).
 // - No cheats: the run fails if the Options panel (playtest cheats) opens.
 // Policies decide only on what a player can see (docs/playthrough.md); that
 // part is a review rule, not checked here.
 //
 // The recording is a plain autopilot script (seed, mouse and key events by
-// frame). play_replay() runs one without any policy code; it must reach the
-// same end.
+// frame). play_replay() runs one without any policy code, and so does
+// `reunion --replay=FILE`; both must reach the same end.
+//
+// Checkpoints for iteration: play_checkpoint() marks a point in the
+// recording, and play_resume() replays a recording up to one of its marks
+// (no policy, about 100 times faster than playing) and hands over to a
+// policy there. Its recording starts with that prefix, so it is again one
+// script from power-on.
 #pragma once
 
 #include <stdint.h>
@@ -36,9 +42,17 @@ typedef struct {
 
 // Starts a new boot of the game seeded with `seed` and plays `policy` from
 // the first retrace. The game runs until it halts or quits; the policy ends
-// it with play_quit() or play_fail(). The input is recorded as an autopilot
-// script in `record_path` (may be nullptr).
+// it with play_quit() or play_fail(), or by returning (as play_quit). The
+// input is recorded as an autopilot script in `record_path` (may be
+// nullptr), which ends with a comment giving the result.
 PlayResult play_run(uint32_t seed, PlayPolicy policy, void *arg, const char *record_path);
+// Replays the recording `from` up to its checkpoint `checkpoint` and plays
+// `policy` from there, at the same frame, as if play_checkpoint() had just
+// returned. The run fails if the game is not as it was when the checkpoint
+// was taken. `record_path` may be `from` itself. Recordings that used
+// play_test_setup before the checkpoint are refused.
+PlayResult play_resume(const char *from, const char *checkpoint, PlayPolicy policy, void *arg,
+                       const char *record_path);
 // Boots and plays an autopilot script (e.g. "@path") with no policy.
 PlayResult play_replay(const char *script);
 
@@ -57,6 +71,13 @@ void play_mouse(int x, int y, int buttons);
 void play_click(int x, int y);
 // Queues a Crt.ReadKey code (0 then a scan code for extended keys).
 void play_key(int code);
+// Marks checkpoint `name` (letters, digits, '_', '-', '.'; unique in a run)
+// in the recording, with the frame and a hash of the game, for play_resume.
+// The policy must be able to go on from there knowing only the name: it
+// rereads whatever else it needs from the screen.
+void play_checkpoint(const char *name);
+// The checkpoint this run was resumed at, or nullptr.
+const char *play_resumed_at(void);
 // Driver tests only, never in a proof run: runs fn(arg) now, with the game
 // stopped, to put the game into a state the test needs (e.g. an enemy fleet
 // arriving). The write barrier allows it; the run is marked tainted and its

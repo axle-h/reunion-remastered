@@ -45,6 +45,8 @@ REUNION_AUTOPILOT='40:click:160,60;120:click:80,100;1000:dump:cc.png;1001:quit' 
 build/debug/reunion
 ```
 
+`reunion --replay=FILE` plays a script file headless and prints how the game
+ended (docs/playthrough.md).
 `REUNION_AUTOPILOT=random:SEED:FRAMES` plays random clicks and keys instead
 (deterministic per seed). `tools/soak.sh` runs many seeds of that on the
 `trap` preset (UBSan, trapping) and reports crashes and hangs with gdb

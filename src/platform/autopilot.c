@@ -33,6 +33,9 @@ static int mouse_x, mouse_y;
 // Event frames count from the first retrace after the script was set.
 static uint64_t base;
 static bool have_base;
+// autopilot_set_frame_limit.
+static uint64_t limit;
+static bool limit_reached;
 
 // Random input (soak tests): "random:SEED:FRAMES[:START]".
 static struct {
@@ -154,6 +157,8 @@ void autopilot_set_script(const char *script)
     pressed = false;
     have_base = false;
     have_seed = false;
+    limit = 0;
+    limit_reached = false;
     rnd.on = false;
     active = script && *script;
     if (!active)
@@ -168,25 +173,33 @@ void autopilot_set_script(const char *script)
     }
     if (!copy)
         return;
-    char *save = nullptr;
-    for (char *tok = SDL_strtok_r(copy, ";\n", &save); tok; tok = SDL_strtok_r(nullptr, ";\n", &save)) {
-        while (*tok == ' ' || *tok == '\r')
-            tok++;
-        if (!*tok || *tok == '#')
-            continue;
-        if (SDL_strncmp(tok, "random:", 7) == 0) {
-            if (!parse_random(tok))
+    char *save_line = nullptr;
+    for (char *line = SDL_strtok_r(copy, "\n", &save_line); line;
+         line = SDL_strtok_r(nullptr, "\n", &save_line)) {
+        while (*line == ' ' || *line == '\r')
+            line++;
+        if (*line == '#')
+            continue;  // the whole line, ';' and all
+        char *save = nullptr;
+        for (char *tok = SDL_strtok_r(line, ";", &save); tok; tok = SDL_strtok_r(nullptr, ";", &save)) {
+            while (*tok == ' ' || *tok == '\r')
+                tok++;
+            if (!*tok || *tok == '#')
+                continue;
+            if (SDL_strncmp(tok, "random:", 7) == 0) {
+                if (!parse_random(tok))
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: bad event '%s'", tok);
+                continue;
+            }
+            unsigned long s32;
+            if (SDL_sscanf(tok, "seed:%lu", &s32) == 1) {
+                seed = (uint32_t)s32;
+                have_seed = true;
+                continue;
+            }
+            if (!add_event(tok))
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: bad event '%s'", tok);
-            continue;
         }
-        unsigned long s32;
-        if (SDL_sscanf(tok, "seed:%lu", &s32) == 1) {
-            seed = (uint32_t)s32;
-            have_seed = true;
-            continue;
-        }
-        if (!add_event(tok))
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Autopilot: bad event '%s'", tok);
     }
     SDL_free(copy);
     SDL_qsort(events, (size_t)event_count, sizeof *events, by_frame);
@@ -332,6 +345,41 @@ void autopilot_frame(uint64_t frame)
     }
     if (rnd.on)
         random_frame(frame);
+    if (limit && frame >= limit && !limit_reached) {
+        SDL_Log("Autopilot: frame limit %llu reached", (unsigned long long)limit);
+        limit_reached = true;
+        input_request_quit();
+    }
     if (controller)
         controller(frame);
+}
+
+uint64_t autopilot_last_event(void)
+{
+    return event_count ? events[event_count - 1].frame : 0;
+}
+
+void autopilot_set_frame_limit(uint64_t frame)
+{
+    limit = frame;
+}
+
+bool autopilot_limit_reached(void)
+{
+    return limit_reached;
+}
+
+uint64_t autopilot_hash(const void *data, size_t size)
+{
+    const uint8_t *p = data;
+    uint64_t h = 0x84222325CBF29CE4u;
+    for (size_t i = 0; i + 8 <= size; i += 8) {
+        uint64_t w;
+        SDL_memcpy(&w, p + i, 8);
+        h = (h ^ w) * 0x9E3779B97F4A7C15u;
+        h ^= h >> 29;
+    }
+    for (size_t i = size & ~(size_t)7; i < size; i++)
+        h = (h ^ p[i]) * 0x9E3779B97F4A7C15u;
+    return h;
 }

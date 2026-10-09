@@ -51,7 +51,8 @@ static uint64_t timer_period;
 
 // The OPL and the timer, interleaved frame by frame so that register writes
 // from the tick land at the sample where its interrupt would have fired.
-static void mix_opl(int32_t *acc, int frames)
+// Without `render` only the timer runs (audio_advance).
+static void mix_opl(int32_t *acc, int frames, bool render)
 {
     for (int i = 0; i < frames; i++) {
         if (timer_tick) {
@@ -61,7 +62,7 @@ static void mix_opl(int32_t *acc, int frames)
                 timer_tick();
             }
         }
-        if (opl_active) {
+        if (opl_active && render) {
             int16_t s[2];
             OPL3_GenerateResampled(&opl, s);
             acc[2 * i] += s[0] * music_gain / GAIN_ONE;
@@ -70,6 +71,8 @@ static void mix_opl(int32_t *acc, int frames)
     }
 }
 
+// Mixes `frames` into `out`; with out == nullptr only advances everything
+// the game can observe (module position, timer, which voices still play).
 static void mix_chunk(int16_t *out, int frames)
 {
     int32_t acc[CHUNK_FRAMES * 2] = {};
@@ -87,10 +90,19 @@ static void mix_chunk(int16_t *out, int frames)
     }
 
     if (opl_active || timer_tick)
-        mix_opl(acc, frames);
+        mix_opl(acc, frames, out != nullptr);
 
     for (int v = 0; v < AUDIO_VOICES; v++) {
         Voice *vc = &voices[v];
+        if (!out && vc->active) {
+            // As the loop below: stops at the first frame past the end.
+            uint64_t last = vc->pos + (uint64_t)vc->step * (uint64_t)(frames - 1);
+            if ((size_t)(last >> 16) >= vc->len)
+                vc->active = false;
+            else
+                vc->pos += (uint64_t)vc->step * (uint64_t)frames;
+            continue;
+        }
         for (int i = 0; vc->active && i < frames; i++) {
             size_t idx = (size_t)(vc->pos >> 16);
             if (idx >= vc->len) {
@@ -109,7 +121,7 @@ static void mix_chunk(int16_t *out, int frames)
         }
     }
 
-    for (int i = 0; i < frames * 2; i++)
+    for (int i = 0; out && i < frames * 2; i++)
         out[i] = (int16_t)SDL_clamp(acc[i], INT16_MIN, INT16_MAX);
 }
 
@@ -118,7 +130,8 @@ static void mix_locked(int16_t *out, int frames)
     while (frames > 0) {
         int n = SDL_min(frames, CHUNK_FRAMES);
         mix_chunk(out, n);
-        out += n * 2;
+        if (out)
+            out += n * 2;
         frames -= n;
     }
 }
@@ -139,6 +152,11 @@ static void SDLCALL feed(void *userdata, SDL_AudioStream *s, int additional, int
 
 bool audio_init(void)
 {
+    // Scripted runs are never heard (see below), and the game takes another
+    // path without a sound device: the dummy device makes them replay the
+    // same on machines without one. SDL_AUDIO_DRIVER still wins.
+    if (autopilot_active())
+        SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, "dummy", SDL_HINT_DEFAULT);
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
         SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Audio: %s", SDL_GetError());
         return false;
@@ -464,5 +482,14 @@ void audio_mix(int16_t *out, int frames)
     }
     SDL_LockAudioStream(stream);
     mix_locked(out, frames);
+    SDL_UnlockAudioStream(stream);
+}
+
+void audio_advance(int frames)
+{
+    if (!stream)
+        return;
+    SDL_LockAudioStream(stream);
+    mix_locked(nullptr, frames);
     SDL_UnlockAudioStream(stream);
 }

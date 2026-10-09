@@ -10,6 +10,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <setjmp.h>
+#include <stdio.h>
 
 #include "cutscene/cutscene.h"
 #include "game/dseg.h"
@@ -52,11 +53,22 @@ static int exit_code;
     longjmp(exit_jump, 1);
 }
 
-// Command line: [--skip-intro] [--cutscene=credits|intro|victory] [DATA_DIR].
+// Command line: [--skip-intro] [--cutscene=credits|intro|victory]
+// [--replay=SCRIPT] [DATA_DIR].
 // REUNION_SKIP_INTRO=1 also skips the credits and intro before the game, and
 // so does an autopilot script (its frame numbers count from the game's start).
 static bool skip_intro;
 static const char *only_cutscene;
+// --replay=SCRIPT checks a recorded autopilot script (the playthrough
+// fixture's, docs/playthrough.md): plays it without a window or sound until
+// the game halts or quits, prints "replay: exit CODE after FRAMES frames,
+// hash HASH" as the fixture reports its runs, and exits with the halt code
+// (0 for a quit, 1 if the script can't be read or the game never ends).
+static const char *replay;
+
+// A replay that goes on this many frames past the script's last event
+// without halting has failed (100,000 retraces: about 40 game days).
+enum : uint64_t { REPLAY_MARGIN = 100000 };
 
 static const char *find_data_dir(int argc, char *argv[])
 {
@@ -66,6 +78,8 @@ static const char *find_data_dir(int argc, char *argv[])
             skip_intro = true;
         else if (SDL_strncmp(argv[i], "--cutscene=", 11) == 0)
             only_cutscene = argv[i] + 11;
+        else if (SDL_strncmp(argv[i], "--replay=", 9) == 0)
+            replay = argv[i] + 9;
         else if (!dir)
             dir = argv[i];
     }
@@ -91,8 +105,28 @@ static bool boot(void)
     return true;
 }
 
+// --replay: the script, with a frame limit so that a replay that goes wrong
+// still ends.
+static bool start_replay(void)
+{
+    if (!SDL_GetPathInfo(replay, nullptr)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Replay %s: %s", replay, SDL_GetError());
+        return false;
+    }
+    char script[1100];
+    SDL_snprintf(script, sizeof script, "@%s", replay);
+    autopilot_set_script(script);
+    autopilot_set_frame_limit(autopilot_last_event() + REPLAY_MARGIN);
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
+    const char *data_dir = find_data_dir(argc, argv);
+    // Headless unless SDL_VIDEO_DRIVER says otherwise (the replay is then
+    // shown fast-forward).
+    if (replay)
+        SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "offscreen,dummy", SDL_HINT_DEFAULT);
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init: %s", SDL_GetError());
         return 1;
@@ -104,8 +138,12 @@ int main(int argc, char *argv[])
     input_init();
     autopilot_init();
     Fixes_Init();
+    if (replay && !start_replay()) {
+        vid_shutdown();
+        SDL_Quit();
+        return 1;
+    }
 
-    const char *data_dir = find_data_dir(argc, argv);
     char *exe = nullptr;
     if (fs_init(data_dir))
         exe = fs_resolve("GRWAR\\REUNION.PRG");
@@ -143,6 +181,7 @@ int main(int argc, char *argv[])
     system_exit_handler = on_halt;
     timing_set_quit_handler(on_quit);
     int result = 0;
+    uint64_t replay_start = timing_frames();
     while (play_game) {
         // volatile: read after longjmp.
         volatile bool booted = false;
@@ -156,6 +195,21 @@ int main(int argc, char *argv[])
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Reunion",
                                      "GRWAR\\REUNION.PRG could not be read.", nullptr);
             result = 1;
+            break;
+        }
+        if (replay) {
+            // The state as the game left it, before any restart or VICTORY.
+            uint64_t frames = timing_frames() - replay_start;
+            if (autopilot_limit_reached()) {
+                printf("replay: no end after %llu frames\n", (unsigned long long)frames);
+                result = 1;
+            } else {
+                printf("replay: exit %d after %llu frames, hash %016llx\n", exit_code,
+                       (unsigned long long)frames,
+                       (unsigned long long)autopilot_hash(mem, MEM_SIZE));
+                result = exit_code == EXIT_QUIT ? 0 : exit_code;
+            }
+            fflush(stdout);
             break;
         }
         // Soak tests (random autopilot) keep playing after the player quits.

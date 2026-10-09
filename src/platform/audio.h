@@ -75,3 +75,8 @@ void audio_unlock(void);
 // Renders `frames` stereo frames of interleaved S16 at AUDIO_RATE, advancing
 // music and voices exactly like the device callback. For tests.
 void audio_mix(int16_t *out, int frames);
+// Advances `frames` like audio_mix without producing the sound: the module
+// position, the timer (and so the AdLib player) and the sound effects'
+// play state move on exactly as there, but the OPL is not synthesised.
+// Unpaced autopilot runs, which discard the sound, use it (timing.c).
+void audio_advance(int frames);

@@ -83,13 +83,29 @@ Inner `do ... while` loop; each iteration is one frame, in this order:
 9. **Hit test**: `PrevHotspotHit := HotspotHit`; `4758:05bc(HotspotHit)`
    (below); if the menu bar is in its second state (`7C63==0`) ids 1..6 map to 7..12;
    on change, the hint line is drawn (`405f:11e8`, text from `DS:7C51+0x15*n` for
-   menu buttons, or the Mouse hotspot's label string); `8A82` = "hot button has a
-   command / is repeatable".
-10. Loop ends when: `ScreenSwitch`, or `8A80` (quit flag ?), or (button down and over a
-    hotspot, and either not a repeat button or the button state just changed), or (button up, state
-    changed, over a non-repeat hotspot, hotspot differs from the previous one...),
-    or (`8A87` cursor-hidden flag and no right/other button). Effectively: a press on a hotspot,
-    a release, or a screen switch.
+   menu buttons, or the Mouse hotspot's label string); `8A82` = "a button": the
+   menu toggle, a menu button with a command, or a Mouse hotspot with byte `+19h`
+   set (`THotspot.Repeat_`, a name the wrong way round: set means it does *not*
+   repeat).
+10. Loop ends when (`1000:089d-08f6`): `ScreenSwitch`, or `8A80` (quit flag ?), or
+    (button down over a hotspot, and either `8A82` clear or the button state just
+    changed), or (button up, the state just changed, `8A82` clear, and the hotspot
+    the same as on the previous frame), or (`8A87` cursor-hidden flag and no
+    right/other button). Effectively: a press on a hotspot, a release, or a screen switch.
+
+**Clicks and handler passes.** Every end of phase A is one pass of the screen's
+handler with `HotspotHit` set. A button (`8A82`) ends it once, on the press. Any
+other hotspot, the clock button (0Eh) among them, ends it on the press, again on
+every frame the button stays down over it (auto-repeat), and once more on the
+release over it. So a click held n frames runs such a handler n+1 times, unless
+the handler's own waits swallow the frames (cargo's 4-frame row flash: a 4-frame
+click moves two loads of ore). Measured in the port with the playthrough fixture
+on the group grid (screen 22, hotspots set with `+19h` = 0): a press held 1, 4,
+12 or 40 frames and released in place added 2, 5, 13 or 41 ships; slid off to an
+empty point before the release, 1, 4, 12 or 40. This is the original's loop (the
+condition above, transcribed in `main_program.c` `wait_for_event`), not a port
+bug. The fixture's `UI_PRESS` (tests/play/ui.h) presses for one frame and slides
+off.
 
 **Hit-test hotspot ids** (`4758:05bc`): `0` none; `1..12` menu-bar buttons
 (top strip, command id at word `DS:7C64+0x15*n`, label at `7C51+0x15*n`); `0xD`

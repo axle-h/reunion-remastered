@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/mem.h"
@@ -52,18 +53,21 @@ static struct {
     bool rebaseline;    // ... this slice: skip the write barrier once
     bool failed;
     char failure[256];
+    // play_resume: the policy first wakes at the checkpoint's frame, where
+    // the memory must hash as it did when the checkpoint was taken.
+    bool check_resume;
+    uint64_t resume_hash;
+    char checkpoint[64];
 } ctl;
+
+// The write barrier: the memory as the policy got it. Copying 1.1 MB and
+// comparing it afterwards costs about 30 us, a fraction of hashing it twice,
+// and finds the exact byte.
+static uint8_t shadow[MEM_SIZE];
 
 static uint64_t hash_memory(void)
 {
-    uint64_t h = 0x84222325CBF29CE4u;
-    for (size_t i = 0; i < MEM_SIZE; i += 8) {
-        uint64_t w;
-        memcpy(&w, mem + i, 8);
-        h = (h ^ w) * 0x9E3779B97F4A7C15u;
-        h ^= h >> 29;
-    }
-    return h;
+    return autopilot_hash(mem, MEM_SIZE);
 }
 
 static void set_failure(const char *fmt, va_list ap)
@@ -113,6 +117,22 @@ static void trace_frame(uint64_t frame)
     }
 }
 
+static void check_write_barrier(uint64_t frame)
+{
+    if (memcmp(shadow, mem, MEM_SIZE) == 0)
+        return;
+    uint32_t at = 0;
+    while (shadow[at] == mem[at])
+        at++;
+    uint32_t ds_base = MEM_DS_SEG * 16;
+    if (at >= ds_base && at < ds_base + 0x10000)
+        fail_from_game("write barrier: the policy changed game memory at frame %llu (DS:%04X)",
+                       (unsigned long long)frame, at - ds_base);
+    else
+        fail_from_game("write barrier: the policy changed game memory at frame %llu (linear %05X)",
+                       (unsigned long long)frame, at);
+}
+
 // autopilot controller: runs on the game thread at every retrace.
 static void on_retrace(uint64_t frame)
 {
@@ -124,25 +144,46 @@ static void on_retrace(uint64_t frame)
         ctl.sleep--;
         return;
     }
-    uint64_t before = hash_memory();
+    if (ctl.check_resume) {
+        ctl.check_resume = false;
+        if (hash_memory() != ctl.resume_hash) {
+            fail_from_game("resume: the game at checkpoint %s (frame %llu) is not as recorded",
+                           ctl.checkpoint, (unsigned long long)frame);
+            return;
+        }
+    }
+    memcpy(shadow, mem, MEM_SIZE);
     SDL_SignalSemaphore(ctl.to_policy);
     SDL_WaitSemaphore(ctl.to_game);
     if (ctl.rebaseline)
         ctl.rebaseline = false;
-    else if (hash_memory() != before)
-        fail_from_game("write barrier: the policy changed game memory at frame %llu",
-                       (unsigned long long)frame);
+    else
+        check_write_barrier(frame);
     if (options_panel_open())
         fail_from_game("the Options panel (cheats) was opened at frame %llu",
                        (unsigned long long)frame);
+}
+
+[[gnu::format(printf, 1, 2)]] static void record_line(const char *fmt, ...)
+{
+    if (!ctl.record)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(ctl.record, fmt, ap);
+    va_end(ap);
 }
 
 static int policy_main(void *unused)
 {
     (void)unused;
     SDL_WaitSemaphore(ctl.to_policy);
-    if (!ctl.aborting && setjmp(ctl.top) == 0)
+    if (!ctl.aborting && setjmp(ctl.top) == 0) {
         ctl.policy(ctl.arg);
+        // Returning ends the run as play_quit() does.
+        input_request_quit();
+        record_line("%llu:quit\n", (unsigned long long)ctl.frame);
+    }
     ctl.done = true;
     ctl.exited = true;
     SDL_SignalSemaphore(ctl.to_game);
@@ -158,12 +199,15 @@ static void yield(void)
         longjmp(ctl.top, 1);
 }
 
+// Boots as src/main.c does for a scripted run (no intro, fixes on) and plays
+// until the game halts or quits.
 static PlayResult boot_and_run(const char *script)
 {
     audio_shutdown();
     input_reset();
     input_set_mouse(0, 0, 0, 0);  // as a fresh process starts
     timing_reset();
+    Fixes_Init();
     autopilot_set_script(script);
     system_exit_handler = on_halt;
     timing_set_quit_handler(on_quit);
@@ -207,24 +251,47 @@ static PlayResult boot_and_run(const char *script)
     return r;
 }
 
-PlayResult play_run(uint32_t seed, PlayPolicy policy, void *arg, const char *record_path)
+static PlayResult failed_result(const char *fmt, ...)
+{
+    PlayResult r = {.exit_code = -2, .failed = true};
+    va_list ap;
+    va_start(ap, fmt);
+    SDL_vsnprintf(r.failure, sizeof r.failure, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+// A checkpoint line of a recording (play_checkpoint).
+typedef struct {
+    char name[64];
+    uint64_t frame, hash;
+} Checkpoint;
+
+// Plays `policy` on the game booted with `script`. The recording starts with
+// `prefix`. With `resume`, the policy first wakes at its frame.
+static PlayResult run_policy(const char *script, const char *prefix, const Checkpoint *resume,
+                             PlayPolicy policy, void *arg, const char *record_path)
 {
     memset(&ctl, 0, sizeof ctl);
+    if (resume) {
+        SDL_strlcpy(ctl.checkpoint, resume->name, sizeof ctl.checkpoint);
+        ctl.check_resume = true;
+        ctl.resume_hash = resume->hash;
+        ctl.sleep = (int)resume->frame;
+    }
     ctl.policy = policy;
     ctl.arg = arg;
-    ctl.to_policy = SDL_CreateSemaphore(0);
-    ctl.to_game = SDL_CreateSemaphore(0);
     if (record_path) {
         ctl.record = fopen(record_path, "w");
-        if (ctl.record)
-            fprintf(ctl.record, "# Recorded by the playthrough fixture (tests/play/).\nseed:%u\n",
-                    (unsigned)seed);
+        if (!ctl.record)
+            return failed_result("can't write the recording %s", record_path);
+        fputs(prefix, ctl.record);
     }
+    ctl.to_policy = SDL_CreateSemaphore(0);
+    ctl.to_game = SDL_CreateSemaphore(0);
     ctl.thread = SDL_CreateThread(policy_main, "policy", nullptr);
     autopilot_set_controller(on_retrace);
 
-    char script[32];
-    SDL_snprintf(script, sizeof script, "seed:%u", (unsigned)seed);
     PlayResult r = boot_and_run(script);
 
     autopilot_set_controller(nullptr);
@@ -237,11 +304,75 @@ PlayResult play_run(uint32_t seed, PlayPolicy policy, void *arg, const char *rec
     SDL_WaitThread(ctl.thread, nullptr);
     SDL_DestroySemaphore(ctl.to_policy);
     SDL_DestroySemaphore(ctl.to_game);
-    if (ctl.record)
-        fclose(ctl.record);
     r.failed = ctl.failed;
     r.tainted = ctl.tainted;
     SDL_strlcpy(r.failure, ctl.failure, sizeof r.failure);
+    if (ctl.record) {
+        fprintf(ctl.record, "# end: exit %d after %llu frames, hash %016llx%s\n", r.exit_code,
+                (unsigned long long)r.frames, (unsigned long long)r.state_hash,
+                r.failed ? " (failed)" : r.tainted ? " (tainted)" : "");
+        fclose(ctl.record);
+    }
+    return r;
+}
+
+PlayResult play_run(uint32_t seed, PlayPolicy policy, void *arg, const char *record_path)
+{
+    char script[64];
+    SDL_snprintf(script, sizeof script, "seed:%u", (unsigned)seed);
+    char prefix[128];
+    SDL_snprintf(prefix, sizeof prefix, "# Recorded by the playthrough fixture (tests/play/).\n%s\n",
+                 script);
+    return run_policy(script, prefix, nullptr, policy, arg, record_path);
+}
+
+// "# checkpoint NAME at frame F, hash H".
+static bool parse_checkpoint(const char *line, Checkpoint *c)
+{
+    unsigned long long f, h;
+    if (SDL_sscanf(line, "# checkpoint %63s at frame %llu, hash %llx", c->name, &f, &h) != 3)
+        return false;
+    c->frame = f;
+    c->hash = h;
+    return true;
+}
+
+PlayResult play_resume(const char *from, const char *checkpoint, PlayPolicy policy, void *arg,
+                       const char *record_path)
+{
+    char *text = SDL_LoadFile(from, nullptr);
+    if (!text)
+        return failed_result("resume: %s: %s", from, SDL_GetError());
+    // The prefix: everything up to and including the checkpoint's line.
+    char *end = nullptr;
+    bool tainted = false;
+    Checkpoint c;
+    for (char *line = text; *line && !end;) {
+        char *eol = SDL_strchr(line, '\n');
+        char *next = eol ? eol + 1 : line + SDL_strlen(line);
+        if (eol)
+            *eol = 0;
+        tainted |= line[0] == '#' && SDL_strstr(line, ": test setup") != nullptr;
+        if (parse_checkpoint(line, &c) && SDL_strcmp(c.name, checkpoint) == 0)
+            end = next;
+        if (eol)
+            *eol = '\n';
+        line = next;
+    }
+    PlayResult r;
+    if (!end) {
+        r = failed_result("resume: no checkpoint %s in %s", checkpoint, from);
+    } else if (tainted) {
+        r = failed_result("resume: %s used play_test_setup before checkpoint %s", from, checkpoint);
+    } else {
+        *end = 0;
+        size_t size = SDL_strlen(text) + 1024;
+        char *prefix = SDL_malloc(size);
+        SDL_snprintf(prefix, size, "%s# resumed at checkpoint %s of %s\n", text, checkpoint, from);
+        r = run_policy(text, prefix, &c, policy, arg, record_path);
+        SDL_free(prefix);
+    }
+    SDL_free(text);
     return r;
 }
 
@@ -258,6 +389,11 @@ PlayResult play_replay(const char *script)
 uint64_t play_frame(void)
 {
     return ctl.frame;
+}
+
+const char *play_resumed_at(void)
+{
+    return ctl.checkpoint[0] ? ctl.checkpoint : nullptr;
 }
 
 void play_wait(int frames)
@@ -280,8 +416,7 @@ bool play_wait_until(bool (*pred)(void *arg), void *arg, int timeout)
 void play_mouse(int x, int y, int buttons)
 {
     input_set_mouse(x, y, buttons & 1, (buttons >> 1) & 1);
-    if (ctl.record)
-        fprintf(ctl.record, "%llu:mouse:%d,%d,%d\n", (unsigned long long)ctl.frame, x, y, buttons);
+    record_line("%llu:mouse:%d,%d,%d\n", (unsigned long long)ctl.frame, x, y, buttons);
 }
 
 void play_click(int x, int y)
@@ -295,8 +430,21 @@ void play_click(int x, int y)
 void play_key(int code)
 {
     input_push_key(code);
+    record_line("%llu:key:%d\n", (unsigned long long)ctl.frame, code);
+}
+
+void play_checkpoint(const char *name)
+{
+    bool ok = *name && SDL_strlen(name) < sizeof ctl.checkpoint;
+    for (const char *p = name; *p; p++)
+        ok &= SDL_isalnum(*p) || *p == '_' || *p == '-' || *p == '.';
+    if (!ok)
+        play_fail("play_checkpoint: bad name '%s'", name);
+    record_line("# checkpoint %s at frame %llu, hash %016llx\n", name,
+                (unsigned long long)ctl.frame, (unsigned long long)hash_memory());
     if (ctl.record)
-        fprintf(ctl.record, "%llu:key:%d\n", (unsigned long long)ctl.frame, code);
+        fflush(ctl.record);
+    play_log("checkpoint %s%s", name, ctl.tainted ? " (tainted: can't be resumed)" : "");
 }
 
 void play_test_setup(void (*fn)(void *arg), void *arg)
@@ -305,16 +453,14 @@ void play_test_setup(void (*fn)(void *arg), void *arg)
     ctl.tainted = true;
     ctl.rebaseline = true;
     play_log("test setup: this run is not a proof");
-    if (ctl.record)
-        fprintf(ctl.record, "# %llu: test setup (game state changed outside input; won't replay)\n",
+    record_line("# %llu: test setup (game state changed outside input, won't replay)\n",
                 (unsigned long long)ctl.frame);
 }
 
 void play_quit(void)
 {
     input_request_quit();
-    if (ctl.record)
-        fprintf(ctl.record, "%llu:quit\n", (unsigned long long)ctl.frame);
+    record_line("%llu:quit\n", (unsigned long long)ctl.frame);
     longjmp(ctl.top, 1);
 }
 
@@ -326,8 +472,7 @@ void play_fail(const char *fmt, ...)
     va_end(ap);
     play_log("FAILED: %s", ctl.failure);
     input_request_quit();
-    if (ctl.record)
-        fprintf(ctl.record, "%llu:quit\n", (unsigned long long)ctl.frame);
+    record_line("%llu:quit\n", (unsigned long long)ctl.frame);
     longjmp(ctl.top, 1);
 }
 

@@ -25,6 +25,7 @@
 // as fast as the CPU allows; frames still count one per retrace.
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 // Reads REUNION_AUTOPILOT once. Returns true if a script is active.
@@ -44,3 +45,13 @@ void autopilot_set_controller(void (*fn)(uint64_t frame));
 // Called by timing_wait_retrace() after input_pump() for retrace `frame`
 // (timing_frames()).
 void autopilot_frame(uint64_t frame);
+// Frame of the script's last event (0 if none).
+uint64_t autopilot_last_event(void);
+// Requests quit at script frame `frame` if the run is still going (0: no
+// limit), so a replay that never halts ends. Cleared by the next script.
+void autopilot_set_frame_limit(uint64_t frame);
+// The run was ended by the frame limit.
+bool autopilot_limit_reached(void);
+// Hash of a memory image: the end state reported for scripted runs (the
+// playthrough fixture, reunion --replay), so the two can be compared.
+uint64_t autopilot_hash(const void *data, size_t size);

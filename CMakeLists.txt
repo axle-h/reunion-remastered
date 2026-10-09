@@ -162,5 +162,11 @@ if(BUILD_TESTING)
         endif()
         add_test(NAME ${name} COMMAND ${name} "${REUNION_DATA_DIR}")
         set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77)
+        if(name MATCHES "^test_play_")
+            # Recordings are also replayed by the game itself (reunion --replay).
+            add_dependencies(${name} reunion)
+            set_tests_properties(${name} PROPERTIES
+                ENVIRONMENT "REUNION_BIN=$<TARGET_FILE:reunion>")
+        endif()
     endforeach()
 endif()

@@ -39,20 +39,36 @@ void timing_reset(void)
 
 // Unpaced autopilot runs drive the mixer from the frame clock (the device
 // stays paused), so sounds last the same number of frames as in real time.
+// Nobody hears them, so nothing is synthesised (audio_advance).
 static void mix_one_retrace(void)
 {
-    int16_t buf[2 * 1024];
     audio_set_paused(true);
     mix_pending += AUDIO_RATE * RETRACE_NS / 1e9;
     int n = (int)mix_pending;
     mix_pending -= n;
-    audio_mix(buf, n);
+    audio_advance(n);
+}
+
+// Unpaced autopilot runs show at most this many frames a second: presenting
+// costs more than a frame of the game and changes nothing it sees.
+enum : uint64_t { AUTOPILOT_PRESENT_NS = 1000000000 / 60 };
+static uint64_t last_present_ns;
+
+static void present(void)
+{
+    if (autopilot_active()) {
+        uint64_t now = SDL_GetTicksNS();
+        if (last_present_ns && now - last_present_ns < AUTOPILOT_PRESENT_NS)
+            return;
+        last_present_ns = now;
+    }
+    vid_present();
 }
 
 bool timing_wait_retrace(void)
 {
     idle_polls = 0;
-    vid_present();
+    present();
     input_pump();
     if (autopilot_init())
         autopilot_frame(frames);
