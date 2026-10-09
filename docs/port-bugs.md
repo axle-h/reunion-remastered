@@ -519,3 +519,26 @@ the original), fix, and how it was verified. Status: **open**,
   `mov byte [8afe],0`); the port set only its position, size and flags.
 - **Fix:** `src/game/grwar.c:264`. `test_diff_grwar` fails on the old code.
 - **Status:** fixed
+
+## 31. Scripted runs hung entering a ground battle
+
+- **Seen:** found by the playthrough fixture's battle drivers
+  (`tests/test_play_battle.c`): entering a ground battle the game stopped
+  advancing frames, in the fixture as in any unpaced autopilot run
+  (`reunion --replay`, soak runs).
+- **Cause:** `Sound_AllocWarSndBuf` (`431a:03e8`, called by
+  `GrWar_EnterGroundBattle` and `SpWar_EnterSpaceBattle`) waits until the
+  war sample still playing has ended. The original spun on the SB status word,
+  which the card cleared by itself at the end of the sample; the port spun
+  with `SDL_Delay(1)` until `Sound_IsSbPlaying()` turned false
+  (`src/game/sound.c:147`). Unpaced autopilot runs keep the audio device
+  paused and advance the mixer only from the frame clock, one retrace's worth
+  in `timing_wait_retrace` (`src/platform/timing.c` `mix_one_retrace`), so
+  while the spin let no retrace pass the voice never ended.
+- **Fix:** the spin calls `timing_idle_poll()` like the port's other busy
+  loops: every few polls a retrace passes, with the frame clock, the input
+  pump and the mixer.
+- **Verified:** `tests/test_play_battle.c` (wave 1 fought on the ground,
+  the Mirach 3 invasion) reaches screens 19 and 32 and finishes both battles;
+  before the fix they hung entering the ground battle.
+- **Status:** fixed

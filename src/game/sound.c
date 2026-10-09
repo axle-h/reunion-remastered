@@ -8,6 +8,7 @@
 #include "game/dseg.h"
 #include "platform/audio.h"
 #include "platform/fs.h"
+#include "platform/timing.h"
 
 static bool device_open;
 static int voice = -1; // the single "SB voice"
@@ -140,10 +141,11 @@ void Sound_AllocWarSndBuf(void)
 {
     if (!ds.Sound_Enabled)
         return;
-    // The original spun on the SB status word; the poll ends as soon as the
-    // mixer reports the voice finished (or immediately without a device).
+    // The original spun on the SB status word, which the card cleared at the
+    // end of the sample. Scripted runs mix audio from the frame clock only,
+    // so the spin has to let retraces pass or the voice never ends.
     while (Sound_IsSbPlaying())
-        SDL_Delay(1);
+        timing_idle_poll();
     Sound_StopAndFreeSample();
     smp_free(&warsnd);
     ds.Sound_LastWarSnd = 0;
