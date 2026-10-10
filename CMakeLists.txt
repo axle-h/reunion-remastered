@@ -168,5 +168,9 @@ if(BUILD_TESTING)
             set_tests_properties(${name} PROPERTIES
                 ENVIRONMENT "REUNION_BIN=$<TARGET_FILE:reunion>")
         endif()
+        if(name STREQUAL "test_play_game")
+            # The whole game and its two replays: ~26 minutes in a debug build.
+            set_tests_properties(${name} PROPERTIES TIMEOUT 3600)
+        endif()
     endforeach()
 endif()

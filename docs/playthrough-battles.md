@@ -179,12 +179,56 @@ are means per run.
 | Morgrul wave 2 (M8) | 25H (+10Tr) | 24H, 16SF (4T), 20T | space 10/10, lose 2.5H 0.9SF; ground (20T vs 10Tr) 10/10 | as planned |
 | Morgrul wave 3 (M12) | 20H 10SF (+15Tr 2T) | 30H, 24SF, 30T | space 10/10, lose 3.9H 2.6SF; ground (30T) 10/10 | as planned |
 | Mirach 3 (M18) | 20H 20SF 3D; 61Tr 40T | 20H 30SF 5D, 60T; fallback 40T | space 30/30; **ground 60T: 6/10, 40T: 4/10**; 75T 9/10; 90T 20/20 (lose ~29T); 60T + 30Tr 9/10 | **≥ 90 tanks** (or 60T + 30Tr). Plan and fallback are insufficient. |
-| Lisonian wave (L7/L12) | 20H 20SF 3D; 30Tr 15T 5Air | 30H 30SF 5D, 40T | space 10/10, lose 10.7H 4.7SF; **ground 40T: 0/10** (5 aircraft stun-lock the tanks); 40T 10Air 10/10 | Space as planned; the 40-tank reserve cannot hold a landing. Aircraft (≥ 10) come only with L11, after this wave, so the space win is the only defence: keep the margin (or add SF). |
-| Orionis 3 (L13) | 30H 23SF 3D; 90Tr 35T | 30H 30SF 5D, 60T 20Air | space 10/10, lose 15.7H 5.8SF; ground 10/10, lose 3Air; 40T 4/10; 30T 10Air 10/10 | as planned |
-| Lyrae 5 (L13) | 30H 25SF 3D; 52Tr 10T | same | space 10/10; ground 10/10 | as planned |
-| Lyrae 7 (L13) | 40H 30SF 2D 1C; 70Tr 40T 10Air | 50H 50SF 8D, 60T 20Air | space 10/10, lose 15.1H 5.6SF; ground 10/10, lose 1T 8.8Air; 40T 20Air 10/10; **60T 10Air 4/10**, 40T 10Air 2/10 | as planned; the 20 aircraft are essential |
-| Earth 1 wave (X6) | 80SF 12D 3C; 30Tr 30T 30Air | 20SF 4D 2C, 40T 20ML | **space 0/10** (kills 1.7 SF); 50SF 10D 4C also 0/10; 50H 80SF 15D 6C 10/10. Ground 40T 20ML: 10/10, no losses; 20T 10ML 10/10 | **Home guard ships are wasted**; the ground reserve wins alone. Keep 40T 20ML (or 20T 10ML) and no warships at New Earth, or a fleet of ≥ 50H 80SF 15D 6C. |
-| Earth (X3/X9) | 80H 80SF 7D 5C; 30Tr 90T 50Air 30ML | 50H 50SF 10D 6C; 60T 20Air 50ML | **space 6C: 0/10**, 8C: 0/10; 10C: 20/20 (lose 40H 39SF 4D); 12C 10/10; 60H 60SF 12D 10C 10/10. Ground plan 10/10 but loses all tanks and aircraft and 30 ML | **≥ 10 Cruisers** (the guide's 50H 50SF 10D 10C). Ground as planned (60T 30Air 50ML also 10/10). |
+| Lisonian wave (L7/L12) | 20H 20SF 3D; 30Tr 15T 5Air | 30H 30SF 5D, 40T | space 10/10, lose 10.7H 4.7SF; **ground 40T: 0/10** (5 aircraft stun-lock the tanks); 40T 10Air 10/10. Without Plasma: 30H 30SF 5D 10/10 (lose ~14H 4SF), 40H 40SF 6D 10/10 (lose ~9H 2.5SF); ground alone 40T 10Air 10/10, 30T 10Air 9/10, 40T 5Air 9/20, 60T 5Air 13/20, 60T 0/20 | Space as planned; the 40-tank reserve cannot hold a landing. Aircraft (≥ 10) come only with L11, after this wave, so the space win is the only defence: keep the margin (or add SF). |
+| Orionis 3 (L13) | 30H 23SF 3D; 90Tr 35T | 30H 30SF 5D, 60T 20Air | space 10/10, lose 15.7H 5.8SF; ground 10/10, lose 3Air; 40T 4/10; 30T 10Air 10/10. Without Plasma: 30H 30SF 5D 10/10 (lose ~22H 12SF), 40H 40SF 6D 20/20 (lose ~13H 4SF); ground 40T 20Air 20/20, 40T 15Air 20/20 (lose 3Air), **40T 10Air 17/20**, 30T 10-20Air 20/20 | 40H 40SF 6D, 30T 20Air |
+| Lyrae 5 (L13) | 30H 25SF 3D; 52Tr 10T | same | space 10/10; ground 10/10. Without Plasma: 40H 40SF 6D 20/20 (lose ~7H 2SF); ground 40T 10-30Air 20/20 (lose 1Air) | as Orionis 3 |
+| Lyrae 7 (L13) | 40H 30SF 2D 1C; 70Tr 40T 10Air | 50H 50SF 8D, 60T 20Air | space 10/10, lose 15.1H 5.6SF; ground 10/10, lose 1T 8.8Air; 40T 20Air 10/10; **60T 10Air 4/10**, 40T 10Air 2/10 | the Lisonian wave's troops come back: next row |
+| Lyrae 7 after the Lisonian wave (`lyrae7-back`) | the wave's fifth of ships and all its troops home: 44H 34SF 3D 1C; 100Tr 55T 15Air | 50H 50SF 8D, 30T 30Air (no Plasma) | space 30/30 (lose ~24H 10SF); 40H 40SF 6D 13/20; 60H 60SF 8D 10/10. Ground 30T 30Air 20/20 (lose 9-20Air), 40T 30Air 30/30 (lose 1T 9-22Air), 60T 30Air 20/20, 60T 25Air 19/20, 40T 25Air 15/20, 80T 20Air 18/20, 40T 20Air 11/20, 80T 15Air 9/20 | **≥ 30 aircraft**, 50H 50SF 8D |
+| Earth 1 wave (X6) | 80SF 12D 3C; 30Tr 30T 30Air | 20SF 4D 2C, 40T 20ML | **space 0/10** (kills 1.7 SF); 50SF 10D 4C also 0/10; 50H 80SF 15D 6C 10/10. Ground 40T 20ML: 10/10, no losses; 20T 10ML 10/10. 20 seeds: 40T 10Air 0/20, 40T 20Air 0/20, 40T 30Air 8/20; 40T 10Air 5ML, 40T 10Air 10ML, 40T 10ML, 40T 20ML, 20T 10ML 20/20 | **Home guard ships are wasted**; the ground reserve wins alone, but only with launchers. Keep 40T 10Air 10ML (act 4's Home Guard and 10 launchers) and no warships at New Earth, or a fleet of ≥ 50H 80SF 15D 6C. |
+| Earth (X3/X9) | 80H 80SF 7D 5C; 30Tr 90T 50Air 30ML | 50H 50SF 10D 6C; 60T 20Air 50ML | **space 6C: 0/10**, 8C: 0/10; 10C: 20/20 (lose 40H 39SF 4D); 12C 10/10; 60H 60SF 12D 10C 10/10. Ground plan 10/10 but loses all tanks and aircraft and 30 ML. With Plasma, 10 seeds: 50H 50SF 10D 10C 10/10 (lose 40H 40SF 1-8D 0-1C), 50H 50SF 12D 10C 10/10, 60H 60SF 12D 10C 10/10 (lose ~48H 40SF 0-2D), 40H 50SF 10D 10C 9/10, 50H 50SF 10D 8C 3/10. Ground (`earth-ground` needs one own ship to carry the troops): 40T 20-40Air with 0-20ML 0/10; 40T 30Air 30ML 6/10, 40T 20Air 30ML 9/10, 30T 20Air 30ML 10/10; 20 seeds: 40T 20Air 40ML (lose 10T 20Air 30ML), 40T 20Air 50ML, 40T 10Air 50ML, 30T 20-30Air 40ML, 60T 20Air 50ML 20/20 | **≥ 10 Cruisers**: the policy takes 60H 60SF 12D 10C. Ground 40T 20Air 40ML (≥ 40 launchers win every time; each costs the Missile line 5 missiles). |
+
+**As played** (thread F, the whole-game fixture, seed 12345; Kyle after his
+course; one proof run and runs resumed from its checkpoints):
+
+| Battle | Own | Enemy | Result |
+|---|---|---|---|
+| Morgrul wave 2 | 24H (2L+1T) 16SF (4T); 19T at home | 25H (10Tr) | space won, lost 2–4H 0–2SF |
+| Morgrul wave 3 | 30H 24SF; 30+T at home | 20H 10SF (15Tr 2T) | space won, lost 3–11H 2–4SF |
+| Mirach 3 | 40H 40SF 6D (+ Kall fleet 2: 15H 10SF) | 55 ships | space won, lost 21–30H 18–20SF 3D (the Kalls' included) |
+| Mirach 3, ground | 90T (3L+1T) + the Kalls' 10Tr 35T | 89Tr 42T | won, lost 14–69T |
+| Lisonian wave (New Earth) | Strike docked, 40–50H 40–50SF 6–8D (no Plasma); 70–80T at home | 20H 20SF 3D (30Tr 15T 5Air) | space won, lost 3–8H 1–5SF |
+| Orionis 3 | 47–50H 49–50SF 8D | 30H 23SF 3D (56 ships) | space won, lost 4–11H 1–5SF |
+| Orionis 3, ground | 30–40T 20–30Air | 90Tr 35T | won, lost 3–6Air |
+| Lyrae 5 | 41–50H 45–50SF 8D | 42 ships | space won, lost 2–7H 0–4SF |
+| Lyrae 5, ground | 30–40T 20–28Air | 52Tr 10T | won, lost 1Air |
+| Lyrae 7 | 50H 50SF 8D | 81 ships | space won, lost 16–21H 3–5SF (the grids; the loss table is wrong, below) |
+| Lyrae 7, ground | 30–40T 30Air | 100Tr 55T 15Air | won, lost 0–1T 10–19Air |
+| Earth | 60H 60SF 12D 10C (Plasma) | 80H 80SF 7D 5C (172 ships) | space won, lost 39–48H 20–42SF |
+| Earth, ground | 40T 20Air 40ML | 30Tr 90T 50Air 30ML | won, lost 10T 20Air 30ML: VICTORY |
+
+At Mirach 3 the enemy is more than §6 measured: the waves' survivors go
+home there (a fifth of the destroyed survive, `SpWar_ApplySpaceLosses`),
+so the space side was 55 ships and the ground 89Tr 42T, not 20H 20SF 3D
+and 61Tr 40T. Allied forces at the battle body fight on the player's
+side in both battles (status 6: `SpWar_InitSpaceFleets`,
+`GrWarUnits_CollectAvailableForces`), so the Kalls' fleet 2, sent to
+Mirach 3 by talk 6, joins the invasion. 30H 30SF 5D with them also won
+(lost 31H 19SF 3D; ground 125T 10Tr lost 69T), but with little to spare
+in space; the three Morgrul Destroyers, which only Destroyers hurt much,
+did most of the damage.
+
+At Lyrae 7 it is the same: the Lisonian wave, beaten in space at New
+Earth, takes the fifth of its ships that survive and all its troops home
+(its ground units never land), so Lyrae 7 had 81 ships and 100Tr 55T
+15Air, not the measured 73 and 70Tr 40T 10Air (`lyrae7-back` measures
+that). Its space battle's loss table, read off the result picture,
+showed "lost 50–58H 29–33SF 2D 1C, destroyed 4H 4SF" for a won battle
+in which the grid lost 21H 5SF: `SpWar_ApplySpaceLosses` adds the losses
+of the ships stored on the planet and its moons to the side its pointer
+was left at by the last race of the force loop with status 2 or 6
+(allied Undorlings, race 8: the player's side), as the original does
+(the code's "BUG?"). The policy reads the grids for the forces. Each home
+world taken becomes a colony of the player (`Intel_ClaimBodyForPlayer`).
 
 The runs use Kyle Douglas at hire (experience 20). By act 5 his factor has
 grown to about 1.23 (MACH 1.32), which helps the player's space damage only.
@@ -240,12 +284,16 @@ code creates, with `play_test_setup` (so these runs are not proofs):
   space and ground units. The fixture then clicks GROUND WAR on the star map.
 - `*-ground` scenarios take the other side's ships away (defence: no Home
   Guard; invasion: no enemy ships) to measure the ground battle alone.
+- `lyrae7-back`: Lyrae 7 with the Lisonian wave (force 1) home again, a
+  fifth of its ships and all its troops (beaten in space at New Earth).
+- `kit=noplasma`: Destroyers without the Plasma gun, as before Rigel 1
+  (act 5): the "without Plasma" figures of §6.
 
 Run `build/e/test_play_battle DATA` for the checks (wave 1 won in space,
 wave 1 beaten on the ground by 10 tanks, Mirach 3 invaded with 90 tanks,
 seed 12345), or
 `build/e/test_play_battle DATA NAME [hold|counter|charge] [FIRST LAST]
-[own=H,SF,D,C/Tr,T,Air,ML] [order=mrta|keep]` for a scenario over seeds
+[own=H,SF,D,C/Tr,T,Air,ML] [order=mrta|keep] [kit=noplasma]` for a scenario over seeds
 (order letters: r trooper, t tank, a aircraft, m launcher, rear to front).
 
 ## 9. Port bug found

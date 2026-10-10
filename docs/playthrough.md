@@ -39,6 +39,48 @@ it (halt code, retraces, hash of the emulated memory) and exits with the
 halt code. A script that has not ended 100,000 retraces after its last event
 fails (status 1).
 
+### Result: seed 12345
+
+`tests/test_play_game.c` plays one game from "new game" with seed 12345
+through the 76 steps of acts 1-5 and wins: Halt(10) after 3,490,240
+retraces, on 2930-03-05 01:00 (game date), memory hash
+`bc4fca9eb88e20f0`. The recording, 3.2 MB of plain autopilot script, is
+[tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
+replays it in-process and `reunion --replay` ends the same way, with exit
+status 10:
+
+```sh
+build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
+# replay: exit 10 after 3490240 frames, hash bc4fca9eb88e20f0   (exit status 10)
+```
+
+Milestones: Jade 2927-09-08, Jaanosian contact 2928-03-02, the Galleon
+2928-08-05, Mirach 3 taken 2929-04-01, the League's surrender
+2929-10-01, Earth 2930-03-05 (the dates of each step are in
+[playthrough-policy.md](playthrough-policy.md) §1 "As run"). The Earth
+invasion: 60H 60SF 12D 10C against 80H 80SF 7D 5C in space (won, lost
+48H 42SF), 40T 20Air 40ML against 30Tr 90T 50Air 30ML on the ground (won,
+lost 10T 20Air 30ML). `test_play_game` takes about 26 minutes in a debug
+build (ctest `TIMEOUT` 3600 s), 3-4 minutes in a release build.
+
+### Robustness: other seeds
+
+The same policy, unchanged per seed, from "new game" with `PLAY_SEED`
+(release build, one recording each):
+
+| Seed | Result | Where and why |
+|---|---|---|
+| 1 | lost at M18; with the fixes won 2930-01-27 | M18, GROUND WAR not offered: the click aimed at Mirach 3 on the star map landed on Mirach 2 as the planets passed each other, and the zoom showed Mirach 2. `ui_invade` now checks that the zoom names the planet and aims again. The rerun (both fixes) went differently from M16 on and needed no second aim. |
+| 2 | won 2930-02-23 | |
+| 3 | lost at M16 | Detoxin: New Earth stopped at 5 Derricks (seed 12345: 20) and gained ~270 t a day; the army's lines took it as it came, and the Space station (60,000 t) was never bought within M16's 60 days. The army goal now keeps the station's ores from its lines while M16 waits; then the Detoxin gathers, but too slowly (18,000 t after 60 days). Why E21 built no more Derricks is open. |
+| 4 | won 2930-03-09 | |
+| 5 | won 2930-02-29 | |
+| 6 | won 2930-02-23 | |
+
+Seeds 2, 4, 5 and 6 ran before the two fixes, 1 and 3 again after them;
+five of six win. Seed 12345's recording is unchanged by both fixes (same
+hash).
+
 ## Architecture
 
 1. **Frame hook.** `timing_wait_retrace` calls the controller once per retrace
@@ -118,16 +160,54 @@ fails (status 1).
    - `ui_talk.c`: alien talks (34), pub (23, 25), advisor (24).
    - `ui_battle.c`: space battle (29), unit assignment (19), ground battle
      (32), GROUND WAR.
+   - `policy.c`: the whole-game policy's shared part
+     ([playthrough-policy.md](playthrough-policy.md) §0, §2, §3): money
+     and ore gates with claims by priority (a goal waiting for money keeps
+     lower ones from spending it), background goals for the steps marked
+     ‖, the idle wait on the message log that runs the standing orders
+     (S3 tax, S4 power, S8 wave evacuation, S11 research) at least daily
+     and after every box, the dispatch of talks and battles (`pol_try`
+     below), a step's chore run between the goals (`pol_between_goals`),
+     and the dates of the boxes, talks and battles seen.
+   - `act1.c` ... `act5.c`: the steps of each act, run by
+     `tests/test_play_game.c` (one checkpoint per step:
+     `PLAY_RESUME=E15_station_on_apollo`). A step rereads what it needs
+     from the screen, so it can run from its checkpoint knowing only its
+     name; the goals of the steps before it are registered again
+     (`pol_run_step`). A resumed run therefore goes on differently from the
+     continuous one (its goals start afresh), and both must pass.
+   - `army.c`: the army goal of acts 3 to 5 (every production line its
+     target force needs kept busy, the Army groups docked at New Earth
+     filled from the stores, tier by tier).
 
    **Interrupt rule.** Every wait and click in `ui.c` services the interrupts
    while it waits (`ui_handle_interrupts`): it closes message boxes (their
    text stays in `ui_last_box`/`ui_box_seen`), accepts rename prompts with
    Enter, clicks through story scenes and presses away holograms. So a box
    that opens just before a click is closed instead of stalling it, and a
-   driver that expects a box (a refusal) looks it up afterwards. Drivers wait
-   with these; `play_wait_until` only to watch a hover or a box themselves.
+   driver that expects a box (a refusal) looks it up afterwards. A story
+   scene ends on the command centre, so a click meant for the screen before
+   it is dropped, and the driver finds its way back (`ui_open_screen`,
+   `ui_open_body` try again); a sequence under `pol_try` (below) is left
+   there, as for a talk (the supernova's scene, act 4, came in the middle of
+   shop and surface sequences). Drivers wait with these; `play_wait_until`
+   only to watch a hover or a box themselves.
    Alien talks, battles and endings are the policy's (`ui_interrupt_screen`);
    a click fails the run if one of them replaced the screen while it waited.
+   So the policy runs every driver sequence (a goal's pass, a standing
+   order, a step's check) under `pol_try`: `ui_on_interrupt_screen` calls
+   back from the first wait that finds such a screen, the sequence is left
+   there (longjmp), the screen is handled (`pol_service`) and the sequence
+   runs again later from what the screens then show.
+
+   **Game data block.** Groups and Buildings share one 8770h-byte block
+   that, with EMS, shares the page frame with the toolbar graphics
+   (`game/ems.h`); the game maps it in before each use, so between a
+   toolbar draw and its next use the frame holds toolbar bytes. Observers
+   read groups and buildings through `ui_group_record` and
+   `ui_building_record` (the block as the game would see it mapped,
+   `emm_page_view`); read straight from the frame, a group's name came back
+   empty right after a screen switch.
 
 ## Threads of work
 
