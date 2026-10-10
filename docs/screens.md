@@ -104,8 +104,8 @@ on the group grid (screen 22, hotspots set with `+19h` = 0): a press held 1, 4,
 12 or 40 frames and released in place added 2, 5, 13 or 41 ships; slid off to an
 empty point before the release, 1, 4, 12 or 40. This is the original's loop (the
 condition above, transcribed in `main_program.c` `wait_for_event`), not a port
-bug. The fixture's `UI_PRESS` (tests/play/ui.h) presses for one frame and slides
-off.
+bug. The fixture's `UI_PRESS` (tests/play/ui.h) presses until the loop has
+polled the press (one frame when it waits for input) and slides off.
 
 **Hit-test hotspot ids** (`4758:05bc`): `0` none; `1..12` menu-bar buttons
 (top strip, command id at word `DS:7C64+0x15*n`, label at `7C51+0x15*n`); `0xD`

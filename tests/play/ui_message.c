@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 
 #include "game/dseg.h"
+#include "game/emm.h"
+#include "game/ems.h"
 #include "game/main_program.h"
 #include "game/mem.h"
 #include "game/mouse.h"
@@ -281,19 +283,18 @@ static struct {
 static struct { int count, last; } scenes;
 static int handled;  // UI_INT_* bits since ui_interrupts_handled()
 
-// The state above belongs to one run; when the frame goes back, a new run
-// (play_run, play_resume) has started in this process and starts it afresh.
+// The state above belongs to one run; a new run (play_run, play_resume) in
+// this process starts it afresh.
 static void check_run(void)
 {
-    static uint64_t last_frame;
-    uint64_t f = play_frame();
-    if (f < last_frame) {
+    static uint32_t last_run;
+    if (play_run_id() != last_run) {
         loop = (typeof(loop)){};
         boxes.count = 0;
         scenes = (typeof(scenes)){};
         handled = 0;
     }
-    last_frame = f;
+    last_run = play_run_id();
 }
 
 static void track_loop(void)
@@ -407,6 +408,22 @@ void ui_on_box(void (*fn)(const char *text, void *arg), void *arg)
 {
     boxes.hook = fn;
     boxes.arg = arg;
+}
+
+static void (*screen_hook)(void);
+
+void ui_on_interrupt_screen(void (*fn)(void))
+{
+    screen_hook = fn;
+}
+
+void ui_screen_lost(const char *what)
+{
+    play_log("%s: screen %d shown instead (a story scene ends on the command centre)", what,
+             ui_screen());
+    if (screen_hook)
+        screen_hook();
+    play_fail("%s: the screen was replaced", what);
 }
 
 // Toolbar strip and its toggle, the clock button (mouse.c Mouse_HitTest).
@@ -563,6 +580,12 @@ static bool scene_played(void *arg)
     return scenes.count != *(int *)arg;
 }
 
+int ui_scenes_played(void)
+{
+    check_run();
+    return scenes.count;
+}
+
 int ui_story_scene(void)
 {
     check_run();
@@ -618,6 +641,9 @@ int ui_handle_interrupts(void)
         }
         if (unhandled_screen(s)) {
             done |= UI_INT_SCREEN;
+            handled |= done;
+            if (screen_hook)
+                screen_hook();
         } else if (s == 1 && !ds.Game_ScreenSwitch && loop.busy >= HOLOGRAM_BUSY) {
             // Research finished on the command centre: the hologram waits
             // for a press (command.c:291-299), which the room then sees.
@@ -634,7 +660,48 @@ int ui_handle_interrupts(void)
             continue;
         }
         handled |= done;
+        // A story scene ends on the command centre: the driver sequence it
+        // came into is left as for an interrupt screen (the supernova's
+        // comes at any hour, in the middle of a shop or surface sequence).
+        if ((done & UI_INT_SCENE) && screen_hook)
+            screen_hook();
         return done;
     }
     play_fail("interrupts kept coming (last box: %s)", ui_last_box());
+}
+
+// --- Game data block ---
+
+enum : uint32_t { GAME_DATA_SIZE = 0x8770 };
+
+// The block's bytes: the memory itself without EMS, else a copy of its
+// pages as mapped or stored.
+static const uint8_t *game_data(void)
+{
+    static uint8_t copy[GAME_DATA_SIZE];
+    const TEmsBlock *blk = Ems_GameDataBlock();
+    if (blk->State != 2)
+        return far_host(blk->Data);
+    for (uint32_t page = 0; page * EMM_PAGE_SIZE < GAME_DATA_SIZE; page++) {
+        const uint8_t *v = emm_page_view(blk->Handle, (uint16_t)page);
+        uint32_t n = SDL_min((uint32_t)EMM_PAGE_SIZE, GAME_DATA_SIZE - page * EMM_PAGE_SIZE);
+        if (v)
+            SDL_memcpy(copy + page * EMM_PAGE_SIZE, v, n);
+    }
+    return copy;
+}
+
+static uint32_t block_offset(FarPtr p)
+{
+    return far_linear(p) - far_linear(Ems_GameDataBlock()->Data);
+}
+
+const TGroup *ui_group_record(int list, int k)
+{
+    return (const TGroup *)(game_data() + block_offset(ds.Game_Groups)) + list * 32 + (k - 1);
+}
+
+const TBuilding *ui_building_record(int i)
+{
+    return (const TBuilding *)(game_data() + block_offset(ds.Game_Buildings)) + (i - 1);
 }

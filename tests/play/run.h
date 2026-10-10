@@ -37,6 +37,9 @@ typedef struct {
     uint32_t seed;           // 0: 12345
 } PlayPlan;
 
+// The name of the step running (nullptr outside a plan's step).
+const char *play_step_name(void);
+
 // Parses argv[1] (game data directory), runs the plan and verifies the
 // recording. Returns the process exit code: 0 passed, 1 failed, 77 no data.
 int play_main(int argc, char *argv[], const PlayPlan *plan);

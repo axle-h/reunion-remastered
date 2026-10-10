@@ -85,6 +85,13 @@ UiBuildings ui_buildings(const char *kind);
 // and active, for at most `hours`.
 bool ui_wait_buildings_active(const char *kind, int n, int hours);
 
+// Clicks a finished building of `kind` on the surface shown (moving the
+// window with the radar to find one), reads the number on its info line
+// starting with `label` ("Status", "Production", "Workers", "Energy",
+// "Working") and goes back to the map. -1 if there is no such building or
+// line. Not for Mines (a click on one opens the droid screen).
+int32_t ui_building_info(const char *kind, const char *label);
+
 // Droids working on the body shown (the droid figures on screen 4 and the
 // "n Miner Droid" line on screen 8), droids in stock for it (the big digits
 // on screen 4) and places for droids (finished Mines and Miner stations: the
@@ -106,8 +113,11 @@ bool ui_add_droid(void);
 // trade group carrying one), "COLONIZATION" (5).
 bool ui_body_action(const char *label);
 // Puts a stock satellite (bought in the shop) on the body shown with ADD
-// SATELLITE. True when its object list (or the screen 8 redraw) then reads
-// "Satellite". (A carrier group's satellites: ui_deploy_carrier_satellite.)
+// SATELLITE. True when the toolbar then no longer offers it (a body takes
+// one satellite). Only around New Earth does the object list then read
+// "Satellite": elsewhere the satellite is lost within hours and never listed
+// (the Klatoo box, E8). (A carrier group's satellites:
+// ui_deploy_carrier_satellite.)
 bool ui_deploy_stock_satellite(void);
 // Opens colonisation (screen 28) for the body shown, picks the starter
 // buildings named in `starters` (n of them) and clicks OK BUILD IT. True when

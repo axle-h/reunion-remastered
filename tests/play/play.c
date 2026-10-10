@@ -22,6 +22,7 @@
 // Game side: the longjmp out of Halt or a quit.
 static jmp_buf game_out;
 static int halt_code;
+static uint32_t run_id;  // boots so far (play_run_id)
 
 [[noreturn]] static void on_halt(uint8_t code)
 {
@@ -203,6 +204,7 @@ static void yield(void)
 // until the game halts or quits.
 static PlayResult boot_and_run(const char *script)
 {
+    run_id++;
     audio_shutdown();
     input_reset();
     input_set_mouse(0, 0, 0, 0);  // as a fresh process starts
@@ -391,6 +393,11 @@ uint64_t play_frame(void)
     return ctl.frame;
 }
 
+uint32_t play_run_id(void)
+{
+    return run_id;
+}
+
 const char *play_resumed_at(void)
 {
     return ctl.checkpoint[0] ? ctl.checkpoint : nullptr;
@@ -471,6 +478,7 @@ void play_fail(const char *fmt, ...)
     set_failure(fmt, ap);
     va_end(ap);
     play_log("FAILED: %s", ctl.failure);
+    play_dump("failed");
     input_request_quit();
     record_line("%llu:quit\n", (unsigned long long)ctl.frame);
     longjmp(ctl.top, 1);

@@ -30,6 +30,10 @@ typedef enum {
     UI_PRESS,        // press 1 retrace, slide off to an inert point, hold 4,
     UI_PRESS_RIGHT,  // release there, 2 more
 } UiClick;
+// Either holds the press until the game's input poll has taken it (ui.c
+// hold_until_polled): longer than 1 or 4 retraces only if the game turned
+// busy as the button went down. If it stays busy (a box), the button is
+// released unseen and the click starts again once the game takes input.
 
 // --- Waits (all service interrupts) ---
 
@@ -80,6 +84,9 @@ bool ui_toolbar_has_command(int command);
 int ui_find_hotspot(const char *caption, int k);
 // Hotspot j is on screen (not of zero size) and captioned `caption`.
 bool ui_hotspot_captioned(int j, const char *caption);
+// The caption of hotspot j, blanks at both ends trimmed ("" if it has none
+// or is not on screen).
+const char *ui_hotspot_caption(int j);
 // Clicks the first hotspot captioned `caption` (UI_CLICK); false if none.
 bool ui_hotspot(const char *caption);
 // Clicks the k-th hotspot captioned `caption` (same-caption hotspots, e.g.

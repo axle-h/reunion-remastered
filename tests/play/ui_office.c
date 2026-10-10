@@ -127,6 +127,22 @@ bool ui_research_panel(UiResearchPanel *p)
     return p->name[0] != 0;
 }
 
+bool ui_developer_skills(int skills[4])
+{
+    if (ui_screen() != 3)
+        return false;
+    // Research_DrawDeveloperSkills: at the x of the layout table DS:0C24
+    // (entries 1..4) + 100, y BCh.
+    const int16_t *xs = (const int16_t *)ds_at(0xC24);
+    for (int k = 1; k <= 4; k++) {
+        int32_t v;
+        if (!ui_read_number(xs[k] + 100, 0xBC, 2, &v))
+            return false;
+        skills[k - 1] = v;
+    }
+    return true;
+}
+
 static bool panel_running(const char *name)
 {
     UiResearchPanel p;

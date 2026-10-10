@@ -5,7 +5,7 @@
 //   test_play_battle DATA                     the checks (ctest)
 //   test_play_battle DATA NAME [hold|counter|charge] [FIRST LAST]
 //                    [own=H,SF,D,C/Tr,T,Air,ML] [order=mrta|keep]
-//                                             one scenario over seeds FIRST..LAST
+//                    [kit=noplasma]           one scenario over seeds FIRST..LAST
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,11 +32,13 @@ typedef struct {
 
 // Loadouts per unit: lasers, twins, missiles, plasma (walkthrough.md
 // "Weapons and loadouts"). Early Hunters have 2 lasers only (before Twin
-// laser gun), early Starfighters 4 twins (before Missile).
-typedef enum { KIT_FULL, KIT_EARLY } Kit;
-static const int space_kit[2][4][4] = {
+// laser gun), early Starfighters 4 twins (before Missile); Destroyers have
+// no Plasma gun before Rigel 1 (act 5).
+typedef enum { KIT_FULL, KIT_EARLY, KIT_NO_PLASMA } Kit;
+static const int space_kit[3][4][4] = {
     {{2, 1, 0, 0}, {0, 4, 1, 0}, {0, 2, 4, 1}, {0, 0, 6, 3}},
     {{2, 0, 0, 0}, {0, 4, 0, 0}, {0, 2, 4, 1}, {0, 0, 6, 3}},
+    {{2, 1, 0, 0}, {0, 4, 1, 0}, {0, 2, 4, 0}, {0, 0, 6, 0}},
 };
 static const int ground_kit[4][4] = {{1, 0, 0, 0}, {3, 1, 0, 0}, {0, 4, 1, 0}, {0, 0, 5, 0}};
 
@@ -119,6 +121,8 @@ typedef struct {
     int system, planet, moon;  // invasion: the target
     const char *system_name, *planet_name;
     int spent;                 // invasion: forces 1..spent of the race are gone
+    int back;                  // invasion: force `back` came home from a lost wave: a
+                               // fifth of its ships (SpWar_ApplySpaceLosses), all its troops
     Force own;                 // Home Guard + planet force, or Strike
     Kit kit;
     bool ground_only;          // no own ships (defence) / no enemy ships (invasion)
@@ -165,6 +169,10 @@ static const Scenario scenarios[] = {
      .planet_name = "Lyrae 5", .own = {{30, 30, 5}, {0, 60, 20}}},
     {"lyrae7", .invasion = true, .race = 7, .system = 6, .planet = 7, .system_name = "Lyrae",
      .planet_name = "Lyrae 7", .spent = 1, .own = {{50, 50, 8}, {0, 60, 20}}},
+    // ... after the Lisonian wave was beaten in space at New Earth: its troops
+    // went home with the fifth of its ships that survived.
+    {"lyrae7-back", .invasion = true, .race = 7, .system = 6, .planet = 7, .system_name = "Lyrae",
+     .planet_name = "Lyrae 7", .back = 1, .own = {{50, 50, 8}, {0, 40, 30}}},
     // X9: Earth with 50H 50SF 10D 6C, 60T 20Air 50ML.
     {"earth", .invasion = true, .race = 12, .system = 8, .planet = 3, .system_name = "Sun",
      .planet_name = "Earth", .own = {{50, 50, 10, 6}, {0, 60, 20, 50}}},
@@ -208,6 +216,9 @@ static void setup_invasion(const Scenario *s)
     r->Status = 2;
     for (int f = 1; f <= s->spent; f++)
         memset(Intel_Force((int16_t)s->race, (int16_t)f)->Units, 0, sizeof r->Forces[0].Units);
+    if (s->back)
+        for (int t = 0; t < 4; t++)
+            Intel_Force((int16_t)s->race, (int16_t)s->back)->Units[t] /= 5;
     TBody *b = body_at(s->system, s->planet, s->moon);
     b->InfoLevel = 40;
     if (s->ground_only) {
@@ -323,6 +334,8 @@ static int sweep(int argc, char *argv[])
             first = (uint32_t)strtoul(argv[i], nullptr, 10);
             last = i + 1 < argc ? (uint32_t)strtoul(argv[++i], nullptr, 10) : first;
         } else {
+            if (!strcmp(argv[i], "kit=noplasma"))
+                s.kit = KIT_NO_PLASMA;
             if (!strcmp(argv[i], "order=keep")) {
                 keep_order = true;
                 strcpy(order_name, "keep");

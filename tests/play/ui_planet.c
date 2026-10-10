@@ -62,31 +62,66 @@ void ui_command_centre(void)
 // The galactic map: bodies are hotspots captioned with their names.
 // A right click opens planet info, a left click zooms into a planet's moons
 // (system view) or opens the surface (moon view) (Launch_MapScreen).
-static void click_body(const char *name, bool right)
+// False if a story scene took the map away meanwhile (the caller tries
+// again from the command centre).
+static bool click_body(const char *name, bool right)
 {
-    if (!ui_hotspot_as(name, 1, right ? UI_CLICK_RIGHT : UI_CLICK))
-        play_fail("no %s on the galactic map", name);
+    if (ui_hotspot_as(name, 1, right ? UI_CLICK_RIGHT : UI_CLICK))
+        return true;
+    if (ui_screen() != 7)
+        return false;
+    play_fail("no %s on the galactic map", name);
+}
+
+static bool zoomed_on(void *planet)
+{
+    // The zoomed view: the planet is hotspot 13h, its moons follow.
+    return ui_hotspot_captioned(0x13, planet);
 }
 
 void ui_open_body(const char *planet, const char *moon, int screen)
 {
     if (ui_screen() != 7)
         ui_open_screen("GALACTIC MAP", 7);
-    // Back to the system view if a planet is zoomed in (its moons are shown).
-    if (ui_toolbar("ZOOM OUT"))
-        play_wait(SETTLE);
-    if (!moon && screen == 8) {
-        click_body(planet, true);
-    } else {
-        // Zoom in; there the planet itself and its moons are hotspots.
-        click_body(planet, false);
-        if (moon && !ui_wait_hotspot(moon, 500))
-            play_fail("no moon %s around %s", moon, planet);
-        play_wait(SETTLE);
-        click_body(moon ? moon : planet, screen == 8);
+    // The bodies move on to their next orbit position at each game hour: a
+    // click aimed just before may miss (or zoom in on another planet), so
+    // each click is tried again.
+    for (int tries = 1;; tries++) {
+        // A story scene that came between returns to the command centre.
+        if (ui_screen() != 7)
+            ui_open_screen("GALACTIC MAP", 7);
+        // Back to the system view if another planet is zoomed in (or any,
+        // for a planet's info).
+        bool keep = (moon || screen != 8) && zoomed_on((void *)planet);
+        if (!keep && ui_toolbar("ZOOM OUT"))
+            play_wait(SETTLE);
+        bool clicked;
+        if (!moon && screen == 8) {
+            clicked = click_body(planet, true);
+        } else {
+            // Zoom in; there the planet itself and its moons are hotspots.
+            if (!zoomed_on((void *)planet)) {
+                clicked = click_body(planet, false);
+                if (!clicked || !ui_wait_until(zoomed_on, (void *)planet, 200)) {
+                    if (tries < 3)
+                        continue;
+                    play_fail("the galactic map did not zoom in on %s", planet);
+                }
+            }
+            if (moon && !ui_wait_hotspot(moon, 500) && ui_screen() == 7) {
+                play_dump("no-moon");
+                ui_log_screen();
+                play_fail("no moon %s around %s", moon, planet);
+            }
+            play_wait(SETTLE);
+            clicked = click_body(moon ? moon : planet, screen == 8);
+        }
+        if (clicked && ui_wait_screen(screen, 300))
+            break;
+        if (tries == 3)
+            play_fail("%s/%s did not open screen %d", planet, moon ? moon : "-", screen);
+        play_log("%s/%s: the click missed, again", planet, moon ? moon : "-");
     }
-    if (!ui_wait_screen(screen, TIMEOUT))
-        play_fail("%s/%s did not open screen %d", planet, moon ? moon : "-", screen);
     play_log("opened %s%s%s on screen %d", planet, moon ? "/" : "", moon ? moon : "", screen);
 }
 
@@ -138,6 +173,15 @@ void ui_set_tax(int level)
     for (int tries = 0; tries < 10; tries++) {
         ui_settle();
         int now = ui_tax_level();
+        if (now < 0) {
+            // The mouse cursor may cover the line (the last click left it
+            // there): move it off.
+            int x, y;
+            ui_inert_point(0, &x, &y);
+            play_mouse(x, y, 0);
+            play_wait(3);
+            now = ui_tax_level();
+        }
         if (now < 0)
             play_fail("ui_set_tax: can't read the TAX line");
         if (now == level) {
@@ -234,6 +278,18 @@ bool ui_select_kind(const char *kind)
         char now[20];
         SDL_strlcpy(now, ui_surface_kind(), sizeof now);
         int at = kind_index(now);
+        // A cell may read '?' while something is drawn over it (the mouse
+        // cursor moving in): read again a few times.
+        for (int i = 0; at == 0 && i < 20; i++) {
+            if (i == 0) {
+                int x, y;
+                ui_inert_point(0, &x, &y);
+                play_mouse(x, y, 0);
+            }
+            play_wait(2);
+            SDL_strlcpy(now, ui_surface_kind(), sizeof now);
+            at = kind_index(now);
+        }
         if (at == want)
             return true;
         if (at == 0)
@@ -251,9 +307,9 @@ bool ui_select_kind(const char *kind)
 
 // The current body's buildings and map layers (Surface_* state): the map
 // window draws them (building tiles, construction markers, terrain).
-static TBuilding *building(int i)
+static const TBuilding *building(int i)
 {
-    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+    return ui_building_record(i);
 }
 
 static int16_t cur_planet(void)
@@ -421,12 +477,14 @@ static bool scrolled(void *arg)
 // cells from its middle (the radar draws the whole map in its box).
 static void radar_move(int step)
 {
+    ui_settle();
+    if (ui_screen() != 20)
+        ui_screen_lost("radar");
     int j = ui_find_hotspot("Radar", 1);
     if (j == 0)
         play_fail("no radar on the surface");
     const THotspot *h = Mouse_Hotspot((int16_t)j);
     int was[2] = {ds.Surface_ScrollX, ds.Surface_ScrollY};
-    ui_settle();
     ui_click(h->X + h->W / 2 + radar_moves[step][0], h->Y + h->H / 2 + radar_moves[step][1]);
     ui_wait_until(scrolled, was, 20);
     play_wait(12);
@@ -540,8 +598,15 @@ int ui_droid_stock(void)
 {
     if (ds.Game_CurSystem == 1 && ds.Game_CurPlanet[0] == 5 && ds.Game_CurMoon[0] == 0)
         return ds.Research_Products[1].Stock;
-    int force = Groups_FindPlanetForce(ds.Game_CurSystem, cur_planet(), cur_moon());
-    return force ? Groups_At(1, force)->Items[12] : 0;
+    // The body's planet force (Groups_FindPlanetForce: the last match)
+    // holds its droids.
+    int stock = 0;
+    for (int k = 1; k <= ds.Game_PlanetForceCount; k++) {
+        const TGroup *f = ui_group_record(1, k);
+        if (f->System == ds.Game_CurSystem && f->Planet == cur_planet() && f->Moon == cur_moon())
+            stock = f->Items[12];
+    }
+    return stock;
 }
 
 int ui_droid_slots(void)
@@ -566,6 +631,66 @@ static bool find_mine(int *x, int *y)
         }
     }
     return false;
+}
+
+// A finished building of kind `k` in the window.
+static bool find_kind(int k, int *x, int *y)
+{
+    for (int j = 1; j <= MAP_ROWS; j++) {
+        for (int i = 1; i <= MAP_COLS; i++) {
+            int b = building_under(i, j);
+            if (b != 0 && building(b)->Kind == k && building(b)->Health == 0) {
+                *x = i;
+                *y = j;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool info_shown(void *unused)
+{
+    (void)unused;
+    return ui_find_hotspot("See surface", 1) != 0;
+}
+
+int32_t ui_building_info(const char *kind, const char *label)
+{
+    int k = kind_index(kind);
+    if (ui_screen() != 20 || k == 0)
+        play_fail("ui_building_info: not on a surface, or no kind '%s'", kind);
+    see_surface();
+    int x, y;
+    bool found = false;
+    for (int step = 0; step < (int)SDL_arraysize(radar_moves) && !found; step++) {
+        if (step > 0)
+            radar_move(step);
+        found = find_kind(k, &x, &y);
+    }
+    if (!found)
+        return -1;
+    ui_settle();
+    ui_click(cell_px(x), cell_py(y));
+    if (!ui_wait_until(info_shown, nullptr, 200))
+        play_fail("ui_building_info: the %s did not show its info", kind);
+    ui_settle();
+    // Surface_DrawBuildingInfo: "<label> : <value>..." lines from (62h, 46h),
+    // 9 pixels apart.
+    int32_t value = -1;
+    for (int row = 0; row < 6; row++) {
+        char line[24];
+        read_text(0x62, 0x46 + row * 9, 20, line);
+        size_t n = SDL_strlen(label);
+        if (SDL_strncmp(line, label, n) == 0) {
+            const char *p = SDL_strchr(line + n, ':');
+            int32_t v;
+            if (p && SDL_sscanf(p + 1, "%d", &v) == 1)
+                value = v;
+        }
+    }
+    see_surface();
+    return value;
 }
 
 static bool droids_changed(void *arg)
@@ -617,13 +742,13 @@ bool ui_body_action(const char *label)
 
 bool ui_deploy_stock_satellite(void)
 {
-    int screen = ui_screen();
     if (!ui_body_action("ADD SATELLITE"))  // stock satellite: command 0x46 on screens 8 and 20
         return false;
     play_dump("satellite");
-    if (screen == 8)
-        return ui_body_lists("Satellite");
-    return true;
+    // satellite.c Satellite_DeployStockSatellite: Satellite 1 around New
+    // Earth, else E2h (lost after 5-14 hours, listed as nothing); either
+    // way the body action is gone.
+    return !ui_toolbar_has("ADD SATELLITE");
 }
 
 bool ui_found_colony(const char *const *starters, int n)

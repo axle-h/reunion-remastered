@@ -43,3 +43,9 @@ void emm_int67(Registers *r);
 size_t emm_state_size(void);
 void emm_state_save(void *buf);
 void emm_state_load(const void *buf);
+
+// Test support (tests/play observers): logical page `page` of `handle` as
+// a program that mapped it would read it, i.e. its physical page in the
+// frame if it is mapped there, else the copy outside mem[]; nullptr if the
+// handle has no such page. Read-only.
+const uint8_t *emm_page_view(uint16_t handle, uint16_t page);

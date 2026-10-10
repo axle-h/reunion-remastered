@@ -48,6 +48,9 @@ typedef struct {
 int ui_research_icon(const char *name);
 // The info panel of the selected product.
 bool ui_research_panel(UiResearchPanel *panel);
+// The developer's four skills (Maths, Physics, Electronics, A.I.) drawn
+// under the research screen; false if no developer is shown.
+bool ui_developer_skills(int skills[4]);
 // Starts researching `name` (goes to screen 3): clicks its icon if it shows
 // "Can be developed" or "Can be analysed", then checks that the panel says
 // "Under development"/"Under analysis". Does nothing if it is already

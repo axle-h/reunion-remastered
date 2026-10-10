@@ -114,6 +114,8 @@ int ui_story_scene_shown(void);
 // out as ui_handle_interrupts does, until the command centre is back.
 // Returns the scene's picture number.
 int ui_story_scene(void);
+// Story scenes played out so far in this run.
+int ui_scenes_played(void);
 
 // --- Interrupts ---
 
@@ -135,3 +137,25 @@ int ui_interrupts_handled(void);
 // An alien talk, battle or ending screen is shown (UI_INT_SCREEN): the
 // screens a policy must handle itself.
 bool ui_interrupt_screen(void);
+// Calls fn() (nullptr: none) whenever ui_handle_interrupts finds such a
+// screen, i.e. from any wait or click: a policy can leave a driver
+// sequence there (longjmp) to handle the screen and take it up again.
+void ui_on_interrupt_screen(void (*fn)(void));
+// For a driver that finds its screen gone (a story scene, e.g. the
+// supernova's, ends on the command centre): leaves the sequence as for an
+// interrupt screen (the hook above), else fails the run.
+[[noreturn]] void ui_screen_lost(const char *what);
+
+// --- Game data block ---
+
+// The game keeps its Groups and Buildings in one block that, with EMS,
+// shares the page frame with the toolbar graphics (game/ems.h): the game
+// maps it in before it uses it, and between a toolbar draw and its next
+// use the frame holds the toolbar. Observers that stand for the group and
+// surface screens read the records here, as the game sees them once it
+// maps the block again (the frame if mapped, else the EMM's copy;
+// emm_page_view). A pointer stays valid until the next call of either.
+struct TGroup;
+struct TBuilding;
+const struct TGroup *ui_group_record(int list, int k);  // Groups^[list][k]
+const struct TBuilding *ui_building_record(int i);      // Buildings^[i]

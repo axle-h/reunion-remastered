@@ -60,6 +60,9 @@ PlayResult play_replay(const char *script);
 
 // Retrace number counted from the start of the run.
 uint64_t play_frame(void);
+// Identifies the run: each play_run, play_resume and play_replay boots the
+// game afresh and gets a new id, so drivers can reset their per-run state.
+uint32_t play_run_id(void);
 // Gives the game `frames` retraces (at least 1).
 void play_wait(int frames);
 // Waits until pred(arg) holds, checking once per retrace, for at most

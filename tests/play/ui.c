@@ -5,6 +5,7 @@
 #include "game/dseg.h"
 #include "game/main_program.h"
 #include "game/mouse.h"
+#include "platform/input.h"
 #include "play/play.h"
 #include "play/ui_message.h"
 
@@ -17,6 +18,8 @@ enum : int {
     SETTLE = 30,            // retraces for fades after a screen is set up
     IDLE_RUN = 3,
     BUSY_TIMEOUT = 5000,
+    HOLD_LIMIT = 100,       // retraces a press waits for the game's poll
+    CLICK_TRIES = 5,
     SCREEN_TIMEOUT = 3000,
     HOUR_RETRACES = 101,    // running retraces per game hour (screens.md §5)
     AIM_MARGIN = 3,         // pixels kept from lower hotspots (orbits move on)
@@ -122,26 +125,80 @@ bool ui_wait_hotspot(const char *caption, int timeout)
 
 // --- Clicks ---
 
+// Holds the button just pressed until the game's input poll has taken it,
+// and returns the retraces held, or 0 if it gave up. The main loop polls
+// (Mouse_Poll: a snapshot of the buttons and the position) before each
+// retrace and hit-tests that snapshot after it, so while it waits for input
+// the press is polled before the next retrace and taken right after it. A
+// game busy then (a handler's own frames, an hour's simulation) polls later,
+// and a press moved off first would be lost. Busy for long, the game likely
+// shows a box, which waits for the button to go up: then it gives up, and
+// the caller releases the button before any poll can see it. So a press is
+// either polled once (if the mouse then moves off, as UI_PRESS does) or not
+// at all, never twice. This reads the game's input state, not anything shown:
+// it times the fixture's own input, as ui_wait_idle's Game_EventWaitFrames
+// does, and decides nothing.
+static int hold_until_polled(void)
+{
+    InputMouse m = input_mouse();  // as clamped to the screen
+    for (int held = 1; held <= HOLD_LIMIT; held++) {
+        play_wait(1);
+        // ui_wait_idle saw polls with the button up, so a snapshot of it
+        // down is from after the press.
+        if (ds.Mouse_Buttons != 0 && ds.Mouse_ClickX == m.x && ds.Mouse_ClickY == m.y) {
+            if (held > 1)
+                play_log("press at %d,%d polled after %d retraces", m.x, m.y, held);
+            return held;
+        }
+    }
+    return 0;
+}
+
 void ui_click_as(int x, int y, UiClick how)
 {
-    int screen = ui_screen();
-    if (!ui_wait_idle(BUSY_TIMEOUT))
-        play_fail("the game stayed busy before a click at %d,%d (screen %d)", x, y, ui_screen());
-    if (ui_screen() != screen && ui_interrupt_screen())
-        play_fail("screen %d came up before a click at %d,%d on screen %d", ui_screen(), x, y, screen);
-    int button = how == UI_CLICK_RIGHT || how == UI_PRESS_RIGHT ? 2 : 1;
-    play_mouse(x, y, button);
-    if (how == UI_PRESS || how == UI_PRESS_RIGHT) {
-        // The main loop sees the press at its next poll; by the one after,
-        // the button is down over no hotspot, and the release there runs no
-        // handler.
-        play_wait(1);
-        ui_inert_point(0, &x, &y);
+    int screen = ui_screen(), button = how == UI_CLICK_RIGHT || how == UI_PRESS_RIGHT ? 2 : 1;
+    int scenes = ui_scenes_played();
+    for (int tries = 1;; tries++) {
+        if (!ui_wait_idle(BUSY_TIMEOUT))
+            play_fail("the game stayed busy before a click at %d,%d (screen %d)", x, y, ui_screen());
+        if (ui_screen() != screen && ui_interrupt_screen())
+            play_fail("screen %d came up before a click at %d,%d on screen %d", ui_screen(), x, y,
+                      screen);
+        // A story scene played meanwhile returns to the command centre: the
+        // click was meant for the screen before, so it is dropped (the
+        // caller sees nothing happen and goes there again).
+        if (ui_screen() != screen && ui_scenes_played() != scenes) {
+            play_log("a story scene came before a click at %d,%d on screen %d: dropped", x, y,
+                     screen);
+            return;
+        }
         play_mouse(x, y, button);
+        int held = hold_until_polled();
+        if (held == 0) {
+            // Not polled: no handler saw it, so pressing again is safe once
+            // the game takes input again (ui_wait_idle closes a box).
+            play_mouse(x, y, 0);
+            play_wait(2);
+            play_log("press at %d,%d not polled in %d retraces (screen %d)", x, y, HOLD_LIMIT,
+                     ui_screen());
+            if (tries == CLICK_TRIES)
+                play_fail("the game did not take a press at %d,%d (screen %d)", x, y, ui_screen());
+            continue;
+        }
+        if (how == UI_PRESS || how == UI_PRESS_RIGHT) {
+            // The hit test after this retrace takes the press; the next poll
+            // finds the button down over no hotspot, and the release there
+            // runs no handler.
+            ui_inert_point(0, &x, &y);
+            play_mouse(x, y, button);
+            play_wait(4);
+        } else if (held < 4) {
+            play_wait(4 - held);
+        }
+        play_mouse(x, y, 0);
+        play_wait(2);
+        return;
     }
-    play_wait(4);
-    play_mouse(x, y, 0);
-    play_wait(2);
 }
 
 void ui_click(int x, int y)
@@ -263,6 +320,25 @@ bool ui_hotspot_captioned(int j, const char *caption)
     return h->W > 0 && h->H > 0 && caption_is(h, caption);
 }
 
+const char *ui_hotspot_caption(int j)
+{
+    static char s[19];
+    s[0] = 0;
+    if (j < 1 || j > ds.Mouse_HotspotCount)
+        return s;
+    const THotspot *h = Mouse_Hotspot((int16_t)j);
+    if (h->W <= 0 || h->H <= 0)
+        return s;
+    size_t start = 0, len = SDL_min((size_t)h->Caption.len, sizeof s - 1);
+    while (len > 0 && h->Caption.s[len - 1] == ' ')
+        len--;
+    while (start < len && h->Caption.s[start] == ' ')
+        start++;
+    SDL_memcpy(s, h->Caption.s + start, len - start);
+    s[len - start] = 0;
+    return s;
+}
+
 int ui_find_hotspot(const char *caption, int k)
 {
     for (int j = 1; j <= ds.Mouse_HotspotCount; j++)
@@ -375,16 +451,28 @@ int ui_fast_forward(bool (*pred)(void *arg), void *arg, int hours)
 
 void ui_open_screen(const char *label, int screen)
 {
-    if (ui_screen() == screen) {
-        ui_settle();
-        return;
+    // A story scene that comes up as the button is pressed replaces the
+    // screen switch (the scene returns to the command centre): the way is
+    // taken again from where it left off.
+    for (int tries = 1;; tries++) {
+        if (ui_screen() == screen) {
+            ui_settle();
+            return;
+        }
+        int scenes = ui_scenes_played();
+        if (!ui_toolbar_has(label) && screen != 1) {
+            if (!ui_toolbar("BACK TO M.SCREEN") || !ui_wait_screen(1, SCREEN_TIMEOUT)) {
+                if (tries < 3 && ui_scenes_played() != scenes)
+                    continue;
+                play_fail("no way back to the command centre from screen %d", ui_screen());
+            }
+        }
+        if (ui_toolbar(label) && ui_wait_screen(screen, SCREEN_TIMEOUT))
+            return;
+        if (tries == 3 || ui_scenes_played() == scenes)
+            play_fail("'%s' did not open screen %d (on %d)", label, screen, ui_screen());
+        play_log("'%s': a story scene came between, again", label);
     }
-    if (!ui_toolbar_has(label) && screen != 1) {
-        if (!ui_toolbar("BACK TO M.SCREEN") || !ui_wait_screen(1, SCREEN_TIMEOUT))
-            play_fail("no way back to the command centre from screen %d", ui_screen());
-    }
-    if (!ui_toolbar(label) || !ui_wait_screen(screen, SCREEN_TIMEOUT))
-        play_fail("'%s' did not open screen %d (on %d)", label, screen, ui_screen());
 }
 
 void ui_hire(const char *kind, const char *name)

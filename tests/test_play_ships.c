@@ -16,9 +16,6 @@
 //    a Trade group with the ship and the station, ore loaded on screen 13,
 //    Move refused without a pilot, a pilot hired, a flight to Apollo and
 //    back, docking and unloading.
-//
-// The research (screen 3), shop (screen 5) and planet-info satellite steps
-// are minimal local helpers: their screens belong to other threads.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -28,6 +25,7 @@
 #include "play/ui.h"
 #include "play/ui_message.h"
 #include "play/ui_office.h"
+#include "play/ui_planet.h"
 #include "play/ui_ships.h"
 
 static bool ok = true;
@@ -36,52 +34,18 @@ static bool ok = true;
 enum : int {
     SCR_COMMAND = 1,
     SCR_RESEARCH = 3,
-    SCR_SHOP = 5,
-    SCR_STAR_MAP = 7,
     SCR_PLANET_INFO = 8,
     SCR_MESSAGES = 11,
     SCR_GROUP = 17,
 };
 
-// --- Local helpers for other threads' screens --------------------------------------
+// --- Research, shop and satellites (ui_office.h, ui_planet.h) -----------------------
 
-static TProduct *product(const char *name)
-{
-    for (int k = 0; k < 35; k++) {
-        TProduct *p = &ds.Research_Products[k];
-        if (p->Name.len == SDL_strlen(name) && SDL_strncmp(p->Name.s, name, p->Name.len) == 0)
-            return p;
-    }
-    play_fail("no product %s", name);
-}
-
-// Research screen panel: 1 "Can be developed", 2 under development, 3 "Can
-// be analysed", 4 under analysis, 5 done (research.c DrawInventionInfo).
-static int research_state(const char *name)
-{
-    return product(name)->State;
-}
-
-// Screen 3: starts the research of `name` (never clicks a running project:
-// that pauses it).
-static void research(const char *name)
-{
-    ui_open_screen("RESEARCH-DESIGN", SCR_RESEARCH);
-    int st = research_state(name);
-    if (st == 2 || st == 4 || st == 5)
-        return;
-    if (st != 1 && st != 3)
-        play_fail("research: %s is not offered (state %d)", name, st);
-    if (!ui_hotspot(name))
-        play_fail("research: no icon for %s", name);
-    ui_settle();
-    play_log("research %s: state %d", name, research_state(name));
-}
-
-// The research screen shows the product's icon (captioned).
+// The research screen shows the product's icon (it appears there when the
+// product is invented).
 static bool research_offered(void *name)
 {
-    return research_state(name) >= 1;
+    return ui_research_icon(name) != UI_RS_UNKNOWN;
 }
 
 // The box "The <name> is ready for production", in the message log.
@@ -92,40 +56,12 @@ static bool research_done(void *name)
     return ui_log_has(text);
 }
 
-// Screen 5 via screen 3: orders up to n more of `name`; returns how many the
-// editor accepted (it cuts the order to what credits and ore allow).
-static int buy(const char *name, int n)
+// The shop panel's "Stores: n" for the product selected (redrawn when a unit
+// is finished) reaches *n.
+static bool stores_reach(void *n)
 {
-    ui_open_screen("RESEARCH-DESIGN", SCR_RESEARCH);
-    if (research_state(name) != 5)
-        play_fail("buy: %s is not done", name);
-    ui_hotspot(name);  // selects it for the shop
-    ui_settle();
-    ui_open_screen("INFO-BUY", SCR_SHOP);
-    if (!ui_toolbar("BUY ITEM"))
-        play_fail("buy: no BUY ITEM");
-    ui_settle();
-    int start = ds.Shop_Qty;  // "Ore needed: (k pieces)" shows the editor's count
-    for (int i = 0; i < n; i++)
-        ui_toolbar("ADD ONE");
-    ui_settle();
-    int got = ds.Shop_Qty - start;
-    play_log("buy %s: %d of %d (stores %d)", name, got, n, product(name)->Stock);
-    ui_toolbar(got > 0 ? "OK,BUY" : "CANCEL BUY");
-    ui_settle();
-    return got;
-}
-
-typedef struct {
-    const char *name;
-    int n;
-} StockWait;
-
-// Shop panel "Stores: n" (redrawn when a unit is finished).
-static bool stores_reach(void *arg)
-{
-    const StockWait *w = arg;
-    return product(w->name)->Stock >= w->n;
+    UiShopQueue q;
+    return ui_shop_queue(&q) && q.stores >= *(int *)n;
 }
 
 // Buys until `n` are in stock, retrying once a game day when credits or ore
@@ -134,37 +70,28 @@ static void buy_stock(const char *name, int n, int hours)
 {
     int64_t end = ui_clock_hours() + hours;
     for (;;) {
-        int queued = product(name)->Stock + (int)product(name)->_1D;
-        if (queued < n)
-            buy(name, n - queued);
-        StockWait w = {name, n};
+        UiShopQueue q;
+        if (!ui_shop_select(name) || !ui_shop_queue(&q))
+            play_fail("buy_stock: no %s in the shop", name);
+        int queued = q.stores + (q.shown ? q.queued : 0);
+        if (queued < n && ui_buy(name, n - queued) < 0)
+            play_fail("buy_stock: %s can't be bought", name);
         int day = 24;
-        if (ui_wait_hours(stores_reach, &w, day))
+        if (ui_wait_hours(stores_reach, &n, day))
             return;
-        if (ui_clock_hours() >= end)
-            play_fail("buy_stock: %s stores %d of %d", name, product(name)->Stock, n);
+        if (ui_clock_hours() >= end) {
+            ui_shop_queue(&q);
+            play_fail("buy_stock: %s stores %d of %d", name, q.stores, n);
+        }
     }
 }
 
-// Screen 7 -> 8: the stock satellite on `planet`, or on its moon `moon`.
+// The stock satellite on `planet`, or on its moon `moon`, from planet info.
 static void deploy_stock_satellite(const char *planet, const char *moon)
 {
-    ui_open_screen("GALACTIC MAP", SCR_STAR_MAP);
-    if (ui_toolbar("ZOOM OUT"))  // from a planet screen the map opens zoomed in
-        ui_settle();
-    if (moon) {
-        ui_hotspot(planet);  // zoom to its moons
-        ui_settle();
-        ui_hotspot_as(moon, 1, UI_CLICK_RIGHT);
-    } else {
-        ui_hotspot_as(planet, 1, UI_CLICK_RIGHT);
-    }
-    if (!ui_wait_screen(SCR_PLANET_INFO, 3000))
-        play_fail("deploy: no planet info for %s", moon ? moon : planet);
-    if (!ui_toolbar("ADD SATELLITE"))
-        play_fail("deploy: no ADD SATELLITE on %s", moon ? moon : planet);
-    ui_settle();
-    play_dump("satellite");
+    ui_open_body(planet, moon, SCR_PLANET_INFO);
+    if (!ui_deploy_stock_satellite())
+        play_fail("deploy: no satellite on %s", moon ? moon : planet);
     play_log("stock satellite deployed on %s", moon ? moon : planet);
 }
 
@@ -206,7 +133,8 @@ static void proof_policy(void *unused)
     ui_hire("PILOTS", "Jack Benson");
 
     // E4: Satellite.
-    research("Satellite");
+    if (!ui_research_start("Satellite"))
+        play_fail("Satellite not researched");
     idle_screen();
     wait_or_fail(research_done, "Satellite", 30, "Satellite ready for production");
 
@@ -220,7 +148,8 @@ static void proof_policy(void *unused)
     // E10: Satellite carrier, once invented (KIT 4).
     ui_open_screen("RESEARCH-DESIGN", SCR_RESEARCH);
     wait_or_fail(research_offered, "Sat.carrier", 60, "Sat.carrier offered");
-    research("Sat.carrier");
+    if (!ui_research_start("Sat.carrier"))
+        play_fail("Sat.carrier not researched");
     idle_screen();
     wait_or_fail(research_done, "Sat.carrier", 60, "Sat.carrier ready for production");
 
@@ -265,6 +194,17 @@ static void proof_policy(void *unused)
 }
 
 // --- 2. Trade group and cargo (test setup) ----------------------------------------
+
+// Test setup only: the product record to change.
+static TProduct *product(const char *name)
+{
+    for (int k = 0; k < 35; k++) {
+        TProduct *p = &ds.Research_Products[k];
+        if (p->Name.len == SDL_strlen(name) && SDL_strncmp(p->Name.s, name, p->Name.len) == 0)
+            return p;
+    }
+    play_fail("no product %s", name);
+}
 
 static void grant_transfer_ship(void *unused)
 {

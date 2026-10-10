@@ -9,6 +9,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 enum : int {
     TALK_QUESTIONS_MAX = 5,  // questions in one menu (pub and advisor; talks have 3)
@@ -47,7 +48,8 @@ void ui_pub_reply(char *out, size_t size);
 bool ui_advisor_menu(TalkMenu *m);
 // The advisor's answer drawn under the question on screen 24.
 void ui_advisor_reply(char *out, size_t size);
-// The last reply a talk or pub driver saw drawn ("" before any).
+// The last reply a talk or pub driver saw drawn, or the advisor's refusal
+// of a course ("" before any).
 const char *ui_last_reply(void);
 
 // --- Drivers ---
@@ -75,3 +77,6 @@ int ui_pub_ask_path(const char *person, const char *const path[]);
 // others. Pays when asked. True if the advisor goes ("All right, I'll go."),
 // false on a refusal (logged); either way ends on the command centre.
 bool ui_university(const char *who, const char *course);
+// ui_university that declines ("You shouldn't go.") a course quoted above
+// `max_price`; *price (may be nullptr) gets the quote, 0 if none was made.
+bool ui_university_upto(const char *who, const char *course, int32_t max_price, int32_t *price);

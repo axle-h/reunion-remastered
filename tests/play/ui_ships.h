@@ -72,6 +72,9 @@ bool ui_new_group(const char *type, const char *name);
 // Opens the group from the ship-info list: screen 17 (control panel) or 22
 // (equipment).
 void ui_open_group(const char *name, int screen);
+// Screen 22 "Change name": renames the group (backspaces, types `name`,
+// Enter). True when the list then shows the new name.
+bool ui_rename_group(const char *group, const char *name);
 // Screen 22: sets the grid count of `ship` (weapon nullptr) or of `weapon`
 // on the row of `ship` to n. Returns false if the count stops short (stock,
 // capacity, or not docked at a colony).
@@ -81,7 +84,8 @@ bool ui_take_off(const char *group);
 bool ui_dock(const char *group);
 // Screen 17 Move -> 18: flies the group (in orbit) to `planet`, or its moon
 // `moon`, of `system` (nullptr = the group's system); planet nullptr flies to
-// the sun to explore the system. Returns false (box closed) on a refusal.
+// the sun to explore the system. Returns false (box closed) on a refusal,
+// true when it flies or (a fast pilot, a short trip) is there already.
 bool ui_launch(const char *group, const char *system, const char *planet, const char *moon);
 // Screen 13 via screen 17: moves `item` between the group (docked at a
 // colony) and the planet: amount > 0 to the ship, < 0 to the planet. Ores

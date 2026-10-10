@@ -476,6 +476,13 @@ static bool advisor_ask(const char *want)
 
 bool ui_university(const char *who, const char *course)
 {
+    return ui_university_upto(who, course, INT32_MAX, nullptr);
+}
+
+bool ui_university_upto(const char *who, const char *course, int32_t max_price, int32_t *price)
+{
+    if (price)
+        *price = 0;
     if (ui_screen() != SCREEN_COMMAND)
         play_fail("ui_university: not on the command centre");
     if (!ui_hotspot(who) || !ui_wait_screen(SCREEN_ADVISOR, TIMEOUT))
@@ -485,8 +492,17 @@ bool ui_university(const char *who, const char *course)
         play_fail("ui_university: no \"Go to university?\"");
     if (course && on_screen(SCREEN_ADVISOR) && !advisor_ask(course))
         play_log("ui_university: no course \"%s\" offered", course);
-    if (on_screen(SCREEN_ADVISOR))
-        advisor_ask("I will pay.");
+    char quote[TALK_TEXT_MAX];
+    int quoted = 0;
+    ui_advisor_reply(quote, sizeof quote);
+    if (on_screen(SCREEN_ADVISOR) && SDL_sscanf(quote, "It will be %d credits", &quoted) == 1) {
+        if (price)
+            *price = quoted;
+        if (quoted > max_price)
+            advisor_ask("You shouldn't go.");
+        else
+            advisor_ask("I will pay.");
+    }
     // Only "All right, I'll go." closes the screen (VALASZ1.SP line 13, menu 00).
     if (!on_screen(SCREEN_ADVISOR)) {
         if (!ui_wait_screen(SCREEN_COMMAND, TIMEOUT))
@@ -495,9 +511,8 @@ bool ui_university(const char *who, const char *course)
         return true;
     }
     // Refused: the first menu is back. The menu bar leads out.
-    char reply[TALK_TEXT_MAX];
-    ui_advisor_reply(reply, sizeof reply);
-    play_log("ui_university: %s refused: \"%s\"", who, reply);
+    ui_advisor_reply(last_reply, sizeof last_reply);
+    play_log("ui_university: %s refused: \"%s\"", who, last_reply);
     if (!ui_toolbar("BACK TO M.SCREEN") || !ui_wait_screen(SCREEN_COMMAND, TIMEOUT))
         play_fail("ui_university: no way back to the command centre");
     return false;

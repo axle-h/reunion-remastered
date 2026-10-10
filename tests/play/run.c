@@ -8,6 +8,12 @@
 
 static const PlayPlan *plan;
 static const char *stop_at;
+static const char *current;
+
+const char *play_step_name(void)
+{
+    return current;
+}
 
 static int step_index(const char *name)
 {
@@ -34,7 +40,9 @@ static void run_steps(void *unused)
             play_log("PLAY_STOP: stopping before %s", s->name);
             play_quit();
         }
+        current = s->name;
         s->run();
+        current = nullptr;
     }
 }
 

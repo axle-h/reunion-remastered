@@ -31,11 +31,15 @@ enum : int {
 #define CARGO_PLANET_CAP (*(const int32_t *)ds_at(0x7872))
 #define TEXT_INPUT (*(const uint8_t *)ds_at(0x7C4A))    // the blinking edit cursor is shown
 
+// Names are padded with blanks in places ("Texon   ", "Kremir  "): those
+// are ignored, as on screen.
 static bool pstr_is(const void *p, const char *s)
 {
     const uint8_t *q = p;
-    size_t n = SDL_strlen(s);
-    return q[0] == n && SDL_strncasecmp((const char *)q + 1, s, n) == 0;
+    size_t n = SDL_strlen(s), len = q[0];
+    while (len > n && q[len] == ' ')
+        len--;
+    return len == n && SDL_strncasecmp((const char *)q + 1, s, n) == 0;
 }
 
 // Clicks hotspot `caption`; fails the run if there is none.
@@ -47,10 +51,16 @@ static void click(const char *caption, const char *what)
 
 // --- Observers ------------------------------------------------------------------------
 
-static TGroup *group_named(const char *name, int *index)
+// The selected group's record (ui_group_record: as the game sees it).
+static const TGroup *selected_group(void)
+{
+    return ui_group_record(ds.Game_GroupList, ds.Game_SelGroup);
+}
+
+static const TGroup *group_named(const char *name, int *index)
 {
     for (int i = 1; i <= ds.Game_GroupCount; i++) {
-        TGroup *g = Groups_At(0, (int16_t)i);
+        const TGroup *g = ui_group_record(0, i);
         if (pstr_is(&g->Name, name)) {
             if (index)
                 *index = i;
@@ -90,10 +100,10 @@ void ui_group_location(const char *name, char *out, size_t n)
     SDL_snprintf(out, n, "%s%.*s", g->Status <= 6 ? prefix[g->Status] : "", loc.len, loc.s);
 }
 
-static int16_t *grid_unit(TGroup *g, int cat, int s)
+static const int16_t *grid_unit(const TGroup *g, int cat, int s)
 {
     uint8_t row = *(const uint8_t *)ds_at((uint16_t)(0x0BB9 + g->Kind * 4 + cat));
-    return (int16_t *)((uint8_t *)g + row * 0x28 + s * 10 - 21);
+    return (const int16_t *)((const uint8_t *)g + row * 0x28 + s * 10 - 21);
 }
 
 static const PStr16 *product_name(uint8_t id)
@@ -131,7 +141,7 @@ static bool grid_find(const TGroup *g, const char *ship, const char *weapon, int
 
 int ui_group_units(const char *name, const char *ship, const char *weapon)
 {
-    TGroup *g = group_named(name, nullptr);
+    const TGroup *g = group_named(name, nullptr);
     int cat, s, w;
     if (!g || !grid_find(g, ship, weapon, &cat, &s, &w))
         return 0;
@@ -163,7 +173,7 @@ static int cargo_row(const char *item, int *item_index)
 
 int32_t ui_cargo_ship(const char *item)
 {
-    const TGroup *g = Groups_Selected();
+    const TGroup *g = selected_group();
     int idx = 0, row = cargo_row(item, &idx);
     if (row == 0)
         return 0;
@@ -217,7 +227,7 @@ void ui_ship_info(void)
 
 static bool group_selected(const char *name)
 {
-    return ds.Game_GroupList == 0 && ds.Game_SelGroup > 0 && pstr_is(&Groups_Selected()->Name, name);
+    return ds.Game_GroupList == 0 && ds.Game_SelGroup > 0 && pstr_is(&selected_group()->Name, name);
 }
 
 void ui_open_group(const char *name, int screen)
@@ -233,15 +243,33 @@ void ui_open_group(const char *name, int screen)
     if (i == 0)
         play_fail("ui_open_group: no group '%s' in the list", name);
     // Name hotspots follow the 32 icon hotspots (ShipInfo_SetupShipInfoHotspots).
-    ui_click_hotspot(i + 0x22, screen == SCR_EQUIP ? UI_CLICK_RIGHT : UI_CLICK);
-    if (!ui_wait_screen(screen, SCREEN_TIMEOUT) || !group_selected(name))
-        play_fail("ui_open_group: '%s' did not open on screen %d", name, screen);
+    // The group opens on the release over its name; a click that a box
+    // took (seen once, as a Destroyer finished) leaves the list shown, so
+    // it is tried again.
+    bool shown = false;
+    for (int tries = 0; !shown && tries < 3 && ui_screen() == SCR_SHIP_INFO; tries++) {
+        ui_click_hotspot(i + 0x22, screen == SCR_EQUIP ? UI_CLICK_RIGHT : UI_CLICK);
+        shown = ui_wait_screen(screen, SCREEN_TIMEOUT / 4);
+    }
+    if (!shown || !group_selected(name)) {
+        const TGroup *g = ds.Game_SelGroup > 0 ? selected_group() : nullptr;
+        for (int k = 1; k <= ds.Game_GroupCount; k++) {
+            const TGroup *h = ui_group_record(0, k);
+            play_log("group %d: '%.*s' status %d at %d:%d:%d", k, h->Name.len, h->Name.s, h->Status,
+                     h->System, h->Planet, h->Moon);
+        }
+        play_log("found at %d, hotspot caption '%s'", i, ui_hotspot_caption(i + 0x22));
+        play_fail("ui_open_group: '%s' did not open on screen %d (%d: screen %d, list %d, group %d "
+                  "'%.*s')",
+                  name, screen, shown, ui_screen(), ds.Game_GroupList, ds.Game_SelGroup,
+                  g ? g->Name.len : 0, g ? g->Name.s : "");
+    }
 }
 
 // The New Group screen's type line (Groups_DrawNewGroupNameAndType).
 static bool type_shown(const char *type)
 {
-    return pstr_is(ds_at((uint16_t)(0x591A + Groups_Selected()->Kind * 14)), type);
+    return pstr_is(ds_at((uint16_t)(0x591A + selected_group()->Kind * 14)), type);
 }
 
 typedef struct {
@@ -252,13 +280,13 @@ typedef struct {
 static bool name_changed(void *arg)
 {
     const NameState *s = arg;
-    return Groups_Selected()->Name.len != s->len || TEXT_INPUT != s->active;
+    return selected_group()->Name.len != s->len || TEXT_INPUT != s->active;
 }
 
 // Types one key into the name being edited and waits until the field shows it.
 static void type_key(int code)
 {
-    NameState s = {Groups_Selected()->Name.len, TEXT_INPUT};
+    NameState s = {selected_group()->Name.len, TEXT_INPUT};
     play_key(code);
     if (!ui_wait_until(name_changed, &s, 30))
         play_fail("ui_new_group: key %d did not reach the name field", code);
@@ -267,13 +295,19 @@ static void type_key(int code)
 bool ui_new_group(const char *type, const char *name)
 {
     ui_ship_info();
+    // NEW UNIT is on the groups' list; a conquered colony's new planet
+    // force leaves the planet-forces list shown (Intel_ClaimBodyForPlayer).
+    if (ds.Game_GroupList != 0) {
+        click("Change mode", "ui_new_group");
+        ui_settle();
+    }
     if (!ui_toolbar("NEW UNIT"))
         play_fail("ui_new_group: no NEW UNIT button (groups not enabled, or 32 groups)");
     if (!ui_wait_screen(SCR_NEW_GROUP, SCREEN_TIMEOUT))
         play_fail("ui_new_group: no New Group screen");
     // The screen opens with the name field in edit mode ("New Group").
     if (name && *name) {
-        while (Groups_Selected()->Name.len > 0)
+        while (selected_group()->Name.len > 0)
             type_key(8);
         for (const char *p = name; *p; p++)
             type_key((unsigned char)*p);
@@ -293,26 +327,45 @@ bool ui_new_group(const char *type, const char *name)
     ui_toolbar("OK,CREATE IT");
     if (!ui_wait_screen(SCR_EQUIP, SCREEN_TIMEOUT))
         play_fail("ui_new_group: no group screen after OK,CREATE IT");
-    play_log("created %s group '%.*s'", type, Groups_Selected()->Name.len, Groups_Selected()->Name.s);
+    play_log("created %s group '%.*s'", type, selected_group()->Name.len, selected_group()->Name.s);
     return true;
+}
+
+bool ui_rename_group(const char *group, const char *name)
+{
+    ui_open_group(group, SCR_EQUIP);
+    if (!ui_hotspot("Change name"))
+        return false;
+    for (int guard = 0; !TEXT_INPUT && guard < 50; guard++)
+        play_wait(1);
+    if (!TEXT_INPUT)
+        play_fail("ui_rename_group: the name field did not open");
+    while (selected_group()->Name.len > 0)
+        type_key(8);
+    for (const char *p = name; *p; p++)
+        type_key((unsigned char)*p);
+    type_key(13);
+    ui_settle();
+    play_log("renamed group '%s' to '%.*s'", group, selected_group()->Name.len, selected_group()->Name.s);
+    return pstr_is(&selected_group()->Name, name);
 }
 
 bool ui_equip(const char *group, const char *ship, const char *weapon, int n)
 {
     ui_open_group(group, SCR_EQUIP);
-    TGroup *g = Groups_Selected();
     int cat, s, w;
-    if (!grid_find(g, ship, weapon, &cat, &s, &w))
+    if (!grid_find(selected_group(), ship, weapon, &cat, &s, &w))
         play_fail("ui_equip: no %s%s%s in the grid of '%s'", ship, weapon ? "/" : "",
                   weapon ? weapon : "", group);
+    // The grid shows one category (page) at a time: ships, ground units...
     for (int i = 0; i < 4 && ds.Groups_SlotCategory != cat; i++) {
-        click("Page down", "ui_equip");
+        click(ds.Groups_SlotCategory < cat ? "Page down" : "Page up", "ui_equip");
         ui_settle();
     }
     // Ship slot buttons are hotspots 8.., weapon buttons 13 + 5 per row.
     int j = w == 0 ? s + 7 : w + 0xC + (s - 1) * 5;
     for (int tries = 0; tries < 4 * n + 20; tries++) {
-        int now = grid_unit(g, cat, s)[w];
+        int now = grid_unit(selected_group(), cat, s)[w];
         if (now == n)
             return true;
         if (j > ds.Mouse_HotspotCount || !ui_hotspot_captioned(j, weapon ? weapon : ship)) {
@@ -321,12 +374,12 @@ bool ui_equip(const char *group, const char *ship, const char *weapon, int n)
         }
         ui_click_hotspot(j, now > n ? UI_PRESS_RIGHT : UI_PRESS);
         ui_settle();
-        if (grid_unit(g, cat, s)[w] == now) {
+        if (grid_unit(selected_group(), cat, s)[w] == now) {
             play_log("ui_equip: %s stays at %d (wanted %d)", weapon ? weapon : ship, now, n);
             return false;
         }
     }
-    return grid_unit(g, cat, s)[w] == n;
+    return grid_unit(selected_group(), cat, s)[w] == n;
 }
 
 typedef struct {
@@ -421,6 +474,29 @@ static bool destination_refused(uint64_t since)
     return true;
 }
 
+static bool off_destination(void *unused)
+{
+    (void)unused;
+    return ui_screen() != SCR_DESTINATION;
+}
+
+// Clicks body hotspot `name` to pick it as the destination; the map then
+// goes back to the control panel. The bodies orbit on this screen too: a
+// click aimed at where one was can land on empty space (seen once, on a
+// moon), so it is aimed again.
+static void click_destination(const char *name, UiClick how)
+{
+    for (int tries = 0; tries < 3 && ui_screen() == SCR_DESTINATION; tries++) {
+        int j = body_hotspot(name);
+        if (j == 0)
+            break;
+        ui_click_hotspot(j, how);
+        if (ui_wait_until(off_destination, nullptr, 100))
+            return;
+        play_log("ui_launch: the click on %s missed, again", name);
+    }
+}
+
 static bool pick_destination(const char *system, const char *planet, const char *moon)
 {
     if (system && !pstr_is(&ds.Names_Systems[ds.Game_CurSystem - 1], system)) {
@@ -454,19 +530,21 @@ static bool pick_destination(const char *system, const char *planet, const char 
             return true;
         }
         zoom_out();
-        int j = body_hotspot(planet);
-        if (j == 0)
+        if (body_hotspot(planet) == 0)
             play_fail("ui_launch: planet %s not on the map", planet);
-        ui_click_hotspot(j, UI_CLICK_RIGHT);
+        click_destination(planet, UI_CLICK_RIGHT);
         return true;
     }
-    if (!on_planet) {
+    // The planets move every game hour: a click aimed just before one can
+    // zoom in on another, so the zoom is checked and tried again.
+    for (int tries = 0; !on_planet && tries < 3; tries++) {
         zoom_out();
         int j = body_hotspot(planet);
         if (j == 0)
             play_fail("ui_launch: planet %s not on the map", planet);
         ui_click_hotspot(j, UI_CLICK);
         ui_settle();
+        on_planet = zoomed() && body_hotspot(planet) == BODY_FIRST;
     }
     int j = body_hotspot(moon);
     if (j == 0 || j == BODY_FIRST) {
@@ -475,7 +553,7 @@ static bool pick_destination(const char *system, const char *planet, const char 
         ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
         return false;
     }
-    ui_click_hotspot(j, UI_CLICK);
+    click_destination(moon, UI_CLICK);
     return true;
 }
 
@@ -485,18 +563,39 @@ static bool destination_or_box(void *arg)
     return ui_screen() == SCR_DESTINATION || ui_box_seen("", *(const uint64_t *)arg);
 }
 
+typedef enum { LAUNCH_FLYING, LAUNCH_REFUSED, LAUNCH_MISSED } LaunchResult;
+
+static LaunchResult launch_once(const char *group, const char *move, const char *system,
+                                const char *planet, const char *moon);
+
 bool ui_launch(const char *group, const char *system, const char *planet, const char *moon)
 {
     ui_open_group(group, SCR_GROUP);
     const char *move = ui_group_status(group) == SHIP_FLYING ? "Change destination" : "Move";
     if (ui_group_status(group) == SHIP_DOCKED)
         play_fail("ui_launch: '%s' is docked", group);
+    // The bodies move on at each game hour: a click aimed just before can
+    // pick the body the group is at, and nothing changes; tried again.
+    for (int tries = 1; tries < 3; tries++) {
+        LaunchResult r = launch_once(group, move, system, planet, moon);
+        if (r != LAUNCH_MISSED)
+            return r == LAUNCH_FLYING;
+        play_log("ui_launch: '%s' did not leave, again", group);
+    }
+    return launch_once(group, move, system, planet, moon) == LAUNCH_FLYING;
+}
+
+static LaunchResult launch_once(const char *group, const char *move, const char *system,
+                                const char *planet, const char *moon)
+{
+    char before[128];
+    ui_group_location(group, before, sizeof before);
     click(move, "ui_launch");
     uint64_t since = play_frame();
     ui_wait_until(destination_or_box, &since, 300);
     if (ui_screen() != SCR_DESTINATION && ui_box_seen("", since)) {
         play_log("ui_launch: '%s' refused", group);
-        return false;
+        return LAUNCH_REFUSED;
     }
     if (!ui_wait_screen(SCR_DESTINATION, SCREEN_TIMEOUT))
         play_fail("ui_launch: no destination screen");
@@ -507,13 +606,17 @@ bool ui_launch(const char *group, const char *system, const char *planet, const 
                      bodies[i]);
     play_log("destination map: %s", line);
     if (!pick_destination(system, planet, moon))
-        return false;
+        return LAUNCH_REFUSED;
     if (!ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT))
         play_fail("ui_launch: no way back to the control panel");
     char loc[128];
     ui_group_location(group, loc, sizeof loc);
     play_log("launch '%s': %s", group, loc);
-    return ui_group_status(group) == SHIP_FLYING;
+    // Gone, or there already: a pilot at experience 90 covers the 80-99
+    // legs to a moon of the same planet within the hour the control panel
+    // ran (sim.c ProcessTravellingGroups).
+    return ui_group_status(group) == SHIP_FLYING || SDL_strcmp(loc, before) != 0 ? LAUNCH_FLYING
+                                                                                : LAUNCH_MISSED;
 }
 
 int32_t ui_cargo(const char *group, const char *item, int32_t amount)

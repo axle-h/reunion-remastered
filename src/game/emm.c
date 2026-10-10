@@ -220,3 +220,16 @@ void emm_state_load(const void *buf)
     EMM_STATE_VARS
 #undef X
 }
+
+const uint8_t *emm_page_view(uint16_t handle, uint16_t page)
+{
+    for (uint16_t i = 0; i < total_pages; i++) {
+        if (owner[i] != handle || logical[i] != page)
+            continue;
+        for (uint16_t p = 0; p < EMM_PHYS_PAGES; p++)
+            if (frame[p] == i)
+                return frame_host(p);
+        return store[i];
+    }
+    return nullptr;
+}

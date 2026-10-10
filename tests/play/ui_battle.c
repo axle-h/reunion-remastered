@@ -143,14 +143,39 @@ bool ui_invade(const char *system, const char *planet, const char *group)
 {
     if (ui_screen() != 7 && (!ui_toolbar("GALACTIC MAP") || !ui_wait_screen(7, 2000)))
         return false;
+    // Zoomed in on a planet (the map opens on the selected one) the system
+    // list gives way to the fleets there.
+    if (ui_toolbar_has("ZOOM OUT")) {
+        ui_toolbar("ZOOM OUT");
+        ui_settle();
+    }
     if (!ui_wait_hotspot(system, 200) || !ui_hotspot(system))
         return false;
     play_wait(20);
-    if (!ui_wait_hotspot(planet, 200) || !ui_hotspot(planet))
+    // The planets circle their sun: a click aimed at one can land on its
+    // neighbour as they pass (seed 1, Mirach 2 for Mirach 3). The zoomed
+    // view names only the planet zoomed on; on another, zoom out and aim
+    // again.
+    for (int aim = 0;; aim++) {
+        if (!ui_wait_hotspot(planet, 200) || !ui_hotspot(planet)) {
+            ui_log_screen();
+            return false;
+        }
+        play_wait(20);
+        if (!ui_toolbar_has("ZOOM OUT") || ui_find_hotspot(planet, 1) != 0)
+            break;
+        play_log("ui_invade: zoomed on another planet than %s", planet);
+        if (aim == 3) {
+            ui_log_screen();
+            return false;
+        }
+        ui_toolbar("ZOOM OUT");
+        ui_settle();
+    }
+    if (!ui_wait_hotspot(group, 200) || !ui_hotspot(group)) {
+        ui_log_screen();
         return false;
-    play_wait(20);
-    if (!ui_wait_hotspot(group, 200) || !ui_hotspot(group))
-        return false;
+    }
     play_wait(20);
     if (!ui_toolbar_has_command(CMD_GROUND_WAR)) {
         ui_log_screen();
