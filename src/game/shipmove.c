@@ -131,14 +131,16 @@ void ShipMove_GroupScreen(void)
     if (ds.Game_HotspotHit == 0x16 && (g->Status == 1 || g->Status == 2)) {
         // Launch / Docking
         TBody *body = bodyp(ds.Game_CurBody);
-        const uint8_t *msg = nullptr;
-        if (body->SurfaceType == 2) {
-            msg = PS(" You cannot land on this type of planet, |          since it is gaseous!");
-        } else if (g->Kind == 4 && (g->System != 1 || g->Planet != 5 || g->Moon != 0)) {
-            msg = PS(" The satellite carriers can only land |          on your main planet");
-        } else if (Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)) {
-            msg = PS(" No ships in this unit ! ");
-        }
+        // One expression: a PS() literal inside an if branch would end with
+        // the branch (docs/port-bugs.md #32).
+        const uint8_t *msg =
+            body->SurfaceType == 2
+                ? PS(" You cannot land on this type of planet, |          since it is gaseous!")
+            : g->Kind == 4 && (g->System != 1 || g->Planet != 5 || g->Moon != 0)
+                ? PS(" The satellite carriers can only land |          on your main planet")
+            : Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)
+                ? PS(" No ships in this unit ! ")
+                : nullptr;
         if (msg) {
             Message_ShowMessageNoLog(msg);
         } else {

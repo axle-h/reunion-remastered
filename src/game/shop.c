@@ -566,19 +566,16 @@ void Shop_DrawNotProducible(void)
     Gfx_DrawTextF9(LIT(""), 0xA0, 0xBD, 0x1A);
     bool stores = p->Produced != 0 || (p->SpaceBuilt != 0 && SPACE_STATION.State == 5);
     if (!stores) {
-        const uint8_t *msg;
-        if (id == 8 || id == 12 || id == 0x22)
-            msg = LIT("You only need one of this item.");
-        else if (id == 14 || id == 18)
-            msg = LIT("This item will be fitted on the ships");
-        else if (id == 0x1C)
-            msg = LIT("This is fitted on the colony centres");
-        else if (id == 0x17)
-            msg = LIT("This cannot be produced on New Earth");
-        else if (id == 1 || id == 7 || id == 0x1D || id == 0x1E || id == 0x23)
-            msg = LIT("This can be built on your colonies");
-        else
-            msg = LIT("This cannot be produced");
+        // One expression: a LIT() literal inside an if branch would end with
+        // the branch (docs/port-bugs.md #32).
+        const uint8_t *msg =
+            id == 8 || id == 12 || id == 0x22 ? LIT("You only need one of this item.")
+            : id == 14 || id == 18            ? LIT("This item will be fitted on the ships")
+            : id == 0x1C                      ? LIT("This is fitted on the colony centres")
+            : id == 0x17                      ? LIT("This cannot be produced on New Earth")
+            : id == 1 || id == 7 || id == 0x1D || id == 0x1E || id == 0x23
+                ? LIT("This can be built on your colonies")
+                : LIT("This cannot be produced");
         Gfx_DrawTextFC(msg, 0xE, 0xBD, 0x28);
         return;
     }

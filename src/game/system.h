@@ -43,7 +43,9 @@ void system_add_exit_proc(FarPtr proc, void (*fn)(void));
 // PString, so pass it cast to PString *; `maxLen` is the declared N.
 // ---------------------------------------------------------------------------
 
-// A PString literal: PSTR("abc") is a const PString * to {3, "abc"}.
+// A PString literal: PSTR("abc") is a const PString * to {3, "abc"}. It is a
+// compound literal, so it lives only to the end of the enclosing block: an
+// if or else branch is a block of its own (docs/port-bugs.md #32).
 #define PSTR(lit) (&(const PString){sizeof(lit) - 1, lit})
 
 // 48c7:0c7c: tmp := src (tmp is a 255-character temporary).

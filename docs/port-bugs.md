@@ -542,3 +542,22 @@ the original), fix, and how it was verified. Status: **open**,
   the Mirach 3 invasion) reaches screens 19 and 32 and finishes both battles;
   before the fix they hung entering the ground battle.
 - **Status:** fixed
+
+## 32. Two refusal boxes were blank in optimised builds
+
+- **Seen:** found by the playthrough fixture: in a release build
+  `tests/test_play_ships.c` read an empty box where " The satellite carriers
+  can only land | on your main planet" belongs (docking a carrier at Zeus);
+  debug builds showed the text.
+- **Cause:** `PSTR` (`src/game/system.h`) is a compound literal, which lives
+  only to the end of its block, and every if or else branch is a block. The
+  docking refusals in `ShipMove` (`src/game/shipmove.c`) and the "This can be
+  built on your colonies" family in `Shop_DrawNotProducible`
+  (`src/game/shop.c`) chose the text in branches and drew it after them, so
+  the pointer was dangling; at -O2 the stack slot was reused and the box drew
+  nothing. GCC warned only for the shop.
+- **Fix:** both choose the text in one conditional expression in the block
+  that uses it; `PSTR`'s comment says why.
+- **Verified:** `test_play_ships` passes in the release build (it failed
+  before) and in the debug build.
+- **Status:** fixed
