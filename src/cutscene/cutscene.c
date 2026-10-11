@@ -662,6 +662,7 @@ bool cutscene_play(Cutscene which)
     timer_base = timing_frames();
 
     volatile bool quit = false;
+    timing_set_mouse_hook(nullptr);  // the game's cursor stays off the cut-scene
     timing_set_quit_handler(on_quit);
     int jumped = setjmp(exit_jump);
     if (jumped == 0)

@@ -33,11 +33,8 @@ static bool hook_row_overlaps(void)
 
 // 4758:0000 MouseCallback. In the original this ran from INT 33h with
 // CX/DX = position and BX = buttons (bit 0 left, bit 1 right).
-void Mouse_Update(void)
+static void callback(void)
 {
-    // The port's mouse state only changes when events are pumped (at
-    // retrace); busy polling loops get a retrace every few calls.
-    timing_idle_poll();
     InputMouse m = input_mouse();
 
     if (ds.Mouse_CursorState != 2) {
@@ -78,6 +75,29 @@ void Mouse_Update(void)
         Mouse_CursorSaveBackground();
         Mouse_CursorDraw();
     }
+}
+
+void Mouse_Update(void)
+{
+    // The port's mouse state only changes when events are pumped (at
+    // retrace); busy polling loops get a retrace every few calls.
+    timing_idle_poll();
+    callback();
+}
+
+// Every retrace: the driver called back on a move or a button change, also
+// while the game was busy elsewhere (typing text, fading, waiting), so the
+// cursor kept following the mouse. Only once Mouse_InitMouse installed it.
+// A change is against what the callback last wrote to DS, so a mouse at
+// rest where DS has it does nothing (as the diff harness sets it up).
+static void retrace_hook(void)
+{
+    if (!ds.Mouse_Present)
+        return;
+    InputMouse m = input_mouse();
+    if (m.x != ds.Mouse_X || m.y != ds.Mouse_Y || m.left != ds.Mouse_BtnLeft
+        || m.right != ds.Mouse_BtnRight)
+        callback();
 }
 
 // 4758:012d CursorBlitHook (Blit_CursorHook)
@@ -150,8 +170,9 @@ void Mouse_CursorRestoreBackground(void)
     Blit_RestoreCursorBackground((uint16_t)(ds.Mouse_CursorSaveY * 320 + ds.Mouse_CursorSaveX), w, h);
 }
 
-// 4758:0314: the INT 33h setup (reset, mickeys, range 0..318 x 0..198, callback)
-// is input.h's job; SDL always has a mouse.
+// 4758:0314: the INT 33h setup (reset, mickeys, range 0..318 x 0..198) is
+// input.h's job; SDL always has a mouse. The callback runs from the retrace
+// wait (retrace_hook).
 void Mouse_InitMouse(void)
 {
     ds.Mouse_Present = 1;
@@ -162,6 +183,7 @@ void Mouse_InitMouse(void)
     Mouse_CursorSaveBackground();
     ds.Blit_CursorHook = far_ptr(0x4758, 0x012D);  // Mouse_CursorBlitHook
     G8A87 = 0;
+    timing_set_mouse_hook(retrace_hook);
 }
 
 // 4758:03e4

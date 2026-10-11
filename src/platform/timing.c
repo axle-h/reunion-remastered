@@ -13,6 +13,7 @@ static const double RETRACE_NS = 1e9 * 800.0 * 449.0 / 25175000.0;
 static uint64_t frames;
 static uint64_t next_ns;
 static void (*quit_handler)(void);
+static void (*mouse_hook)(void);
 static unsigned idle_polls;
 
 enum : unsigned { IDLE_POLLS_PER_RETRACE = 4 };
@@ -20,6 +21,11 @@ enum : unsigned { IDLE_POLLS_PER_RETRACE = 4 };
 void timing_set_quit_handler(void (*fn)(void))
 {
     quit_handler = fn;
+}
+
+void timing_set_mouse_hook(void (*fn)(void))
+{
+    mouse_hook = fn;
 }
 
 void timing_idle_poll(void)
@@ -72,6 +78,8 @@ bool timing_wait_retrace(void)
     input_pump();
     if (autopilot_init())
         autopilot_frame(frames);
+    if (mouse_hook && !input_quit_requested())
+        mouse_hook();
 
     if (input_quit_requested()) {
         if (quit_handler)

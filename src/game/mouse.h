@@ -2,8 +2,10 @@
 //
 // The original read the mouse through an INT 33h user callback that wrote
 // Mouse::X/Y and the raw button bytes asynchronously. The port does the same
-// work in Mouse_Update(), which Mouse_Poll() calls first; code that polled
-// DS:918E directly without Mouse_Poll (e.g. 405f:077f) should call
+// work in Mouse_Update(), which Mouse_Poll() calls first, and at every
+// retrace wait once the mouse moved or a button changed (so the cursor
+// follows the mouse during waits that never poll it). Code that polled
+// DS:918E in a loop without a retrace wait (e.g. 405f:077f) should call
 // Mouse_Update() first.
 #pragma once
 
