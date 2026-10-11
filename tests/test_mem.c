@@ -14,7 +14,7 @@ int main(void)
     ds.Game_Credits = 120000;
     ok = ok && *(int32_t *)far_host(credits) == 120000;
     ok = ok && far_host(credits) == &ds.Game_Credits;
-    ok = ok && ghidra_host(0x4A81, 0x95BE) == &ds.Game_Credits;
+    ok = ok && far_from_host(&ds.Game_Credits) == credits;
 
     // Segment:offset aliasing works as in real mode.
     ok = ok && far_host(far_ptr(0x1234, 0x0010)) == far_host(far_ptr(0x1235, 0x0000));

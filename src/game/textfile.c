@@ -16,7 +16,7 @@ char (*TextFile_ReadKey)(void) = Crt_ReadKey;
 // The edited string as a host pointer. The original stored the far pointer in
 // TextFile::InputStr; callers here may hold the string outside the emulated
 // memory (tests), so the host pointer is kept too, and the far pointer only
-// when the string lies inside mem[].
+// when the string lies in DS or mem[].
 static uint8_t *input_str;
 static FarPtr caller_ptr;  // TextFile_SetStringPtr
 
@@ -31,17 +31,15 @@ void TextFile_SetStringPtr(FarPtr p)
 static uint32_t host_to_far(const void *p)
 {
     const uint8_t *b = p;
-    if (b < mem || b >= mem + MEM_SIZE)
-        return 0;
+    FarPtr far = far_from_host(p);
+    if (far == 0 || (far >> 16) == MEM_DS_SEG)
+        return far;
     uint32_t lin = (uint32_t)(b - mem);
-    uint32_t ds_lin = (uint32_t)MEM_DS_SEG * 16;
-    if (lin >= ds_lin && lin < ds_lin + DSEG_SIZE)
-        return far_ptr(MEM_DS_SEG, (uint16_t)(lin - ds_lin));
     // A group's name: Groups^[list][group] keeps Game_Groups' segment.
     uint32_t groups_lin = (uint32_t)(ds.Game_Groups >> 16) * 16 + (uint16_t)ds.Game_Groups;
     if (ds.Game_Groups != 0 && lin >= groups_lin && lin < groups_lin + 64 * sizeof(TGroup))
         return far_ptr((uint16_t)(ds.Game_Groups >> 16), (uint16_t)(lin - (ds.Game_Groups >> 16) * 16));
-    return far_ptr((uint16_t)(lin >> 4), (uint16_t)(lin & 15));
+    return far;
 }
 
 static void underline(uint8_t colour)

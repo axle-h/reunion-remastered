@@ -30,10 +30,12 @@ static bool apply_relocations(const uint8_t *exe, size_t size)
     return true;
 }
 
+DSeg ds;
+
 bool dseg_init(void)
 {
-    // The rest of the segment is zero, as after System's ClearBss; mem_init()
-    // must have run.
+    // The rest of the segment is zero, as after System's ClearBss.
+    SDL_memset(&ds, 0, sizeof ds);
     size_t size;
     uint8_t *exe = fs_load("GRWAR\\REUNION.PRG", &size);
     if (!exe)

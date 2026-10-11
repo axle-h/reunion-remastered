@@ -368,8 +368,9 @@ def generate(types, kept, dropped):
     out += [f"static_assert(offsetof(DSeg, {s.cname}) == 0x{s.ofs:04X});" for s in kept]
     out += [
         "",
-        "// The data segment lives in the emulated address space (game/mem.h).",
-        "#define ds (*(DSeg *)(mem + MEM_DS_SEG * 16))",
+        "// The data segment (game/dseg.c). Far pointers into it (segment",
+        "// MEM_DS_SEG) are offsets in it (game/mem.h).",
+        "extern DSeg ds;",
         "",
         "// Fills DS 0000..DSEG_INIT_SIZE-1 from GRWAR\\REUNION.PRG and zeroes the",
         "// rest, like the original at startup. Needs fs_init().",

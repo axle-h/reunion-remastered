@@ -53,25 +53,21 @@ static inline uint32_t far_linear(FarPtr p)
     return (p >> 16) * 16 + (p & 0xFFFF);
 }
 
+// The data segment is a C global (game/dseg.h), outside mem[]; far
+// pointers into it (segment MEM_DS_SEG) are offsets in it.
+extern struct DSeg ds;
+
 // Host pointer for a far pointer (no bounds check beyond the 1 MB + 64 KB).
 static inline void *far_host(FarPtr p)
 {
+    if ((p >> 16) == MEM_DS_SEG)
+        return (uint8_t *)&ds + (uint16_t)p;
     return mem + far_linear(p);
 }
 
-// Host pointer for the code's segment numbering in Ghidra (e.g. 4A81h:95BEh),
-// for reading data the decompile refers to.
-static inline void *ghidra_host(uint16_t seg, uint16_t off)
-{
-    return mem + (uint32_t)(seg - 0x1000 + MEM_LOAD_SEG) * 16 + off;
-}
+// The far pointer for a host pointer into DS or mem[] (normalised as GetMem
+// returns them: offset 0..15), 0 for anything else.
+FarPtr far_from_host(const void *p);
 
-// Host pointer for an offset in the data segment, for globals that have no
-// name in DSeg yet: e.g. *(uint16_t *)ds_at(0x8A80).
-static inline void *ds_at(uint16_t off)
-{
-    return mem + MEM_DS_SEG * 16 + off;
-}
-
-// Clears the address space and video memory.
+// Clears the address space, DS and video memory.
 void mem_init(void);
