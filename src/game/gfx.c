@@ -384,7 +384,7 @@ void Gfx_WaitFramesOrClick(int32_t n)
 // --- files ---------------------------------------------------------------------
 
 // 405f:0856
-void Gfx_LoadFile(const uint8_t *name, FarPtr *buf, uint16_t *size)
+void Gfx_LoadFile(const uint8_t *name, uint8_t **buf, uint16_t *size)
 {
     uint8_t nm[256];
     pstr_copy(nm, name);
@@ -400,7 +400,7 @@ void Gfx_LoadFile(const uint8_t *name, FarPtr *buf, uint16_t *size)
     // FileSize is a longint; only its low word is kept.
     *size = (uint16_t)f.size;
     *buf = System_GetMem(*size);
-    file_block_read(&f, far_host(*buf), *size);
+    file_block_read(&f, *buf, *size);
     check_io();
     file_close(&f);
     check_io();
@@ -431,7 +431,7 @@ void Gfx_IconAllOpen(void)
 }
 
 // 405f:09f3
-void Gfx_IconAllReadChunk(const FarPtr *buf, uint16_t *len)
+void Gfx_IconAllReadChunk(uint8_t *const *buf, uint16_t *len)
 {
     uint8_t word[2] = {0, 0};
     if (io_res == 0 && data_file.open && data_file.pos + 2 <= data_file.size) {
@@ -444,7 +444,7 @@ void Gfx_IconAllReadChunk(const FarPtr *buf, uint16_t *len)
     *len = (uint16_t)(word[0] | word[1] << 8);
     uint16_t ofs = ds.Gfx_ReadPos;
     ds.Gfx_ReadPos = (uint16_t)(ds.Gfx_ReadPos + *len);
-    file_block_read(&data_file, (uint8_t *)far_host(*buf) + ofs, *len);
+    file_block_read(&data_file, *buf + ofs, *len);
     check_io();
 }
 
@@ -477,7 +477,7 @@ static void track_min_mem(void)
 }
 
 // 405f:0af8
-void Gfx_ReadChunk(FarPtr *buf, uint16_t *size)
+void Gfx_ReadChunk(uint8_t **buf, uint16_t *size)
 {
     uint8_t word[2] = {0, 0};
     if (io_res == 0 && data_file.open && data_file.pos + 2 <= data_file.size) {
@@ -496,7 +496,7 @@ void Gfx_ReadChunk(FarPtr *buf, uint16_t *size)
         *buf = 0;
     } else {
         *buf = System_GetMem(*size);
-        file_block_read(&data_file, far_host(*buf), *size);
+        file_block_read(&data_file, *buf, *size);
         check_io();
     }
     track_min_mem();
@@ -532,10 +532,9 @@ void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t r
     Sound_FreeSampleIfIdle();
     pstr_copy(path, nm);
     pstr_cat_c(path, ".pic");
-    FarPtr buf_ptr;
+    uint8_t *buf;
     uint16_t size;
-    Gfx_LoadFile(path, &buf_ptr, &size);
-    uint8_t *buf = far_host(buf_ptr);
+    Gfx_LoadFile(path, &buf, &size);
 
     uint16_t width = (uint16_t)(*at(buf, 8) | *at(buf, 9) << 8);
     uint16_t height = (uint16_t)(*at(buf, 10) | *at(buf, 11) << 8);
@@ -602,7 +601,7 @@ void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t r
         }
     }
     track_min_mem();
-    System_FreeMem(buf_ptr, size);
+    System_FreeMem(buf, size);
     Sound_FreeSampleIfIdle();
 }
 
@@ -618,11 +617,11 @@ void Gfx_LoadPicScreen(const uint8_t *name, uint8_t *dest, uint16_t rows, uint8_
 void Gfx_ShowGrafikaPic(const uint8_t *name)
 {
     uint8_t path[256];
-    FarPtr buf = System_GetMem(0xBCC0);
+    uint8_t *buf = System_GetMem(0xBCC0);
     pstr_from_c(path, "grafika\\");
     pstr_cat(path, name);
-    Gfx_LoadPicScreen(path, far_host(buf), 151, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), gfx_screen() + 49 * 320, 320, 151);
+    Gfx_LoadPicScreen(path, buf, 151, Gfx_PalettePtr());
+    Blit_CopyRect(buf, gfx_screen() + 49 * 320, 320, 151);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     System_FreeMem(buf, 0xBCC0);
 }
@@ -660,7 +659,8 @@ static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
     for (uint16_t r = 0; r < 8; r++) {
         for (uint16_t c = 0; c < 6; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);
-            *at(screen, (uint16_t)(ofs + o)) = (uint8_t)(*at(far_host(ds.Gfx_Charset), (uint16_t)(src + o)) + colour);
+            *at(screen, (uint16_t)(ofs + o)) =
+                (uint8_t)(*at(ds.Gfx_Charset, (uint16_t)(src + o)) + colour);
         }
     }
 }
@@ -792,7 +792,8 @@ static void type_glyph(int16_t x, int16_t y, uint16_t cell, uint8_t g, uint8_t c
     for (uint16_t r = 0; r <= 7; r++) {
         for (uint16_t c = 0; c <= 5; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);
-            *at(screen, (uint16_t)(base + o)) = (uint8_t)(colour + *at(far_host(ds.Gfx_Charset), (uint16_t)(src + o)));
+            *at(screen, (uint16_t)(base + o)) =
+                (uint8_t)(colour + *at(ds.Gfx_Charset, (uint16_t)(src + o)));
         }
     }
 }

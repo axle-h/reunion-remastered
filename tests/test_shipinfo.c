@@ -19,10 +19,11 @@ static void reset(void)
 {
     mem_init();
     ds.Mouse_CursorState = 1;  // hidden: Hide/ShowCursor leave the screen alone
-    ds.Game_Groups = far_ptr(0x3000, 0);
-    ds.ShipInfo_Sprites = far_ptr(0x4000, 0);
-    ds.ShipInfo_Backdrop = far_ptr(0x5000, 0);
-    ds.ShipInfo_Buffer = far_ptr(0x6000, 0);
+    // Blocks at segment starts in the address space (the buffer is addressed from its segment).
+    ds.Game_Groups = (TGroup (*)[32])(mem + 0x30000);
+    ds.ShipInfo_Sprites = mem + 0x40000;
+    ds.ShipInfo_Backdrop = mem + 0x50000;
+    ds.ShipInfo_Buffer = mem + 0x60000;
 }
 
 static void hotspots(void)
@@ -53,11 +54,11 @@ static void hotspots(void)
 static void markers(void)
 {
     reset();
-    memset((uint8_t *)far_host(ds.ShipInfo_Sprites) + 0x1C55, 0x77, 7 * 6);  // marker "on" pixels
-    memset((uint8_t *)far_host(ds.ShipInfo_Sprites) + 0x1C45, 0x11, 16);
+    memset(ds.ShipInfo_Sprites + 0x1C55, 0x77, 7 * 6);  // marker "on" pixels
+    memset(ds.ShipInfo_Sprites + 0x1C45, 0x11, 16);
     // 6 rows of 7 from the sprite sheet: rows are 320 apart.
     for (int r = 0; r < 6; r++)
-        memset((uint8_t *)far_host(ds.ShipInfo_Sprites) + 0x1C55 + r * 320, 0x77, 7);
+        memset(ds.ShipInfo_Sprites + 0x1C55 + r * 320, 0x77, 7);
     ds.Game_SelGroup = 10;  // column 1, row 1
     ShipInfo_DrawSelectionMarker();
     uint8_t *scr = &vid_screen[0][0];
@@ -70,15 +71,15 @@ static void markers(void)
     // Buffered marker goes to the off-screen copy, 49 rows down.
     ds.Game_SelGroup = 1;
     ShipInfo_DrawSelectionMarkerBuffered();
-    uint8_t *buf = far_host(ds.ShipInfo_Buffer);
+    uint8_t *buf = ds.ShipInfo_Buffer;
     CHECK(buf[0x3D40 + 0x10 * 320 + 5] == 0x77);
 }
 
 static void icons(void)
 {
     reset();
-    uint8_t *spr = far_host(ds.ShipInfo_Sprites);
-    uint8_t *bd = far_host(ds.ShipInfo_Backdrop);
+    uint8_t *spr = ds.ShipInfo_Sprites;
+    uint8_t *bd = ds.ShipInfo_Backdrop;
     memset(bd, 0x22, 0xBCC0);
     // icon 2: sheet offset (2-1)*32+1+320, a 31x14 sprite with 0x55 pixels (key 0x40 is transparent)
     for (int r = 0; r < 14; r++)

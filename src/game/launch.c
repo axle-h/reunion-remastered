@@ -115,7 +115,7 @@ void Launch_MapScreen(void)
             ds.Game_SelGroup0 = ds.Game_SelGroup;
             CUR_MOON = g->Moon;
             PlanetInfo_SelectCurBody();
-            TBody *body = (TBody *)far_host(ds.Game_CurBody);
+            TBody *body = ds.Game_CurBody;
             if ((int8_t)body->Owner > 1 && body->InfoLevel > 0x27
                 && (int8_t)RACE_STATE((int8_t)body->Owner) < 6)
                 ds.Launch_InvadeIcon = g->Kind == 1 ? 1 : 0;
@@ -215,7 +215,7 @@ void Launch_MapScreen(void)
         } else {
             CUR_MOON = Groups_At(0, ds.Game_SelGroup)->Moon;
             PlanetInfo_SelectCurBody();
-            RACE_STATE(((TBody *)far_host(ds.Game_CurBody))->Owner) = 2; // BUG? Owner as a signed char in the original
+            RACE_STATE(ds.Game_CurBody->Owner) = 2; // BUG? Owner as a signed char in the original
             ds.SpWar_BattleSystem = ds.Game_CurSystem;
             ds.SpWar_BattlePlanet = CUR_PLANET;
             ds.SpWar_BattleMoon = CUR_MOON;

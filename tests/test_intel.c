@@ -32,15 +32,6 @@ static void reset(void)
     system_init();
     Ems_Init();
     Message_Init();
-    // dseg_init copies the typed constants without the EXE's relocations: fix the segments
-    // of the per-system tables like the DOS loader does.
-    for (int s = 0; s < 8; s++) {
-        uint32_t *tables[3] = {&ds.Galaxy_Names[s], &ds.Galaxy_MoonLists[s], &ds.Galaxy_Bodies[s]};
-        for (int t = 0; t < 3; t++) {
-            if (*tables[t] >> 16 == 0x3A81)
-                *tables[t] = far_ptr(MEM_DS_SEG, (uint16_t)*tables[t]);
-        }
-    }
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;
@@ -49,11 +40,7 @@ static void reset(void)
     messages = 0;
 }
 
-static TBody *body(int s, int idx)
-{
-    FarPtr p = ds.Galaxy_Bodies[s - 1];
-    return (TBody *)far_host(p) + (idx - 1);
-}
+static TBody *body(int s, int idx) { return ds.Galaxy_Bodies[s - 1] + (idx - 1); }
 
 // The value Random(range) + base gives after seeding with `seed`.
 static int rnd(int32_t seed, uint16_t range, int base)
@@ -205,7 +192,7 @@ int main(int argc, char *argv[])
 
     // Groups: SetGroupTarget statuses, SendGroupHome, DisbandGroup with the planet force merge.
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
     ds.Game_GroupCount = 3;
     ds.Game_PlanetForceCount = 1;
     ds.Game_GroupList = 0;

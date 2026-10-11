@@ -31,9 +31,10 @@ int main(int argc, char *argv[])
     check(dseg_init(), "dseg_init");
 
     check(pstr_is(&ds.Galaxy_SunNames[0].Name, "Mercury"), "SunNames[1]");
-    // Far pointers in the typed constants are relocated like DOS does.
-    check((ds.Galaxy_Bodies[0] >> 16) == MEM_DS_SEG, "Galaxy_Bodies relocated");
-    check(far_host(ds.Galaxy_Bodies[7]) == (void *)&ds.Galaxy_SunBodies, "Bodies[8] -> SunBodies");
+    // Far pointers in the typed constants are relocated like DOS does, here
+    // into host pointers into DS.
+    check(ds.Galaxy_Bodies[0] == &ds.Galaxy_AmnestyBodies[0], "Bodies[1] -> AmnestyBodies");
+    check(ds.Galaxy_Bodies[7] == &ds.Galaxy_SunBodies[0], "Bodies[8] -> SunBodies");
     check(pstr_is(&ds.Galaxy_SunNames[2].Name, "Earth"), "SunNames[3]");
     static const int16_t planets[8] = {7, 5, 5, 3, 3, 7, 2, 8};
     check(SDL_memcmp(ds.Galaxy_PlanetCount, planets, sizeof planets) == 0, "PlanetCount");
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
     // Past the typed constants everything starts zeroed (System's ClearBss).
     const uint8_t *raw = (const uint8_t *)&ds;
     bool zero = true;
-    for (size_t i = DSEG_INIT_SIZE; i < sizeof ds; i++)
+    for (size_t i = (size_t)(dseg_orig(DSEG_INIT_SIZE) - raw); i < sizeof ds; i++)
         zero = zero && raw[i] == 0;
     check(zero, "uninitialised part is zero");
 

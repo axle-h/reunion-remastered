@@ -304,6 +304,18 @@ static void test_real(void)
     }
 }
 
+// The heap's own variables are far pointers; these keep the blocks as far
+// pointers too, to compare with them.
+static FarPtr get_mem(uint16_t size)
+{
+    return far_from_host(System_GetMem(size));
+}
+
+static void free_mem(FarPtr p, uint16_t size)
+{
+    System_FreeMem(far_host(p), size);
+}
+
 static void test_heap(void)
 {
     system_init();
@@ -312,11 +324,11 @@ static void test_heap(void)
     int32_t all = (0xA000 - h) * 16;
     CHECK(system_heap_free() == all && system_heap_max_block() == all);
 
-    CHECK(System_GetMem(0) == 0);
-    FarPtr p1 = System_GetMem(10); // 16 bytes
-    FarPtr p2 = System_GetMem(5);  // 8
-    FarPtr p3 = System_GetMem(20); // 24
-    FarPtr p4 = System_GetMem(100); // 104
+    CHECK(System_GetMem(0) == nullptr);
+    FarPtr p1 = get_mem(10); // 16 bytes
+    FarPtr p2 = get_mem(5);  // 8
+    FarPtr p3 = get_mem(20); // 24
+    FarPtr p4 = get_mem(100); // 104
     CHECK(p1 == far_ptr(h, 0) && p2 == far_ptr(h + 1, 0));
     CHECK(p3 == far_ptr(h + 1, 8) && p4 == far_ptr(h + 3, 0));
     CHECK(ds.System_HeapPtr == far_ptr(h + 9, 8) && ds.System_FreeList == ds.System_HeapPtr);
@@ -325,48 +337,48 @@ static void test_heap(void)
     CHECK(system_heap_free() == top);
 
     // A hole: listed with its size, ending at HeapPtr.
-    System_FreeMem(p2, 5);
+    free_mem(p2, 5);
     CHECK(ds.System_FreeList == p2);
     CHECK(*(uint32_t *)far_host(p2) == ds.System_HeapPtr);
     CHECK(*(uint32_t *)far_host(p2 + 4) == far_ptr(0, 8));
     CHECK(system_heap_free() == top + 8 && system_heap_max_block() == top);
 
     // Freeing the block below merges the two.
-    System_FreeMem(p1, 10);
+    free_mem(p1, 10);
     CHECK(ds.System_FreeList == p1 && *(uint32_t *)far_host(p1 + 4) == far_ptr(1, 8));
     CHECK(system_heap_free() == top + 24);
 
     // First fit splits the hole and keeps the rest listed.
-    FarPtr p5 = System_GetMem(16);
+    FarPtr p5 = get_mem(16);
     CHECK(p5 == p1 && ds.System_FreeList == far_ptr(h + 1, 0));
     CHECK(*(uint32_t *)far_host(far_ptr(h + 1, 4)) == far_ptr(0, 8));
     // An exact fit unlinks it.
-    FarPtr p6 = System_GetMem(8);
+    FarPtr p6 = get_mem(8);
     CHECK(p6 == far_ptr(h + 1, 0) && ds.System_FreeList == ds.System_HeapPtr);
-    System_FreeMem(p6, 8);
+    free_mem(p6, 8);
 
     // Blocks at the top lower HeapPtr, swallowing free blocks below.
-    System_FreeMem(p4, 100);
+    free_mem(p4, 100);
     CHECK(ds.System_HeapPtr == p4 && *(uint32_t *)far_host(p6) == p4);
-    System_FreeMem(p3, 20);
+    free_mem(p3, 20);
     CHECK(ds.System_HeapPtr == far_ptr(h + 1, 0) && ds.System_FreeList == ds.System_HeapPtr);
-    System_FreeMem(p5, 16);
+    free_mem(p5, 16);
     CHECK(ds.System_HeapPtr == far_ptr(h, 0) && system_heap_free() == all);
 
     // Invalid pointers.
-    p1 = System_GetMem(64);
-    EXPECT_ERROR(System_FreeMem(far_ptr(h, 4), 8), 204);
-    EXPECT_ERROR(System_FreeMem(ds.System_HeapPtr, 8), 204);
-    EXPECT_ERROR(System_FreeMem(far_ptr(h - 1, 8), 8), 204);
-    System_FreeMem(far_ptr(h, 8), 8);
-    EXPECT_ERROR(System_FreeMem(far_ptr(h, 8), 8), 204); // already free
-    System_FreeMem(p1, 0); // size 0: ignored
+    p1 = get_mem(64);
+    EXPECT_ERROR(free_mem(far_ptr(h, 4), 8), 204);
+    EXPECT_ERROR(free_mem(ds.System_HeapPtr, 8), 204);
+    EXPECT_ERROR(free_mem(far_ptr(h - 1, 8), 8), 204);
+    free_mem(far_ptr(h, 8), 8);
+    EXPECT_ERROR(free_mem(far_ptr(h, 8), 8), 204); // already free
+    free_mem(p1, 0); // size 0: ignored
 
     // Running out: up to video memory, then above it (B000:0000 to
     // F000:0000), with what is left below video memory a free block.
     system_init();
     volatile int n = 0;
-    EXPECT_ERROR(for (;; n++) System_GetMem(0xFFF0), 203);
+    EXPECT_ERROR(for (;; n++) get_mem(0xFFF0), 203);
     int below = all / 0xFFF0, above = 0x40000 / 0xFFF0;
     CHECK(n == below + above);
     CHECK(ds.System_HeapEnd == far_ptr(0xF000, 0));

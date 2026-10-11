@@ -26,17 +26,6 @@ enum : uint16_t {
 static uint16_t slot_col(int16_t slot) { return (uint16_t)(slot - 1) >> 3; }
 static uint16_t slot_row(int16_t slot) { return (uint16_t)(slot - 1) % 8; }
 
-static uint8_t *far_add(FarPtr p, uint16_t off)
-{
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + off)));
-}
-
-// The start of p's segment (the buffer routines use 16-bit offsets from it).
-static uint8_t *seg_base(FarPtr p)
-{
-    return far_host(far_ptr((uint16_t)(p >> 16), 0));
-}
-
 // 26fe:001b
 void ShipInfo_ShipInfoScreen(void)
 {
@@ -178,11 +167,11 @@ void ShipInfo_InitShipInfoScreen(void)
     PString name;
     ds.ShipInfo_Backdrop = System_GetMem(0xBCC0);
     ship_backdrop_name(&name);
-    Gfx_LoadPicScreen((const uint8_t *)&name, far_host(ds.ShipInfo_Backdrop), 0x97,
+    Gfx_LoadPicScreen((const uint8_t *)&name, ds.ShipInfo_Backdrop, 0x97,
                       Gfx_PalettePtr());
-    Blit_CopyRect(far_host(ds.ShipInfo_Backdrop), gfx_screen() + ROW49, 320, 0x97);
+    Blit_CopyRect(ds.ShipInfo_Backdrop, gfx_screen() + ROW49, 320, 0x97);
     ds.ShipInfo_Sprites = System_GetMem(0x5000);
-    Gfx_LoadPic(S("grafika\\ship3"), far_host(ds.ShipInfo_Sprites), 1, 0x40, 0, 0, 320, false,
+    Gfx_LoadPic(S("grafika\\ship3"), ds.ShipInfo_Sprites, 1, 0x40, 0, 0, 320, false,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     ShipInfo_DrawAllGroupIcons();
     if (ds.Game_SelGroup != 0) {
@@ -199,13 +188,12 @@ static void draw_icon(int16_t icon, int16_t slot, uint8_t *seg, uint16_t base_of
 {
     uint16_t col = slot_col(slot), row = slot_row(slot);
     uint16_t slot_x = (uint16_t)(col * 0x30);
-    uint8_t *src = far_add(ds.ShipInfo_Backdrop,
-                           (uint16_t)(slot_x + (row * 0x10 + 0xB) * 320 + 0x10));
+    uint8_t *src = ds.ShipInfo_Backdrop + (uint16_t)(slot_x + (row * 0x10 + 0xB) * 320 + 0x10);
     Blit_CopyRect(src, seg + (uint16_t)(base_ofs + (row * 0x10 + copy_dy) * 320 + slot_x + 0x10),
                   0x20, 0xF);
     Mouse_HideCursor();
     if (icon != 0) {
-        uint8_t *sprite = far_add(ds.ShipInfo_Sprites, (uint16_t)((icon - 1) * 0x20 + 0x141));
+        uint8_t *sprite = ds.ShipInfo_Sprites + (uint16_t)((icon - 1) * 0x20 + 0x141);
         Blit_BlitTransparent(
             sprite, seg + (uint16_t)(base_ofs + (row * 0x10 + blit_dy) * 320 + slot_x + blit_dx),
             0x1F, 0xE, 0x40);
@@ -250,7 +238,7 @@ void ShipInfo_DrawAllGroupIcons(void)
 // 26fe:056d: as DrawGroupIcon into the off-screen copy (a full 320x200 image)
 void ShipInfo_DrawGroupIconBuffered(int16_t icon, int16_t slot)
 {
-    draw_icon(icon, slot, seg_base(ds.ShipInfo_Buffer), ROW49, 0xB, 0xC, 0x11);
+    draw_icon(icon, slot, far_seg_start(ds.ShipInfo_Buffer), ROW49, 0xB, 0xC, 0x11);
     int16_t saved = ds.Game_SelGroup;
     ds.Game_SelGroup = slot;
     if (saved < 0 || slot != saved)
@@ -266,11 +254,11 @@ void ShipInfo_SwitchGroupList(void)
 {
     PString name;
     ship_backdrop_name(&name);
-    Gfx_LoadPic((const uint8_t *)&name, far_host(ds.ShipInfo_Backdrop), 1, 0x97, 0, 0, 320, false,
+    Gfx_LoadPic((const uint8_t *)&name, ds.ShipInfo_Backdrop, 1, 0x97, 0, 0, 320, false,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     ds.ShipInfo_Buffer = System_GetMem(0xFB40);
     // 26fe:0710: only the buffer's segment is used, as in the icon routines.
-    Blit_CopyBytes(far_host(ds.ShipInfo_Backdrop), seg_base(ds.ShipInfo_Buffer) + ROW49, 0xBCC0);
+    Blit_CopyBytes(ds.ShipInfo_Backdrop, far_seg_start(ds.ShipInfo_Buffer) + ROW49, 0xBCC0);
     int16_t n = ds.Game_ShownGroupCount;
     for (int16_t i = 1; i <= n; i++)
         ShipInfo_DrawGroupIconBuffered(icon_of(Groups_At(ds.Game_GroupList, i)), i);
@@ -280,7 +268,7 @@ void ShipInfo_SwitchGroupList(void)
             break;
     }
 
-    uint8_t *bseg = seg_base(ds.ShipInfo_Buffer);
+    uint8_t *bseg = far_seg_start(ds.ShipInfo_Buffer);
     Mouse_HideCursor();
     // Lines from the fixed point (95,125) around the edge of the view (rows 49..199).
     for (int16_t x = 0x5F; x <= 0xBE; x++) {
@@ -388,7 +376,7 @@ void ShipInfo_DrawGroupInfo(void)
         if (ts->Used[cat - 1] != 0) {
             uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
             const TGroupSlot *units = &g->Units[row - 1][0];
-            const uint8_t *layout = far_host(ts->Layout[cat - 1]);
+            const uint8_t *layout = ts->Layout[cat - 1];
             int n = layout[0];
             for (int j = 1; j <= n; j++) {
                 const uint8_t *entry = layout + j * 0x19 + 0x21;
@@ -410,7 +398,7 @@ void ShipInfo_DrawGroupInfo(void)
     if (g->Kind == 4) {
         // Carrier: satellites in the first unit slot's weapon words.
         const int16_t *words = (const int16_t *)&g->Units[0][0];
-        const uint8_t *layout = far_host(ds.Groups_TypeSlots[g->Kind - 1].Layout[3]);
+        const uint8_t *layout = ds.Groups_TypeSlots[g->Kind - 1].Layout[3];
         int n = layout[1];
         for (int j = 1; j <= n; j++) {
             if (words[j] > 0) {
@@ -428,7 +416,7 @@ void ShipInfo_DrawGroupInfo(void)
     int16_t total = 0;
     if (g->Kind == 2) {
         // Miner stations: the fourth weapon word of the first row's slots.
-        const uint8_t *layout = far_host(ds.Groups_TypeSlots[g->Kind - 1].Layout[1]);
+        const uint8_t *layout = ds.Groups_TypeSlots[g->Kind - 1].Layout[1];
         int n = layout[0];
         for (int j = 1; j <= n; j++)
             total = (int16_t)(total + g->Units[0][j - 1].Weapons[3]);
@@ -472,7 +460,7 @@ static void marker(uint16_t sprite_ofs, uint8_t *seg, uint16_t base)
     Mouse_HideCursor();
     if (ds.Game_SelGroup != 0) {
         uint16_t row = slot_row(ds.Game_SelGroup), col = slot_col(ds.Game_SelGroup);
-        Blit_CopyRect(far_add(ds.ShipInfo_Sprites, sprite_ofs),
+        Blit_CopyRect(ds.ShipInfo_Sprites + sprite_ofs,
                       seg + (uint16_t)(base + (row * 0x10) * 320 + 5 + col * 0x30), 7, 6);
     }
     Mouse_ShowCursor();
@@ -491,12 +479,12 @@ void ShipInfo_EraseSelectionMarker(void)
 
 void ShipInfo_DrawSelectionMarkerBuffered(void)
 {
-    marker(MARKER_ON, seg_base(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
+    marker(MARKER_ON, far_seg_start(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
 }
 
 void ShipInfo_EraseSelectionMarkerBuffered(void)
 {
-    marker(MARKER_OFF, seg_base(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
+    marker(MARKER_OFF, far_seg_start(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
 }
 
 // 26fe:1278: hotspot 1 = Change mode, 2 = unused, 3..34 = icons, 35.. = names

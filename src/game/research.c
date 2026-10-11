@@ -48,7 +48,7 @@ void Research_ResearchScreen(void)
             ds.Game_SelInvention = ds.Game_CurResearch;
         GfxPath_ShowScreenBackdrop();
         ds.Research_IconBuffer = System_GetMem(0x6901);
-        Gfx_LoadPic(pstr(PSTR("grafika\\cds")), far_host(ds.Research_IconBuffer), 1, 0x54, 0, 0,
+        Gfx_LoadPic(pstr(PSTR("grafika\\cds")), ds.Research_IconBuffer, 1, 0x54, 0, 0,
                     0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
         Research_DrawInventionIcons();
         if (ds.Game_CurResearch > 0)
@@ -217,7 +217,7 @@ void Research_DrawDeveloperSkills(void)
         Gfx_DrawTextF9(pstr(&ds.Staff_Names[3][ds.Game_StaffHired[3] - 1]), 8, 0xBC, 0xE);
     }
     // Update arrows beside the developer's name: dim when no developer can work.
-    const uint8_t *base = far_host(ds.Research_IconBuffer);
+    const uint8_t *base = ds.Research_IconBuffer;
     bool idle = ds.Game_StaffHired[3] == 0 || developer_away();
     uint16_t o1 = idle ? 0x62D2 : 0x62C0, o2 = idle ? 0x62DE : 0x62CC;
     Blit_CopyRect(base + o1, gfx_screen() + 0xD4CC, 0xB, 5);
@@ -281,8 +281,7 @@ void Research_DrawInventionIcons(void)
 void Research_DrawIconFrame(uint8_t frame, uint16_t dest, uint8_t *seg)
 {
     Mouse_HideCursor();
-    const uint8_t *src =
-        (const uint8_t *)far_host(ds.Research_IconBuffer) + frame / 10 * 0x12C0 + frame * 0x20;
+    const uint8_t *src = ds.Research_IconBuffer + frame / 10 * 0x12C0 + frame * 0x20;
     Blit_CopyRect(src, seg + (uint16_t)(dest + 0x140), 0x1F, 0xE);
     Mouse_ShowCursor();
 }

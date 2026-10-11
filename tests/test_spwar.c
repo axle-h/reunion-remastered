@@ -20,12 +20,6 @@ static void reset(void)
     mem_init();
     CHECK(dseg_init());
     system_init();
-    for (int s = 0; s < 8; s++) {
-        uint32_t *tables[3] = {&ds.Galaxy_Names[s], &ds.Galaxy_MoonLists[s], &ds.Galaxy_Bodies[s]};
-        for (int t = 0; t < 3; t++)
-            if (*tables[t] >> 16 == 0x3A81)
-                *tables[t] = far_ptr(MEM_DS_SEG, (uint16_t)*tables[t]);
-    }
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;
@@ -40,7 +34,7 @@ static void reset(void)
     ds.SpWar_AttackerShipCount = ds.SpWar_DefenderShipCount = 0;
 }
 
-static SpShip *ship(FarPtr list, int i) { return (SpShip *)far_host(list) + i - 1; }
+static SpShip *ship(uint8_t *list, int i) { return (SpShip *)list + i - 1; }
 
 static void set_ship(SpShip *s, uint8_t id, uint8_t cls, uint16_t dmg, int16_t hp)
 {
@@ -133,7 +127,7 @@ static void test_losses(void)
 {
     reset();
     ds.Game_Groups = System_GetMem(0x2840);
-    memset(far_host(ds.Game_Groups), 0, 0x2840);
+    memset(ds.Game_Groups, 0, 0x2840);
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.Game_CurSystem = 1;

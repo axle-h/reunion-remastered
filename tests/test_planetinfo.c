@@ -34,7 +34,7 @@ static bool pstr_is(const PString *s, const char *want)
 
 static TBody *body(int sys, int idx)
 {
-    return (TBody *)far_host(ds.Galaxy_Bodies[sys - 1]) + (idx - 1);
+    return ds.Galaxy_Bodies[sys - 1] + (idx - 1);
 }
 
 static void reset(void)
@@ -45,21 +45,19 @@ static void reset(void)
         exit(77);
     }
     system_init();
-    // dseg_init copies the typed constants without the EXE's relocations.
-    for (int s = 0; s < 8; s++) {
-        uint32_t *t[3] = {&ds.Galaxy_Names[s], &ds.Galaxy_MoonLists[s], &ds.Galaxy_Bodies[s]};
-        for (int i = 0; i < 3; i++) {
-            if (*t[i] >> 16 == 0x3A81)
-                *t[i] = far_ptr(MEM_DS_SEG, (uint16_t)*t[i]);
-        }
-    }
+    // The charset lives in the game data block, which this test doesn't
+    // load; blank glyphs instead.
+    static uint8_t charset[0x2880];
+    ds.Gfx_Charset = charset;
+    // The surface's building tiles, as Surface's set-up allocates them.
+    ds.Surface_BufC = System_GetMem(0xF000);
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = no_wait;
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
     ds.Game_Buildings = System_GetMem(1000 * sizeof(TBuilding));
-    System_FillChar(far_host(ds.Game_Buildings), 1000 * sizeof(TBuilding), 0);
+    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
 }
 
 static void test_bodies(void)
@@ -69,7 +67,7 @@ static void test_bodies(void)
     ds.Game_CurPlanet[7] = 3;
     ds.Game_CurMoon[7] = 0;
     PlanetInfo_SelectCurBody();
-    CHECK(far_host(ds.Game_CurBody) == body(8, 3));
+    CHECK(ds.Game_CurBody == body(8, 3));
     PString s;
     PlanetInfo_GetBodyName(&s, 8, 3, 0);
     CHECK(pstr_is(&s, "Earth"));
@@ -92,9 +90,9 @@ static void test_bodies(void)
     // The moon: the body index comes from the planet's moon list.
     ds.Game_CurMoon[7] = 1;
     PlanetInfo_SelectCurBody();
-    const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[7]) + 2;
+    const TMoonList *ml = ds.Galaxy_MoonLists[7] + 2;
     CHECK(ml->Count == 1);
-    CHECK(far_host(ds.Game_CurBody) == body(8, ml->Moons[0]));
+    CHECK(ds.Game_CurBody == body(8, ml->Moons[0]));
     CHECK(ml->Moons[0] > ds.Galaxy_PlanetCount[7]);
     CHECK(PlanetInfo_IsCurrentBody(8, 3, 1));
 
@@ -104,7 +102,7 @@ static void test_bodies(void)
     ds.Game_CurMoon[0] = 0;
     ds.Game_CurBodyIsColony = 0xFF00;
     PlanetInfo_SelectCurBody();
-    CHECK(far_host(ds.Game_CurBody) == body(1, 5));
+    CHECK(ds.Game_CurBody == body(1, 5));
     CHECK(ds.Game_CurBodyIsColony == 0xFF01);
     ds.Game_CurPlanet[0] = 7;  // Jade is an alien colony
     PlanetInfo_SelectCurBody();
@@ -141,7 +139,7 @@ static void test_list(void)
     ds.Galaxy_SystemStatus[0] = 1;  // only systems with status 1 are listed
     ds.PlanetList_Mode = 1;
     PlanetList_BuildList();
-    const PlanetListEntry *e = far_host(ds.PlanetList_Entries);
+    const PlanetListEntry *e = (const PlanetListEntry *)ds.PlanetList_Entries;
     CHECK(ds.PlanetList_Count == 1);
     CHECK(e[0].System == 1 && e[0].Planet == 5 && e[0].Moon == 0 && e[0].Kind == 1);
 
@@ -170,7 +168,7 @@ static void test_list(void)
 
     // A moon adds its own row of kind 4 behind the entry.
     ds.PlanetList_Count = 0;
-    int16_t moonIdx = ((const TMoonList *)far_host(ds.Galaxy_MoonLists[0]))[3].Moons[1];
+    int16_t moonIdx = ds.Galaxy_MoonLists[0][3].Moons[1];
     TBody *m = body(1, moonIdx);
     m->Surveyed = 1;
     m->InfoLevel = 0x20;
@@ -233,9 +231,9 @@ static void test_list(void)
 // Places n buildings of the given kinds on 1:5:0 and balances their power.
 static void place(const uint8_t *kinds, const uint8_t *outputs, int n)
 {
-    System_FillChar(far_host(ds.Game_Buildings), 1000 * sizeof(TBuilding), 0);
+    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
     for (int i = 0; i < n; i++) {
-        TBuilding *b = (TBuilding *)far_host(ds.Game_Buildings) + i;
+        TBuilding *b = ds.Game_Buildings + i;
         b->Kind = kinds[i];
         b->System = 1;
         b->Planet = 5;
@@ -248,7 +246,7 @@ static void place(const uint8_t *kinds, const uint8_t *outputs, int n)
 
 static TBuilding *bld(int i)
 {
-    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+    return ds.Game_Buildings + (i - 1);
 }
 
 static void test_power(void)
@@ -330,10 +328,10 @@ static void test_power(void)
     pf->Planet = 3;
     pf->Moon = 1;
     pf->Storage = 5;
-    const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[7]) + 2;
+    const TMoonList *ml = ds.Galaxy_MoonLists[7] + 2;
     TBody *moon = body(8, ml->Moons[0]);
     moon->Population = 1000;
-    System_FillChar(far_host(ds.Game_Buildings), 1000 * sizeof(TBuilding), 0);
+    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
     TBuilding *mb = bld(1);
     mb->Kind = 11;  // storage bay: 114 workers, 450 energy
     mb->System = 8;
@@ -378,7 +376,7 @@ static void test_colonize(void)
     ds.Game_CurPlanet[0] = 4;  // Zeus
     ds.Game_CurMoon[0] = 0;
     PlanetInfo_SelectCurBody();
-    TBody *b = far_host(ds.Game_CurBody);
+    TBody *b = ds.Game_CurBody;
     b->SurfaceType = 1;
     ds.Game_ColonySetupCount = 1;
     ds.Game_ScreenEntered = 0;
@@ -438,7 +436,7 @@ static void test_colonize(void)
     CHECK(g->Kind == 5 && g->Status == 7 && g->System == 1 && g->Planet == 4 && g->Moon == 0);
     CHECK(pstr_is((const PString *)&g->Name, "Zeus forces"));
     CHECK(ds.Game_CurrentScreen == 0x14 && ds.Game_ScreenSwitch);
-    CHECK(((TBody *)far_host(ds.Game_CurBody))->Owner == 1);
+    CHECK(ds.Game_CurBody->Owner == 1);
 
     // Hotspots.
     Colonize_SetupColonizeHotspots();
@@ -461,7 +459,7 @@ static void test_droids(void)
     ds.Game_CurMoon[0] = 0;
     ds.Game_BuildingCount = 0;
     PlanetInfo_SelectCurBody();
-    TBody *b = far_host(ds.Game_CurBody);
+    TBody *b = ds.Game_CurBody;
     b->_0A = 2;
     ds.Research_Products[1].Stock = 7;
     ds.Game_ScreenEntered = 0;
@@ -494,7 +492,7 @@ static void test_system_view(void)
     System_FillChar(vid_screen, 320 * 200, 0);
     PlanetInfo_InitSystemView();
     // One orbit record per planet, from the name table.
-    const TBodyName *nm = (const TBodyName *)far_host(ds.Galaxy_Names[7]);
+    const TBodyName *nm = ds.Galaxy_Names[7];
     const TOrbit *rec = &ds.PlanetInfo_Orbits[3];
     CHECK(rec->RX == nm[2].X && rec->RY == nm[2].Y && rec->Speed == nm[2].Size);
     CHECK(rec->Angle >= 0 && rec->Angle < 3600);
@@ -536,7 +534,7 @@ static void test_system_view(void)
     CHECK(pstr_is((const PString *)&Mouse_Hotspot(0x15)->Caption, "Deimos"));
     PlanetInfo_ReloadSystemView();
     const TOrbit *m1 = &ds.PlanetInfo_Orbits[1];
-    const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[7]) + 3;
+    const TMoonList *ml = ds.Galaxy_MoonLists[7] + 3;
     CHECK(m1->RX == nm[ml->Moons[0] - 1].X);
 }
 
@@ -546,7 +544,7 @@ static void test_baseeff(void)
     ds.Game_CurPlanet[0] = 5;
     ds.Game_CurMoon[0] = 0;
     PlanetInfo_SelectCurBody();
-    TBody *b = far_host(ds.Game_CurBody);
+    TBody *b = ds.Game_CurBody;
     ds.Game_ScreenEntered = 0;
     ds.Game_HotspotHit = 0;
     ds.PlanetInfo_AlienMode = 0;
@@ -571,7 +569,7 @@ static void test_baseeff(void)
     // Jade is an alien colony: its page opens and the click returns to the info.
     ds.Game_CurPlanet[0] = 7;
     PlanetInfo_SelectCurBody();
-    b = far_host(ds.Game_CurBody);
+    b = ds.Game_CurBody;
     b->InfoLevel = 0x30;
     RawText_LoadSzFaj();
     ds.Game_HotspotHit = 0x15;
@@ -629,7 +627,7 @@ static void test_screens(void)
     // An alien body.
     ds.Game_CurPlanet[0] = 7;
     PlanetInfo_SelectCurBody();
-    ((TBody *)far_host(ds.Game_CurBody))->InfoLevel = 50;
+    ds.Game_CurBody->InfoLevel = 50;
     RawText_LoadSzFaj();
     free0 = system_heap_free();  // the race texts stay loaded
     ds.PlanetInfo_AlienMode = 1;
@@ -646,7 +644,7 @@ static void test_screens(void)
     // Colony set-up screen.
     ds.Game_CurPlanet[0] = 4;
     PlanetInfo_SelectCurBody();
-    ((TBody *)far_host(ds.Game_CurBody))->SurfaceType = 1;
+    ds.Game_CurBody->SurfaceType = 1;
     ds.Surface_TileSet = 1;
     System_FillChar(vid_screen, 320 * 200, 0);
     Colonize_DrawColonizeScreen();

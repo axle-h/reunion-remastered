@@ -29,11 +29,9 @@ static void decoder(void)
                                     0x05, 0x82, 0xC2, 0x07, 0x80, 0x01, 0x00, 0xC0, 0x02,
                                     0x00, 0x09,
                                     0x01};  // never read: the counter is 0 by then
-    uint8_t *frame = far_host(far_ptr(0x5000, 0x0008));
-    SDL_memcpy(frame, block, sizeof block);
-    uint8_t *dst = far_host(far_ptr(0x6000, 0));
+    static uint8_t dst[16];
     SDL_memset(dst, 0xEE, 16);
-    Anim_DecodeAnimFrame(frame, dst, 0x40);
+    Anim_DecodeAnimFrame(block, dst, 0x40);
     static const uint8_t want[10] = {0x45, 0xEE, 0xEE, 0x47, 0x47, 0xEE, 0x49, 0x49, 0xEE, 0xEE};
     CHECK(SDL_memcmp(dst, want, sizeof want) == 0);
 }
@@ -41,7 +39,7 @@ static void decoder(void)
 static void wedge(void)
 {
     mem_init();
-    uint8_t *s = far_host(far_ptr(0x5000, 0));
+    static uint8_t s[0x8000];
     for (int i = 0; i < 0x8000; i++)
         s[i] = (uint8_t)(i % 251 + 1);
     Anim_BlitWedgeToScreen(s);
@@ -65,9 +63,8 @@ static void setup(void)
     CHECK(dseg_init());
     system_init();
     // The record Anim::Record points to (InitRoomAnim allocates it).
-    FarPtr rec = System_GetMem(0x349);
-    SDL_memset(far_host(rec), 0, 0x349);
-    ds.Anim_Record = rec;
+    ds.Anim_Record = System_GetMem(0x349);
+    SDL_memset(ds.Anim_Record, 0, 0x349);
 }
 
 // MAIN8 (320x200, delta frames) straight onto the screen, as the cut-scene
@@ -93,8 +90,7 @@ static void main_anim(void)
     }
     CHECK(same);
     // The record holds the sizes (stream + 13) and the loaded flag.
-    FarPtr rec = ds.Anim_Record;
-    uint8_t *r = far_host(rec);
+    const uint8_t *r = ds.Anim_Record;
     CHECK(r[0] == 1);
     CHECK((size_t)(r[0x231] | r[0x232] << 8) == ani.frames[0].size + 13);
     // A second load while one is loaded does nothing.
@@ -123,7 +119,7 @@ static void war_anim(void)
     CHECK(t->Frames >= 2 && t->Frames <= ani.count);
     CHECK(t->Width == ani.width && t->Height == ani.height);
     Anim_LoadWarAnim(1);
-    uint8_t *buf = far_host(far_ptr(0x9000, 0));
+    static uint8_t buf[0x10000]; // the decoder's 16-bit index stays inside
     size_t n = (size_t)ani.width * (size_t)ani.height;
     uint8_t *ref = SDL_malloc(n);
     bool same = true;

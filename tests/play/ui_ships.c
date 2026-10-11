@@ -112,7 +112,7 @@ static bool grid_find(const TGroup *g, const char *ship, const char *weapon, int
     for (int c = 1; c <= 4; c++) {
         if (!Groups_SlotUsed(g->Kind, (int16_t)c))
             continue;
-        const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, (int16_t)c));
+        const uint8_t *layout = Groups_SlotLayout(g->Kind, (int16_t)c);
         for (int i = 1; i <= layout[0]; i++) {
             if (!pstr_is(product_name(layout[i * 25 + 0x21]), ship))
                 continue;
@@ -185,8 +185,8 @@ int32_t ui_cargo_planet(const char *item)
     if (row == 0)
         return 0;
     if (row <= 6)
-        return ((const int32_t *)far_host(ds.Cargo_Stores))[row - 1];
-    return *(const int16_t *)far_host(ds.Cargo_ItemStore[idx - 1]);
+        return ds.Cargo_Stores[row - 1];
+    return *ds.Cargo_ItemStore[idx - 1];
 }
 
 // Body hotspots of the system view (PlanetInfo_SetupSystemViewHotspots):

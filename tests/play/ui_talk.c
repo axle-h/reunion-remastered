@@ -117,7 +117,7 @@ bool ui_talk_menu(TalkMenu *m)
         return false;
     int row = 1;
     for (int k = 0; k < ds.Alien_CurMenu[0] && k < TALK_QUESTIONS_MAX; k++) {
-        const uint8_t *q = (const uint8_t *)far_host(ds.AlienTalk_QuestionBuf) + k * 0x100;
+        const uint8_t *q = ds.AlienTalk_QuestionBuf + k * 0x100;
         drawn_text(q, 3, m->text[k], TALK_TEXT_MAX);
         m->row[k] = row;
         row += text_lines(q);
@@ -152,8 +152,7 @@ static bool talk_replied(void)
 
 static const uint8_t *pub_line(int i)
 {
-    FarPtr b = ds.Pub_Lines;
-    return far_host(far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + (i - 1) * 256)));
+    return ds.Pub_Lines + (i - 1) * 256;
 }
 
 bool ui_pub_menu(TalkMenu *m)
@@ -402,9 +401,8 @@ bool ui_advisor_menu(TalkMenu *m)
     m->count = 0;
     if (!on_screen(SCREEN_ADVISOR) || ds.Mouse_HotspotCount != 1)
         return false;
-    FarPtr b = ds.Advisor_MenuLines;
     for (int k = 0; k < ds.Advisor_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
-        const uint8_t *p = far_host(far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + k * 0x3D)));
+        const uint8_t *p = ds.Advisor_MenuLines + k * 0x3D;
         drawn_text(p, 0, m->text[k], TALK_TEXT_MAX);
         m->row[k] = k + 1;
         m->count++;

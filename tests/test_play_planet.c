@@ -112,7 +112,7 @@ static void give_control_centre(void *unused)
 {
     (void)unused;
     ds.Research_Products[6].State = 5;  // Control Centre developed
-    TBody *apollo = far_host(ds.Game_CurBody);
+    TBody *apollo = ds.Game_CurBody;
     apollo->InfoLevel = 40;
     apollo->Surveyed = 1;
     ds.Game_Credits = 400000;

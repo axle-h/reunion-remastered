@@ -16,17 +16,10 @@ enum : uint16_t {
     SCREEN_AT = 0x3D40, // grafika\main window: screen row 49
 };
 
-// The original's offsets wrap inside the segment; these stay inside their
-// buffers, so the port's pointers agree.
-static inline uint8_t *fp_add(FarPtr p, uint16_t add)
+// Byte off from the start of block's segment (not from block).
+static inline uint8_t *seg_at(const uint8_t *block, uint16_t off)
 {
-    return (uint8_t *)far_host(p) + add;
-}
-
-// Byte off from the start of p's segment (not from p).
-static inline uint8_t *fp_at(FarPtr p, uint16_t off)
-{
-    return (uint8_t *)far_host(far_ptr((uint16_t)(p >> 16), 0)) + off;
+    return far_seg_start(block) + off;
 }
 
 static inline uint8_t *screen_at(uint16_t off)
@@ -50,10 +43,9 @@ static const TWarAnim *war_anim(int16_t id)
 }
 
 // Gfx_LoadPic with the arguments shared by every command-centre sheet.
-static void load_sheet(const uint8_t *name, FarPtr dest, uint16_t rows, uint16_t stride)
+static void load_sheet(const uint8_t *name, uint8_t *dest, uint16_t rows, uint16_t stride)
 {
-    Gfx_LoadPic(name, far_host(dest), 1, rows, 0, 0, stride, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
-                0, 0xBE);
+    Gfx_LoadPic(name, dest, 1, rows, 0, 0, stride, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
 }
 
 // Sound names of the staff kinds (pilots, builders, fighters, developers).
@@ -157,10 +149,10 @@ void Command_HandleCommandCentre(void)
 // 3abd:0275: grafika\main on the screen below the toolbar.
 void Command_DrawCommandBackdrop(void)
 {
-    FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\main"), far_host(dest), 1, 0x97, 0, 0, 200,
-                ds.Command_BackdropShown != 0, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(dest), screen_at(SCREEN_AT), 0x140, 0x97);
+    uint8_t *dest = System_GetMem(0xBCC0);
+    Gfx_LoadPic(LIT("grafika\\main"), dest, 1, 0x97, 0, 0, 200, ds.Command_BackdropShown != 0,
+                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(dest, screen_at(SCREEN_AT), 0x140, 0x97);
     System_FreeMem(dest, 0xBCC0);
     Command_LoadCommandGfx();
     if (ds.Command_BackdropShown == 0)
@@ -191,7 +183,7 @@ void Command_LoadCommandGfx(void)
 // "iris" (n from 0 to 0x39 when opening, back down when closing).
 static void iris_lines(int16_t n)
 {
-    uint8_t *seg = fp_at(ds.Command_Offscreen, 0);
+    uint8_t *seg = far_seg_start(ds.Command_Offscreen);
     Gfx_DrawLineCopy(gfx_screen(), (int16_t)(n + 0xA6), 0x31, 0xA6, 0xBA, seg);
     Gfx_DrawLineCopy(gfx_screen(), (int16_t)(0xA6 - n), 0x31, 0xA6, 0xBA, seg);
     if (n % 2 == 0) {
@@ -214,10 +206,10 @@ void Command_ShowHologram(int16_t vec)
     System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("grafika\\holo"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), fp_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false, pal,
-                0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(ps(&name), seg_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false,
+                pal, 0, 0xB0, 0x40, 0, 0xBE);
 
-    uint8_t *seg = fp_at(ds.Command_Offscreen, 0);
+    uint8_t *seg = far_seg_start(ds.Command_Offscreen);
     for (int16_t n = 1;; n++) {
         for (int16_t x = 0xA4; x <= 0xA8; x++)
             Gfx_DrawLineCopy(gfx_screen(), x, 0xBA, x, (int16_t)(0xBA - n), seg);
@@ -238,7 +230,7 @@ void Command_ShowHologram(int16_t vec)
     VecLoad_AllocWireBuffers();
     VecLoad_LoadWireVec(vec);
     VecLoad_SetWirePalette();
-    Blit_CopyRect(fp_at(ds.Command_Offscreen, 0x3DBD), fp_at(ds.VecLoad_Buffer, 0x0DE0), 0x4E,
+    Blit_CopyRect(seg_at(ds.Command_Offscreen, 0x3DBD), seg_at(ds.VecLoad_Buffer, 0x0DE0), 0x4E,
                   0x41);
     VecLoad_DrawWireScene();
     for (;;) {
@@ -246,8 +238,8 @@ void Command_ShowHologram(int16_t vec)
         if (Crt_KeyPressed() || ds.Mouse_BtnDown != 0)
             break;
         Command_TickAmbientLights();
-        Blit_CopyRect(fp_at(ds.VecLoad_Buffer, 0x0DE0), screen_at(0x3DBD), 0x4E, 0x41);
-        Blit_CopyRect(fp_at(ds.Command_Offscreen, 0x3DBD), fp_at(ds.VecLoad_Buffer, 0x0DE0),
+        Blit_CopyRect(seg_at(ds.VecLoad_Buffer, 0x0DE0), screen_at(0x3DBD), 0x4E, 0x41);
+        Blit_CopyRect(seg_at(ds.Command_Offscreen, 0x3DBD), seg_at(ds.VecLoad_Buffer, 0x0DE0),
                       0x4E, 0x41);
         VecLoad_DrawWireScene();
         Gfx_WaitVRetrace();
@@ -257,7 +249,7 @@ void Command_ShowHologram(int16_t vec)
     VecLoad_FreeWireBuffers();
     System_FreeMem(ds.VecLoad_Buffer, 0x8980);
 
-    Gfx_LoadPic(LIT("grafika\\main"), fp_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140,
+    Gfx_LoadPic(LIT("grafika\\main"), seg_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140,
                 false, pal, 0, 0xB0, 0x40, 0, 0xBE);
     Command_DrawHeroPortraitToBuffer();
     for (int16_t n = 0x39;; n--) {
@@ -269,7 +261,7 @@ void Command_ShowHologram(int16_t vec)
     ds.Command_MainFace = System_GetMem(0xE600);
     load_sheet(LIT("grafika\\mainface"), ds.Command_MainFace, 0xB8, 0x140);
     Command_TickAmbientLights();
-    Blit_CopyRect(fp_at(ds.Command_Offscreen, SCREEN_AT), screen_at(SCREEN_AT), 0x140, 0x97);
+    Blit_CopyRect(seg_at(ds.Command_Offscreen, SCREEN_AT), screen_at(SCREEN_AT), 0x140, 0x97);
     Command_TickAmbientLights();
     Command_DrawHeroPortrait();
     Command_DrawAllStaffIcons();
@@ -329,7 +321,7 @@ void Command_InitRoomAnim(void)
     ds.Command_AnimId = 0;
     ds.Command_AnimFrame = 0;
     ds.Command_AnimTick = 1;
-    *(uint8_t *)far_host(ds.Anim_Record) = 0; // Anim record: not loaded
+    *ds.Anim_Record = 0; // Anim record: not loaded
 }
 
 // 3abd:0bdc
@@ -382,23 +374,23 @@ void Command_TickRoomAnim(void)
     Anim_LoadMainAnim((uint16_t)id);
     const TRoomAnim *room = &ds.Cc_Doors[ds.Command_AnimId - 1];
     uint16_t size = (uint16_t)(room->H * room->W);
-    FarPtr buf = System_GetMem(size);
+    uint8_t *buf = System_GetMem(size);
     uint16_t scr = (uint16_t)(room->Y * 0x140 + room->X);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(screen_at(scr), fp_add(buf, (uint16_t)(w + 1)), (int16_t)(w - 2),
+    Blit_CopyRectStrided(screen_at(scr), buf + (uint16_t)(w + 1), (int16_t)(w - 2),
                          (int16_t)(ds.Cc_Doors[id - 1].H - 2), 0x140, (int16_t)w);
     Mouse_ShowCursor();
     bool ok;
-    Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, far_host(buf), &ok);
+    Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, buf, &ok);
     uint16_t fighter = ds.Game_StaffHired[2];
     Mouse_HideCursor();
     if ((int16_t)fighter > 0 && ds.Command_AnimId < 7) {
         Blit_BlitTransparentStrided(
-            fp_add(ds.Command_MainFace, (uint16_t)(ds.Command_StaffSrcY[2][fighter - 1] * 0x140
-                                                   + ds.Command_StaffSrcX[2][fighter - 1] + 0x147)),
-            fp_add(buf, (uint16_t)(w * 0x27 + 1)), 0x2A, 0x1A, 0x140, (int16_t)w, 0x40);
+            ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[2][fighter - 1] * 0x140
+                                             + ds.Command_StaffSrcX[2][fighter - 1] + 0x147),
+            buf + (uint16_t)(w * 0x27 + 1), 0x2A, 0x1A, 0x140, (int16_t)w, 0x40);
     }
-    Blit_CopyRectStrided(fp_add(buf, (uint16_t)(w + 1)), screen_at(scr), (int16_t)(w - 2),
+    Blit_CopyRectStrided(buf + (uint16_t)(w + 1), screen_at(scr), (int16_t)(w - 2),
                          (int16_t)(ds.Cc_Doors[id - 1].H - 2), (int16_t)w, 0x140);
     Mouse_ShowCursor();
     ds.Command_AnimDelay = 0;
@@ -461,14 +453,14 @@ void Command_TickGrAnim(void)
     } else {
         Anim_LoadGrAnim((uint16_t)ds.Command_AnimId);
         bool ok;
-        Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, far_host(ds.Command_WarAnimBuffer), &ok);
+        Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, ds.Command_WarAnimBuffer, &ok);
         if (!ok) {
             ds.Command_AnimFrame = war_anim(ds.Command_AnimId)->Frames;
             ds.Command_AnimRepeat = 1;
         }
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(ds.Command_WarAnimBuffer, 0x3A), screen_at(0x4103), 0x3A, 0x4F,
-                             0x3A, 0x140);
+        Blit_CopyRectStrided(ds.Command_WarAnimBuffer + 0x3A, screen_at(0x4103), 0x3A, 0x4F, 0x3A,
+                             0x140);
         Mouse_ShowCursor();
     }
 }
@@ -484,12 +476,12 @@ static void panel_tick(void)
 // 3abd:102c
 void Command_OpenPanelMaina1(void)
 {
-    FarPtr dest = System_GetMem(0x95D0);
+    uint8_t *dest = System_GetMem(0x95D0);
     load_sheet(LIT("grafika\\maina1"), dest, 0x88, 0x11A);
     panel_tick();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(dest, (uint16_t)((n - 1) * 0x2F)), screen_at(0x4851), 0x2F, 0x88,
+        Blit_CopyRectStrided(dest + (uint16_t)((n - 1) * 0x2F), screen_at(0x4851), 0x2F, 0x88,
                              0x11A, 0x140);
         Command_DrawStaffIcon(1);
         Mouse_ShowCursor();
@@ -504,13 +496,13 @@ void Command_OpenPanelMaina1(void)
 // 3abd:1122
 void Command_OpenPanelMaina2(void)
 {
-    FarPtr dest = System_GetMem(0x19BA);
+    uint8_t *dest = System_GetMem(0x19BA);
     load_sheet(LIT("grafika\\maina2"), dest, 0x59, 0x4A);
     panel_tick();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(dest, (uint16_t)((n - 1) * 0x12)), screen_at(0x3DEC), 0x12, 0x59,
-                             0x4A, 0x140);
+        Blit_CopyRectStrided(dest + (uint16_t)((n - 1) * 0x12), screen_at(0x3DEC), 0x12, 0x59, 0x4A,
+                             0x140);
         Mouse_ShowCursor();
         Command_DrawHeroPortrait();
         for (int i = 0; i < 4; i++)
@@ -524,14 +516,14 @@ void Command_OpenPanelMaina2(void)
 // 3abd:1221
 void Command_OpenPanelMaina3And4(void)
 {
-    FarPtr buf = System_GetMem(0x5B00);
+    uint8_t *buf = System_GetMem(0x5B00);
     load_sheet(LIT("grafika\\maina4"), buf, 0x5B, 0x100);
     Gfx_WaitVRetrace();
     for (int16_t n = 1;; n++) {
         int16_t strip = ds.Command_DoorDir == 0 ? n : (int16_t)(0x10 - n);
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(buf, (uint16_t)((strip - 1) * 0x10)), screen_at(0x584D), 0x10,
-                             0x5B, 0x100, 0x140);
+        Blit_CopyRectStrided(buf + (uint16_t)((strip - 1) * 0x10), screen_at(0x584D), 0x10, 0x5B,
+                             0x100, 0x140);
         Command_DrawStaffIcon(2);
         Mouse_ShowCursor();
         Gfx_WaitFrames(4);
@@ -545,8 +537,8 @@ void Command_OpenPanelMaina3And4(void)
     Gfx_WaitVRetrace();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(buf, (uint16_t)((n - 1) * 0x15)), screen_at(0x46CA), 0x15, 0x69,
-                             0x56, 0x140);
+        Blit_CopyRectStrided(buf + (uint16_t)((n - 1) * 0x15), screen_at(0x46CA), 0x15, 0x69, 0x56,
+                             0x140);
         Command_DrawStaffIcon(2);
         Mouse_ShowCursor();
         Gfx_WaitFrames(5);
@@ -573,14 +565,13 @@ void Command_TickPanelDoorAnim(void)
                                              : (int16_t)(ds.Command_DoorTimer - 1);
     if (strip >= 0 && strip < 0x10) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(ds.Command_MainA4, (uint16_t)(strip * 0x10)), screen_at(0x584D),
+        Blit_CopyRectStrided(ds.Command_MainA4 + (uint16_t)(strip * 0x10), screen_at(0x584D),
                              0x10, 0x5B, 0x100, 0x140);
         uint16_t hired = ds.Game_StaffHired[1];
         if ((int16_t)hired > 0) {
             Blit_BlitTransparent(
-                fp_add(ds.Command_MainFace,
-                       (uint16_t)(ds.Command_StaffSrcY[1][hired - 1] * 0x140
-                                  + ds.Command_StaffSrcX[1][hired - 1] + 0x141)),
+                ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[1][hired - 1] * 0x140
+                                                 + ds.Command_StaffSrcX[1][hired - 1] + 0x141),
                 screen_at((uint16_t)((ds.Command_StaffY[1] + 0x31) * 0x140 + ds.Command_StaffX[1]
                                      + 0x141)),
                 (int16_t)(ds.Command_StaffW[1] - 2), (int16_t)(ds.Command_StaffH[1] - 2), 0x40);
@@ -602,14 +593,14 @@ void Command_TickAmbientLights(void)
         ds.Command_LightFrame = (int16_t)((ds.Command_LightFrame + 1) % 0x26);
         uint16_t f = (uint16_t)ds.Command_LightFrame;
         Blit_CopyRect(
-            fp_add(ds.Command_MainA5, (uint16_t)((f >> 4) * 0x1B80 + (f % 0x10) * 0x13 + 0x140)),
+            ds.Command_MainA5 + (uint16_t)((f >> 4) * 0x1B80 + (f % 0x10) * 0x13 + 0x140),
             screen_at(0x3D65), 0x13, 0x15);
     }
     ds.Command_Light2Timer--;
     if (ds.Command_Light2Timer < 1) {
         ds.Command_Light2Timer = 7;
         ds.Command_Light2Frame = (int16_t)((ds.Command_Light2Frame + 1) % 10);
-        Blit_CopyRect(fp_add(ds.Command_MainA5, (uint16_t)(ds.Command_Light2Frame * 0xD + 0x38B3)),
+        Blit_CopyRect(ds.Command_MainA5 + (uint16_t)(ds.Command_Light2Frame * 0xD + 0x38B3),
                       screen_at(0x6622), 0xC, 0xE);
     }
     for (uint16_t i = 1;; i++) {
@@ -637,7 +628,7 @@ void Command_TickAmbientLights(void)
 void Command_DrawHeroPortrait(void)
 {
     Mouse_HideCursor();
-    Blit_BlitTransparent(fp_add(ds.Command_Heroes, (uint16_t)(0x140 + ds.Game_HeroSpriteX)),
+    Blit_BlitTransparent(ds.Command_Heroes + (uint16_t)(0x140 + ds.Game_HeroSpriteX),
                          screen_at(0x7C43), 0x43, 0x3B, 0x40);
     Mouse_ShowCursor();
 }
@@ -646,8 +637,8 @@ void Command_DrawHeroPortrait(void)
 void Command_DrawHeroPortraitToBuffer(void)
 {
     Mouse_HideCursor();
-    Blit_BlitTransparent(fp_add(ds.Command_Heroes, (uint16_t)(0x140 + ds.Game_HeroSpriteX)),
-                         fp_at(ds.Command_Offscreen, 0x7C43), 0x43, 0x3B, 0x40);
+    Blit_BlitTransparent(ds.Command_Heroes + (uint16_t)(0x140 + ds.Game_HeroSpriteX),
+                         seg_at(ds.Command_Offscreen, 0x7C43), 0x43, 0x3B, 0x40);
     Mouse_ShowCursor();
 }
 
@@ -660,9 +651,8 @@ void Command_DrawStaffIcon(int16_t slot)
     if ((s != 4 || ds.Intel_DevAwayTimer == 0) && ds.Advisor_TrainingKind != s
         && (int16_t)hired > 0) {
         Blit_BlitTransparent(
-            fp_add(ds.Command_MainFace,
-                   (uint16_t)(ds.Command_StaffSrcY[s - 1][hired - 1] * 0x140
-                              + ds.Command_StaffSrcX[s - 1][hired - 1] + 0x141)),
+            ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[s - 1][hired - 1] * 0x140
+                                             + ds.Command_StaffSrcX[s - 1][hired - 1] + 0x141),
             screen_at((uint16_t)((ds.Command_StaffY[s - 1] + 0x31) * 0x140
                                  + ds.Command_StaffX[s - 1] + 0x141)),
             (int16_t)(ds.Command_StaffW[s - 1] - 2), (int16_t)(ds.Command_StaffH[s - 1] - 2), 0x40);
@@ -688,19 +678,19 @@ void Command_ShowDeathEnding(void)
         System_StrStore(PSTR("1"), &num, 0xFF);
     else
         System_StrStore(PSTR("2"), &num, 0xFF);
-    FarPtr buf = System_GetMem(64000);
+    uint8_t *buf = System_GetMem(64000);
     System_StrLoad(&name, PSTR("grafika\\deathsz"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), far_host(buf), 0, 200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
-    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
+    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
+    Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     Gfx_WaitFrames(0x2D0);
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
     System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("grafika\\death"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), far_host(buf), 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
-    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
+    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
+    Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     if (ds.Game_Hero == 2) {
         Command_InitRoomAnim();
@@ -716,9 +706,9 @@ void Command_ShowDeathEnding(void)
         Gfx_WaitFrames(0x67C);
     }
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
-    Gfx_LoadPic(LIT("grafika\\death"), far_host(buf), 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40,
-                0, 0xB0);
-    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
+    Gfx_LoadPic(LIT("grafika\\death"), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0,
+                0xB0);
+    Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
     System_FreeMem(buf, 64000);
     Gfx_WaitFrames(0x46);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x46);

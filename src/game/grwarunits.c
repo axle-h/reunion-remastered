@@ -18,7 +18,7 @@
 // original's 32-bit wrap. A macro: the packed entries can't be pointed to.
 #define ADD32(entry, v) ((entry) = (int32_t)((uint32_t)(entry) + (uint32_t)(int32_t)(v)))
 
-static GrUnit *unit_at(FarPtr list, int i) { return (GrUnit *)far_host(list) + (i - 1); }
+static GrUnit *unit_at(uint8_t *list, int i) { return (GrUnit *)list + (i - 1); }
 
 static const uint8_t *ps(const char *lit_with_len) { return (const uint8_t *)lit_with_len; }
 
@@ -115,11 +115,11 @@ void GrWarUnits_UnitAssignDrawScreen(void)
         GfxPath_AddToolbarIcon(0x24);
     GfxPath_ShowToolbar();
     ds.GrWar_UnitIcons = System_GetMem(0x3C00);
-    FarPtr buf = System_GetMem(0xBCC0);
-    Gfx_LoadPic(ps("\x0C" "war\\grbeoszt"), far_host(buf), 1, 0x97, 0, 0, 0x140, true,
+    uint8_t *buf = System_GetMem(0xBCC0);
+    Gfx_LoadPic(ps("\x0C" "war\\grbeoszt"), buf, 1, 0x97, 0, 0, 0x140, true,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
-    Gfx_LoadPic(ps("\x0A" "war\\gricon"), far_host(ds.GrWar_UnitIcons), 1, 0x30, 0, 0, 0x140, false,
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
+    Gfx_LoadPic(ps("\x0A" "war\\gricon"), ds.GrWar_UnitIcons, 1, 0x30, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
     GrWarUnits_DrawUnitList();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -128,7 +128,7 @@ void GrWarUnits_UnitAssignDrawScreen(void)
 
 // Fills up to 20 slots of `list` from GrWarUnits::Scratch (types 1..4), at
 // most SlotCap[t] units per slot; returns the slot count.
-static int16_t fill_slots(FarPtr list, bool defenders)
+static int16_t fill_slots(uint8_t *list, bool defenders)
 {
     int16_t count = 0;
     for (int t = 1; t <= 4; t++) {
@@ -222,7 +222,7 @@ void GrWarUnits_CollectAvailableForces(void)
     }
 
     // The planet's own stores belong to its owner's side.
-    const TBody *body = (const TBody *)far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     if ((int8_t)body->Owner > 1 && ds.Races_Races[(int8_t)body->Owner - 2].Status == 6) {
         for (int t = 1; t <= 4; t++) {
             int32_t s = body->Stores[t + 3];
@@ -289,8 +289,7 @@ void GrWarUnits_DrawUnitList(void)
                             * (uint32_t)ds.GrWarUnits_Attack[0][u->type - 1]) / total;
         System_StrLong(str, 4, &s, 0x32);
         Gfx_DrawTextF9((uint8_t *)&s, (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
-        const uint8_t *icon =
-            (const uint8_t *)far_host(ds.GrWar_UnitIcons) + (uint16_t)((u->type - 1) * 0x50);
+        const uint8_t *icon = ds.GrWar_UnitIcons + (uint16_t)((u->type - 1) * 0x50);
         Blit_CopyRect(icon, gfx_screen() + (uint16_t)(ofs + 10 + 0x8C0), 0x10, 0x10);
     }
     for (int i = n + 1; i <= 0x14; i++) {

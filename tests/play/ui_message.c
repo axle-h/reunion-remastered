@@ -3,7 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
 #include "game/main_program.h"
 #include "game/mem.h"
 #include "game/mouse.h"
@@ -69,7 +68,7 @@ static bool under_cursor(int x, int y)
 // hides the whole cell); *seen counts the pixels compared.
 static int match_glyph(int x, int y, int g, int *seen)
 {
-    const uint8_t *s = screen(), *cs = far_host(ds.Gfx_Charset);
+    const uint8_t *s = screen(), *cs = ds.Gfx_Charset;
     int colour = -1;
     *seen = 0;
     for (int r = 0; r < GLYPH_H; r++) {
@@ -672,22 +671,12 @@ int ui_handle_interrupts(void)
 
 // --- Game data block ---
 
-static const uint8_t *game_data(void)
-{
-    return far_host(Ems_GameDataBlock()->Data);
-}
-
-static uint32_t block_offset(FarPtr p)
-{
-    return far_linear(p) - far_linear(Ems_GameDataBlock()->Data);
-}
-
 const TGroup *ui_group_record(int list, int k)
 {
-    return (const TGroup *)(game_data() + block_offset(ds.Game_Groups)) + list * 32 + (k - 1);
+    return &ds.Game_Groups[list][k - 1];
 }
 
 const TBuilding *ui_building_record(int i)
 {
-    return (const TBuilding *)(game_data() + block_offset(ds.Game_Buildings)) + (i - 1);
+    return &ds.Game_Buildings[i - 1];
 }

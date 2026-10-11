@@ -72,13 +72,13 @@ static inline uint8_t *screen_info(int16_t screen)
 
 static inline TBody *cur_body(void)
 {
-    return (TBody *)far_host(ds.Game_CurBody);
+    return ds.Game_CurBody;
 }
 
 // Game::Buildings^[i] (1-based).
 static inline TBuilding *building(int16_t i)
 {
-    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+    return ds.Game_Buildings + (i - 1);
 }
 
 // Surface::BuildingTypes[k]. Of the unnamed bytes, _10 is the builder skill
@@ -1234,7 +1234,7 @@ static void screen_space_battle(void)
 
 static uint8_t *gw_unit_record(void)
 {
-    return (uint8_t *)far_host(ds.GrWarUnits_UnitLists[0]) + ds.GrWar_Selected * 0x27 - 0x27;
+    return ds.GrWarUnits_UnitLists[0] + ds.GrWar_Selected * 0x27 - 0x27;
 }
 
 static void ground_battle_won_story(void)
@@ -1607,7 +1607,7 @@ static void list_mode_button(int16_t mode, const uint8_t *sfx)
 static void screen_planet_list(void)
 {
     if (ds.Game_ScreenEntered) {
-        FarPtr entries = System_GetMem(0x4B0);
+        uint8_t *entries = System_GetMem(0x4B0);
         ds.PlanetList_Top = 1;
         ds.PlanetList_Mode = 1;
         ds.PlanetList_Entries = entries;

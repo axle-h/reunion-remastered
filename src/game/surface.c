@@ -18,17 +18,6 @@
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
 
-static FarPtr far_add(FarPtr p, int32_t delta)
-{
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
-}
-
-// Host pointer `ofs` bytes into the heap block `p`, for the blitters.
-static uint8_t *buf_at(FarPtr p, uint16_t ofs)
-{
-    return (uint8_t *)far_host(p) + ofs;
-}
-
 static int16_t cur_planet(void)
 {
     return ds.Game_CurPlanet[ds.Game_CurSystem - 1];
@@ -40,11 +29,12 @@ static int16_t cur_moon(void)
 }
 
 // Cell (x, y) of a map layer; `size` is 1 for the byte layers and 2 for the
-// word layer. The offset wraps like the original's 16-bit arithmetic.
-static void *cell(FarPtr layer, int16_t x, int16_t y, int size)
+// word layer. The offset wraps like the original's 16-bit arithmetic, within
+// the layer's segment.
+static void *cell(uint8_t *layer, int16_t x, int16_t y, int size)
 {
-    uint16_t ofs = (uint16_t)(x * 60 * size + y * size - 61 * size);
-    return far_host(far_add(layer, ofs));
+    uint8_t *seg = far_seg_start(layer);
+    return seg + (uint16_t)(layer - seg + x * 60 * size + y * size - 61 * size);
 }
 
 static uint8_t *tile_at(int16_t x, int16_t y)
@@ -65,7 +55,7 @@ static uint16_t *building_at(int16_t x, int16_t y)
 // Record `index` (1-based) of Game_Buildings.
 static TBuilding *bldg(int16_t index)
 {
-    return (TBuilding *)far_host(far_add(ds.Game_Buildings, (index - 1) * 14));
+    return ds.Game_Buildings + (index - 1);
 }
 
 static const TBuildingType *btype(int16_t kind)
@@ -84,8 +74,8 @@ static TBody *body_of(int16_t system, int16_t planet, int16_t moon)
 {
     int16_t idx = planet;
     if (moon != 0)
-        idx = *(uint8_t *)far_host(far_add(ds.Galaxy_MoonLists[system - 1], planet * 9 + moon - 9));
-    return (TBody *)far_host(far_add(ds.Galaxy_Bodies[system - 1], (idx - 1) * 0x41));
+        idx = ((const uint8_t *)ds.Galaxy_MoonLists[system - 1])[planet * 9 + moon - 9];
+    return ds.Galaxy_Bodies[system - 1] + (idx - 1);
 }
 
 // The test that guards the map drawing routines: the body is a colony, has a
@@ -111,33 +101,33 @@ void Surface_EnterSurface(void)
 {
     PString s, tmp, prefix;
 
-    FarPtr pic = System_GetMem(0xBCC0);
-    Gfx_LoadPic(P("grafika\\designer"), far_host(pic), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+    uint8_t *pic = System_GetMem(0xBCC0);
+    Gfx_LoadPic(P("grafika\\designer"), pic, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(pic), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Blit_CopyRect(pic, gfx_screen() + 0x3D40, 0x140, 0x97);
     Mouse_HideCursor();
     Blit_FillRect(0x5D, 0x35, 0xE0, 0x90, 0x40);
     Mouse_ShowCursor();
     ds.Surface_BufA = System_GetMem(0x24FF);
-    Blit_CopyRectStrided(buf_at(pic, 0x69E), far_host(ds.Surface_BufA), 0x7B, 0x4D, 0x140, 0x7B);
+    Blit_CopyRectStrided(pic + 0x69E, ds.Surface_BufA, 0x7B, 0x4D, 0x140, 0x7B);
     System_FreeMem(pic, 0xBCC0);
 
     System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
     ds.Surface_RadarColors = System_GetMem(0x820);
     System_StrLoad(&tmp, PSTR("planets\\radar"));
     System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, far_host(ds.Surface_RadarColors), 1, 0x1A, 0, 0, 0x50, false,
+    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_RadarColors, 1, 0x1A, 0, 0, 0x50, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
     System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
     prefix.len = 0;
-    if (((const TBody *)far_host(ds.Game_CurBody))->Owner > 1)
+    if (ds.Game_CurBody->Owner > 1)
         System_StrStore(PSTR("t"), &prefix, 0xFF);
     ds.Surface_BufC = System_GetMem(0xF000);
     System_StrLoad(&tmp, PSTR("planets\\epul"));
     System_StrConcat(&tmp, &prefix);
     System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, far_host(ds.Surface_BufC), 1, 0xC0, 0, 0, 0x140, false,
+    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
     int16_t fanim = ds.Surface_FanimHeight[ds.Surface_TileSet - 1];
@@ -146,7 +136,7 @@ void Surface_EnterSurface(void)
         System_StrLoad(&tmp, PSTR("planets\\fanim"));
         System_StrConcat(&tmp, &s);
         // 0C0h rows whatever the sheet height; LoadPic clips to the picture.
-        Gfx_LoadPic((const uint8_t *)&tmp, far_host(ds.Surface_BufD), 1, 0xC0, 0, 0, 0x140, false,
+        Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufD, 1, 0xC0, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
     }
 
@@ -154,7 +144,7 @@ void Surface_EnterSurface(void)
     ds.Surface_BufB = System_GetMem((uint16_t)(felsz * 0x140));
     System_StrLoad(&tmp, PSTR("planets\\felsz"));
     System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, far_host(ds.Surface_BufB), 1, (uint16_t)felsz, 0, 0, 0x140,
+    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufB, 1, (uint16_t)felsz, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
     ds.Surface_TileLayer = System_GetMem(0x1518);
@@ -181,7 +171,7 @@ void Surface_EnterSurface(void)
 void Surface_LoadMap(void)
 {
     PString kind, variant, name;
-    const TBody *body = far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     System_StrLong((int8_t)body->SurfaceType, 0, &kind, 0xFF);
     System_StrLong(ds.Surface_MapVariant, 0, &variant, 0xFF);
     System_StrLoad(&name, PSTR("map\\map"));
@@ -199,8 +189,7 @@ void Surface_LoadMap(void)
     // The original reads the cells into a GetMem'd buffer and frees it at
     // the end (the heap keeps the trace).
     uint16_t size = (uint16_t)(m.width * m.height);
-    FarPtr buf = System_GetMem(size);
-    uint8_t *cells = far_host(buf);
+    uint8_t *cells = System_GetMem(size);
     memcpy(cells, m.cells, size);
     for (uint16_t row = 1; row <= (uint16_t)m.height; row++) {
         for (uint16_t col = 1; col <= (uint16_t)m.width; col++) {
@@ -214,7 +203,7 @@ void Surface_LoadMap(void)
             *building_at((int16_t)col, (int16_t)row) = 0;
         }
     }
-    System_FreeMem(buf, size);
+    System_FreeMem(cells, size);
     ds.Surface_MapWidth = (uint16_t)m.width;
     ds.Surface_MapHeight = (uint16_t)m.height;
     map_free(&m);
@@ -239,7 +228,7 @@ void Surface_RegisterBuildingAnims(int16_t system, int16_t planet, int16_t moon)
             }
         }
     }
-    if (((const TBody *)far_host(ds.Game_CurBody))->Owner > 1) {
+    if (ds.Game_CurBody->Owner > 1) {
         int16_t x = 0, y = 0;
         bool found = false;
         Surface_FindBuildSpot(0x19, system, planet, moon, &x, &y, &found);
@@ -315,7 +304,8 @@ void Surface_DrawBuildingInfo(void)
     PString s, s2, tmp;
     const TBuildingType *bt = btype(ds.Surface_SelKind);
     int8_t cat = (int8_t)bt->Category;
-    const int8_t *rows = ds.Surface_CategoryRows[cat - 1];
+    // Category 0 reads the three bytes before the table, as the original does.
+    const int8_t *rows = &ds.Surface_CategoryRows[0][0] + (cat - 1) * 3;
 
     Gfx_DrawTextF9((const uint8_t *)bt, 0x75, 0x3B, 0x12);
     System_StrLong(bt->Cost, 0, &s, 0xFF);
@@ -378,7 +368,7 @@ void Surface_DrawBuildingInfo(void)
             System_StrConcat(&tmp, PSTR(" kwh"));
             System_StrStore(&tmp, &s, 0xFF);
             if (cat == 2) {
-                const TBody *body = far_host(ds.Game_CurBody);
+                const TBody *body = ds.Game_CurBody;
                 System_StrLong(body->Deposits[0] / 10, 0, &s, 0xFF);
                 System_StrLoad(&tmp, &s);
                 System_StrConcat(&tmp, PSTR(" t/ptp"));
@@ -427,18 +417,18 @@ void Surface_DrawBuildingInfo(void)
 void Surface_ShowBuildingInfoView(void)
 {
     PString s, name;
-    FarPtr buf = System_GetMem(0x1950);
+    uint8_t *buf = System_GetMem(0x1950);
     System_StrLong(ds.Surface_SelKind, 0, &s, 0xFF);
     System_StrLoad(&name, PSTR("epulet\\epulet"));
     System_StrConcat(&name, &s);
-    Gfx_LoadPic((const uint8_t *)&name, far_host(buf), 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
+    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
     Mouse_HideCursor();
     Blit_FillRect(0x5D, 0x35, 0xE0, 0x90, 0x40);
     Mouse_ShowCursor();
     Surface_DrawSurfaceFrame();
     Mouse_HideCursor();
-    screen_blit_rect(buf_at(buf, 0xB6), 0x46E4, 0x56, 0x44, 0x5A);
+    screen_blit_rect(buf + 0xB6, 0x46E4, 0x56, 0x44, 0x5A);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0x1950);
     Surface_DrawBuildingInfo();
@@ -448,14 +438,14 @@ void Surface_ShowBuildingInfoView(void)
 void Surface_ShowBuildingPicture(void)
 {
     PString s, name;
-    FarPtr buf = System_GetMem(0x1950);
+    uint8_t *buf = System_GetMem(0x1950);
     System_StrLong(ds.Surface_SelKind, 0, &s, 0xFF);
     System_StrLoad(&name, PSTR("epulet\\epulet"));
     System_StrConcat(&name, &s);
-    Gfx_LoadPic((const uint8_t *)&name, far_host(buf), 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
+    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
     Mouse_HideCursor();
-    screen_blit_rect(buf_at(buf, 0xB6), 0x46E4, 0x56, 0x44, 0x5A);
+    screen_blit_rect(buf + 0xB6, 0x46E4, 0x56, 0x44, 0x5A);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0x1950);
     Surface_DrawBuildingInfo();
@@ -475,7 +465,7 @@ void Surface_DrawSurfaceFrame(void)
     };
     Mouse_HideCursor();
     for (int i = 0; i < 10; i++)
-        screen_blit_rect(buf_at(ds.Surface_BufA, pieces[i].src), pieces[i].dest, pieces[i].w,
+        screen_blit_rect(ds.Surface_BufA + pieces[i].src, pieces[i].dest, pieces[i].w,
                          pieces[i].h, 0x7B);
     Mouse_ShowCursor();
 }
@@ -484,8 +474,8 @@ void Surface_DrawSurfaceFrame(void)
 void Surface_DrawModeButtons(void)
 {
     Mouse_HideCursor();
-    screen_blit_rect(buf_at(ds.Surface_BufA, 0x8B2), 0x3E80, 0x2C, 0xD, 0x7B);
-    screen_blit_rect(buf_at(ds.Surface_BufA, 0xEF1), 0x3EAD, 0x2C, 0xD, 0x7B);
+    screen_blit_rect(ds.Surface_BufA + 0x8B2, 0x3E80, 0x2C, 0xD, 0x7B);
+    screen_blit_rect(ds.Surface_BufA + 0xEF1, 0x3EAD, 0x2C, 0xD, 0x7B);
     Mouse_ShowCursor();
 }
 
@@ -502,7 +492,7 @@ void Surface_BlinkModeButton(void)
         if (sel == -1)
             return;
         Mouse_HideCursor();
-        screen_blit_rect(buf_at(ds.Surface_BufA, sel + 0x8B2), 0x3E80, 0x2C, 0xD, 0x7B);
+        screen_blit_rect(ds.Surface_BufA + (uint16_t)(sel + 0x8B2), 0x3E80, 0x2C, 0xD, 0x7B);
         Mouse_ShowCursor();
     }
     if (ds.Surface_Mode == 6) {
@@ -513,7 +503,7 @@ void Surface_BlinkModeButton(void)
             sel = 0;
         if (sel != -1) {
             Mouse_HideCursor();
-            screen_blit_rect(buf_at(ds.Surface_BufA, sel + 0xEF1), 0x3EAD, 0x2C, 0xD, 0x7B);
+            screen_blit_rect(ds.Surface_BufA + (uint16_t)(sel + 0xEF1), 0x3EAD, 0x2C, 0xD, 0x7B);
             Mouse_ShowCursor();
         }
     }
@@ -524,9 +514,9 @@ void Surface_DrawKindArrows(void)
 {
     Mouse_HideCursor();
     int16_t n = ds.Surface_SelKind == 1 ? 1 : 2;
-    screen_blit_rect(buf_at(ds.Surface_BufA, (n - 1) * 0xC + 0x15AB), 0x5000, 0xC, 0x20, 0x7B);
+    screen_blit_rect(ds.Surface_BufA + (uint16_t)((n - 1) * 0xC + 0x15AB), 0x5000, 0xC, 0x20, 0x7B);
     n = ds.Surface_SelKind == 0x19 ? 3 : 4;
-    screen_blit_rect(buf_at(ds.Surface_BufA, (n - 1) * 0xC + 0x15AB), 0x7940, 0xC, 0x20, 0x7B);
+    screen_blit_rect(ds.Surface_BufA + (uint16_t)((n - 1) * 0xC + 0x15AB), 0x7940, 0xC, 0x20, 0x7B);
     Mouse_ShowCursor();
 }
 
@@ -551,7 +541,7 @@ static void draw_backdrop_tile(uint16_t x, uint16_t y)
         w = (int16_t)(0x4D - x);
     if ((uint16_t)(y + 0x10) > 0x40)
         h = (int16_t)(0x40 - y);
-    Blit_CopyRect(buf_at(ds.Surface_BufB, ofs), gfx_screen() + (uint16_t)(x + 0x500C + y * 0x140),
+    Blit_CopyRect(ds.Surface_BufB + ofs, gfx_screen() + (uint16_t)(x + 0x500C + y * 0x140),
                   w, h);
 }
 
@@ -559,7 +549,7 @@ static void draw_backdrop_tile(uint16_t x, uint16_t y)
 static void draw_building_tile(uint16_t tile, int16_t x, int16_t y)
 {
     uint16_t t = (uint16_t)(tile - 1);
-    Blit_CopyRect(buf_at(ds.Surface_BufC, (uint16_t)((t % 0x14) * 0x10 + (t / 0x14) * 0x1400)),
+    Blit_CopyRect(ds.Surface_BufC + (uint16_t)((t % 0x14) * 0x10 + (t / 0x14) * 0x1400),
                   gfx_screen() + (uint16_t)(y * 0x140 + x), 0x10, 0x10);
 }
 
@@ -584,7 +574,7 @@ void Surface_BlitTileInner(const uint8_t *src, uint16_t tile, int16_t x, int16_t
 // 2ef2:19f7
 void Surface_DrawBuildingPreview(int16_t kind)
 {
-    if (!body_shown(far_host(ds.Game_CurBody)))
+    if (!body_shown(ds.Game_CurBody))
         return;
     if (ds.Surface_CanBuild != 0)
         Gfx_DrawTextF9((const uint8_t *)btype(ds.Surface_SelKind), 3, 0x82, 0xE);
@@ -646,10 +636,10 @@ void Surface_DrawFootprint(int16_t kind, int16_t x, int16_t y)
             int16_t cy = (int16_t)(j + y - ds.Surface_ScrollY);
             uint8_t occ = *occupy_at((int16_t)(x + i), (int16_t)(y + j));
             if (occ == 0)
-                Surface_BlitTile(far_host(ds.Surface_BufB),
+                Surface_BlitTile(ds.Surface_BufB,
                                  *tile_at((int16_t)(x + i), (int16_t)(y + j)), cx, cy);
             else
-                Surface_BlitTile(far_host(ds.Surface_BufC), (uint16_t)(occ - 1), cx, cy);
+                Surface_BlitTile(ds.Surface_BufC, (uint16_t)(occ - 1), cx, cy);
         }
     }
 }
@@ -673,7 +663,7 @@ void Surface_DrawMapView(void)
         x1 = 0;
         y1 = 0;
     }
-    if (!body_shown(far_host(ds.Game_CurBody)))
+    if (!body_shown(ds.Game_CurBody))
         return;
 
     int16_t frame_ofs = (int16_t)((ds.Surface_AnimTileFrame - 1) * 0x100);
@@ -691,14 +681,14 @@ void Surface_DrawMapView(void)
                 if (occ == 0 || occ == 0xFF) {
                     uint16_t t = *tile_at(ax, ay);
                     if (t < ds.Surface_FelszTiles)
-                        Surface_BlitTile(far_host(ds.Surface_BufB), t, sx, sy);
+                        Surface_BlitTile(ds.Surface_BufB, t, sx, sy);
                     else
-                        Surface_BlitTile(buf_at(ds.Surface_BufD, ds.Surface_AnimTileOffset),
+                        Surface_BlitTile(ds.Surface_BufD + ds.Surface_AnimTileOffset,
                                          (uint16_t)(t - ds.Surface_FelszTiles), sx, sy);
                 } else {
                     int16_t bi = (int16_t)*building_at(ax, ay);
                     const TBuilding *b = bldg(bi);
-                    Surface_BlitTile(far_host(ds.Surface_BufC), (uint16_t)(occ - 1), sx, sy);
+                    Surface_BlitTile(ds.Surface_BufC, (uint16_t)(occ - 1), sx, sy);
                     if (b->Flag == 0 && b->Health == 0 && ds.Surface_BlinkOn != 0) {
                         // Three nested outlines flash on finished but unpowered buildings.
                         Gfx_DrawRectOutline((int16_t)((x - 1) * 16 + 0x61), (int16_t)((y - 1) * 16 + 0x39),
@@ -711,7 +701,7 @@ void Surface_DrawMapView(void)
                 }
             } else if (occ == 0) {
                 // Cursor over free ground: the building tile itself, green outline.
-                Surface_BlitTileInner(far_host(ds.Surface_BufC), foot(bt, x - x0, y - y0), sx, sy);
+                Surface_BlitTileInner(ds.Surface_BufC, foot(bt, x - x0, y - y0), sx, sy);
                 Gfx_DrawRectOutline((int16_t)((x - 1) * 16 + 0x5E), (int16_t)((y - 1) * 16 + 0x36),
                                     (int16_t)(x * 16 + 0x5D), (int16_t)(y * 16 + 0x35), 0x0A);
             } else {
@@ -719,12 +709,12 @@ void Surface_DrawMapView(void)
                 if (occ == 0xFF) {
                     uint16_t t = *tile_at(ax, ay);
                     if (t < ds.Surface_FelszTiles)
-                        Surface_BlitTileInner(far_host(ds.Surface_BufB), t, sx, sy);
+                        Surface_BlitTileInner(ds.Surface_BufB, t, sx, sy);
                     else
-                        Surface_BlitTileInner(buf_at(ds.Surface_BufD, ds.Surface_AnimTileOffset),
+                        Surface_BlitTileInner(ds.Surface_BufD + ds.Surface_AnimTileOffset,
                                               (uint16_t)(t - ds.Surface_FelszTiles), sx, sy);
                 } else {
-                    Surface_BlitTileInner(far_host(ds.Surface_BufC), (uint16_t)(occ - 1), sx, sy);
+                    Surface_BlitTileInner(ds.Surface_BufC, (uint16_t)(occ - 1), sx, sy);
                 }
                 Gfx_DrawRectOutline((int16_t)((x - 1) * 16 + 0x5E), (int16_t)((y - 1) * 16 + 0x36),
                                     (int16_t)(x * 16 + 0x5D), (int16_t)(y * 16 + 0x35), 0x14);
@@ -741,7 +731,7 @@ void Surface_DrawMapView(void)
 // 2ef2:22df: x, y = the cell under the mouse; adjusts Mode and SelBuilding / SelKind.
 void Surface_UpdateModeForCell(int16_t x, int16_t y)
 {
-    const TBody *body = far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     if (ds.Surface_Mode == 1 && body->Owner == 1) {
         ds.Surface_SelBuilding = (int16_t)*building_at(x, y);
         if (ds.Surface_SelBuilding != 0) {
@@ -791,7 +781,7 @@ void Surface_AddBuilding(uint8_t kind, uint8_t system, uint8_t planet, uint8_t m
     // nonzero = allowed there, and the value scales the Output.
     int8_t factor = (int8_t)((const uint8_t *)btype(kind))[0x13 + surface];
     if (factor != 0 && ds.Game_BuildingCount < 1000) {
-        TBuilding *b = (TBuilding *)far_host(far_add(ds.Game_Buildings, idx * 14));
+        TBuilding *b = ds.Game_Buildings + idx;
         ds.Game_BuildingCount++;
         b->Kind = kind;
         b->System = system;
@@ -1007,7 +997,7 @@ static uint8_t *radar_source(int16_t x, int16_t y)
     } else {
         ofs = (uint16_t)((v / 0x14) * 0xA0 + (v % 0x14) * 2);
     }
-    return far_host(far_add(ds.Surface_RadarColors, ofs));
+    return ds.Surface_RadarColors + ofs;
 }
 
 static void radar_viewport(void)
@@ -1029,7 +1019,7 @@ static void radar_viewport(void)
 // area is blanked. The bitmap is drawn on the screen, then saved to RadarBuf.
 void Surface_RebuildRadar(void)
 {
-    if (!body_shown(far_host(ds.Game_CurBody)))
+    if (!body_shown(ds.Game_CurBody))
         return;
     bool radar = Surface_CountBuildings(0x11, ds.Game_CurSystem, cur_planet(), cur_moon(), true) > 0;
     Gfx_WaitVRetrace();
@@ -1055,7 +1045,7 @@ void Surface_RebuildRadar(void)
             Blit_FillRect(rx, ry, (int16_t)(w << 1), (int16_t)(h << 1), 0x40);
         Gfx_DrawRectOutline(rx, ry, (int16_t)(rx + w * 2 + 1), (int16_t)(ry + h * 2 + 1), 0xA0);
         Mouse_HideCursor();
-        Blit_CopyRectStrided(screen + ds.Surface_RadarOfs, far_host(ds.Surface_RadarBuf),
+        Blit_CopyRectStrided(screen + ds.Surface_RadarOfs, ds.Surface_RadarBuf,
                              (int16_t)(w << 1), (int16_t)(h << 1), 0x140, (int16_t)(w << 1));
         radar_viewport();
     }
@@ -1072,7 +1062,7 @@ void Surface_RebuildRadar(void)
             Blit_FillRect(rx, ry, w, h, 0x40);
         Gfx_DrawRectOutline(rx, ry, (int16_t)(rx + w + 1), (int16_t)(ry + h + 1), 0xA0);
         Mouse_HideCursor();
-        Blit_CopyRectStrided(screen + ds.Surface_RadarOfs, far_host(ds.Surface_RadarBuf), w, h,
+        Blit_CopyRectStrided(screen + ds.Surface_RadarOfs, ds.Surface_RadarBuf, w, h,
                              0x140, w);
         radar_viewport();
     }
@@ -1082,19 +1072,19 @@ void Surface_RebuildRadar(void)
 // 2ef2:312f: the saved bitmap and the viewport rectangle.
 void Surface_DrawRadar(void)
 {
-    if (!body_shown(far_host(ds.Game_CurBody)))
+    if (!body_shown(ds.Game_CurBody))
         return;
     Gfx_WaitVRetrace();
     Mouse_HideCursor();
     int16_t w = (int16_t)ds.Surface_MapWidth;
     int16_t h = (int16_t)ds.Surface_MapHeight;
     if (ds.Surface_RadarDouble) {
-        Blit_CopyRectStrided(far_host(ds.Surface_RadarBuf), gfx_screen() + ds.Surface_RadarOfs,
+        Blit_CopyRectStrided(ds.Surface_RadarBuf, gfx_screen() + ds.Surface_RadarOfs,
                              (int16_t)(w << 1), (int16_t)(h << 1), (int16_t)(w << 1), 0x140);
         radar_viewport();
     }
     if (!ds.Surface_RadarDouble) {
-        Blit_CopyRectStrided(far_host(ds.Surface_RadarBuf), gfx_screen() + ds.Surface_RadarOfs, w,
+        Blit_CopyRectStrided(ds.Surface_RadarBuf, gfx_screen() + ds.Surface_RadarOfs, w,
                              h, w, 0x140);
         radar_viewport();
     }

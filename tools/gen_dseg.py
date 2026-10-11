@@ -28,8 +28,8 @@ BUILTIN_TYPES = """
 type
   TextRec = record
     Handle, Mode, BufSize, Private, BufPos, BufEnd: word;
-    BufPtr: pointer;
-    OpenFunc, InOutFunc, FlushFunc, CloseFunc: pointer;
+    BufPtr: farptr;
+    OpenFunc, InOutFunc, FlushFunc, CloseFunc: procedure;
     UserData: array[1..16] of byte;
     Name: array[0..79] of char;
     Buffer: array[0..127] of char;
@@ -51,7 +51,9 @@ SCALARS = {
     "word": ("uint16_t", 2),
     "integer": ("int16_t", 2),
     "longint": ("int32_t", 4),
-    "pointer": ("uint32_t", 4),  # DOS far pointer value (seg:ofs)
+    "pointer": ("uint32_t", 4),  # a host pointer (uint8_t *) in the port
+    "farptr": ("uint32_t", 4),   # kept as a DOS far pointer value (seg:ofs)
+    "procedure": ("uint32_t", 4),  # a far code pointer, kept as its value
     "real": ("Real48", 6),
     "single": ("float", 4),
     "double": ("double", 8),
@@ -75,12 +77,21 @@ class TypeError_(Exception):
 class CType:
     """A laid-out type: C base type, array dimensions (lo, hi), size."""
 
-    def __init__(self, base, size, dims=(), note="", pointer=False):
+    def __init__(self, base, size, dims=(), note="", pointer=False, target=None):
         self.base, self.size, self.dims, self.note = base, size, list(dims), note
         self.pointer = pointer
+        # Host pointers: (pointed-to C type, its array dimensions). size and
+        # the layout stay the original's 4-byte far pointer.
+        self.target = target
 
     def decl(self, name):
-        return self.base + " " + name + "".join(f"[{hi - lo + 1}]" for lo, hi in self.dims)
+        dims = "".join(f"[{hi - lo + 1}]" for lo, hi in self.dims)
+        if self.target:
+            base, inner = self.target
+            if inner:
+                return f"{base} (*{name}{dims})" + "".join(f"[{n}]" for n in inner)
+            return f"{base} *{name}{dims}"
+        return self.base + " " + name + dims
 
     def comment(self):
         parts = []
@@ -114,7 +125,12 @@ class Types:
         if not t:
             raise TypeError_("empty type")
         if t.startswith("^"):
-            return CType("uint32_t", 4, note="far ^" + t[1:].strip(), pointer=True)
+            # ^array[..] of T points at the first element; inner dimensions
+            # stay (^array[0..1] of array[1..32] of T: T (*)[32]).
+            to = self.resolve(t[1:])
+            inner = [hi - lo + 1 for lo, hi in to.dims[1:]]
+            note = "^" + t[1:].strip()
+            return CType("uint32_t", 4, note=note, pointer=True, target=(to.base, inner))
         m = re.fullmatch(r"(?:packed\s+)?array\s*\[(.*?)\]\s*of\s+(.+)", t, re.I)
         if m:
             dims = []
@@ -129,7 +145,8 @@ class Types:
             count = 1
             for lo, hi in dims:
                 count *= hi - lo + 1
-            return CType(elem.base, elem.size * count, dims + elem.dims, elem.note, elem.pointer)
+            return CType(elem.base, elem.size * count, dims + elem.dims, elem.note, elem.pointer,
+                         elem.target)
         m = re.fullmatch(r"string\s*\[\s*(\S+?)\s*\]", low)
         if m:
             n = self.parse_int(m.group(1))
@@ -141,7 +158,9 @@ class Types:
             return CType("PString", 256)
         if low in SCALARS:
             base, size = SCALARS[low]
-            return CType(base, size, pointer=low == "pointer")
+            if low == "pointer":
+                return CType(base, size, pointer=True, target=("uint8_t", []))
+            return CType(base, size, pointer=low in ("farptr", "procedure"))
         if low in self.records:
             name, size, _ = self.records[low]
             return CType(name, size)
@@ -314,13 +333,19 @@ def generate(types, kept, dropped):
         "#error \"the DS mirror assumes a little-endian host\"",
         "#endif",
         "",
-        f"#define DSEG_SIZE 0x{DS_SIZE:04X}",
+        f"#define DSEG_SIZE 0x{DS_SIZE:04X} // the original's size",
         f"#define DSEG_INIT_SIZE 0x{DS_INIT_SIZE:04X} // typed constants, loaded by dseg_init()",
         "",
+        "// No padding: records are the game's data formats (loaded, saved, kept",
+        "// in heap blocks), and DSeg keeps the original's globals in order with",
+        "// nothing between them, because the original reads and writes past",
+        "// arrays into the next globals in places and those must stay the same",
+        "// bytes. Only pointers differ: `pointer` and ^T are host pointers;",
+        "// farptr and procedure are still DOS far pointer values (uint32_t,",
+        "// segment:offset).",
         "#pragma pack(push, 1)",
         "",
-        "// Pascal types: real is 6 bytes, strings are length-prefixed, pointers",
-        "// are DOS far pointer values (uint32_t, segment:offset), not C pointers.",
+        "// Pascal types: real is 6 bytes, strings are length-prefixed.",
         "typedef struct Real48 { uint8_t b[6]; } Real48;",
         "typedef struct Extended80 { uint8_t b[10]; } Extended80;",
         "typedef struct PString { uint8_t len; char s[255]; } PString;",
@@ -335,8 +360,9 @@ def generate(types, kept, dropped):
         out.append(f"typedef struct {name} {{")
         out += [field_line(ct, f) for f, ct, _ in fields]
         out.append(f"}} {name};")
-        out.append(f"static_assert(sizeof({name}) == {size});")
-        out += [f"static_assert(offsetof({name}, {f}) == 0x{o:02X});" for f, _, o in fields]
+        if not any(ct.target for _, ct, _ in fields):
+            out.append(f"static_assert(sizeof({name}) == {size});")
+            out += [f"static_assert(offsetof({name}, {f}) == 0x{o:02X});" for f, _, o in fields]
         out.append("")
 
     out.append("typedef struct DSeg {")
@@ -364,8 +390,6 @@ def generate(types, kept, dropped):
     out.append("")
     out.append("#pragma pack(pop)")
     out.append("")
-    out.append(f"static_assert(sizeof(DSeg) == DSEG_SIZE);")
-    out += [f"static_assert(offsetof(DSeg, {s.cname}) == 0x{s.ofs:04X});" for s in kept]
     out += [
         "",
         "// The data segment (game/dseg.c). Far pointers into it (segment",
@@ -397,15 +421,15 @@ def generate_fields(types, kept):
             dims = [count // (dims[-1] * dims[-2]), dims[-2], dims[-1]]
         return ", ".join(str(x) for x in dims[:3])
 
-    def entry(cname, ct, ofs, top=False):
-        at = f"offsetof(DSeg, {cname})" if top else f"0x{ofs:04X}"
+    def entry(cname, ct, ofs, top=None):
+        at = f"offsetof({top}, {cname})"
         if ct is None:
             return f'    {{"{cname}", 0x{ofs:04X}, {at}, 1, 1, -1, DSF_LABEL, {{1, 1, 1}}}},'
         count = 1
         for lo, hi in ct.dims:
             count *= hi - lo + 1
         rec = rec_index.get(ct.base, -1)
-        flags = "DSF_POINTER" if ct.pointer else "0"
+        flags = ("DSF_POINTER | DSF_HOST" if ct.target else "DSF_POINTER") if ct.pointer else "0"
         return (f'    {{"{cname}", 0x{ofs:04X}, {at}, {ct.size // count}, {count}, '
                 f'{rec}, {flags}, {{{dims_of(ct, count)}}}}},')
 
@@ -427,13 +451,13 @@ def generate_fields(types, kept):
     for name in types.order:
         _, size, fields = types.records[name.lower()]
         out.append(f"static const DsField fields_{name}[] = {{")
-        out += [entry(f, ct, o) for f, ct, o in fields]
+        out += [entry(f, ct, o, name) for f, ct, o in fields]
         out.append("};")
     out.append("")
     out.append("const DsRecord ds_records[] = {")
     for name in types.order:
         _, size, fields = types.records[name.lower()]
-        out.append(f'    {{"{name}", {size}, {len(fields)}, fields_{name}}},')
+        out.append(f'    {{"{name}", {size}, sizeof({name}), {len(fields)}, fields_{name}}},')
     out.append("};")
     out.append("const int ds_record_count = sizeof ds_records / sizeof ds_records[0];")
     out.append("")
@@ -442,7 +466,7 @@ def generate_fields(types, kept):
     for s in kept:
         if s.ofs > pos:
             out.append(pad(pos, s.ofs - pos))
-        out.append(entry(s.cname, s.ctype, s.ofs, top=True))
+        out.append(entry(s.cname, s.ctype, s.ofs, "DSeg"))
         pos = s.ofs + s.size
     if pos < DS_SIZE:
         out.append(pad(pos, DS_SIZE - pos))

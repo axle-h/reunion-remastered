@@ -142,13 +142,13 @@ void Hire_HireScreen(void)
 // 3fab:0321
 void Hire_LoadHireBackground(void)
 {
-    FarPtr buf = System_GetMem(0x8AC0);
+    uint8_t *buf = System_GetMem(0x8AC0);
     PString name;
     System_StrLoad(&name, PSTR("grafika\\"));
     System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[ds.Hire_StaffKind - 1]);
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x6E, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0x8F,
+    Gfx_LoadPic(ps(&name), buf, 1, 0x6E, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0x8F,
                 0x40, 0, 0x8F);
-    Blit_CopyRect((uint8_t *)far_host(buf) + 0x141, gfx_screen() + 0x3E81, 0x140, 0x6D);
+    Blit_CopyRect(buf + 0x141, gfx_screen() + 0x3E81, 0x140, 0x6D);
     Gfx_FadeIn(0x40, 0xCF, Gfx_PalettePtr());
     System_FreeMem(buf, 0x8AC0);
 }
@@ -168,9 +168,7 @@ void Hire_DrawCandidateFrames(void)
 static const uint8_t *face_text(int16_t t, int16_t c, int line)
 {
     static const uint16_t off[3] = {0, 0x29, 0x7B};
-    FarPtr base = ds.RawText_SzFace;
-    return far_host(far_ptr((uint16_t)(base >> 16),
-                            (uint16_t)((uint16_t)base + (t - 1) * 0x1EC + (c - 1) * 0xA4 + off[line])));
+    return ds.RawText_SzFace + (t - 1) * 0x1EC + (c - 1) * 0xA4 + off[line];
 }
 
 // 3fab:048f

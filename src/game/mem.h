@@ -69,5 +69,13 @@ static inline void *far_host(FarPtr p)
 // returns them: offset 0..15), 0 for anything else.
 FarPtr far_from_host(const void *p);
 
+// The start of the segment the original addressed a heap block from
+// (segment:0000, the block at offset 0 or 8 of it), for routines that take
+// a segment. block must be the block's start (as GetMem returned it).
+static inline uint8_t *far_seg_start(const void *block)
+{
+    return far_host(far_from_host(block) & 0xFFFF0000u);
+}
+
 // Clears the address space, DS and video memory.
 void mem_init(void);

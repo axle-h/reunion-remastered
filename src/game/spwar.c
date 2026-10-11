@@ -15,18 +15,15 @@
 #include "game/system.h"
 #include "platform/fs.h"
 
-// Far pointer to a DS variable, as the original builds for SideCount and LossPtr.
-#define DS_FAR(field) far_ptr(MEM_DS_SEG, (uint16_t)offsetof(DSeg, field))
-
 #define NAME(lit) ((const uint8_t *)PSTR(lit))
 
 // Scratch palette for the picture loads (the original used 768 bytes of its
 // stack).
 static uint8_t scratch_pal[768];
 
-static inline SpShip *Ship(FarPtr list, int16_t i)
+static inline SpShip *Ship(uint8_t *list, int16_t i)
 {
-    return (SpShip *)far_host(list) + (i - 1);
+    return (SpShip *)list + (i - 1);
 }
 
 static inline int32_t lmul(int32_t a, int32_t b)
@@ -38,17 +35,17 @@ static inline int32_t lmul(int32_t a, int32_t b)
 void SpWar_EnterSpaceBattle(void)
 {
     Sound_AllocWarSndBuf();
-    FarPtr buf = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(NAME("war\\spwar"), far_host(buf), 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
+    uint8_t *buf = System_GetMem(0xBCC0);
+    Gfx_LoadPicScreen(NAME("war\\spwar"), buf, 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     ds.SpWar_View = System_GetMem(0x5E60);
     ds.SpWar_Background = System_GetMem(0x5E60);
     ds.SpWar_Sprites = System_GetMem(0xF00);
     ds.SpWar_Face = System_GetMem(0x1180);
-    Gfx_LoadPic(NAME("war\\sphatter"), far_host(ds.SpWar_Background), 1, 0x97, 0, 0, 0xA0, false,
+    Gfx_LoadPic(NAME("war\\sphatter"), ds.SpWar_Background, 1, 0x97, 0, 0, 0xA0, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Gfx_LoadPic(NAME("war\\spants"), far_host(ds.SpWar_Sprites), 1, 0x30, 0, 0, 0x50, false,
+    Gfx_LoadPic(NAME("war\\spants"), ds.SpWar_Sprites, 1, 0x30, 0, 0, 0x50, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
     // The picture of the hired fighter (Game::StaffHired[2] in the decompile
     // is 0-based: the third of pilot, builder, fighter, developer).
@@ -56,7 +53,7 @@ void SpWar_EnterSpaceBattle(void)
     System_StrLong(ds.Game_StaffHired[2], 0, &num, 10);
     System_StrLoad(&name, PSTR("war\\spface"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic((const uint8_t *)&name, far_host(ds.SpWar_Face), 1, 0x50, 0, 0, 0x38, false,
+    Gfx_LoadPic((const uint8_t *)&name, ds.SpWar_Face, 1, 0x50, 0, 0, 0x38, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
     SpWar_StepSpaceBattle();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -70,8 +67,8 @@ void SpWar_EnterSpaceBattle(void)
 // mirror: x counts from the right edge. The original does that for every
 // alien ship (forces and store ships), whichever side they are on; only the
 // player's groups start on the left.
-static void add_ship(FarPtr list, int16_t *count, uint8_t id, uint8_t cls, uint16_t dmg, uint16_t hp,
-                     bool mirror)
+static void add_ship(uint8_t *list, int16_t *count, uint8_t id, uint8_t cls, uint16_t dmg,
+                     uint16_t hp, bool mirror)
 {
     SpShip *s = Ship(list, *count + 1);
     s->id = id;
@@ -91,7 +88,7 @@ static void add_ship(FarPtr list, int16_t *count, uint8_t id, uint8_t cls, uint1
 }
 
 // Fleet of a force-owning race (status 2 defends, 6 attacks), or false.
-static bool race_side(const TRace *r, FarPtr *list, int16_t **count)
+static bool race_side(const TRace *r, uint8_t **list, int16_t **count)
 {
     if (r->Status == 2) {
         *list = ds.SpWar_DefenderList;
@@ -112,17 +109,18 @@ static void set_side(const TRace *r)
 {
     bool def = r->Status == 2;
     ds.SpWar_SideList = def ? ds.SpWar_DefenderList : ds.SpWar_AttackerList;
-    ds.SpWar_SideCount = def ? DS_FAR(SpWar_DefenderShipCount) : DS_FAR(SpWar_AttackerShipCount);
+    ds.SpWar_SideCount = def ? (uint8_t *)&ds.SpWar_DefenderShipCount
+                             : (uint8_t *)&ds.SpWar_AttackerShipCount;
 }
 
 // The store ships of the body that is current (CurBody) join the fleet of its
 // owner, if the owner is a race at war with the player's fleet.
 static void add_store_ships(void)
 {
-    const TBody *body = (const TBody *)far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     if ((int8_t)body->Owner < 2)
         return;
-    FarPtr list;
+    uint8_t *list;
     int16_t *count;
     if (!race_side(&ds.Races_Races[body->Owner - 2], &list, &count))
         return;
@@ -141,7 +139,7 @@ static void add_store_ships(void)
 
 static inline uint8_t moon_count(void)
 {
-    const TMoonList *lists = far_host(ds.Galaxy_MoonLists[ds.SpWar_BattleSystem - 1]);
+    const TMoonList *lists = ds.Galaxy_MoonLists[ds.SpWar_BattleSystem - 1];
     return lists[ds.SpWar_BattlePlanet - 1].Count;
 }
 
@@ -164,7 +162,7 @@ void SpWar_InitSpaceFleets(void)
     ds.SpWar_Script = 0;
     ds.SpWar_ScriptStep = 0;
     ds.SpWar_RepeatsLeft = 0;
-    *(uint8_t *)far_host(ds.Anim_Record) = 0;
+    *ds.Anim_Record = 0;
     // Scripts 2..25 are available to be picked (set constant at 20d4:01b3).
     ds.SpWar_ScriptsLeft[0] = 0xFC;
     ds.SpWar_ScriptsLeft[1] = 0xFF;
@@ -207,7 +205,7 @@ void SpWar_InitSpaceFleets(void)
     ds.SpWar_DefenderShipCount = 0;
     for (int16_t r = 2; r <= 12; r++) {
         TRace *race = &ds.Races_Races[r - 2];
-        FarPtr list;
+        uint8_t *list;
         int16_t *count;
         if (!((race->Status == 2 || race->Status == 6) && race->ForceCount > 0))
             continue;
@@ -265,7 +263,7 @@ void SpWar_LoadWarAnimDef(int16_t n)
     // Seek to script n, BlockRead 0x230 bytes (a short file leaves the rest).
     size_t from = (size_t)(n - 1) * 0x230;
     if (from < size)
-        memcpy(far_host(ds.Anim_Script), file + from, size - from < 0x230 ? size - from : 0x230);
+        memcpy(ds.Anim_Script, file + from, size - from < 0x230 ? size - from : 0x230);
     SDL_free(file);
 }
 
@@ -274,7 +272,7 @@ void SpWar_FreeWarAnims(void)
 {
     if (ds.SpWar_Script > 0) {
         for (int16_t i = 1; i <= ds.SpWar_ScriptStep; i++) {
-            uint8_t anim = ((uint8_t *)far_host(ds.Anim_Script))[i * 4 - 4];
+            uint8_t anim = ds.Anim_Script[i * 4 - 4];
             if (anim != 0)
                 Anim_FreeWarAnim(anim);
         }
@@ -285,7 +283,7 @@ void SpWar_FreeWarAnims(void)
 // Entry of a script: {anim, frame, sound, delay}.
 static inline uint8_t *script_entry(int16_t i)
 {
-    return (uint8_t *)far_host(ds.Anim_Script) + i * 4 - 4;
+    return ds.Anim_Script + i * 4 - 4;
 }
 
 // Shows the script entry at ScriptStep and sets the delay to its time.
@@ -295,9 +293,9 @@ static void play_entry(void)
     if (e[0] != 0) {
         const TSaAnim *r = &ds.SpWar_SpriteRects[e[0] - 1];
         Anim_LoadWarAnim(e[0]);
-        Anim_DrawAnimKeyed(e[1], far_host(ds.SpWar_View));
+        Anim_DrawAnimKeyed(e[1], ds.SpWar_View);
         Mouse_HideCursor();
-        Blit_CopyRectStrided(far_host(ds.SpWar_View),
+        Blit_CopyRectStrided(ds.SpWar_View,
                              gfx_screen() + (uint16_t)(r->Y * 0x140 + r->X), r->Width, r->Height,
                              r->Width, 0x140);
         Mouse_ShowCursor();
@@ -389,18 +387,18 @@ void SpWar_PlayWarAnimScript(void)
 // 20d4:0dcc
 void SpWar_DrawPilotFace(void)
 {
-    Blit_BlitTransparentStrided(far_host(ds.SpWar_Face), gfx_screen() + 0xB42A, 0x50, 0x38, 0x50,
+    Blit_BlitTransparentStrided(ds.SpWar_Face, gfx_screen() + 0xB42A, 0x50, 0x38, 0x50,
                                 0x140, 0x40);
 }
 
 static inline uint8_t *view_at(int16_t ofs)
 {
-    return (uint8_t *)far_host(ds.SpWar_View) + (uint16_t)ofs;
+    return ds.SpWar_View + (uint16_t)ofs;
 }
 
 static inline uint8_t *sprite_at(int16_t ofs)
 {
-    return (uint8_t *)far_host(ds.SpWar_Sprites) + (uint16_t)ofs;
+    return ds.SpWar_Sprites + (uint16_t)ofs;
 }
 
 // 20d4:0df2
@@ -484,7 +482,8 @@ static uint8_t path_dir(uint8_t path, uint8_t code)
 
 // One side's ships fly their routes, shoot at random enemies and the dead
 // are swapped to the end of their list. Defenders mirror the x movement.
-static void step_side(FarPtr own, int16_t ownCount, FarPtr foe, int16_t *foeCount, bool defender)
+static void step_side(uint8_t *own, int16_t ownCount, uint8_t *foe, int16_t *foeCount,
+                      bool defender)
 {
     for (int16_t i = 1; i <= ownCount; i++) {
         SpShip *s = Ship(own, i);
@@ -543,7 +542,7 @@ static void step_side(FarPtr own, int16_t ownCount, FarPtr foe, int16_t *foeCoun
 }
 
 // Explosion frames of the ships lost (the end of the list from the live count).
-static void draw_explosions(FarPtr list, int16_t live, int16_t start)
+static void draw_explosions(uint8_t *list, int16_t live, int16_t start)
 {
     for (int16_t i = live + 1; i <= start; i++) {
         SpShip *s = Ship(list, i);
@@ -566,7 +565,7 @@ void SpWar_StepSpaceBattle(void)
     if (ds.SpWar_StepNo != 1)
         return;
     ds.SpWar_Exploding = 0;
-    Blit_CopyBytes(far_host(ds.SpWar_Background), far_host(ds.SpWar_View), 0x5E60);
+    Blit_CopyBytes(ds.SpWar_Background, ds.SpWar_View, 0x5E60);
     step_side(ds.SpWar_AttackerList, ds.SpWar_AttackerShipCount, ds.SpWar_DefenderList,
               &ds.SpWar_DefenderShipCount, false);
     step_side(ds.SpWar_DefenderList, ds.SpWar_DefenderShipCount, ds.SpWar_AttackerList,
@@ -574,7 +573,7 @@ void SpWar_StepSpaceBattle(void)
     draw_explosions(ds.SpWar_AttackerList, ds.SpWar_AttackerShipCount, ds.SpWar_AttackerStart);
     draw_explosions(ds.SpWar_DefenderList, ds.SpWar_DefenderShipCount, ds.SpWar_DefenderStart);
     Mouse_HideCursor();
-    Anim_BlitWedgeToScreen(far_host(ds.SpWar_View));
+    Anim_BlitWedgeToScreen(ds.SpWar_View);
     SpWar_DrawPilotFace();
     Mouse_ShowCursor();
     if (ds.SpWar_AttackerShipCount == 0)
@@ -590,7 +589,7 @@ void SpWar_StepSpaceBattle(void)
 }
 
 // Ships of one id and class that are still alive in a list.
-static int32_t count_alive(FarPtr list, int16_t n, int id, int cls)
+static int32_t count_alive(uint8_t *list, int16_t n, int id, int cls)
 {
     int32_t c = 0;
     for (int16_t i = 1; i <= n; i++)
@@ -641,19 +640,19 @@ void SpWar_ApplySpaceLosses(void)
             if (!(race->Status == 2 || race->Status == 6))
                 continue;
             TRaceForce *f = &race->Forces[k - 1];
-            FarPtr list;
+            uint8_t *list;
             int16_t *count;
             race_side(race, &list, &count);
             set_side(race);
-            ds.SpWar_LossPtr =
-                race->Status == 2 ? DS_FAR(SpWar_DefenderLosses) : DS_FAR(SpWar_AttackerLosses);
+            ds.SpWar_LossPtr = race->Status == 2 ? (uint8_t *)ds.SpWar_DefenderLosses
+                                                 : (uint8_t *)ds.SpWar_AttackerLosses;
             if (f->System == ds.SpWar_BattleSystem && f->Body == ds.SpWar_BattlePlanet
                 && f->Active == 1) {
                 for (int16_t j = 1; j <= 4; j++) {
                     int32_t alive = count_alive(list, *count, r * 10 + k, j);
                     uint16_t orig = (uint16_t)f->Units[j - 1];
                     int32_t now = alive + ((int32_t)orig - alive) / 5;
-                    int32_t *loss = (int32_t *)far_host(ds.SpWar_LossPtr) + (j - 1);
+                    int32_t *loss = (int32_t *)ds.SpWar_LossPtr + (j - 1);
                     *loss += (int32_t)orig - now;
                     f->Units[j - 1] = (int16_t)now;
                 }
@@ -664,11 +663,11 @@ void SpWar_ApplySpaceLosses(void)
     uint8_t moons = moon_count();
     for (int16_t m = 0; m <= moons; m++) {
         select_moon(m);
-        TBody *body = (TBody *)far_host(ds.Game_CurBody);
+        TBody *body = ds.Game_CurBody;
         if (!((int8_t)body->Owner > 1))
             continue;
         TRace *race = &ds.Races_Races[body->Owner - 2];
-        FarPtr list;
+        uint8_t *list;
         int16_t *count;
         if (!race_side(race, &list, &count))
             continue;
@@ -678,9 +677,12 @@ void SpWar_ApplySpaceLosses(void)
             int32_t orig = body->Stores[j - 1];
             int32_t now = alive + (orig - alive) / 5;
             // BUG? LossPtr still points where the last force loop left it
-            // (or at nothing), not at the side of this owner.
-            int32_t *loss = (int32_t *)far_host(ds.SpWar_LossPtr) + (j - 1);
-            *loss += orig - now;
+            // (or at nothing), not at the side of this owner. Nil made the
+            // original add to the interrupt table at 0000:0000; the port drops it.
+            if (ds.SpWar_LossPtr != nullptr) {
+                int32_t *loss = (int32_t *)ds.SpWar_LossPtr + (j - 1);
+                *loss += orig - now;
+            }
             body->Stores[j - 1] = now;
         }
     }
@@ -694,13 +696,13 @@ void SpWar_EndSpaceBattle(void)
     SpWar_ApplySpaceLosses();
     SpWar_FreeWarAnims();
     ds.SpWar_PlayerWon = !(ds.SpWar_AttackerShipCount == 0 || ds.SpWar_Retreated != 0);
-    FarPtr buf = System_GetMem(0xBCC0);
+    uint8_t *buf = System_GetMem(0xBCC0);
     PString name;
     System_StrLoad(&name, PSTR("war\\"));
     System_StrConcat(&name, ds.SpWar_PlayerWon ? PSTR("spvict") : PSTR("splost"));
-    Gfx_LoadPic((const uint8_t *)&name, far_host(buf), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
                 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     PString num;
     for (int c = 1; c <= 4; c++) {

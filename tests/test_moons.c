@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 
     // A satellite carrier reaching Zeus explores its moons (1b8a:2e4e).
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
     ds.Game_GroupCount = 1;
     TGroup *g = Groups_At(0, 1);
     g->Kind = 4;

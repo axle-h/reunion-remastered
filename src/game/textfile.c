@@ -13,35 +13,6 @@
 bool (*TextFile_KeyPressed)(void) = Crt_KeyPressed;
 char (*TextFile_ReadKey)(void) = Crt_ReadKey;
 
-// The edited string as a host pointer. The original stored the far pointer in
-// TextFile::InputStr; callers here may hold the string outside the emulated
-// memory (tests), so the host pointer is kept too, and the far pointer only
-// when the string lies in DS or mem[].
-static uint8_t *input_str;
-static FarPtr caller_ptr;  // TextFile_SetStringPtr
-
-void TextFile_SetStringPtr(FarPtr p)
-{
-    caller_ptr = p;
-}
-
-// The far pointer the original's caller would have passed: DS-relative for a
-// global, Game_Groups' segment for a group's name, normalised (as GetMem
-// returns them) for any other heap block.
-static uint32_t host_to_far(const void *p)
-{
-    const uint8_t *b = p;
-    FarPtr far = far_from_host(p);
-    if (far == 0 || (far >> 16) == MEM_DS_SEG)
-        return far;
-    uint32_t lin = (uint32_t)(b - mem);
-    // A group's name: Groups^[list][group] keeps Game_Groups' segment.
-    uint32_t groups_lin = (uint32_t)(ds.Game_Groups >> 16) * 16 + (uint16_t)ds.Game_Groups;
-    if (ds.Game_Groups != 0 && lin >= groups_lin && lin < groups_lin + 64 * sizeof(TGroup))
-        return far_ptr((uint16_t)(ds.Game_Groups >> 16), (uint16_t)(lin - (ds.Game_Groups >> 16) * 16));
-    return far;
-}
-
 static void underline(uint8_t colour)
 {
     Mouse_HideCursor();
@@ -50,13 +21,20 @@ static void underline(uint8_t colour)
     Mouse_ShowCursor();
 }
 
+static void draw_input(void)
+{
+    Gfx_DrawTextFC(ds.TextFile_InputStr, ds.TextFile_InputX, ds.TextFile_InputY,
+                   ds.TextFile_InputWidth);
+}
+
 // The cursor sits after the last character, or on it when the field is full.
 static void place_cursor(void)
 {
-    if (input_str[0] < ds.TextFile_InputWidth)
-        ds.TextFile_CursorX = (int16_t)(input_str[0] * 6 + ds.TextFile_InputX);
+    uint8_t len = ds.TextFile_InputStr[0];
+    if (len < ds.TextFile_InputWidth)
+        ds.TextFile_CursorX = (int16_t)(len * 6 + ds.TextFile_InputX);
     else
-        ds.TextFile_CursorX = (int16_t)(input_str[0] * 6 + ds.TextFile_InputX - 6);
+        ds.TextFile_CursorX = (int16_t)(len * 6 + ds.TextFile_InputX - 6);
     ds.TextFile_CursorY = (int16_t)(ds.TextFile_InputY + 8);
 }
 
@@ -88,15 +66,12 @@ void TextFile_BeginInput(uint8_t *s, int16_t x, int16_t y, int16_t width)
     ds.TextFile_InputX = x;
     ds.TextFile_InputY = y;
     ds.TextFile_InputWidth = width;
-    input_str = s;
-    ds.TextFile_InputStr =
-        caller_ptr != 0 && far_host(caller_ptr) == s ? caller_ptr : host_to_far(s);
-    caller_ptr = 0;
+    ds.TextFile_InputStr = s;
     // BUG? StrStore(…, 255) into a 60-byte block: longer strings overrun it.
-    System_StrStore((const PString *)s, far_host(ds.TextFile_InputBackup), 0xFF);
+    System_StrStore((const PString *)s, (PString *)ds.TextFile_InputBackup, 0xFF);
     ds.TextFile_InputBlink = 0;
     ds.TextFile_InputCanCancel = 0;
-    Gfx_DrawTextFC(input_str, ds.TextFile_InputX, ds.TextFile_InputY, ds.TextFile_InputWidth);
+    draw_input();
     ds.TextFile_InputActive = 1;
     ds.TextFile_InputEscaped = 0;
     place_cursor();
@@ -107,7 +82,7 @@ void TextFile_EndInput(void)
 {
     if (ds.TextFile_InputActive != 0) {
         underline(0xFC);
-        Gfx_DrawTextFC(input_str, ds.TextFile_InputX, ds.TextFile_InputY, ds.TextFile_InputWidth);
+        draw_input();
         System_FreeMem(ds.TextFile_InputBackup, 0x3C);
         ds.TextFile_InputActive = 0;
     }
@@ -134,32 +109,33 @@ void TextFile_InputTick(void)
     }
     ds.TextFile_InputBlink = 0;
     underline(0xFC);
-    if (key == 8 && input_str[0] != 0)
-        input_str[0]--;  // Delete(s, Length(s), 1)
-    if (key == 0x0D && input_str[0] != 0) {
+    uint8_t *s = ds.TextFile_InputStr;
+    if (key == 8 && s[0] != 0)
+        s[0]--;  // Delete(s, Length(s), 1)
+    if (key == 0x0D && s[0] != 0) {
         TextFile_EndInput();
         ds.TextFile_InputActive = 0;
         ds.TextFile_InputEscaped = 0;
     }
     if (key == 0x1B && ds.TextFile_InputCanCancel != 0) {
         if (ds.TextFile_InputEscaped != 0)
-            System_StrStore(far_host(ds.TextFile_InputBackup), (PString *)input_str, 0xFF);
+            System_StrStore((const PString *)ds.TextFile_InputBackup, (PString *)s, 0xFF);
         TextFile_EndInput();
         ds.TextFile_InputActive = 0;
         ds.TextFile_InputEscaped = 1;
     }
     if (key == ' ' || (key > 0x60 && key < 0x7B) || (key > 0x40 && key < 0x5B)
         || (key > 0x2F && key < 0x3A)) {
-        if (input_str[0] < ds.TextFile_InputWidth) {
-            if (input_str[0] < 255) {
-                input_str[1 + input_str[0]] = (char)key;
-                input_str[0]++;
+        if (s[0] < ds.TextFile_InputWidth) {
+            if (s[0] < 255) {
+                s[1 + s[0]] = (char)key;
+                s[0]++;
             }
         } else {
-            input_str[ds.TextFile_InputWidth] = key;  // s[width]: overwrite the last character
+            s[ds.TextFile_InputWidth] = key;  // s[width]: overwrite the last character
         }
     }
-    Gfx_DrawTextFC(input_str, ds.TextFile_InputX, ds.TextFile_InputY, ds.TextFile_InputWidth);
+    draw_input();
     place_cursor();
 }
 

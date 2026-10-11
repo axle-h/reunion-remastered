@@ -11,7 +11,7 @@
 
 static PlanetListEntry *entry_at(int16_t i)
 {
-    return (PlanetListEntry *)far_host(ds.PlanetList_Entries) + (i - 1);
+    return (PlanetListEntry *)ds.PlanetList_Entries + (i - 1);
 }
 
 // 1390:000b
@@ -24,7 +24,7 @@ void PlanetList_SetupScrollBarHotspot(void)
 // 1390:0047
 void PlanetList_AddListEntry(int16_t sys, int16_t planet, int16_t moon, int16_t bodyIdx)
 {
-    const TBody *b = (const TBody *)far_host(ds.Galaxy_Bodies[sys - 1]) + (bodyIdx - 1);
+    const TBody *b = ds.Galaxy_Bodies[sys - 1] + (bodyIdx - 1);
 
     // The original's flags, in the order it computes them.
     bool colony = b->Owner == 1 && b->Colony != 0;
@@ -90,7 +90,7 @@ void PlanetList_BuildList(void)
         int16_t planets;
         if (ds.Galaxy_SystemStatus[sys - 1] == 1 && (planets = ds.Galaxy_PlanetCount[sys - 1]) > 0) {
             for (int16_t p = 1;; p++) {
-                const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[sys - 1]) + (p - 1);
+                const TMoonList *ml = ds.Galaxy_MoonLists[sys - 1] + (p - 1);
                 PlanetList_AddListEntry(sys, p, 0, p);
                 uint8_t moons = ml->Count;
                 if (moons != 0) {

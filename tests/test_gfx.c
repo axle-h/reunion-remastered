@@ -101,7 +101,7 @@ static void palette(void)
     CHECK(retraces == 6 && SDL_memcmp(vid_palette, ds.Gfx_Palette, sizeof vid_palette) == 0);
 
     // GetPalette reads the DAC back.
-    uint8_t *buf = far_host(far_ptr(0x6000, 0));
+    static uint8_t buf[768];
     Gfx_GetPalette(buf);
     CHECK(SDL_memcmp(buf, vid_palette, 768) == 0);
 
@@ -176,9 +176,10 @@ static void lines(void)
 
     // DrawLineCopy takes the pixels from the source segment.
     reset();
+    static uint8_t src[4 * 320];
     for (int i = 0; i < 4 * 320; i++)
-        ((uint8_t *)far_host(far_ptr(0x6000, 0)))[i] = (uint8_t)(i % 320 + 1);
-    Gfx_DrawLineCopy(gfx_screen(), 0, 0, 4, 2, far_host(far_ptr(0x6000, 0)));
+        src[i] = (uint8_t)(i % 320 + 1);
+    Gfx_DrawLineCopy(gfx_screen(), 0, 0, 4, 2, src);
     CHECK(vid_screen[0][0] == 1 && vid_screen[1][1] == 2 && vid_screen[2][4] == 5 && vid_screen[0][1] == 0);
 
     // HLine/VLine/outline are 1-based.
@@ -213,8 +214,8 @@ static void text(void)
     // As Title::InitTitleAndMainMenu: charset1 at Charset + 80h, 32 rows.
     ds.Gfx_Charset = System_GetMem(10368);
     uint8_t name[] = "\x10grafika\\charset1";
-    uint8_t *tmp_pal = far_host(far_ptr(0x9000, 0));
-    Gfx_LoadPic(name, (uint8_t *)far_host(ds.Gfx_Charset) + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
+    static uint8_t tmp_pal[0x300];
+    Gfx_LoadPic(name, ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
 
     Pic pic;
     CHECK(pic_load("GRAFIKA\\CHARSET1.PIC", &pic));
@@ -284,12 +285,12 @@ static void load_pic(void)
     CHECK(system_heap_free() == system_heap_max_block());
 
     // rows is clipped to the picture height (405f:0ccb): nothing past it.
-    FarPtr buf = System_GetMem((uint16_t)(320 * (h + 4)));
-    SDL_memset(far_host(buf), 0xEE, (size_t)320 * (h + 4));
-    Gfx_LoadPic(name, far_host(buf), 1, (uint16_t)(h + 4), 0, 0, 320, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
+    uint8_t *buf = System_GetMem((uint16_t)(320 * (h + 4)));
+    SDL_memset(buf, 0xEE, (size_t)320 * (h + 4));
+    Gfx_LoadPic(name, buf, 1, (uint16_t)(h + 4), 0, 0, 320, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
                 0, 0xBE);
-    CHECK(SDL_memcmp(far_host(buf), want, (size_t)w * h) == 0);
-    const uint8_t *tail = (const uint8_t *)far_host(buf) + w * h;
+    CHECK(SDL_memcmp(buf, want, (size_t)w * h) == 0);
+    const uint8_t *tail = buf + w * h;
     CHECK(tail[0] == 0xEE && tail[320 * 4 - 1] == 0xEE);
     System_FreeMem(buf, (uint16_t)(320 * (h + 4)));
     SDL_free(data);
@@ -303,7 +304,7 @@ static void icon_all(void)
     Gfx_IconAllOpenSize(&size);
     Gfx_IconAllClose();
     Gfx_IconAllOpen();
-    FarPtr buf = System_GetMem(size);
+    uint8_t *buf = System_GetMem(size);
     uint16_t lens[ICON_COUNT];
     for (int i = 0; i < ICON_COUNT; i++)
         Gfx_IconAllReadChunk(&buf, &lens[i]);
@@ -316,7 +317,7 @@ static void icon_all(void)
     CHECK(icons_load("ICON\\ICON.ALL", &icons));
     if (!icons.pixels)
         return;
-    const uint8_t *p = far_host(buf);
+    const uint8_t *p = buf;
     bool same = true;
     for (int n = 0; n < ICON_COUNT; n++) {
         uint8_t pix[ICON_WIDTH * ICON_HEIGHT + 64];

@@ -9,12 +9,12 @@ enum : uint8_t {
     DSF_POINTER = 1,   // holds pointers (pointer or ^T, or an array of them)
     DSF_LABEL = 2,     // a name without a type: one byte, its extent unknown
     DSF_UNNAMED = 4,   // bytes between named fields
+    DSF_HOST = 8,      // DSF_POINTER as host pointers (sizeof(void *) each)
 };
 
 // A DS field or record field: `count` elements of `elem` bytes (in the
 // original) at `ofs` in the original's DS (or in the record), at `at` in
-// the port's DSeg (records keep the original layout, so `at` == `ofs`
-// there), laid out as C arrays of dims[0] x dims[1] x dims[2]; rec indexes
+// the port's DSeg (or record), laid out as C arrays of dims[0] x dims[1] x dims[2]; rec indexes
 // ds_records when the element is a record, else -1.
 typedef struct DsField {
     const char *name;
@@ -29,7 +29,8 @@ typedef struct DsField {
 
 typedef struct DsRecord {
     const char *name;
-    uint16_t size;
+    uint16_t size;        // in the original
+    uint16_t port_size;   // in the port (differs with host pointers)
     uint16_t nfields;
     const DsField *fields;
 } DsRecord;

@@ -69,9 +69,7 @@ static int icon_index(const char *name)
 // (research.c Research_DrawIconFrame), the cursor's excluded.
 static int icon_mismatch(int k, int frame)
 {
-    FarPtr base = CDS_BUF;
-    uint16_t off = (uint16_t)((uint16_t)base + frame / 10 * 0x12C0 + frame * 0x20);
-    const uint8_t *src = far_host(far_ptr((uint16_t)(base >> 16), off));
+    const uint8_t *src = CDS_BUF + frame / 10 * 0x12C0 + frame * 0x20;
     int dest = (k - 1) / 5 * 0x1400 + 0x4100 + (k - 1) % 5 * 0x20 + 0x140;
     const uint8_t *screen = &vid_screen[0][0] + dest;
     int x0 = dest % SCREEN_W, y0 = dest / SCREEN_W;
@@ -91,7 +89,7 @@ static int icon_mismatch(int k, int frame)
 int ui_research_icon(const char *name)
 {
     int k = icon_index(name);
-    if (k == 0 || CDS_BUF == 0)
+    if (k == 0 || CDS_BUF == nullptr)
         return UI_RS_UNKNOWN;
     // research.c: frame of each state, then the working animation.
     static const struct { int frame, state; } frames[] = {
@@ -384,7 +382,7 @@ bool ui_log_has(const char *text)
 {
     // Message_DrawMessageLog draws these entries ({kind, string[50]}).
     for (int i = 1; i <= ds.Message_LogCount; i++) {
-        const uint8_t *e = (const uint8_t *)far_host(ds.Message_Log) + (i - 1) * 0x35 + 2;
+        const uint8_t *e = ds.Message_Log + (i - 1) * 0x35 + 2;
         char s[64];
         SDL_snprintf(s, sizeof s, "%.*s", e[0], (const char *)e + 1);
         if (SDL_strstr(s, text))

@@ -31,11 +31,6 @@ static int16_t cur_moon(void)
     return ds.Game_CurMoon[ds.Game_CurSystem - 1];
 }
 
-static uint8_t *far_add(FarPtr p, uint16_t delta)
-{
-    return (uint8_t *)far_host(p) + delta;
-}
-
 // 2527:001f
 void Droids_DroidsScreen(void)
 {
@@ -44,7 +39,7 @@ void Droids_DroidsScreen(void)
         Droids_SetupDroidsHotspots();
         GfxPath_ShowScreenBackdrop();
         ds.Droids_DigitsPic = System_GetMem(0x8980);
-        Gfx_LoadPic(P("grafika\\szamok"), far_host(ds.Droids_DigitsPic), 1, 0x6E, 0, 0, 0x140, false,
+        Gfx_LoadPic(P("grafika\\szamok"), ds.Droids_DigitsPic, 1, 0x6E, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xB0);
         Droids_DrawDroidsScreen();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -54,7 +49,7 @@ void Droids_DroidsScreen(void)
     // product 2's stock.
     int16_t stock = at_home_planet() ? ds.Research_Products[1].Stock : Groups_At(1, force)->Items[12];
     if (ds.Game_MenuCommand == 0x19 && stock > 0) {
-        TBody *body = far_host(ds.Game_CurBody);
+        TBody *body = ds.Game_CurBody;
         int16_t a = Surface_CountBuildings(0x19, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
         int16_t b = Surface_CountBuildings(4, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
         if (body->_0A < b + a && body->Colony != 0 && body->Owner == 1 && body->_0A < 9) {
@@ -77,7 +72,7 @@ void Droids_DroidsScreen(void)
 // 2527:01e5
 void Droids_DrawDroidsScreen(void)
 {
-    const TBody *body = far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     uint16_t droids = body->_0A;
     int16_t stock;
     const int32_t *stores;
@@ -97,13 +92,13 @@ void Droids_DrawDroidsScreen(void)
         cap = 99;
 
     uint8_t *scr = gfx_screen();
-    FarPtr pic = ds.Droids_DigitsPic;
-    Blit_CopyRect(far_add(pic, (uint16_t)((droids % 5) * 0x40 + (droids / 5) * 0x2BC0)), scr + 0xB422,
-                  0x30, 0x23);
-    Blit_CopyRect(far_add(pic, (uint16_t)(0x5780 + (stock / 10) * 0x10)), scr + 0xB470, 0x10, 0x23);
-    Blit_CopyRect(far_add(pic, (uint16_t)(0x5780 + (stock % 10) * 0x10)), scr + 0xB480, 0x10, 0x23);
-    Blit_CopyRect(far_add(pic, (uint16_t)(0x5963 + (cap / 10) * 13)), scr + 0x8DB1, 13, 9);
-    Blit_CopyRect(far_add(pic, (uint16_t)(0x5963 + (cap % 10) * 13)), scr + 0x8DBE, 13, 9);
+    uint8_t *pic = ds.Droids_DigitsPic;
+    Blit_CopyRect(pic + (uint16_t)((droids % 5) * 0x40 + (droids / 5) * 0x2BC0), scr + 0xB422, 0x30,
+                  0x23);
+    Blit_CopyRect(pic + (uint16_t)(0x5780 + (stock / 10) * 0x10), scr + 0xB470, 0x10, 0x23);
+    Blit_CopyRect(pic + (uint16_t)(0x5780 + (stock % 10) * 0x10), scr + 0xB480, 0x10, 0x23);
+    Blit_CopyRect(pic + (uint16_t)(0x5963 + (cap / 10) * 13), scr + 0x8DB1, 13, 9);
+    Blit_CopyRect(pic + (uint16_t)(0x5963 + (cap % 10) * 13), scr + 0x8DBE, 13, 9);
 
     PString s;
     for (int16_t k = 1; k <= 6; k++) {

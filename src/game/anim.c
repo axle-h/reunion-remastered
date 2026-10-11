@@ -11,45 +11,39 @@
 enum : uint16_t {
     // Offsets in the record (frames count from 1).
     REC_LOADED = 0x000,
-    REC_PTRS = 0x001,   // 140 far pointers
+    REC_PTRS = 0x001,   // 140 far pointers (see frame_ptr)
     REC_SIZES = 0x231,  // 140 words
 };
 
-static inline uint8_t *at(FarPtr p, uint16_t off)
+static inline uint16_t rd16(const uint8_t *rec, uint16_t off)
 {
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + off)));
+    return (uint16_t)(rec[off] | rec[off + 1] << 8);
 }
 
-static inline uint16_t rd16(FarPtr p, uint16_t off)
+static inline void wr16(uint8_t *rec, uint16_t off, uint16_t v)
 {
-    return (uint16_t)(*at(p, off) | *at(p, (uint16_t)(off + 1)) << 8);
+    rec[off] = (uint8_t)v;
+    rec[off + 1] = (uint8_t)(v >> 8);
 }
 
-static inline void wr16(FarPtr p, uint16_t off, uint16_t v)
-{
-    *at(p, off) = (uint8_t)v;
-    *at(p, (uint16_t)(off + 1)) = (uint8_t)(v >> 8);
-}
-
-static inline FarPtr record(void)
-{
-    return ds.Anim_Record;
-}
-
-static inline FarPtr frame_ptr(FarPtr rec, uint16_t frame)
+// The frame pointers stay 4-byte far values in the record, as the original
+// stores them: host pointers would not fit the 349h bytes its users allocate.
+static inline uint8_t *frame_ptr(const uint8_t *rec, uint16_t frame)
 {
     uint16_t off = (uint16_t)(REC_PTRS + (frame - 1) * 4);
-    return (FarPtr)rd16(rec, (uint16_t)(off + 2)) << 16 | rd16(rec, off);
+    FarPtr p = (FarPtr)rd16(rec, (uint16_t)(off + 2)) << 16 | rd16(rec, off);
+    return p == 0 ? nullptr : far_host(p);
 }
 
-static inline void set_frame_ptr(FarPtr rec, uint16_t frame, FarPtr p)
+static inline void set_frame_ptr(uint8_t *rec, uint16_t frame, const uint8_t *p)
 {
     uint16_t off = (uint16_t)(REC_PTRS + (frame - 1) * 4);
-    wr16(rec, off, (uint16_t)p);
-    wr16(rec, (uint16_t)(off + 2), (uint16_t)(p >> 16));
+    FarPtr fp = far_from_host(p);
+    wr16(rec, off, (uint16_t)fp);
+    wr16(rec, (uint16_t)(off + 2), (uint16_t)(fp >> 16));
 }
 
-static inline uint16_t frame_size(FarPtr rec, uint16_t frame)
+static inline uint16_t frame_size(const uint8_t *rec, uint16_t frame)
 {
     return rd16(rec, (uint16_t)(REC_SIZES + (frame - 1) * 2));
 }
@@ -67,9 +61,9 @@ static void track_min_mem(void)
 static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16_t str_max,
                       bool keep_nil)
 {
-    FarPtr rec = record();
-    if (*at(rec, REC_LOADED) == 0) {
-        *at(rec, REC_LOADED) = 1;
+    uint8_t *rec = ds.Anim_Record;
+    if (rec[REC_LOADED] == 0) {
+        rec[REC_LOADED] = 1;
         PString num, path;
         System_StrLong((int16_t)id, 0, &num, str_max);
         System_StrLoad(&path, prefix);
@@ -79,7 +73,7 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
         uint16_t count = frames;
         if (count != 0) {
             for (uint16_t i = 1;; i++) {
-                FarPtr buf;
+                uint8_t *buf;
                 uint16_t size;
                 Gfx_ReadChunk(&buf, &size);
                 wr16(rec, (uint16_t)(REC_SIZES + (i - 1) * 2), size);
@@ -98,9 +92,9 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
 // whose size is 0; War frees every frame (FreeMem of nil/0 does nothing).
 static void free_anim(uint8_t frames, bool check_size)
 {
-    FarPtr rec = record();
-    if (*at(rec, REC_LOADED) != 0) {
-        *at(rec, REC_LOADED) = 0;
+    uint8_t *rec = ds.Anim_Record;
+    if (rec[REC_LOADED] != 0) {
+        rec[REC_LOADED] = 0;
         uint16_t count = frames;
         if (count != 0) {
             for (uint16_t i = 1;; i++) {
@@ -152,13 +146,13 @@ void Anim_FreeGrAnim(uint16_t id)
 // 3c64:0496
 void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest)
 {
-    FarPtr rec = record();
-    if (*at(rec, REC_LOADED) != 0) {
-        Anim_DecodeAnimFrame(far_host(frame_ptr(rec, 1)), dest, 0x40);
+    uint8_t *rec = ds.Anim_Record;
+    if (rec[REC_LOADED] != 0) {
+        Anim_DecodeAnimFrame(frame_ptr(rec, 1), dest, 0x40);
         uint16_t f = frame;
         while (frame_size(rec, f) == 0 && (int16_t)f > 1)
             f--;
-        Anim_DecodeAnimFrame(far_host(frame_ptr(rec, f)), dest, 0x40);
+        Anim_DecodeAnimFrame(frame_ptr(rec, f), dest, 0x40);
     }
 }
 
@@ -166,12 +160,12 @@ void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest)
 void Anim_DrawAnimFrame(uint16_t frame, uint8_t *dest, bool *ok)
 {
     *ok = true;
-    FarPtr rec = record();
-    if (*at(rec, REC_LOADED) != 0) {
-        if (frame_ptr(rec, frame) == 0)
+    uint8_t *rec = ds.Anim_Record;
+    if (rec[REC_LOADED] != 0) {
+        if (frame_ptr(rec, frame) == nullptr)
             *ok = false;
         else
-            Anim_DecodeAnimFrame(far_host(frame_ptr(rec, frame)), dest, 0x40);
+            Anim_DecodeAnimFrame(frame_ptr(rec, frame), dest, 0x40);
     }
 }
 

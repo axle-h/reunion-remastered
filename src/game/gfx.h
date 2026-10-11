@@ -2,8 +2,7 @@
 // loading, ICON.ALL access, 6x8 text, lines, and the fatal-error exit.
 //
 // Untyped Pascal pointers (palettes, buffers), Pascal strings (a length
-// byte followed by the characters) and `var` parameters are host pointers;
-// heap blocks the unit allocates are still far pointers (game/mem.h).
+// byte followed by the characters) and `var` parameters are host pointers.
 #pragma once
 
 #include <stdint.h>
@@ -58,18 +57,18 @@ void Gfx_WaitFrames(int32_t n);
 void Gfx_WaitFramesOrClick(int32_t n);
 
 // 405f:0856: reads a whole file into a new heap block (halts if missing).
-void Gfx_LoadFile(const uint8_t *name, FarPtr *buf, uint16_t *size);
+void Gfx_LoadFile(const uint8_t *name, uint8_t **buf, uint16_t *size);
 // 405f:095a / 09ce / 09f3 / 0a57: ICON\ICON.ALL through the shared file
 // variable. ReadChunk appends the next chunk at *buf + Gfx_ReadPos and puts
 // its length in *len. (symbols.txt has the two parameter names swapped.)
 void Gfx_IconAllOpenSize(uint16_t *size);
 void Gfx_IconAllOpen(void);
-void Gfx_IconAllReadChunk(const FarPtr *buf, uint16_t *len);
+void Gfx_IconAllReadChunk(uint8_t *const *buf, uint16_t *len);
 void Gfx_IconAllClose(void);
 // 405f:0a78 / 0af8 / 0bd6: chunked data files (word length + data). ReadChunk
 // allocates length + 13 bytes, or returns nil/0 when the heap is too small.
 void Gfx_OpenDataFile(const uint8_t *name);
-void Gfx_ReadChunk(FarPtr *buf, uint16_t *size);
+void Gfx_ReadChunk(uint8_t **buf, uint16_t *size);
 void Gfx_CloseDataFile(void);
 
 // 405f:0bef: decodes <name>.pic into dest + y * stride + x as one linear

@@ -10,7 +10,7 @@ int main(void)
     bool ok = true;
 
     // A far pointer to a global resolves to the same byte as the DS mirror.
-    FarPtr credits = far_ptr(MEM_DS_SEG, 0x95BE);
+    FarPtr credits = far_ptr(MEM_DS_SEG, offsetof(DSeg, Game_Credits));
     ds.Game_Credits = 120000;
     ok = ok && *(int32_t *)far_host(credits) == 120000;
     ok = ok && far_host(credits) == &ds.Game_Credits;

@@ -64,9 +64,7 @@ int ui_space_ships(bool own)
 // the enemy's, with their slot counts. Records are 39 bytes (grwar.h).
 static const uint8_t *battle_unit(int side, int i)
 {
-    FarPtr list = ds.GrWarUnits_UnitLists[side - 1];
-    uint16_t ofs = (uint16_t)((uint16_t)list + (i - 1) * 0x27);
-    return (const uint8_t *)far_host(far_ptr((uint16_t)(list >> 16), ofs));
+    return ds.GrWarUnits_UnitLists[side - 1] + (i - 1) * 0x27;
 }
 
 static int battle_slots(int side)

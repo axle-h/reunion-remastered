@@ -86,6 +86,10 @@ int main(int argc, char *argv[])
     // A reply's two-digit code is the next question menu, MenuIdx (0 leaves
     // the dialog); QuestionCode is left alone (1fd2:075f).
     system_init();
+    // The charset lives in the game data block, which this test doesn't
+    // load; blank glyphs instead.
+    static uint8_t charset[0x2880];
+    ds.Gfx_Charset = charset;
     ds.Pub_Person = 1;                                             // not the trader
     memcpy(&ds.Pub_PersonStr, "\x01" "1", 2);                      // '1'
     for (int16_t r = 1; r <= 3; r++) {

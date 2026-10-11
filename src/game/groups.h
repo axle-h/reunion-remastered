@@ -1,19 +1,20 @@
 // Unit Groups (2b8d): the group lists (fleets and planet forces), the group
 // detail screen (0x16) and the New Group screen (0x15).
 //
-// Game_Groups is a far pointer to array[0..1] of array[1..32] of TGroup in the
-// game data block (game/ems.h): list 0 = fleets, list 1 = planet forces.
+// Game_Groups points to array[0..1] of array[1..32] of TGroup in the game
+// data block (game/ems.h): list 0 = fleets, list 1 = planet forces.
 #pragma once
 
 #include <stdint.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 
 // Group `group` (1..32) of list `list` (0..1): the original's Groups^[list][group].
+// Group 0 (no group selected) is the record before the list, as the
+// original addresses it.
 static inline TGroup *Groups_At(int16_t list, int16_t group)
 {
-    return (TGroup *)far_host(ds.Game_Groups) + list * 32 + (group - 1);
+    return &ds.Game_Groups[0][0] + list * 32 + (group - 1);
 }
 
 // The selected group: Groups^[GroupList][SelGroup].
@@ -28,8 +29,8 @@ static inline bool Groups_SlotUsed(uint8_t kind, int16_t cat)
 {
     return ds.Groups_TypeSlots[kind - 1].Used[cat - 1] != 0;
 }
-// TypeSlots[kind].Layout[cat]: far pointer to the slot layout blob (see groups.c)
-static inline FarPtr Groups_SlotLayout(uint8_t kind, int16_t cat)
+// TypeSlots[kind].Layout[cat]: the slot layout blob (see groups.c)
+static inline uint8_t *Groups_SlotLayout(uint8_t kind, int16_t cat)
 {
     return ds.Groups_TypeSlots[kind - 1].Layout[cat - 1];
 }

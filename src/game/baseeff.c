@@ -16,7 +16,7 @@ void BaseEff_BaseEffScreen(void)
     if (ds.Game_ScreenEntered) {
         PlanetInfo_SelectCurBody();
         GfxPath_SetToolbar(8);
-        const TBody *body = far_host(ds.Game_CurBody);
+        const TBody *body = ds.Game_CurBody;
         if (ds.Game_PrevScreen == 0x11)
             GfxPath_AddToolbarIcon(0x10);
         if (body->Owner == 1 && body->Colony != 0) {
@@ -39,7 +39,7 @@ void BaseEff_BaseEffScreen(void)
         ds.Game_CurrentScreen = 7;
     }
     if (ds.Game_MenuCommand == 0x26) {
-        TBody *body = far_host(ds.Game_CurBody);
+        TBody *body = ds.Game_CurBody;
         body->TechLevel++;
         if ((int8_t)body->TechLevel > 7)
             body->TechLevel = 7;
@@ -47,14 +47,14 @@ void BaseEff_BaseEffScreen(void)
             PlanetInfo_DrawPlanetInfoText();
     }
     if (ds.Game_MenuCommand == 0x27) {
-        TBody *body = far_host(ds.Game_CurBody);
+        TBody *body = ds.Game_CurBody;
         body->TechLevel--;
         if ((int8_t)body->TechLevel < 0)
             body->TechLevel = 0;
         if (ds.PlanetInfo_AlienMode == 0)
             PlanetInfo_DrawPlanetInfoText();
     }
-    const TBody *body = far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == 0x15) {
         Sound_PlayButtonSfx(P("x"));
         if ((int8_t)body->Owner > 1 && body->InfoLevel > 0x27) {

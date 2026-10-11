@@ -99,23 +99,18 @@ static inline int32_t *home_stock(int16_t i) { return &ds.Game_HomeStock[i - 1];
 // Game::Buildings^[i].
 static inline TBuilding *building(int16_t i)
 {
-    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+    return &ds.Game_Buildings[i - 1];
 }
 // Surface::KindCounts[1, kind], filled by Surface::CountBuildingsByKind.
 static inline int32_t kind_count(int16_t kind) { return ds.Surface_KindCounts[1][kind - 1]; }
 
-// Galaxy::Bodies[s]^[idx]: 65-byte records; the offset wraps at 64 KB.
-static TBody *body(int16_t s, int16_t idx)
-{
-    FarPtr p = ds.Galaxy_Bodies[s - 1];
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + idx * 0x41 - 0x41)));
-}
+// Galaxy::Bodies[s]^[idx]: 65-byte records.
+static TBody *body(int16_t s, int16_t idx) { return ds.Galaxy_Bodies[s - 1] + (idx - 1); }
 
 // Galaxy::MoonLists[s]^[planet] (count + 8 body indices).
 static uint8_t *moon_list(int16_t s, int16_t planet)
 {
-    FarPtr p = ds.Galaxy_MoonLists[s - 1];
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + planet * 9 - 9)));
+    return (uint8_t *)(ds.Galaxy_MoonLists[s - 1] + (planet - 1));
 }
 
 // The body at (system, planet, moon): the planet itself for moon 0.
@@ -530,7 +525,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                                       + Surface_CountBuildings(4, system, planet, moon, false));
                 // The original decrements the droids of CurBody, not of this
                 // body. Port fix (game/fixes.h): this body's.
-                TBody *cur = fixes.meteorite_droids ? b : far_host(ds.Game_CurBody);
+                TBody *cur = fixes.meteorite_droids ? b : ds.Game_CurBody;
                 if (cur->_0A > n)
                     cur->_0A--;
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 20));
@@ -1017,7 +1012,7 @@ void Sim_ProcessTravellingGroups(void)
                 ds.Intel_FirstJumpSeen = 1;
             } else if (ds.Game_CurrentScreen == 0x11 && i >= 0 && ds.Game_SelGroup == i) {
                 Gfx_FadeToWhite(0x70, 0x84, Gfx_PalettePtr(), 0x14);
-                Blit_FillBytes(far_host(ds.ShipMove_Backdrop), 0x8980, 0x7F);
+                Blit_FillBytes(ds.ShipMove_Backdrop, 0x8980, 0x7F);
                 ShipMove_AnimateStarfield();
                 Gfx_FadeFromWhite(0x70, 0x84, Gfx_PalettePtr(), 0x14);
             }

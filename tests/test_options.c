@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
     SDL_snprintf(path, sizeof path, "%s/spidysav.1", dir);
     SaveLoad_SetSaveDir(dir);
     SaveLoad_ReadSlotNames();
-    uint8_t *slot = (uint8_t *)far_host(ds.SaveLoad_SlotTable);
+    uint8_t *slot = ds.SaveLoad_SlotTable;
     memcpy(slot + 1, "\x05" "Cheat", 6);
     freeze(true, true);
     Options_Frame();

@@ -12,32 +12,17 @@ int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet,
 void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon);      // 2ef2:2b9e
 void PlanetInfo_SelectCurBody(void);                                                  // 357b:3253
 
-enum { GROUP_SIZE = sizeof(TGroup) };
-
-// Groups is array[0..1] of array[1..32] of TGroup.
-static FarPtr group_far(int16_t list, int16_t idx)
-{
-    uint16_t seg = (uint16_t)(ds.Game_Groups >> 16);
-    uint16_t off = (uint16_t)ds.Game_Groups;
-    return far_ptr(seg, (uint16_t)(off + (list * 32 + idx - 1) * GROUP_SIZE));
-}
-
 #define group_at Groups_At
 #define sel_group Groups_Selected
 
-static FarPtr ds_far(uint16_t off)
-{
-    return far_ptr(MEM_DS_SEG, off);
-}
-
 static int32_t *store_at(int16_t i)
 {
-    return (int32_t *)((uint8_t *)far_host(ds.Cargo_Stores) + (i - 1) * 4);
+    return &ds.Cargo_Stores[i - 1];
 }
 
 static int16_t *item_store(int16_t i)
 {
-    return far_host(ds.Cargo_ItemStore[i - 1]);
+    return ds.Cargo_ItemStore[i - 1];
 }
 
 int32_t Cargo_ShipCapacity(const TGroup *g)
@@ -59,7 +44,7 @@ int32_t Cargo_ItemsSpace(const TGroup *g)
 // True when the ship is at a colony of ours whose store can be shown/used.
 static bool at_own_colony(const TGroup *g)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
+    const TBody *b = ds.Game_CurBody;
     return g->Status == 1 && b->Owner == 1 && (b->Colony != 0 || b->_0A != 0);
 }
 
@@ -198,25 +183,21 @@ void Cargo_InitCargoScreen(void)
 
     Surface_CountBuildingsByKind(g->System, g->Planet, g->Moon);
     int16_t pf = Groups_FindPlanetForce(g->System, g->Planet, g->Moon);
-    ds.Cargo_PlanetCap = (int32_t)(uint16_t)group_at(1, pf)->Storage * 1000;
-    FarPtr pfar = group_far(1, pf);
+    TGroup *pforce = group_at(1, pf);
+    ds.Cargo_PlanetCap = (int32_t)(uint16_t)pforce->Storage * 1000;
     for (int i = 1; i <= 13; i++) {
         int8_t prod = ds.Cargo_Items[i - 1];
         if (prod > 0) {
             if (home)
-                ds.Cargo_ItemStore[i - 1] = ds_far((uint16_t)(offsetof(DSeg, Research_Products)
-                                                  + (prod - 1) * sizeof(TProduct)
-                                                  + offsetof(TProduct, Stock)));
+                ds.Cargo_ItemStore[i - 1] = &ds.Research_Products[prod - 1].Stock;
             else
-                ds.Cargo_ItemStore[i - 1] = far_ptr((uint16_t)(pfar >> 16),
-                                        (uint16_t)((uint16_t)pfar + offsetof(TGroup, Items) + (i - 1) * 2));
+                ds.Cargo_ItemStore[i - 1] = &pforce->Items[i - 1];
         }
     }
     if (home) {
-        ds.Cargo_Stores = ds_far(offsetof(DSeg, Game_HomeStock));
+        ds.Cargo_Stores = ds.Game_HomeStock;
     } else {
-        ds.Cargo_Stores = far_ptr((uint16_t)(ds.Game_CurBody >> 16),
-                         (uint16_t)((uint16_t)ds.Game_CurBody + offsetof(TBody, Stores)));
+        ds.Cargo_Stores = ds.Game_CurBody->Stores;
     }
 }
 
@@ -269,7 +250,7 @@ void Cargo_DrawCargoNames(int16_t row)
 void Cargo_DrawCargoAmounts(void)
 {
     TGroup *g = sel_group();
-    TBody *body = far_host(ds.Game_CurBody);
+    TBody *body = ds.Game_CurBody;
     PString s, a, b;
 
     if (at_own_colony(g)) {

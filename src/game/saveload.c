@@ -20,7 +20,7 @@ enum { SLOT_SIZE = 0x16, SLOT_COUNT = 12 };
 
 static uint8_t *slot_entry(int16_t n)
 {
-    return (uint8_t *)far_host(ds.SaveLoad_SlotTable) + (n - 1) * SLOT_SIZE;
+    return ds.SaveLoad_SlotTable + (n - 1) * SLOT_SIZE;
 }
 
 // --- Files -------------------------------------------------------------------
@@ -153,8 +153,9 @@ static bool transfer(FILE *f, uint8_t *name, bool save)
 {
     bool ok = block(f, name, 0x14, save);
     for (size_t i = 0; ok && i < sizeof blocks / sizeof blocks[0]; i++) {
-        uint8_t *field = (uint8_t *)&ds + blocks[i].off;
-        void *p = blocks[i].ptr ? far_host(*(FarPtr *)field) : field;
+        void *p = (uint8_t *)&ds + blocks[i].off;
+        if (blocks[i].ptr)
+            memcpy(&p, p, sizeof p);  // the block the pointer field points to
         ok = block(f, p, blocks[i].size, save);
     }
     // Port addition: frozen cheats (game/options.h) hold the loaded stocks.
@@ -220,7 +221,7 @@ void SaveLoad_LoadInit(void)
         return;
     }
     memcpy(&ds.Game_BuildingCount, d, 2);
-    memcpy(far_host(ds.Game_Buildings), d + 2, 14000);
+    memcpy(ds.Game_Buildings, d + 2, 14000);
     SDL_free(d);
 }
 
@@ -252,11 +253,6 @@ static uint8_t *screen_at(uint16_t off)
     return gfx_screen() + off;
 }
 
-static uint8_t *buf_at(FarPtr buf, int32_t off)
-{
-    return far_host(far_ptr(buf >> 16, (uint16_t)((uint16_t)buf + off)));
-}
-
 // 1a3e:0d39
 static void DrawSlotNames(void)
 {
@@ -272,9 +268,9 @@ static void DrawSlotNames(void)
 // 1a3e:0da2: animation frame 'frame' of disk.ani to the screen.
 static void DrawDiskFrame(int16_t frame)
 {
-    Anim_DrawAnimKeyed((uint16_t)(frame + 1), far_host(ds.SaveLoad_BufFrame));
+    Anim_DrawAnimKeyed((uint16_t)(frame + 1), ds.SaveLoad_BufFrame);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_host(ds.SaveLoad_BufFrame), screen_at(0xBC26), 100, 0x31, 100, 0x140);
+    Blit_CopyRectStrided(ds.SaveLoad_BufFrame, screen_at(0xBC26), 100, 0x31, 100, 0x140);
     Mouse_ShowCursor();
 }
 
@@ -287,7 +283,7 @@ static void DrawKnob(int16_t step)
         frame = 3;
     if (y < 0x31)
         y = 0x31;
-    Blit_BlitTransparent(buf_at(ds.SaveLoad_BufButtons, frame * 0x4F + 0x141),
+    Blit_BlitTransparent(ds.SaveLoad_BufButtons + frame * 0x4F + 0x141,
                          screen_at((uint16_t)(y * 0x140 + 0xB0)), 0x4E, 0x12, 0x40);
 }
 
@@ -297,7 +293,7 @@ static void RestoreKnobBackground(int16_t step)
     int16_t y = (int16_t)(step * -5 + 0x98);
     if (y < 0x31)
         y = 0x31;
-    Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, (y - 0x31) * 0x140 + 0xB0),
+    Blit_CopyRect(ds.SaveLoad_BufBack + (y - 0x31) * 0x140 + 0xB0,
                   screen_at((uint16_t)(y * 0x140 + 0xB0)), 0x4E, 0x12);
 }
 
@@ -308,9 +304,9 @@ static void DrawOptionButton(int16_t idx, bool on)
     int16_t w = ds.SaveLoad_OptionW[idx - 1], h = ds.SaveLoad_OptionH[idx - 1];
     uint8_t *dest = screen_at((uint16_t)((y + 0x31) * 0x140 + x));
     if (on)
-        Blit_CopyRect(buf_at(ds.SaveLoad_BufButtons, (y - 0x27) * 0x140 + x - 0x89), dest, w, h);
+        Blit_CopyRect(ds.SaveLoad_BufButtons + (y - 0x27) * 0x140 + x - 0x89, dest, w, h);
     else
-        Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, y * 0x140 + x), dest, w, h);
+        Blit_CopyRect(ds.SaveLoad_BufBack + y * 0x140 + x, dest, w, h);
 }
 
 // 1a3e:12d3
@@ -332,9 +328,9 @@ static void DrawPressedButton(int16_t idx, bool pressed)
     int16_t w = ds.SaveLoad_ButtonW[idx - 1], h = ds.SaveLoad_ButtonH[idx - 1];
     uint8_t *dest = screen_at((uint16_t)(x + 0x110 + (y + 0x9A) * 0x140));
     if (pressed)
-        Blit_CopyRect(buf_at(ds.SaveLoad_BufButtons, (y + 0x15) * 0x140 + x), dest, w, h);
+        Blit_CopyRect(ds.SaveLoad_BufButtons + (y + 0x15) * 0x140 + x, dest, w, h);
     else
-        Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, (y + 0x69) * 0x140 + x + 0x110), dest, w, h);
+        Blit_CopyRect(ds.SaveLoad_BufBack + (y + 0x69) * 0x140 + x + 0x110, dest, w, h);
 }
 
 // 1a3e:146e
@@ -383,16 +379,16 @@ static void DiskScreenInit(void)
     ds.Anim_Record = System_GetMem(0x349);
     ds.Anim_Script = System_GetMem(0x230);
     ds.SaveLoad_BufFrame = System_GetMem(0x1324);
-    *(uint8_t *)far_host(ds.Anim_Record) = 0;
+    *ds.Anim_Record = 0;
     Anim_LoadMainAnim(0x11);
     ds.SaveLoad_BufBack = System_GetMem(0xBCC0);
     ds.SaveLoad_BufButtons = System_GetMem(0x5140);
     uint8_t *pal = Gfx_PalettePtr();
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), far_host(ds.SaveLoad_BufBack), 1, 0x97, 0,
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), ds.SaveLoad_BufBack, 1, 0x97, 0,
                 0, 0x140, ds.Game_StartChoice != 2, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), far_host(ds.SaveLoad_BufButtons), 1, 0x41,
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), ds.SaveLoad_BufButtons, 1, 0x41,
                 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(ds.SaveLoad_BufBack), screen_at(0x3D40), 0x140, 0x97);
+    Blit_CopyRect(ds.SaveLoad_BufBack, screen_at(0x3D40), 0x140, 0x97);
     DrawDiskFrame(ds.Game_MusicTrack == 0 ? 0x16 : 0);
     DrawOptionButtons();
     DrawSlotNames();
@@ -438,9 +434,6 @@ void SaveLoad_DiskScreen(void)
             name[0] = (uint8_t)len;
             memcpy(name + 1, tmp, (size_t)len);
         }
-        FarPtr table = ds.SaveLoad_SlotTable;
-        TextFile_SetStringPtr(far_ptr((uint16_t)(table >> 16),
-                                      (uint16_t)((uint16_t)table + (sel - 1) * SLOT_SIZE + 1)));
         TextFile_InputLine(name, 0x10, (sel - 1) * 9 + 0x40, 0x13, true);
         if (ds.TextFile_InputEscaped == 0)
             SaveLoad_SaveGame();

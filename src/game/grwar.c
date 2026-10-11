@@ -14,18 +14,16 @@
 
 enum { GRID_STRIDE = 11, GRID_ORG = 0xC, BASE_SLOT = 21 };
 
-static FarPtr fp_add(FarPtr p, uint16_t add) { return far_ptr(p >> 16, (uint16_t)(p + add)); }
-static uint8_t *host_add(FarPtr p, uint16_t add) { return (uint8_t *)far_host(p) + add; }
 static uint8_t *screen_at(uint16_t ofs) { return gfx_screen() + ofs; }
 // The original addresses the off-screen field as RenderBuf's segment with its
 // own offsets, dropping the pointer's offset (GetMem's 0 or 8).
 static uint8_t *render_at(uint16_t ofs)
 {
-    return (uint8_t *)far_host(far_ptr(ds.GrWar_RenderBuf >> 16, 0)) + ofs;
+    return far_seg_start(ds.GrWar_RenderBuf) + ofs;
 }
 static const uint8_t *lit(const PString *s) { return (const uint8_t *)s; }
 
-static uint8_t *grid(void) { return (uint8_t *)far_host(ds.GrWar_BattleGrids); }
+static uint8_t *grid(void) { return ds.GrWar_BattleGrids; }
 static int slot_count(int side)
 {
     return side == 1 ? ds.GrWarUnits_AttackerSlotCount : ds.GrWarUnits_DefenderSlotCount;
@@ -37,8 +35,9 @@ static int16_t *proj_count(int side) { return &ds.GrWar_ProjectileCount[side - 1
 // target) wraps to the end of the list's segment, not the 39 bytes before it.
 static GrBattleUnit *unit(int side, int i)
 {
-    FarPtr list = ds.GrWarUnits_UnitLists[side - 1];
-    return (GrBattleUnit *)far_host(fp_add(list, (uint16_t)((i - 1) * 0x27)));
+    uint8_t *list = ds.GrWarUnits_UnitLists[side - 1];
+    uint8_t *seg = far_seg_start(list);
+    return (GrBattleUnit *)(seg + (uint16_t)(list - seg + (i - 1) * 0x27));
 }
 
 // Tile step of direction 1..4, read for any byte as the original does: a
@@ -97,20 +96,20 @@ void GrWar_EnterGroundBattle(void)
     ds.GrWar_Background = System_GetMem(64000);
     ds.GrWar_UnitIcons = System_GetMem(0x3C00);
     ds.GrWar_EffectIcons = System_GetMem(0x2800);
-    FarPtr side_pic = System_GetMem(0x3200);
-    Gfx_LoadPic(lit(PSTR("war\\grwar")), far_host(side_pic), 1, 200, 0, 0, 0x40, true,
+    uint8_t *side_pic = System_GetMem(0x3200);
+    Gfx_LoadPic(lit(PSTR("war\\grwar")), side_pic, 1, 200, 0, 0, 0x40, true,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    const TBody *body = (const TBody *)far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     System_StrLong((int8_t)body->SurfaceType, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("war\\grf"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(lit(&name), far_host(ds.GrWar_Background), 1, 200, 0, 0, 0x140, false,
+    Gfx_LoadPic(lit(&name), ds.GrWar_Background, 1, 200, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
-    Blit_CopyRectStrided(far_host(side_pic), far_host(ds.GrWar_Background), 0x40, 200, 0x40, 0x140);
-    Blit_CopyRect(host_add(ds.GrWar_Background, 0x3D40), screen_at(0x3D40), 0x140, 0x97);
-    Gfx_LoadPic(lit(PSTR("war\\gricon")), far_host(ds.GrWar_UnitIcons), 1, 0x30, 0, 0, 0x140, false,
+    Blit_CopyRectStrided(side_pic, ds.GrWar_Background, 0x40, 200, 0x40, 0x140);
+    Blit_CopyRect(ds.GrWar_Background + 0x3D40, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPic(lit(PSTR("war\\gricon")), ds.GrWar_UnitIcons, 1, 0x30, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
-    Gfx_LoadPic(lit(PSTR("war\\gricon2")), far_host(ds.GrWar_EffectIcons), 1, 0x20, 0, 0, 0x140,
+    Gfx_LoadPic(lit(PSTR("war\\gricon2")), ds.GrWar_EffectIcons, 1, 0x20, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
     GrWar_BattleRound();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -316,7 +315,7 @@ void GrWar_DrawSelectedUnitInfo(void)
 void GrWar_DrawUnitSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, int16_t mode)
 {
     const uint8_t *src =
-        host_add(ds.GrWar_UnitIcons, (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10));
+        ds.GrWar_UnitIcons + (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10);
     uint8_t *dst = render_at((uint16_t)(x + 0x10 + y * 0x140));
     switch (mode) {
     case 1: Blit_BlitTransparent(src, dst, 0x10, 0x10, 0x40); break;
@@ -330,15 +329,16 @@ void GrWar_DrawUnitSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, in
 // 1537:0961
 void GrWar_DrawEffectSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, int16_t variant)
 {
-    const uint8_t *src = host_add(ds.GrWar_EffectIcons,
-                        (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10 + (variant - 1) * 0x1400));
+    const uint8_t *src = ds.GrWar_EffectIcons
+                         + (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10
+                                      + (variant - 1) * 0x1400);
     Blit_BlitTransparent(src, render_at((uint16_t)(x + 0x10 + y * 0x140)), 0x10, 0x10, 0x40);
 }
 
 // 1537:09c2: 11x10 projectile sprite (kind 0..15) below the effect sheets.
 void GrWar_DrawProjectile(int16_t x, int16_t y, int16_t kind)
 {
-    const uint8_t *src = host_add(ds.GrWar_EffectIcons, (uint16_t)(0x1400 + kind * 11 + 1));
+    const uint8_t *src = ds.GrWar_EffectIcons + (uint16_t)(0x1400 + kind * 11 + 1);
     Blit_BlitTransparent(src, render_at((uint16_t)(x + 0x10 + y * 0x140)), 0xB, 10, 0x40);
 }
 
@@ -370,14 +370,11 @@ void GrWar_DrawSelectionMarkers(void)
 void GrWar_DrawBaseSprites(void)
 {
     if (ds.Sim_PlayerAttacks == 0) {
-        Blit_CopyRect(host_add(ds.GrWar_Background, 0x40), render_at(0x5410), 0x20, 0x20);
-        Blit_BlitTransparent(host_add(ds.GrWar_Background, 0x29C4), render_at(0x5500), 0x10, 0x10,
-                             0xB0);
+        Blit_CopyRect(ds.GrWar_Background + 0x40, render_at(0x5410), 0x20, 0x20);
+        Blit_BlitTransparent(ds.GrWar_Background + 0x29C4, render_at(0x5500), 0x10, 0x10, 0xB0);
     } else {
-        Blit_BlitTransparent(host_add(ds.GrWar_Background, 0x2980), render_at(0x5410), 0x10, 0x10,
-                             0xB0);
-        Blit_BlitTransparent(host_add(ds.GrWar_Background, 0xC0), render_at(0x54F0), 0x20, 0x20,
-                             0xB0);
+        Blit_BlitTransparent(ds.GrWar_Background + 0x2980, render_at(0x5410), 0x10, 0x10, 0xB0);
+        Blit_BlitTransparent(ds.GrWar_Background + 0xC0, render_at(0x54F0), 0x20, 0x20, 0xB0);
     }
     uint8_t *g = grid();
     g[0x10] = 0x15;
@@ -414,7 +411,7 @@ void GrWar_RenderBattle(void)
 {
     GrWar_DrawSelectedUnitInfo();
     ds.GrWar_RenderBuf = System_GetMem(0xBCD0);
-    Blit_CopyRect(host_add(ds.GrWar_Background, 0x3D80), render_at(0x50), 0x100, 0x97);
+    Blit_CopyRect(ds.GrWar_Background + 0x3D80, render_at(0x50), 0x100, 0x97);
     GrWar_DrawBaseSprites();
 
     for (int s = 1; s <= 2; s++) {
@@ -486,8 +483,8 @@ void GrWar_RenderBattle(void)
     for (int s = 1; s <= 2; s++) {
         int n = *proj_count(s);
         for (int k = 1; k <= n; k++) {
-            const int16_t *p = (const int16_t *)((uint8_t *)far_host(ds.GrWar_Projectiles)
-                                                 + (s - 1) * 900 + (k - 1) * 0x12);
+            const int16_t *p =
+                (const int16_t *)(ds.GrWar_Projectiles + (s - 1) * 900 + (k - 1) * 0x12);
             // x0 y0 x1 y1 step total sprite
             int16_t px = (int16_t)(idiv16((int16_t)((int16_t)(p[2] - p[0]) * p[4]), p[5]) + p[0]);
             int16_t py = (int16_t)(idiv16((int16_t)((int16_t)(p[3] - p[1]) * p[4]), p[5]) + p[1]);
@@ -752,8 +749,8 @@ void GrWar_BattleRound(void)
                             GrWar_StartUnitEffect((int16_t)e, (int16_t)i, 5);
                             int16_t *cnt = proj_count(e);
                             (*cnt)++;
-                            int16_t *p = (int16_t *)((uint8_t *)far_host(ds.GrWar_Projectiles)
-                                                     + (e - 1) * 900 + (*cnt - 1) * 0x12);
+                            int16_t *p = (int16_t *)(ds.GrWar_Projectiles + (e - 1) * 900
+                                                     + (*cnt - 1) * 0x12);
                             p[0] = (int16_t)pos_x(u);
                             p[1] = (int16_t)pos_y(u);
                             p[2] = (int16_t)pos_x(t);
@@ -859,7 +856,7 @@ void GrWar_BattleRound(void)
     for (int s = 1; s <= 2; s++) {
         int k = 1;
         while (k <= *proj_count(s)) {
-            uint8_t *pb = (uint8_t *)far_host(ds.GrWar_Projectiles) + (s - 1) * 900;
+            uint8_t *pb = ds.GrWar_Projectiles + (s - 1) * 900;
             int16_t *p = (int16_t *)(pb + (k - 1) * 0x12);
             if (p[4] == p[5]) {
                 int16_t cx = idiv16((int16_t)(p[2] - 0x40), 0x10);
@@ -985,7 +982,7 @@ void GrWar_ApplyGroundLosses(void)
     int16_t counts[2] = {ds.Game_GroupCount, ds.Game_PlanetForceCount};
     for (int l = 0; l <= 1; l++) {
         for (int g = 1; g <= counts[l]; g++) {
-            TGroup *grp = (TGroup *)((uint8_t *)far_host(ds.Game_Groups) + (l * 32 + g - 1) * (int)sizeof(TGroup));
+            TGroup *grp = &ds.Game_Groups[l][g - 1];
             if (grp->System == ds.SpWar_BattleSystem && grp->Planet == ds.SpWar_BattlePlanet
                 && grp->Moon == ds.SpWar_BattleMoon
                 && (grp->Status == 1 || grp->Status == 2 || grp->Status == 7)
@@ -1034,7 +1031,7 @@ void GrWar_ApplyGroundLosses(void)
     }
 
     // The planet's own stores.
-    TBody *body = (TBody *)far_host(ds.Game_CurBody);
+    TBody *body = ds.Game_CurBody;
     int8_t owner = (int8_t)body->Owner;
     if (owner > 1 && ds.Races_Races[owner - 2].Status == 6)
         for (int t = 1; t <= 4; t++)
@@ -1069,16 +1066,16 @@ void GrWar_EndGroundBattle(void)
     else
         System_StrStore(PSTR("grvict"), &num, 0xFF);
     ds.GrWar_LostShown = ds.GrWar_PlayerWon == false;
-    FarPtr pic = System_GetMem(0xBCC0);
+    uint8_t *pic = System_GetMem(0xBCC0);
     System_StrLoad(&tmp, PSTR("war\\"));
     System_StrConcat(&tmp, &num);
-    Gfx_LoadPic(lit(&tmp), far_host(pic), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0,
+    Gfx_LoadPic(lit(&tmp), pic, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0,
                 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(pic), screen_at(0x3D40), 0x140, 0x97);
+    Blit_CopyRect(pic, screen_at(0x3D40), 0x140, 0x97);
     System_FreeMem(pic, 0xBCC0);
     ds.GrWar_LostFrames = System_GetMem(0x2860);
     if (ds.GrWar_PlayerWon == false)
-        Gfx_LoadPic(lit(PSTR("war\\granim")), far_host(ds.GrWar_LostFrames), 1, 0x44, 0, 0, 0x98,
+        Gfx_LoadPic(lit(PSTR("war\\granim")), ds.GrWar_LostFrames, 1, 0x44, 0, 0, 0x98,
                     false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     ds.GrWar_LostFrame = 1;
     ds.GrWar_LostTick = 0;
@@ -1103,7 +1100,7 @@ void GrWar_AnimateResultScreen(void)
         if (ds.GrWar_LostTick == 1) {
             Mouse_HideCursor();
             uint16_t ofs = (uint16_t)((ds.GrWar_LostFrame - 1) * 0x33);
-            Blit_CopyRectStrided(host_add(ds.GrWar_LostFrames, ofs), screen_at(0x3F6B), 0x32, 0x3D,
+            Blit_CopyRectStrided(ds.GrWar_LostFrames + ofs, screen_at(0x3F6B), 0x32, 0x3D,
                                  0x98, 0x140);
             Mouse_ShowCursor();
             ds.GrWar_LostFrame = (int16_t)(ds.GrWar_LostFrame % 3 + 1);
@@ -1152,10 +1149,9 @@ static void flood_fill_step(PathCtx *c, int16_t x, int16_t y)
 void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int16_t d,
                     uint16_t *dir)
 {
-    FarPtr gridp = System_GetMem(0xC6);
-    FarPtr cur_q = System_GetMem(400);
-    FarPtr next_q = System_GetMem(400);
-    uint8_t *g = (uint8_t *)far_host(gridp);
+    uint8_t *g = System_GetMem(0xC6);
+    int16_t *cur_q = System_GetMem(400);
+    int16_t *next_q = System_GetMem(400);
     const uint8_t *bg = grid();
 
     for (int x = 0; x <= 15; x++)
@@ -1173,9 +1169,8 @@ void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int
 
     PathCtx ctx = {.grid = g, .layer = 1, .a = a, .b = b};
     g[sx * GRID_STRIDE + sy + GRID_ORG] = 1;
-    int16_t *q0 = (int16_t *)far_host(next_q);
-    q0[0] = sx;
-    q0[1] = sy;
+    next_q[0] = sx;
+    next_q[1] = sy;
     // The goal cell, if free (the second test reads (a,b) again in the original).
     if (a >= 0 && b >= 0 && a < 16 && b < 9 && g[a * GRID_STRIDE + b + GRID_ORG] == 0)
         g[a * GRID_STRIDE + b + GRID_ORG] = 0xFE;
@@ -1190,14 +1185,14 @@ void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int
     ctx.found = false;
     int16_t cx = 0, cy = 0;
     while (ctx.count > 0 && !ctx.found) {
-        FarPtr t = cur_q;
+        int16_t *t = cur_q;
         cur_q = next_q;
         next_q = t;
         int16_t n = ctx.count;
         ctx.count = 0;
         ctx.layer++;
-        ctx.next = (uint8_t *)far_host(next_q);
-        const int16_t *cq = (const int16_t *)far_host(cur_q);
+        ctx.next = (uint8_t *)next_q;
+        const int16_t *cq = cur_q;
         while (n > 0 && !ctx.found) {
             cx = cq[n * 2 - 2];
             cy = cq[n * 2 - 1];
@@ -1266,7 +1261,7 @@ void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int
         *dir = 0;
     if (abs16((int16_t)(b - sy)) + abs16((int16_t)(a - sx)) <= ctx.bestDist)
         *dir = 0;
-    System_FreeMem(gridp, 0xC6);
+    System_FreeMem(g, 0xC6);
     System_FreeMem(cur_q, 400);
     System_FreeMem(next_q, 400);
 }

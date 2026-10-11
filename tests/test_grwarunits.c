@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     }
     system_init();
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.SpWar_BattleSystem = 3;
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     g->Units[1][0] = (TGroupSlot){.ShipType = 100, .Weapons = {10, 20, 30, 0}};
     TBody body = {0}; // owner 0: stores ignored
     ds.Game_CurBody = System_GetMem(sizeof(TBody));
-    memcpy(far_host(ds.Game_CurBody), &body, sizeof body);
+    memcpy(ds.Game_CurBody, &body, sizeof body);
 
     GrWarUnits_CollectAvailableForces();
     CHECK(ds.GrWarUnits_Totals[0][0] == 100);

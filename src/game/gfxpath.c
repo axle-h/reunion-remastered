@@ -37,26 +37,16 @@ static inline PString *slot_label(int n)
     return (PString *)&menu_slot(n)->Caption;
 }
 
-static FarPtr block_base(void)
+static uint8_t *block_base(void)
 {
     return Ems_ToolbarBlock()->Data;
 }
 
-// block base + IconAllSize + extra, the offset wrapping in 16 bits.
-static FarPtr bar(uint16_t extra)
+// block base + IconAllSize + extra (the original adds in 16 bits; the
+// offsets stay inside the block).
+static uint8_t *bar(uint16_t extra)
 {
-    FarPtr b = block_base();
-    return far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + ds.GfxPath_IconAllSize + extra));
-}
-
-static uint8_t *bar_host(uint16_t extra)
-{
-    return far_host(bar(extra));
-}
-
-static uint8_t *near_add(FarPtr p, uint16_t n)
-{
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + n)));
+    return block_base() + (uint16_t)(ds.GfxPath_IconAllSize + extra);
 }
 
 static void copy_to_screen(const uint8_t *src, uint16_t ofs)
@@ -67,14 +57,13 @@ static void copy_to_screen(const uint8_t *src, uint16_t ofs)
 // The empty 48x32 cell, from the backgrounds (240 wide).
 static void clear_cell(uint8_t *cell)
 {
-    Blit_CopyRectStrided(far_host(ds.GfxPath_CellBackgrounds), cell, 0x30, 0x20, 0xF0, 0x140);
+    Blit_CopyRectStrided(ds.GfxPath_CellBackgrounds, cell, 0x30, 0x20, 0xF0, 0x140);
 }
 
 // A 32x32 page arrow from the backgrounds at bg.
 static void draw_arrow(uint16_t bg, uint16_t at)
 {
-    Blit_CopyRectStrided(near_add(ds.GfxPath_CellBackgrounds, bg), bar_host(at), 0x20, 0x20, 0xF0,
-                         0x140);
+    Blit_CopyRectStrided(ds.GfxPath_CellBackgrounds + bg, bar(at), 0x20, 0x20, 0xF0, 0x140);
 }
 
 // Cell k (0..11) of the bar: page k / 6, column k % 6.
@@ -86,7 +75,7 @@ static uint16_t cell_ofs(uint16_t k)
 static void draw_slot(uint16_t k, bool check_icon)
 {
     int slot = k + 1;
-    uint8_t *cell = bar_host(cell_ofs(k));
+    uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
     int16_t id = *slot_id(slot);
     int8_t icon = ds.GfxPath_CommandIcon[id];
@@ -167,7 +156,7 @@ void GfxPath_AddToolbarIcon(int16_t id)
     ds.GfxPath_PageFlagA = (ds.GfxPath_PageFlagA == 0 && slot != 7) ? 0 : 1;
 
     uint16_t k = (uint16_t)(slot - 1);
-    uint8_t *cell = bar_host(cell_ofs(k));
+    uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
     GfxPath_DrawIcon(ds.GfxPath_CommandIcon[id], cell);
     System_StrStore((const PString *)&ds.Ui_ButtonLabels[id], slot_label(slot), 18);
@@ -175,7 +164,7 @@ void GfxPath_AddToolbarIcon(int16_t id)
         draw_arrow(0x30, ARROW_NEXT);
         draw_arrow(0x50, ARROW_PREV);
         for (uint16_t s = 8; s <= 12; s++) {
-            clear_cell(bar_host(cell_ofs((uint16_t)(s - 1))));
+            clear_cell(bar(cell_ofs((uint16_t)(s - 1))));
             slot_label(s)->len = 0;
         }
     }
@@ -212,7 +201,7 @@ void GfxPath_ScrollToolbarNext(void)
     uint16_t ofs = 0x140;
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
-        copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
+        copy_to_screen(bar((uint16_t)(ofs + 1)), 0);
         ofs = (uint16_t)(ds.Ui_RowOffset[i] * 0x140 + ofs);
         scroll_extras();
     }
@@ -229,7 +218,7 @@ void GfxPath_ScrollToolbarPrev(void)
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
         ofs = (uint16_t)(ofs - ds.Ui_RowOffset[i] * 0x140);
-        copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
+        copy_to_screen(bar((uint16_t)(ofs + 1)), 0);
         scroll_extras();
     }
     toggle_pages();
@@ -243,7 +232,7 @@ void GfxPath_ShowToolbar(void)
     Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
     uint16_t page = ds.GfxPath_PageFlagB == 0 ? (uint16_t)(PAGE_SIZE + 1) : 1;
-    Blit_InterlaceReveal(bar_host(page), gfx_screen(), 0x140, 0x20);
+    Blit_InterlaceReveal(bar(page), gfx_screen(), 0x140, 0x20);
     Mouse_ShowCursor();
     Sound_FreeSampleIfIdle();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -255,7 +244,7 @@ void GfxPath_ShowToolbarInstant(void)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
-    copy_to_screen(bar_host(1), 0);
+    copy_to_screen(bar(1), 0);
     Mouse_ShowCursor();
     Ems_EmsNop(Ems_ToolbarBlock());
     Ems_EmsMapGameData();
@@ -293,26 +282,23 @@ void GfxPath_IconAllIndex(void)
 void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
-    FarPtr base = block_base();
-    uint16_t seg = (uint16_t)(base >> 16);
-    uint16_t src = (uint16_t)((uint16_t)base + ds.GfxPath_IconIndex[icon]);
-    uint16_t out = (uint16_t)ds.GfxPath_IconScratch;
-    uint16_t tseg = (uint16_t)(ds.GfxPath_IconScratch >> 16);
+    const uint8_t *src = block_base() + ds.GfxPath_IconIndex[icon];
+    uint8_t *out = ds.GfxPath_IconScratch;
     int16_t left = 0x3C0;
     while (left > 0) {
-        uint8_t b = *(uint8_t *)far_host(far_ptr(seg, src++));
+        uint8_t b = *src++;
         if (b < 0xC0) {
-            *(uint8_t *)far_host(far_ptr(tseg, out++)) = (uint8_t)(b + 2);
+            *out++ = (uint8_t)(b + 2);
             left--;
         } else {
             uint16_t n = b & 0x3F;
-            uint8_t v = *(uint8_t *)far_host(far_ptr(seg, src++));
+            uint8_t v = *src++;
             left = (int16_t)(left - n);
             for (; n != 0; n--)
-                *(uint8_t *)far_host(far_ptr(tseg, out++)) = (uint8_t)(v + 2);
+                *out++ = (uint8_t)(v + 2);
         }
     }  // the original tests != 0 after each run; a damaged icon would run on
-    Blit_CopyRectStrided(far_host(ds.GfxPath_IconScratch), dest + 0x504, 0x27, 0x18, 0x28, 0x140);
+    Blit_CopyRectStrided(ds.GfxPath_IconScratch, dest + 0x504, 0x27, 0x18, 0x28, 0x140);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = (int32_t)System_MemAvail();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -321,13 +307,13 @@ void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
 // 3a1b:0932
 void GfxPath_ShowScreenBackdrop(void)
 {
-    FarPtr buf = System_GetMem(0xBCC0);
+    uint8_t *buf = System_GetMem(0xBCC0);
     uint8_t path[256] = {8, 'g', 'r', 'a', 'f', 'i', 'k', 'a', '\\'};
     const uint8_t *name = (const uint8_t *)&ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name;
     for (uint8_t i = 1; i <= name[0] && path[0] < 255; i++)
         path[++path[0]] = name[i];
-    Gfx_LoadPicScreen(path, far_host(buf), 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Gfx_LoadPicScreen(path, buf, 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
 }
 
@@ -343,7 +329,7 @@ void GfxPath_Init(void)
     Gfx_IconAllOpenSize(&ds.GfxPath_IconAllSize);
     uint16_t size = (uint16_t)(ds.GfxPath_IconAllSize + 0x5500 + ds.GfxPath_CellsSize);
     ds.GfxPath_InitBlock = System_GetMem(size);
-    System_FillChar(far_host(ds.GfxPath_InitBlock), size, 2);
+    System_FillChar(ds.GfxPath_InitBlock, size, 2);
     Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, ds.GfxPath_InitBlock);
     ds.Game_GfxPathProc = far_ptr(0x3A1B, 0x09A3);
 }

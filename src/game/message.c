@@ -21,7 +21,7 @@ static inline const uint8_t *ps(const PString *s)
 // Log entry i (1-based): { kind: integer; text: string[50] }.
 static uint8_t *log_entry(int16_t i)
 {
-    return (uint8_t *)far_host(ds.Message_Log) + (uint16_t)(i * LOG_ENTRY - LOG_ENTRY);
+    return ds.Message_Log + (uint16_t)(i * LOG_ENTRY - LOG_ENTRY);
 }
 
 // 34b0:0001
@@ -149,11 +149,11 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
     uint16_t screen_ofs = (uint16_t)((y0 - 3) * 0x140 + (x0 - 3));
 
     bool saved = (int32_t)(int16_t)bytes <= System_MaxAvail();
-    FarPtr save = 0;
+    uint8_t *save = nullptr;
     if (saved) {
         save = System_GetMem(bytes);
         Mouse_HideCursor();
-        Blit_CopyRectStrided(gfx_screen() + screen_ofs, far_host(save), boxw, boxh, 0x140, boxw);
+        Blit_CopyRectStrided(gfx_screen() + screen_ofs, save, boxw, boxh, 0x140, boxw);
         Blit_FillRect((int16_t)(x0 - 3), (int16_t)(y0 - 3), boxw, boxh, 2);
         Gfx_DrawRectOutline((int16_t)(x0 - 2), (int16_t)(y0 - 2), (int16_t)(maxw * 6 + x0 + 3),
                             (int16_t)(y0 + height + 3), 4);
@@ -188,7 +188,7 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
 
     if (saved) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(far_host(save), gfx_screen() + screen_ofs, boxw, boxh, boxw, 0x140);
+        Blit_CopyRectStrided(save, gfx_screen() + screen_ofs, boxw, boxh, boxw, 0x140);
         Mouse_ShowCursor();
         System_FreeMem(save, bytes);
     }
@@ -230,26 +230,25 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
 
 // Satellite animation helpers (nested procedures of PlaySatelliteAnim).
 typedef struct {
-    FarPtr sprites;   // 10 cells of 20h columns per band of 1040h
-    FarPtr backup;
-    uint16_t ofs;     // screen offset of the sprite
+    uint8_t *sprites;  // 10 cells of 20h columns per band of 1040h
+    uint8_t *backup;
+    uint16_t ofs;      // screen offset of the sprite
 } SatAnim;
 
 static void draw_sat_cell(const SatAnim *a, int16_t cell)
 {
     uint16_t src = (uint16_t)((cell / 10) * 0x1040 + (cell % 10) * 0x20 + 1);
-    Blit_BlitOverBackground((uint8_t *)far_host(a->sprites) + src, gfx_screen() + a->ofs, 0x17,
-                            0xC);
+    Blit_BlitOverBackground(a->sprites + src, gfx_screen() + a->ofs, 0x17, 0xC);
 }
 
 static void save_sat_background(const SatAnim *a)
 {
-    Blit_CopyRect(gfx_screen() + a->ofs, far_host(a->backup), 0x17, 0xC);
+    Blit_CopyRect(gfx_screen() + a->ofs, a->backup, 0x17, 0xC);
 }
 
 static void restore_sat_background(const SatAnim *a)
 {
-    Blit_CopyRect(far_host(a->backup), gfx_screen() + a->ofs, 0x17, 0xC);
+    Blit_CopyRect(a->backup, gfx_screen() + a->ofs, 0x17, 0xC);
 }
 
 // 34b0:0953
@@ -262,12 +261,12 @@ void Message_PlaySatelliteAnim(int16_t satNo)
     System_MoveFwd(ds.Gfx_Palette, saved_pal, 0x300);
     uint8_t *pal = Gfx_PalettePtr();
 
-    FarPtr pic = System_GetMem(0xBCC0);
-    Gfx_LoadPic(ps(PSTR("grafika\\szatelit")), far_host(pic), 1, 0x97, 0, 0, 0x140, true, pal, 0,
-                0xB0, 0x40, 0, 0xBE);
-    FarPtr back = System_GetMem(0xBCC0);
-    Blit_CopyRect(gfx_screen() + 0x3D40, far_host(back), 0x140, 0x97);
-    Blit_CopyRect(far_host(pic), gfx_screen() + 0x3D40, 0x140, 0x97);
+    uint8_t *pic = System_GetMem(0xBCC0);
+    Gfx_LoadPic(ps(PSTR("grafika\\szatelit")), pic, 1, 0x97, 0, 0, 0x140, true, pal, 0, 0xB0, 0x40,
+                0, 0xBE);
+    uint8_t *back = System_GetMem(0xBCC0);
+    Blit_CopyRect(gfx_screen() + 0x3D40, back, 0x140, 0x97);
+    Blit_CopyRect(pic, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(pic, 0xBCC0);
 
     SatAnim a = {.sprites = System_GetMem(0x2080)};
@@ -276,8 +275,7 @@ void Message_PlaySatelliteAnim(int16_t satNo)
     PString name;
     System_StrLoad(&name, PSTR("grafika\\sat"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), far_host(a.sprites), 1, 0x1A, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0,
-                0xBE);
+    Gfx_LoadPic(ps(&name), a.sprites, 1, 0x1A, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
     a.backup = System_GetMem(0x1040);
     Gfx_FadeIn(0x40, 0xFE, pal);
 
@@ -294,7 +292,7 @@ void Message_PlaySatelliteAnim(int16_t satNo)
     System_FreeMem(a.backup, 0x1040);
     System_FreeMem(a.sprites, 0x2080);
     Gfx_FadeOut(0x40, 0xFE, pal);
-    Blit_CopyRect(far_host(back), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Blit_CopyRect(back, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_MoveFwd(saved_pal, ds.Gfx_Palette, 0x300);
     Gfx_FadeIn(0x40, 0xFE, pal);
     System_FreeMem(back, 0xBCC0);
@@ -309,10 +307,8 @@ void Message_PromptPlanetName(int16_t sys, int16_t planet)
     System_StrConcat(&s, (const PString *)&ds.Names_Systems[sys - 1]);
     System_StrConcat(&s, PSTR(" system? &xxxxxxxx |"));
     // The names of system sys are 13-byte records (string[12]) behind Galaxy::Names[sys].
-    uint32_t table = ds.Galaxy_Names[sys - 1];
-    FarPtr name = far_ptr((uint16_t)(table >> 16), (uint16_t)((uint16_t)table + planet * 13 - 13));
-    TextFile_SetStringPtr(name);  // the editor keeps it (TextFile::InputStr)
-    Message_MessageBox(ps(&s), ps(PSTR("")), false, far_host(name), true, 9);
+    uint8_t *name = (uint8_t *)&ds.Galaxy_Names[sys - 1][planet - 1];
+    Message_MessageBox(ps(&s), ps(PSTR("")), false, name, true, 9);
 }
 
 // 34b0:0c14

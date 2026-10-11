@@ -1,6 +1,6 @@
 # Plan: native C memory (retire the DOS address space)
 
-Status: in progress (Stages 0-2, Stage 3 interfaces and Stage 4.1 done). Decided by Alex, 2026-10-11. This is the
+Status: in progress (Stages 0-2 done; Stages 3-4 done except heap blocks and procedure pointers). Decided by Alex, 2026-10-11. This is the
 refactor PLAN.md Phase 4 always intended ("Start faithful, clean up
 afterwards ... refactor into idiomatic C once a subsystem matches"). Every
 unit is ported and the whole game plays through (`test_play_game`), so the
@@ -315,6 +315,19 @@ changes.
    pointer fields take their natural size. If it reads better, split `DSeg`
    into per-unit globals; the Stage 0 field table must still serialize the
    same names and sizes in the same order.
+
+   **As done:** the offset `static_assert`s went and pointer fields are
+   8-byte host pointers, but `DSeg` (and the records) keep `pack(1)`: the
+   original's globals in order with no padding. Naming the globals (4.1)
+   found a dozen places where the original reads or writes past an array
+   into the next globals (alien-talk lines into Surface::Mode, race 0/1
+   records before Races, building kind 0, the toolbar scans, ...), and
+   there may be untested ones (index 0 or -1 on 1-based tables). Without
+   padding those stay the same bytes; with natural alignment each would
+   need its own rewrite. The records are the game's data formats (loaded
+   from the executable, saved, kept in heap blocks), so they stay packed
+   anyway. Overruns into a pointer field are handled where they occur
+   (Pub's menu lines).
 4. **Initial values.** `dseg_init` copies initialised data (tables, strings,
    typed constants) from `REUNION.PRG`. Keep loading it from the user's
    executable (we can't ship it), but copy field by field through the field

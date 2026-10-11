@@ -9,14 +9,14 @@
 
 // GetMem(size) and BlockRead of the whole file; a short or missing file is a
 // run-time error (File not found, 2) as the CheckIO after Reset would give.
-static FarPtr load_raw(const char *path, uint16_t size)
+static uint8_t *load_raw(const char *path, uint16_t size)
 {
-    FarPtr p = System_GetMem(size);
+    uint8_t *p = System_GetMem(size);
     size_t got = 0;
     uint8_t *data = fs_load(path, &got);
     if (data == nullptr)
         System_RunError(2);
-    SDL_memcpy(far_host(p), data, SDL_min(got, (size_t)size));
+    SDL_memcpy(p, data, SDL_min(got, (size_t)size));
     SDL_free(data);
     return p;
 }

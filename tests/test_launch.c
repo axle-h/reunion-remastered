@@ -22,7 +22,16 @@ int main(int argc, char **argv)
         return 77;
     }
     system_init();
-    ds.Game_Groups = far_ptr(0x3000, 0);
+    static TGroup groups[2][32];
+    ds.Game_Groups = groups;
+    // The charset lives in the game data block, which this test doesn't
+    // load; blank glyphs instead.
+    static uint8_t charset[0x2880];
+    ds.Gfx_Charset = charset;
+    // The system view's pictures, as PlanetInfo_InitSystemView allocates them.
+    ds.PlanetInfo_Backdrop = System_GetMem(0xBCC0);
+    ds.PlanetInfo_Icons = System_GetMem(24000);
+    ds.PlanetInfo_Sprites = System_GetMem(0x6900);
     ds.Game_CurSystem = 2;
     ds.Game_CurPlanet[1] = 0;
 

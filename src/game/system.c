@@ -618,18 +618,18 @@ static int32_t heap_walk(bool max)
 }
 
 // 48c7:028a
-FarPtr System_GetMem(uint16_t size)
+void *System_GetMem(uint16_t size)
 {
     FarPtr p;
     if (!heap_alloc(size, &p))
         System_RunError(203);
-    return p;
+    return p ? far_host(p) : nullptr;
 }
 
 // 48c7:029f
-void System_FreeMem(FarPtr p, uint16_t size)
+void System_FreeMem(void *p, uint16_t size)
 {
-    if (!heap_free(p, size))
+    if (!heap_free(p ? far_from_host(p) : 0, size))
         System_RunError(204);
 }
 

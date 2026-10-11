@@ -23,10 +23,7 @@ void Surface_AutoPlaceBuilding(int16_t kind, int16_t system, int16_t planet, int
 // (DS:5DAC + 35h*k): the decompile's indices are already 0-based, so they are used as is.
 // [2] = Satellite, [6] = Control Centre (idea 7), [0xB] = Radio (idea 0xC).
 
-static TBody *CurBody(void)
-{
-    return (TBody *)far_host(ds.Game_CurBody);
-}
+static TBody *CurBody(void) { return ds.Game_CurBody; }
 
 // The location of the selected body: CurPlanet/CurMoon of CurSystem.
 #define CUR_PLANET (ds.Game_CurPlanet[ds.Game_CurSystem - 1])
@@ -152,10 +149,9 @@ void Satellite_AcquireBody(void)
     if (b->InfoLevel > 60)
         b->InfoLevel = 60;
     b->Miner = (int8_t)(System_Random(2) + 1);
-    // Galaxy::Bodies[1] + 0x186: the 7th body (65-byte records) of system 1, field +0x0C.
-    const uint8_t *amn = (const uint8_t *)far_host(ds.Galaxy_Bodies[0]);
+    // Galaxy::Bodies[1] + 0x186: the 7th body of system 1, field +0x0C.
     if (ds.Game_CurSystem == 1 && ds.Game_CurPlanet[0] == 7 && ds.Game_CurMoon[0] == 0
-        && amn[0x186] != 2 && ds.Research_Products[0xB].State == 0) {
+        && ds.Galaxy_Bodies[0][6].InfoLevel != 2 && ds.Research_Products[0xB].State == 0) {
         Message_ShowMessageLine(0xD);
         Intel_OfferInventionForAnalysis(0xC);
     }
@@ -259,13 +255,12 @@ void Satellite_UpdateShipInfoMenu(void)
 // 28cd:062b: adds the body action items that apply to the body at system:planet:moon
 void Satellite_AddBodyActionItems(int16_t system, int16_t planet, int16_t moon, bool *any)
 {
-    uint8_t *bodies = (uint8_t *)far_host(ds.Galaxy_Bodies[system - 1]);
     uint16_t idx = planet;
     if (moon != 0) {
-        const uint8_t *moons = (const uint8_t *)far_host(ds.Galaxy_MoonLists[system - 1]);
+        const uint8_t *moons = (const uint8_t *)ds.Galaxy_MoonLists[system - 1];
         idx = moons[(uint16_t)(planet * 9 + moon - 9)];
     }
-    const TBody *b = (const TBody *)(bodies + (uint16_t)(idx * 0x41) - 0x41);
+    const TBody *b = ds.Galaxy_Bodies[system - 1] + (idx - 1);
     int16_t cs = ds.Game_CurSystem, cp = CUR_PLANET, cm = CUR_MOON;
 
     *any = false;

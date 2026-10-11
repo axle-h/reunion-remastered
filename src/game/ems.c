@@ -11,7 +11,7 @@ enum : uint16_t {
 // 4719:0188: the original moves src into EMS pages when an EMM has enough
 // of them. The port has no EMS, so the block stays the heap copy src
 // (state 1), as on a DOS machine without an EMM.
-void Ems_EmsMoveToEms(TEmsBlock *blk, uint16_t size, FarPtr src)
+void Ems_EmsMoveToEms(TEmsBlock *blk, uint16_t size, uint8_t *src)
 {
     blk->State = 1;
     blk->Size = size;
@@ -45,10 +45,10 @@ void Ems_EmsMapGameData(void)
 {
     TEmsBlock *blk = Ems_GameDataBlock();
     Ems_EmsMapAll(blk);
-    FarPtr base = blk->Data;
-    ds.Game_Groups = base;
-    ds.Game_Buildings = far_ptr((uint16_t)(base >> 16), (uint16_t)((uint16_t)base + BUILDINGS_OFS));
-    ds.Gfx_Charset = far_ptr((uint16_t)(base >> 16), (uint16_t)((uint16_t)base + CHARSET_OFS));
+    uint8_t *base = blk->Data;
+    ds.Game_Groups = (TGroup (*)[32])base;
+    ds.Game_Buildings = (TBuilding *)(base + BUILDINGS_OFS);
+    ds.Gfx_Charset = base + CHARSET_OFS;
 }
 
 // 4719:0317

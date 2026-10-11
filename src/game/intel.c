@@ -12,22 +12,16 @@
 #include "game/surface.h"
 #include "game/system.h"
 
-static FarPtr far_add(FarPtr p, int32_t delta)
-{
-    // The offset wraps at 64 KB like the original's 16-bit arithmetic.
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
-}
-
 // Galaxy::Bodies[system]^[idx]
 static TBody *body_by_index(int16_t system, int16_t idx)
 {
-    return far_host(far_add(ds.Galaxy_Bodies[system - 1], idx * 0x41 - 0x41));
+    return ds.Galaxy_Bodies[system - 1] + (idx - 1);
 }
 
-// Galaxy::MoonLists[system]^[planet]
+// Galaxy::MoonLists[system]^[planet] as bytes: [0] = count, [1..8] = moons
 static uint8_t *moon_list(int16_t system, int16_t planet)
 {
-    return far_host(far_add(ds.Galaxy_MoonLists[system - 1], planet * 9 - 9));
+    return (uint8_t *)(ds.Galaxy_MoonLists[system - 1] + (planet - 1));
 }
 
 // The planet (moon = 0) or the moon's body record.
@@ -206,7 +200,7 @@ void Intel_PurgeBody(int16_t system, int16_t planet, int16_t moon)
     Intel_ClearBody(system, planet, moon, true);
     int16_t i = 1;
     while (i <= ds.Game_BuildingCount) {
-        const TBuilding *b = (const TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+        const TBuilding *b = &ds.Game_Buildings[i - 1];
         if (b->System == system && b->Planet == planet && b->Moon == moon)
             Surface_DeleteBuilding(i);
         else
@@ -488,7 +482,7 @@ void Intel_AnnihilateSystem4(void)
     }
     int16_t i = 1;
     while (i <= ds.Game_BuildingCount) {
-        const TBuilding *b = (const TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+        const TBuilding *b = &ds.Game_Buildings[i - 1];
         if (b->System == 4)
             Surface_DeleteBuilding(i);
         else

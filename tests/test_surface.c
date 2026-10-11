@@ -18,29 +18,30 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-#define BODIES far_ptr(0x3100, 0)
-#define BUILDINGS far_ptr(0x3400, 0)
+static TBody bodies[8];
+static TBuilding buildings[1000];
 
-static TBody *body(int idx) { return (TBody *)far_host(BODIES) + (idx - 1); }
+static TBody *body(int idx) { return &bodies[idx - 1]; }
 
-static TBuilding *bld(int i) { return (TBuilding *)far_host(BUILDINGS) + (i - 1); }
+static TBuilding *bld(int i) { return &buildings[i - 1]; }
 
-static uint8_t *layer(FarPtr p, int x, int y) { return (uint8_t *)far_host(p) + (x - 1) * 60 + (y - 1); }
+static uint8_t *layer(uint8_t *p, int x, int y) { return p + (x - 1) * 60 + (y - 1); }
 
 // System 1 with one planet (body 1) of the given surface type, as the
 // current body, plus the three layers.
 static void setup(int surface, int variant)
 {
-    memset(mem + 0x31000, 0, 0xB000); // below the data segment: bodies and buildings
-    ds.Galaxy_Bodies[0] = BODIES;
+    memset(bodies, 0, sizeof bodies);
+    memset(buildings, 0, sizeof buildings);
+    ds.Galaxy_Bodies[0] = bodies;
     body(1)->SurfaceType = (uint8_t)surface;
     body(1)->Owner = 1;
     body(1)->Colony = 1;
     ds.Game_CurSystem = 1;
     ds.Game_CurPlanet[0] = 1;
     ds.Game_CurMoon[0] = 0;
-    ds.Game_CurBody = BODIES;
-    ds.Game_Buildings = BUILDINGS;
+    ds.Game_CurBody = bodies;
+    ds.Game_Buildings = buildings;
     ds.Game_BuildingCount = 0;
     ds.Surface_TileSet = ds.Surface_Tileset[surface - 1];
     ds.Surface_MapVariant = (int16_t)variant;
@@ -76,8 +77,7 @@ static void load_map(void)
                     bad++;
                 if (*layer(ds.Surface_OccupyLayer, x, y) != (wall ? 0xFF : 0))
                     bad++;
-                if (*(uint16_t *)((uint8_t *)far_host(ds.Surface_BuildingLayer)
-                                  + ((x - 1) * 60 + (y - 1)) * 2) != 0)
+                if (*(uint16_t *)(ds.Surface_BuildingLayer + ((x - 1) * 60 + (y - 1)) * 2) != 0)
                     bad++;
                 blocked += wall;
             }
@@ -131,7 +131,7 @@ static void placement(void)
         for (int i = 0; i < bt->Width; i++) {
             uint8_t t = bt->Tiles[j][i];
             CHECK(*layer(ds.Surface_OccupyLayer, x1 + i, y1 + j) == (t == 0xFF ? 0 : t + 1));
-            CHECK(*(uint16_t *)((uint8_t *)far_host(ds.Surface_BuildingLayer)
+            CHECK(*(uint16_t *)(ds.Surface_BuildingLayer
                                 + ((x1 + i - 1) * 60 + (y1 + j - 1)) * 2) == (t == 0xFF ? 0 : 1));
         }
     }
@@ -235,17 +235,17 @@ static void hotspots_and_blits(void)
 
     // BlitTile: tile 21 (row 1, column 1) of a sheet to window cell (2, 3).
     ds.Mouse_CursorState = 1;
-    FarPtr sheet = System_GetMem(0x4000);
-    memset(far_host(sheet), 0, 0x4000);
+    uint8_t *sheet = System_GetMem(0x4000);
+    memset(sheet, 0, 0x4000);
     for (int r = 0; r < 16; r++)
-        memset((uint8_t *)far_host(sheet) + 0x1400 + 16 + r * 320, 0x77, 16);
-    Surface_BlitTile(far_host(sheet), 21, 2, 3);
+        memset(sheet + 0x1400 + 16 + r * 320, 0x77, 16);
+    Surface_BlitTile(sheet, 21, 2, 3);
     uint8_t *scr = &vid_screen[0][0];
     CHECK(scr[(0x35 + 32) * 320 + 0x5D + 16] == 0x77);
     CHECK(scr[(0x35 + 47) * 320 + 0x5D + 31] == 0x77);
     CHECK(scr[(0x35 + 31) * 320 + 0x5D + 16] == 0);
     CHECK(scr[(0x35 + 32) * 320 + 0x5D + 32] == 0);
-    Surface_BlitTileInner(far_host(sheet), 21, 2, 3);
+    Surface_BlitTileInner(sheet, 21, 2, 3);
     CHECK(scr[(0x36 + 32) * 320 + 0x5E + 16] == 0x77);
 }
 
@@ -256,7 +256,7 @@ static void autoplace_when_full(void)
     for (int fix = 0; fix <= 1; fix++) {
         setup(1, 0);
         Surface_LoadMap();
-        memset(far_host(ds.Surface_OccupyLayer), 0xFF, 0x1518);
+        memset(ds.Surface_OccupyLayer, 0xFF, 0x1518);
         ds.Game_CurrentScreen = 0x14;
         fixes.autoplace_when_full = fix;
         Surface_AutoPlaceBuilding(2, 1, 1, 0);
@@ -280,6 +280,12 @@ int main(int argc, char *argv[])
         return 77;
     }
     system_init();
+    // The charset lives in the game data block, which this test doesn't
+    // load; blank glyphs instead.
+    static uint8_t charset[0x2880];
+    ds.Gfx_Charset = charset;
+    static TGroup groups[2][32];
+    ds.Game_Groups = groups;
     load_map();
     placement();
     counting();

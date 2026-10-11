@@ -105,7 +105,7 @@ static void logging(void)
     Message_ShowMessage((const uint8_t *)"\x0f Hello||  World");
     // Empty lines are skipped and leading blanks removed; kind 99.
     CHECK(ds.Message_LogCount == 2);
-    uint8_t *e1 = far_host(ds.Message_Log);
+    uint8_t *e1 = ds.Message_Log;
     CHECK(*(int16_t *)e1 == 99 && e1[2] == 5 && SDL_memcmp(e1 + 3, "Hello", 5) == 0);
     uint8_t *e2 = e1 + 0x35;
     CHECK(*(int16_t *)e2 == 99 && e2[2] == 5 && SDL_memcmp(e2 + 3, "World", 5) == 0);
@@ -114,7 +114,7 @@ static void logging(void)
     for (int i = 0; i < 20; i++)
         Message_AddMessageLogEntry(2, (const uint8_t *)"\x03" "abc", (const uint8_t *)"\x00");
     CHECK(ds.Message_LogCount == 15);
-    CHECK(*(int16_t *)far_host(ds.Message_Log) == 2);
+    CHECK(*(int16_t *)ds.Message_Log == 2);
 
     // On screen 0Bh the log is drawn.
     ds.Game_CurrentScreen = 0x0B;

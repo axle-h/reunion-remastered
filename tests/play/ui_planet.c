@@ -369,14 +369,14 @@ bool ui_wait_buildings_active(const char *kind, int n, int hours)
 static uint8_t occupy(int x, int y)
 {
     int mx = x + ds.Surface_ScrollX, my = y + ds.Surface_ScrollY;
-    const uint8_t *layer = far_host(ds.Surface_OccupyLayer);
+    const uint8_t *layer = ds.Surface_OccupyLayer;
     return layer[(uint16_t)((mx - 1) * 60 + (my - 1))];
 }
 
 static int building_under(int x, int y)
 {
     int mx = x + ds.Surface_ScrollX, my = y + ds.Surface_ScrollY;
-    const uint16_t *layer = far_host(ds.Surface_BuildingLayer);
+    const uint16_t *layer = (const uint16_t *)ds.Surface_BuildingLayer;
     return layer[(uint16_t)((mx - 1) * 60 + (my - 1))];
 }
 
@@ -586,7 +586,7 @@ UiBuildResult ui_build(const char *kind)
 
 static TBody *cur_body(void)
 {
-    return far_host(ds.Game_CurBody);
+    return ds.Game_CurBody;
 }
 
 int ui_droids(void)

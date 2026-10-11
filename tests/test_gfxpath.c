@@ -23,17 +23,18 @@ int main(int argc, char *argv[])
     mem_init();
     CHECK(dseg_init());
     system_init();
+    // The icon scratch buffer is allocated by the toolbar's set-up in Main.
+    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
 
     GfxPath_Init();
     TEmsBlock *blk = Ems_ToolbarBlock();
-    CHECK(blk->State == 1 && blk->Data != 0);  // a heap copy
+    CHECK(blk->State == 1 && blk->Data != nullptr);  // a heap copy
     CHECK(ds.Game_GfxPathProc == far_ptr(0x3A1B, 0x09A3));
     GfxPath_IconAllIndex();
 
     Icons icons;
     CHECK(icons_load("icon\\icon.all", &icons));
-    FarPtr canvas = System_GetMem(0x4000);
-    uint8_t *img = far_host(canvas);
+    uint8_t *img = System_GetMem(0x4000);
     const int picks[] = {0, 1, 10, 33, 67};
     for (size_t k = 0; k < SDL_arraysize(picks); k++) {
         SDL_memset(img, 0, 0x4000);

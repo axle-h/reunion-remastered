@@ -16,22 +16,23 @@ static const uint8_t *ps(const PString *p)
 }
 #define LIT(s) ps(PSTR(s))
 
-static uint8_t *off_ptr(FarPtr base, uint16_t off)
-{
-    return (uint8_t *)far_host(base) + off;
-}
-
 static uint8_t *line_at(int i) // question line i (1..5), string[255]
 {
-    return off_ptr(ds.Pub_Lines, (uint16_t)((i - 1) * 256));
+    return ds.Pub_Lines + (i - 1) * 256;
 }
 
 // LineItem[j]. The original doesn't check the range: the trader's menu can
-// have more than 8 text lines, and then entries 9.. land in LastSound and
-// AnimSheet. Addressed through DS so the same bytes are read and written.
+// have more than 8 text lines, and then entries 9 and 10 land in LastSound
+// (as here) and 11.. in AnimSheet, its offset word first. AnimSheet is a
+// host pointer now, so those go to a scratch byte; no run gets that far.
 static uint8_t *line_item(int16_t j)
 {
-    return (uint8_t *)&ds + offsetof(DSeg, Pub_LineItem) + (j - 1);
+    static uint8_t scratch;
+    if (j <= 8)
+        return &ds.Pub_LineItem[j - 1];
+    if (j <= 10)
+        return (uint8_t *)&ds.Pub_LastSound + (j - 9);
+    return &scratch;
 }
 
 // 1fd2:0000
@@ -40,7 +41,7 @@ void Pub_DrawPubSprite(int16_t idx)
     const TPubPerson *p = &ds.Pub_People[idx - 1];
     if ((p->State == 2 || p->State == 3) && p->Timer == 0) {
         Mouse_HideCursor();
-        uint8_t *src = off_ptr(ds.Pub_PiratesSheet, (uint16_t)(p->SrcY * 0x140 + p->SrcX + 0x141));
+        uint8_t *src = ds.Pub_PiratesSheet + (uint16_t)(p->SrcY * 0x140 + p->SrcX + 0x141);
         uint8_t *dst = gfx_screen() + (uint16_t)((p->Y + 0x31) * 0x140 + p->X + 0x141);
         Blit_BlitTransparent(src, dst, (int16_t)(p->W - 2), (int16_t)(p->H - 2), 0x40);
         Mouse_ShowCursor();
@@ -51,13 +52,13 @@ void Pub_DrawPubSprite(int16_t idx)
 void Pub_LoadPubGraphics(void)
 {
     ds.Pub_PiratesSheet = System_GetMem(0xAF00);
-    Gfx_LoadPic(LIT("grafika\\pirates"), far_host(ds.Pub_PiratesSheet), 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\kocsma"), far_host(dest), 1, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(dest), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Gfx_LoadPic(LIT("grafika\\pirates"), ds.Pub_PiratesSheet, 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    uint8_t *dest = System_GetMem(0xBCC0);
+    Gfx_LoadPic(LIT("grafika\\kocsma"), dest, 1, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(dest, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(dest, 0xBCC0);
     ds.Pub_AnimSheet = System_GetMem(64000);
-    Gfx_LoadPic(LIT("grafika\\kocsmaan"), far_host(ds.Pub_AnimSheet), 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(LIT("grafika\\kocsmaan"), ds.Pub_AnimSheet, 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     for (int16_t i = 10; i >= 1; i--)
         Pub_DrawPubSprite(i);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -93,27 +94,27 @@ void Pub_LoadPersonPortrait(void)
     else
         suffix.len = 0;
     ds.Pub_Lines = System_GetMem(0x500);
-    FarPtr buf = System_GetMem(0xBCC0);
+    uint8_t *buf = System_GetMem(0xBCC0);
     System_StrLoad(&name, PSTR("grafika\\beszed"));
     System_StrConcat(&name, &suffix);
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Gfx_LoadPic(ps(&name), buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
     System_StrLong(ds.Pub_Person, 0, (PString *)&ds.Pub_PersonStr, 2);
     if (ds.Pub_Person != 6) {
         System_StrLoad(&name, PSTR("alien\\kocsmb"));
         System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
-        Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x4E, 0, 0, 0x52, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-        Blit_CopyRectStrided(off_ptr(buf, 0x53), off_ptr(buf, 16000), 0x4F, 0x4C, 0x52, 0x140);
+        Gfx_LoadPic(ps(&name), buf, 1, 0x4E, 0, 0, 0x52, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+        Blit_CopyRectStrided(buf + 0x53, buf + 16000, 0x4F, 0x4C, 0x52, 0x140);
         Mouse_HideCursor();
-        Blit_BlitTransparent(off_ptr(buf, 16000), gfx_screen() + 0x3D8D, 0x4F, 0x4C, 0x40);
+        Blit_BlitTransparent(buf + 16000, gfx_screen() + 0x3D8D, 0x4F, 0x4C, 0x40);
         Mouse_ShowCursor();
     }
     System_StrLong(ds.Pub_People[ds.Pub_Person - 1].Portrait, 0, &num, 255);
     System_StrLoad(&name, PSTR("alien\\alien"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0xBE);
+    Gfx_LoadPic(ps(&name), buf, 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(off_ptr(buf, 99), gfx_screen() + 0x3F60, 0x5F, 0x8F, 0x62, 0x140);
+    Blit_CopyRectStrided(buf + 99, gfx_screen() + 0x3F60, 0x5F, 0x8F, 0x62, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xBCC0);
 }
@@ -175,7 +176,7 @@ void Pub_ShowReply(void)
         System_StrConcat(&t, &line);
         System_StrConcat(&t, PSTR(" credits"));
         System_StrStore(&t, &line, 255);
-        System_StrStore(&line, (PString *)far_host(ds.Pub_Lines), 255);
+        System_StrStore(&line, (PString *)ds.Pub_Lines, 255);
     }
     Mouse_HideCursor();
     Blit_FillRect(6, 0x86, 0xD8, 0x3F, 0x40);
@@ -190,8 +191,7 @@ void Pub_BuildQuestionMenu(void)
 {
     int16_t lines = 0;
     ds.Pub_LineCount = 0;
-    FarPtr lists = ds.Pub_MenuLists[ds.Pub_Person - 1];
-    System_MoveFwd(off_ptr(lists, (uint16_t)(ds.Pub_MenuIdx * 6)), &ds.Pub_CurMenu, 6);
+    System_MoveFwd(ds.Pub_MenuLists[ds.Pub_Person - 1] + ds.Pub_MenuIdx, &ds.Pub_CurMenu, 6);
     TMenu *m = &ds.Pub_CurMenu;
     // The trader's (2) and the informant's menus list only what is available.
     if (ds.Pub_Person == 2 && ds.Pub_MenuIdx == 6) {
@@ -233,7 +233,7 @@ void Pub_BuildQuestionMenu(void)
     if (ds.Pub_Person == 9 && ds.Pub_MenuIdx == 4) {
         m->Count = 1;
         TextFile_ReadTextLine(LIT("pirate.txt"), (int16_t)(Pub_FindActiveDeal() + 10),
-                              far_host(ds.Pub_Lines));
+                              ds.Pub_Lines);
     }
     // BUG? clears as many entries as the last text had lines, not the unused ones.
     for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
@@ -395,7 +395,7 @@ void Pub_AnimatePubPerson(int16_t idx)
         uint16_t src = (uint16_t)(a->SrcX + a->SrcY * 0x140 + (f % a->FramesPerRow) * a->W
                                   + (f / a->FramesPerRow) * (a->H + 1) * 0x140);
         uint16_t dst = (uint16_t)((a->Y + 0x31) * 0x140 + a->X);
-        Blit_BlitTransparent(off_ptr(ds.Pub_AnimSheet, src), gfx_screen() + dst, a->W, a->H, 0x40);
+        Blit_BlitTransparent(ds.Pub_AnimSheet + src, gfx_screen() + dst, a->W, a->H, 0x40);
     }
 }
 

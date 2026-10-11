@@ -77,21 +77,20 @@ static TGroup *add_army(const char *name, int system, int planet, int moon, int 
 
 static TBody *body(int system, int idx)
 {
-    FarPtr p = ds.Galaxy_Bodies[system - 1];
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + idx * 0x41 - 0x41)));
+    return ds.Galaxy_Bodies[system - 1] + (idx - 1);
 }
 
 static TBody *body_at(int system, int planet, int moon)
 {
     if (moon == 0)
         return body(system, planet);
-    const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[system - 1]) + (planet - 1);
+    const TMoonList *ml = ds.Galaxy_MoonLists[system - 1] + (planet - 1);
     return body(system, ml->Moons[moon - 1]);
 }
 
 static int moon_count(int system, int planet)
 {
-    return ((const TMoonList *)far_host(ds.Galaxy_MoonLists[system - 1]) + (planet - 1))->Count;
+    return ds.Galaxy_MoonLists[system - 1][planet - 1].Count;
 }
 
 // --- Scenarios ------------------------------------------------------------------

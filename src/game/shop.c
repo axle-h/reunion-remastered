@@ -286,13 +286,13 @@ void Shop_ShopScreen(void)
 
 // Shared by both panels: LoadPic into a temporary buffer, blit 126x126 to
 // screen offset 3D40h, free it.
-static void show_panel(const PString *name, bool keep_far)
+static void show_panel(const PString *name, bool keep)
 {
-    FarPtr buf = System_GetMem(0x9EC0);
-    if (keep_far)
+    uint8_t *buf = System_GetMem(0x9EC0);
+    if (keep)
         ds.Shop_PanelBuf = buf;
-    Gfx_LoadPic(ps(name), far_host(buf), 1, 0x7F, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
-    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x7E, 0x7E);
+    Gfx_LoadPic(ps(name), buf, 1, 0x7F, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
+    Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x7E, 0x7E);
     System_FreeMem(buf, 0x9EC0);
 }
 
@@ -313,13 +313,12 @@ static void load_product_picture(bool fade)
 {
     PString num, name;
     System_StrLong(SEL_PRODUCT_ID, 0, &num, 255);
-    FarPtr buf = System_GetMem(24000);
+    uint8_t *buf = System_GetMem(24000);
     System_StrLoad(&name, PSTR("info\\info"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x79, 0, 0, 0x140, fade, Gfx_PalettePtr(), 0, 0x5F, 0x60, 0, 0x96);
+    Gfx_LoadPic(ps(&name), buf, 1, 0x79, 0, 0, 0x140, fade, Gfx_PalettePtr(), 0, 0x5F, 0x60, 0, 0x96);
     Mouse_HideCursor();
-    Blit_CopyRectStrided((uint8_t *)far_host(buf) + 0x486, gfx_screen() + 0x4546, 0xB4, 0x73,
-                         0xC0, 0x140);
+    Blit_CopyRectStrided(buf + 0x486, gfx_screen() + 0x4546, 0xB4, 0x73, 0xC0, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 24000);
     for (int i = 0; i < 6; i++)
@@ -363,9 +362,7 @@ void Shop_DrawProductList(void)
 // Line `line` (1..7) of product `id`'s description in sz_talal.raw (7 x string[30]).
 static const uint8_t *talal_line(uint8_t id, int line)
 {
-    FarPtr base = ds.RawText_SzTalal;
-    return far_host(far_ptr((uint16_t)(base >> 16),
-                            (uint16_t)((uint16_t)base + (id - 1) * 0xD9 + (line - 1) * 0x1F)));
+    return ds.RawText_SzTalal + (id - 1) * 0xD9 + (line - 1) * 0x1F;
 }
 
 // 32b4:0b57

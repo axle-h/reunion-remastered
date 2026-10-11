@@ -14,7 +14,7 @@ static bool ok = true;
 
 static bool wait_retrace(void) { return true; }
 
-static uint8_t *grid(void) { return (uint8_t *)far_host(ds.GrWar_BattleGrids); }
+static uint8_t *grid(void) { return ds.GrWar_BattleGrids; }
 static void clear_grid(void) { memset(grid(), 0, 0xC6); }
 static void block(int x, int y) { grid()[x * 11 + y + 0xC] = 1; }
 
@@ -66,20 +66,20 @@ static void find_path(void)
 // Unit lists as the unit assignment screen leaves them.
 static GrBattleUnit *list(int side)
 {
-    return (GrBattleUnit *)far_host(ds.GrWarUnits_UnitLists[side - 1]);
+    return (GrBattleUnit *)ds.GrWarUnits_UnitLists[side - 1];
 }
 
 static void setup_field(void)
 {
     for (int s = 1; s <= 2; s++) {
         ds.GrWarUnits_UnitLists[s - 1] = System_GetMem(21 * 0x27);
-        System_FillChar(far_host(ds.GrWarUnits_UnitLists[s - 1]), 21 * 0x27, 0);
+        System_FillChar(ds.GrWarUnits_UnitLists[s - 1], 21 * 0x27, 0);
     }
     ds.GrWarUnits_AttackerSlotCount = 1;
     ds.GrWarUnits_DefenderSlotCount = 1;
     ds.GrWar_BattleGrids = System_GetMem(0xC6);
     ds.GrWar_Projectiles = System_GetMem(0x708);
-    System_FillChar(far_host(ds.GrWar_Projectiles), 0x708, 0);
+    System_FillChar(ds.GrWar_Projectiles, 0x708, 0);
     ds.GrWar_ProjectileCount[0] = 0;
     ds.GrWar_ProjectileCount[1] = 0;
 }
@@ -149,7 +149,6 @@ static void round_damage(void)
     ds.System_RandSeed = 1234;
     ds.GrWar_BattleOver = 0;
     ds.Game_BattleFlag = false;
-    ds.Gfx_Charset = 0;
     GrWar_BattleRound();
     // Whoever the random side order lets act first hits; the victim is busy with
     // its hit effect and cannot strike back this round.
@@ -185,14 +184,14 @@ static void losses(void)
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
-    TGroup *g = (TGroup *)far_host(ds.Game_Groups);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
+    TGroup *g = &ds.Game_Groups[0][0];
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
     g->Units[1][0].ShipType = 10;
     g->Units[1][0].Weapons[0] = 30;
     g->Units[1][0].Weapons[3] = 40; // weapon 4 is not scaled
     ds.Game_CurBody = System_GetMem(sizeof(TBody));
-    System_FillChar(far_host(ds.Game_CurBody), sizeof(TBody), 0);
+    System_FillChar(ds.Game_CurBody, sizeof(TBody), 0);
     for (int r = 0; r < 11; r++)
         ds.Races_Races[r].ForceCount = 0;
 
@@ -232,6 +231,14 @@ int main(int argc, char *argv[])
         return 77;
     }
     system_init();
+    // The charset lives in the game data block, which this test doesn't
+    // load; blank glyphs instead.
+    static uint8_t charset[0x2880];
+    ds.Gfx_Charset = charset;
+    // The battle's pictures, as GrWar_EnterGroundBattle allocates them.
+    ds.GrWar_Background = System_GetMem(64000);
+    ds.GrWar_UnitIcons = System_GetMem(0x3C00);
+    ds.GrWar_EffectIcons = System_GetMem(0x2800);
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;

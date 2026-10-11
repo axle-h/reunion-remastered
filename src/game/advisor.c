@@ -18,8 +18,7 @@ static const uint8_t *ps(const PString *p)
 // Menu line i (1..5) of MenuLines.
 static uint8_t *menu_line(int i)
 {
-    FarPtr b = ds.Advisor_MenuLines;
-    return far_host(far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + i * 0x3D - 0x3D)));
+    return ds.Advisor_MenuLines + (i - 1) * 0x3D;
 }
 
 // Required developer skill k (1..4) of the hired developer at the current story stage.
@@ -145,11 +144,11 @@ int16_t Advisor_FindAdvisorItem(bool flag)
 void Advisor_LoadAdvisorPictures(void)
 {
     ds.Advisor_MenuLines = System_GetMem(0x131);
-    FarPtr buf = System_GetMem(0xFFFF);
+    uint8_t *buf = System_GetMem(0xFFFF);
     // Offsets into buf wrap inside its segment, as in the original.
-    uint8_t *seg = far_host(far_ptr((uint16_t)(buf >> 16), 0));
-    uint16_t off = (uint16_t)buf;
-    Gfx_LoadPic(ps(PSTR("grafika\\you")), far_host(buf), 1, 0x6E, 0, 0, 0x140, false,
+    uint8_t *seg = far_seg_start(buf);
+    uint16_t off = (uint16_t)(buf - seg);
+    Gfx_LoadPic(ps(PSTR("grafika\\you")), buf, 1, 0x6E, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0xAF, 0x40, 0, 0xAF);
     // Our own face: hero 2 sits at the left of the sheet, hero 1 further right.
     uint16_t hero_off = ds.Game_Hero == 2 ? 0x141 : 0x1A5;
@@ -157,7 +156,7 @@ void Advisor_LoadAdvisorPictures(void)
     PString name;
     System_StrLoad(&name, PSTR("grafika\\"));
     System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[ds.Command_StaffPicked - 1]);
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x8F,
+    Gfx_LoadPic(ps(&name), buf, 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x8F,
                 0x40, 0, 0x8F);
     int16_t col = (int16_t)((int16_t)(ds.Game_StaffHired[ds.Command_StaffPicked - 1] - 1) * 0x6A);
     Blit_CopyRect(seg + (uint16_t)(off + 0x145 + col), gfx_screen() + 0x7085, 0x62, 0x6D);

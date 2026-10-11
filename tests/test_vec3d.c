@@ -24,10 +24,10 @@ static int16_t *words(uint8_t *p)
     return (int16_t *)p;
 }
 
-// The start of segment seg.
+// The start of segment seg of mem[], as scratch memory.
 static uint8_t *seg_host(uint16_t seg)
 {
-    return far_host(far_ptr(seg, 0));
+    return mem + seg * 16;
 }
 
 static void cos_table(void)
@@ -196,7 +196,7 @@ static void model(void)
     bool len = true;
     for (int s = 1; s <= objects; s++) {
         int16_t nf = ds.VecLoad_FaceCount[s - 1];
-        int16_t *n = far_host(ds.VecLoad_Normals[s]);
+        int16_t *n = (int16_t *)ds.VecLoad_Normals[s];
         for (int i = 0; i < nf; i++) {
             const int16_t *v = n + 3 * i;
             int l2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
@@ -206,7 +206,7 @@ static void model(void)
     CHECK(len);
     VecLoad_DrawFrame();
     // Only the window changed, and only to background and blue-ramp colours.
-    uint8_t *buf = far_host(far_ptr((uint16_t)(ds.VecLoad_Buffer >> 16), 0));
+    uint8_t *buf = far_seg_start(ds.VecLoad_Buffer);
     int shaded = 0;
     bool colours = true;
     for (int y = 10; y < 10 + 0x73; y++)

@@ -17,7 +17,7 @@ static bool ok = true;
 static void viewport(void)
 {
     mem_init();
-    uint8_t *src = (uint8_t *)far_host(far_ptr(0x3000, 0));
+    uint8_t *src = mem + 0x30000;
     for (uint32_t i = 0; i < 0xBCC0; i++)
         src[i] = (uint8_t)(i % 251 + 1);
     ShipMove_BlitViewport(src);
@@ -54,7 +54,7 @@ static void starfield(void)
 
     ds.System_RandSeed = 1234;
     ShipMove_InitStarfield();
-    const uint8_t *a = far_host(ds.ShipMove_Stars);
+    const uint8_t *a = ds.ShipMove_Stars;
     uint8_t copy[0x1E1B];
     memcpy(copy, a, sizeof copy);
 
@@ -78,17 +78,17 @@ static void starfield(void)
     // Same seed, same field.
     ds.System_RandSeed = 1234;
     ShipMove_InitStarfield();
-    CHECK(memcmp(copy, far_host(ds.ShipMove_Stars), sizeof copy) == 0);
+    CHECK(memcmp(copy, ds.ShipMove_Stars, sizeof copy) == 0);
 
     // Animate a travelling group: stars appear in the backdrop and on screen.
     ds.Game_Groups = System_GetMem(0x2840);
-    memset(far_host(ds.Game_Groups), 0, 0x2840);
+    memset(ds.Game_Groups, 0, 0x2840);
     ds.Game_GroupList = 0;
     ds.Game_SelGroup = 1;
     Groups_Selected()->Status = 4;
     memset(&vid_screen[0][0], 0, 64000);
     ShipMove_AnimateStarfield();
-    const uint8_t *bd = far_host(ds.ShipMove_Backdrop);
+    const uint8_t *bd = ds.ShipMove_Backdrop;
     int stars = 0;
     for (uint32_t i = 0; i < 0x8980; i++)
         stars += bd[i] >= 0x70 && bd[i] < 0x7F + 1 && bd[i] != 0x7F;

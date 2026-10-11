@@ -23,7 +23,7 @@ static inline TEmsBlock *Ems_ToolbarBlock(void)
 
 // 4719:0188: makes blk hold the size bytes at src (state 1). The original
 // moved them into EMS when it could.
-void Ems_EmsMoveToEms(TEmsBlock *blk, uint16_t size, FarPtr src);
+void Ems_EmsMoveToEms(TEmsBlock *blk, uint16_t size, uint8_t *src);
 // 4719:0253: frees the heap copy; state := 0.
 void Ems_EmsRelease(TEmsBlock *blk);
 // 4719:0290: maps a block in EMS into the page frame: nothing to do for a

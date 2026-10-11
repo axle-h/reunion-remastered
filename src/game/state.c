@@ -136,7 +136,7 @@ static void make_plan(void)
                 const DsField *sf = &r->fields[k];
                 if ((sf->flags & DSF_POINTER) || layout_field(f->name, sf->name))
                     continue;
-                plan_range(f->name, (uint16_t)(f->at + e * r->size + sf->ofs), sf->elem * sf->count,
+                plan_range(f->name, (uint16_t)(f->at + e * r->port_size + sf->at), sf->elem * sf->count,
                               1, -1);
             }
     }
@@ -167,7 +167,7 @@ static void put_ems_block(StateBuf *b, const char *name, const TEmsBlock *blk)
 {
     put_u8(b, name, blk->State != 0);
     if (blk->State != 0)
-        put(b, name, far_host(blk->Data), blk->Size, 1, -1);
+        put(b, name, blk->Data, blk->Size, 1, -1);
 }
 
 // The message log's entries 1..Message_LogCount, {kind: integer; text:
@@ -182,7 +182,7 @@ static void put_log(StateBuf *b)
     put_u8(b, "Message_Log^", ds.Message_Log != 0);
     if (!ds.Message_Log)
         return;
-    const uint8_t *src = far_host(ds.Message_Log);
+    const uint8_t *src = ds.Message_Log;
     for (int16_t i = 0; i < n; i++) {
         const uint8_t *e = src + i * ENTRY;
         SDL_memcpy(log + i * ENTRY, e, 3 + SDL_min(e[2], 50));

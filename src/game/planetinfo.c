@@ -63,38 +63,29 @@ static int16_t cur_moon(void)
     return ds.Game_CurMoon[ds.Game_CurSystem - 1];
 }
 
-static FarPtr far_add(FarPtr p, int32_t delta)
+// A pointer delta bytes from p, keeping the original's 16-bit offset wrap
+// inside p's segment: a sprite at the top edge of the frame has a negative
+// origin. p must be a heap block's start.
+static uint8_t *buf_at_wrapped(uint8_t *p, int32_t delta)
 {
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
-}
-
-// Host pointer into a heap block, for the blitters.
-static uint8_t *buf_at(FarPtr p, int32_t delta)
-{
-    return (uint8_t *)far_host(p) + delta;
-}
-
-// The same, keeping the original's 16-bit offset wrap: a sprite at the top
-// edge of the frame has a negative origin.
-static uint8_t *buf_at_wrapped(FarPtr p, int32_t delta)
-{
-    return far_host(far_add(p, delta));
+    uint8_t *seg = far_seg_start(p);
+    return seg + (uint16_t)(p - seg + delta);
 }
 
 // The system view's pictures.
 static uint8_t *icons_at(int32_t delta)
 {
-    return buf_at(ds.PlanetInfo_Icons, delta);
+    return ds.PlanetInfo_Icons + delta;
 }
 
 static uint8_t *sprites_at(int32_t delta)
 {
-    return buf_at(ds.PlanetInfo_Sprites, delta);
+    return ds.PlanetInfo_Sprites + delta;
 }
 
 static uint8_t *frame_at(int32_t delta)
 {
-    return buf_at(ds.PlanetInfo_Frame, delta);
+    return ds.PlanetInfo_Frame + delta;
 }
 
 static uint8_t *frame_at_wrapped(int32_t delta)
@@ -109,12 +100,12 @@ static uint8_t *screen_at(uint16_t off)
 
 static TBody *body_at(int16_t sys, int16_t idx)
 {
-    return (TBody *)far_host(ds.Galaxy_Bodies[sys - 1]) + (idx - 1);
+    return ds.Galaxy_Bodies[sys - 1] + (idx - 1);
 }
 
 static TBodyName *name_at(int16_t sys, int16_t idx)
 {
-    return (TBodyName *)far_host(ds.Galaxy_Names[sys - 1]) + (idx - 1);
+    return ds.Galaxy_Names[sys - 1] + (idx - 1);
 }
 
 // Galaxy::PlanetStatus[sys, planet] (DS:47CD + 8*sys + planet): -1 planet
@@ -127,7 +118,7 @@ static int8_t planet_status(int16_t sys, int16_t planet)
 
 static TMoonList *moons_of(int16_t sys, int16_t planet)
 {
-    return (TMoonList *)far_host(ds.Galaxy_MoonLists[sys - 1]) + (planet - 1);
+    return ds.Galaxy_MoonLists[sys - 1] + (planet - 1);
 }
 
 // Index in the body array of planet `planet`'s moon number `moon`.
@@ -243,7 +234,7 @@ static int scale_step(int8_t v)
 // 357b:0359
 void PlanetInfo_DrawPlanetInfoText(void)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
+    const TBody *b = ds.Game_CurBody;
     PString text, name, desc;
     PStr40 lines[9];
 
@@ -468,12 +459,12 @@ void PlanetInfo_DrawPlanetInfoText(void)
 // 357b:10d9
 void PlanetInfo_DrawPlanetInfoScreen(void)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
-    FarPtr buf = System_GetMem(0xBCC0);
+    const TBody *b = ds.Game_CurBody;
+    uint8_t *buf = System_GetMem(0xBCC0);
     PString name, tmp;
     str_cat2(&name, 0xFF, PSTR("grafika\\"), (const PString *)&ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name);
-    Gfx_LoadPicScreen(PS(&name), far_host(buf), 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS(&name), buf, 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
     int16_t n = b->InfoLevel < 6 ? 0 : (int8_t)b->SurfaceType;
     PlanetInfo_LoadPlanetPlanetPic(n, false);
     if ((int8_t)b->Owner < 2)
@@ -489,7 +480,7 @@ void PlanetInfo_DrawPlanetInfoScreen(void)
     // the original (InitSystemView allocates it again).
     ds.PlanetInfo_Sprites = System_GetMem(0x5500);
     numbered_name(&tmp, PSTR("planets\\napr"), ds.Game_CurSystem);
-    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Sprites), 1, 0x44, 0, 0, 0x140, false,
+    Gfx_LoadPic(PS(&tmp), ds.PlanetInfo_Sprites, 1, 0x44, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x6F, 0x80, 0, 0xBE);
     Mouse_HideCursor();
     if (cur_moon() == 0) {
@@ -512,12 +503,12 @@ void PlanetInfo_LoadPlanetFajPic(int16_t n, bool setPalette)
 {
     if (ds.PlanetInfo_AlienMode != 0)
         return;
-    FarPtr buf = System_GetMem(0xAA6);
+    uint8_t *buf = System_GetMem(0xAA6);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\faj"), n);
-    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x2F, 0, 0, 0x3A, false, Gfx_PalettePtr(), 0, 0xF, 0x70, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), buf, 1, 0x2F, 0, 0, 0x3A, false, Gfx_PalettePtr(), 0, 0xF, 0x70, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(buf_at(buf, 0x76), screen_at(0x3FC2), 0x35, 0x2B, 0x3A, 0x140);
+    Blit_CopyRectStrided(buf + 0x76, screen_at(0x3FC2), 0x35, 0x2B, 0x3A, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xAA6);
     if (setPalette)
@@ -529,12 +520,12 @@ void PlanetInfo_LoadPlanetPlanetPic(int16_t n, bool setPalette)
 {
     if (ds.PlanetInfo_AlienMode != 0)
         return;
-    FarPtr buf = System_GetMem(0x14A0);
+    uint8_t *buf = System_GetMem(0x14A0);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\planet"), n);
-    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x37, 0, 0, 0x60, false, Gfx_PalettePtr(), 0, 0x1F, 0x50, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), buf, 1, 0x37, 0, 0, 0x60, false, Gfx_PalettePtr(), 0, 0x1F, 0x50, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(buf_at(buf, 0xC2), screen_at(0xB7C2), 0x5C, 0x33, 0x60, 0x140);
+    Blit_CopyRectStrided(buf + 0xC2, screen_at(0xB7C2), 0x5C, 0x33, 0x60, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0x14A0);
     if (setPalette)
@@ -544,19 +535,19 @@ void PlanetInfo_LoadPlanetPlanetPic(int16_t n, bool setPalette)
 // 357b:1515
 void PlanetInfo_DrawAlienInfoScreen(void)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
-    FarPtr buf = System_GetMem(0xBCC0);
+    const TBody *b = ds.Game_CurBody;
+    uint8_t *buf = System_GetMem(0xBCC0);
     PString tmp;
-    Gfx_LoadPicScreen(P("grafika\\aliennfo"), far_host(buf), 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(P("grafika\\aliennfo"), buf, 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
     numbered_name(&tmp, PSTR("alien\\alien"), (int8_t)b->Owner);
-    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x8F, 0x60, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), buf, 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x8F, 0x60, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(buf_at(buf, 0x63), screen_at(0x4382), 0x5E, 0x8F, 0x62, 0x140);
+    Blit_CopyRectStrided(buf + 0x63, screen_at(0x4382), 0x5E, 0x8F, 0x62, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xBCC0);
     // The race's text: 12 strings of 36 bytes, 1B0h bytes per race.
-    const uint8_t *text = (const uint8_t *)far_host(ds.RawText_SzFaj) + ((int8_t)b->Owner - 1) * 0x1B0;
+    const uint8_t *text = ds.RawText_SzFaj + ((int8_t)b->Owner - 1) * 0x1B0;
     Gfx_DrawTextFC(text, 0x69, 0x36, 0x23);
     for (int16_t k = 2; k <= 12; k++)
         Gfx_DrawTextF9(text + (k - 1) * 0x24, 0x69, (int16_t)(k * 9 + 0x36), 0x23);
@@ -567,7 +558,7 @@ void PlanetInfo_DrawAlienInfoScreen(void)
 // 357b:1671
 void PlanetInfo_DrawStoresList(void)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
+    const TBody *b = ds.Game_CurBody;
     if (b->_09 != 0 || ((int8_t)b->Owner > 1 && ds.Races_Hostile[b->Owner - 1] == 2)) {
         // BUG? Bytes 13h..1Ah of the race record (typed as KnownSystems) are
         // read as "has this resource / product" flags, also for owners 0
@@ -599,12 +590,12 @@ void PlanetInfo_DrawStoresList(void)
 // 357b:1825
 void PlanetInfo_DrawPlanetSurfaceBackdrop(void)
 {
-    const TBody *b = far_host(ds.Game_CurBody);
-    FarPtr buf = System_GetMem(0xBCC0);
+    const TBody *b = ds.Game_CurBody;
+    uint8_t *buf = System_GetMem(0xBCC0);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\nagy"), (int8_t)b->SurfaceType);
-    Gfx_LoadPicScreen(PS(&tmp), far_host(buf), 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS(&tmp), buf, 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }
@@ -617,8 +608,8 @@ void PlanetInfo_SelectCurBody(void)
 {
     int16_t sys = ds.Game_CurSystem;
     int16_t idx = cur_moon() == 0 ? cur_planet() : moon_body(sys, cur_planet(), cur_moon());
-    ds.Game_CurBody = far_add(ds.Galaxy_Bodies[sys - 1], (idx - 1) * (int32_t)sizeof(TBody));
-    const TBody *b = far_host(ds.Game_CurBody);
+    ds.Game_CurBody = ds.Galaxy_Bodies[sys - 1] + (idx - 1);
+    const TBody *b = ds.Game_CurBody;
     // Only the low byte of the word is written.
     *(uint8_t *)&ds.Game_CurBodyIsColony = (b->Colony == 0 || b->Owner != 1) ? 0 : 1;
 }
@@ -703,7 +694,7 @@ typedef struct PowerCtx {
 
 static TBuilding *building_at(int16_t i)
 {
-    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+    return ds.Game_Buildings + (i - 1);
 }
 
 // TBuildingType of a building kind; kind 0 is not a real type but the
@@ -1075,14 +1066,14 @@ void PlanetInfo_LoadSystemViewAssets(void)
 
     System_StrStore(cur_planet() == 0 ? PSTR("hatter1") : PSTR("hatter2"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Backdrop), 1, 0x97, 0, 0, 0x140, true, pal, 0,
+    Gfx_LoadPic(PS(&tmp), ds.PlanetInfo_Backdrop, 1, 0x97, 0, 0, 0x140, true, pal, 0,
                 0xB0, 0x40, 0, 0xBE);
     System_StrStore(cur_planet() == 0 ? PSTR("hatter3") : PSTR("hatter4"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Icons), 1, 0x4B, 0, 0, 0x140, false, pal, 0,
+    Gfx_LoadPic(PS(&tmp), ds.PlanetInfo_Icons, 1, 0x4B, 0, 0, 0x140, false, pal, 0,
                 0xB0, 0x40, 0, 0xBE);
     numbered_name(&tmp, PSTR("planets\\napr"), sys);
-    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Sprites), 1, 0x44, 0, 0, 0x140, false, pal, 0,
+    Gfx_LoadPic(PS(&tmp), ds.PlanetInfo_Sprites, 1, 0x44, 0, 0, 0x140, false, pal, 0,
                 0x6F, 0x80, 0, 0xBE);
 
     if (cur_planet() == 0) {
@@ -1150,7 +1141,7 @@ void PlanetInfo_DrawOrbitingPlanet(int16_t k)
         // (The original also computes (ang / 71h + 19h) mod 20h into a local
         // here and never uses it.)
         const TOrbit *o = orbit(k);
-        uint8_t *sprite = far_host(ds.PlanetInfo_PlanetSprite);
+        uint8_t *sprite = ds.PlanetInfo_PlanetSprite;
         Scale_ScaleSprite(sprites_at((k - 1) * 0x20 + 0x180), sprite, o->Size);
         Blit_BlitTransparent(sprite, frame_at_wrapped(sprite_origin(o)), o->Size, o->Size, 0x80);
     }
@@ -1164,9 +1155,9 @@ void PlanetInfo_DrawOrbitingMoon(int16_t k)
         const TOrbit *o = orbit(k);
         int16_t m = (int16_t)(moon_body(sys, cur_planet(), k) - ds.Galaxy_PlanetCount[sys - 1]);
         Scale_ScaleSprite(sprites_at(((m - 1) % 0xE) * 0x11 + 0x2AC2 + ((m - 1) / 0xE) * 0x1540),
-                          far_host(ds.PlanetInfo_MoonSprite), (int16_t)(o->Size << 1));
+                          ds.PlanetInfo_MoonSprite, (int16_t)(o->Size << 1));
         int32_t origin = sprite_origin(o);
-        Blit_BlitTransparent(far_host(ds.PlanetInfo_MoonSprite), frame_at_wrapped(origin), o->Size,
+        Blit_BlitTransparent(ds.PlanetInfo_MoonSprite, frame_at_wrapped(origin), o->Size,
                              o->Size, 0x80);
         if (o->Flag != 0) {
             Blit_BlitTransparent(icons_at(0x2A81 + (o->Flag - 1) * 8),
@@ -1194,7 +1185,7 @@ void PlanetInfo_RenderSystemView(void)
     ds.PlanetInfo_PlanetSprite = System_GetMem(0x2A80);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = System_MemAvail();
-    Blit_CopyBytes(far_host(ds.PlanetInfo_Backdrop), far_host(ds.PlanetInfo_Frame), 0xBCC0);
+    Blit_CopyBytes(ds.PlanetInfo_Backdrop, ds.PlanetInfo_Frame, 0xBCC0);
 
     if (ds.PlanetInfo_BodiesHidden == 0) {
         if (cur_planet() == 0) {
@@ -1275,7 +1266,7 @@ void PlanetInfo_RenderSystemView(void)
         Blit_BlitTransparent(icons_at(0x2906), frame_at(0xAE03), 0x39, 5, 0x40);
     }
 
-    Blit_CopyRect(far_host(ds.PlanetInfo_Frame), screen_at(0x3D40), 0x140, 0x97);
+    Blit_CopyRect(ds.PlanetInfo_Frame, screen_at(0x3D40), 0x140, 0x97);
     int16_t hit;
     Mouse_HitTestCursor(&hit);
     ds.Mouse_ViewHotspot = hit;

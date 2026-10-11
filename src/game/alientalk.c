@@ -43,9 +43,9 @@ void AlienTalk_StartAlienScene(int16_t scene)
 void AlienTalk_PlayAlienScene(int16_t scene)
 {
     Mouse_HideCursor();
-    FarPtr save = System_GetMem(0x1540);
-    FarPtr buf = System_GetMem(64000);
-    Blit_CopyRect(screen_at(0x2800), far_host(save), 0x140, 0x11);
+    uint8_t *save = System_GetMem(0x1540);
+    uint8_t *buf = System_GetMem(64000);
+    Blit_CopyRect(screen_at(0x2800), save, 0x140, 0x11);
     uint8_t old_pal[0x300];
     System_MoveFwd(ds.Gfx_Palette, old_pal, 0x300);
 
@@ -54,8 +54,8 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     System_StrLoad(&name, PSTR("pics\\pic"));
     System_StrConcat(&name, &num);
     uint8_t *pal = Gfx_PalettePtr();
-    Gfx_LoadPic(ps(&name), far_host(buf), 1, 200, 0, 0, 0x140, true, pal, 0, 0xBF, 0x40, 0, 0xBF);
-    Blit_CopyRect(far_host(buf), screen_at(0), 0x140, 200);
+    Gfx_LoadPic(ps(&name), buf, 1, 200, 0, 0, 0x140, true, pal, 0, 0xBF, 0x40, 0, 0xBF);
+    Blit_CopyRect(buf, screen_at(0), 0x140, 200);
     System_FreeMem(buf, 64000);
     Gfx_FadeIn(0, 0xFF, pal);
 
@@ -148,7 +148,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     }
 
     Gfx_FadeOut(0, 0xFF, pal);
-    Blit_CopyRect(far_host(save), screen_at(0x2800), 0x140, 0x11);
+    Blit_CopyRect(save, screen_at(0x2800), 0x140, 0x11);
     System_MoveFwd(old_pal, ds.Gfx_Palette, 0x300);
     System_FreeMem(save, 0x1540);
     Mouse_ShowCursor();
@@ -168,8 +168,7 @@ void AlienTalk_StartAlienTalk(int16_t race)
 void AlienTalk_DrawAlienTalkScreen(void)
 {
     ds.AlienTalk_QuestionBuf = System_GetMem(0x300);
-    FarPtr buf = System_GetMem(0xBCC0);
-    uint8_t *pic = far_host(buf);
+    uint8_t *pic = System_GetMem(0xBCC0);
     uint8_t *pal = Gfx_PalettePtr();
     PString num, name;
     uint8_t portrait = ds.AlienTalk_PortraitByRace[ds.AlienTalk_Race - 1];
@@ -199,7 +198,7 @@ void AlienTalk_DrawAlienTalkScreen(void)
     Mouse_HideCursor();
     Blit_CopyRectStrided(pic + 100, screen_at(0x3F60), 0x5F, 0x95, 0x62, 0x140);
     Mouse_ShowCursor();
-    System_FreeMem(buf, 0xBCC0);
+    System_FreeMem(pic, 0xBCC0);
 }
 
 // 2e4b:0622
@@ -246,7 +245,7 @@ void AlienTalk_DrawAlienReply(void)
 
 static PString *question(int k)
 {
-    return (PString *)((uint8_t *)far_host(ds.AlienTalk_QuestionBuf) + (k - 1) * 0x100);
+    return (PString *)(ds.AlienTalk_QuestionBuf + (k - 1) * 0x100);
 }
 
 // LineQuestion[i]. The original doesn't check the range: menus of more than
@@ -263,8 +262,7 @@ void AlienTalk_BuildQuestionMenu(void)
 {
     ds.AlienTalk_MenuLineCount = 0;
     // The race's list of menus: 4 bytes each (count + 3 question numbers).
-    const uint8_t *menu = (const uint8_t *)far_host(ds.Alien_MenuLists[ds.AlienTalk_Race - 1])
-                          + ds.AlienTalk_MenuNumber * 4;
+    const uint8_t *menu = ds.Alien_MenuLists[ds.AlienTalk_Race - 2] + ds.AlienTalk_MenuNumber * 4;
     memcpy(ds.Alien_CurMenu, menu, 4);
     uint16_t count = ds.Alien_CurMenu[0];
     int16_t lines = 0; // BUG?: the final clearing loop reuses the last question's line count

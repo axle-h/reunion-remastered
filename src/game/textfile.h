@@ -18,11 +18,6 @@ extern char (*TextFile_ReadKey)(void);
 void TextFile_InputLine(uint8_t *s, int16_t x, int16_t y, int16_t width, bool canCancel);
 // 398f:0059 / 011a / 0179: the editor's start, end and one frame.
 void TextFile_BeginInput(uint8_t *s, int16_t x, int16_t y, int16_t width);
-// The far pointer the original's caller passes for the next BeginInput /
-// InputLine string, which the editor keeps in DS:7C50: a pointer into the
-// middle of a heap block keeps its block's segment, which the host pointer
-// alone cannot tell. Used once, and only if it addresses s.
-void TextFile_SetStringPtr(FarPtr p);
 void TextFile_EndInput(void);
 void TextFile_InputTick(void);
 // 398f:03ae: reads line `line` of text\<name> (name is a Pascal string) and

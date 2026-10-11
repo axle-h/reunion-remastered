@@ -18,7 +18,7 @@ enum : uint16_t {
 // The start of the off-screen buffer's segment.
 static inline uint8_t *buffer_base(void)
 {
-    return far_host(far_ptr((uint16_t)(ds.VecLoad_Buffer >> 16), 0));
+    return far_seg_start(ds.VecLoad_Buffer);
 }
 
 // Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
@@ -77,17 +77,7 @@ static void file_close(void)
     vec_file.data = nullptr;
 }
 
-static void block_read(FarPtr dst, uint16_t count)
-{
-    if (vec_file.pos + count > vec_file.size)
-        System_RunError(100);
-    for (uint16_t i = 0; i < count; i++)
-        *(uint8_t *)far_host(far_ptr((uint16_t)(dst >> 16), (uint16_t)((uint16_t)dst + i))) =
-            vec_file.data[vec_file.pos + i];
-    vec_file.pos += count;
-}
-
-static void block_read_host(uint8_t *dst, uint16_t count)
+static void block_read(uint8_t *dst, uint16_t count)
 {
     if (vec_file.pos + count > vec_file.size)
         System_RunError(100);
@@ -96,28 +86,27 @@ static void block_read_host(uint8_t *dst, uint16_t count)
 }
 
 // Shared body of ReadObject and ReadVecObject: the faces go to faces_dst.
-static bool read_object(int16_t slot, FarPtr faces_dst)
+static bool read_object(int16_t slot, uint8_t *faces_dst)
 {
     uint8_t word[2];
-    block_read_host(word, 2);
+    block_read(word, 2);
     uint16_t size = (uint16_t)(word[0] | word[1] << 8);
     if (size == 0xFFFF)
         return false;
     int16_t s = (int16_t)(slot - 1);
-    block_read_host((uint8_t *)&ds.VecLoad_VertCount[s], 2);
+    block_read((uint8_t *)&ds.VecLoad_VertCount[s], 2);
     block_read(ds.VecLoad_Verts[s], (uint16_t)(ds.VecLoad_VertCount[s] * 6));
-    block_read_host((uint8_t *)&ds.VecLoad_EdgeCount[s], 2);
+    block_read((uint8_t *)&ds.VecLoad_EdgeCount[s], 2);
     block_read(ds.VecLoad_Edges[s], (uint16_t)(ds.VecLoad_EdgeCount[s] * 2));
-    block_read_host((uint8_t *)&ds.VecLoad_FaceCount[s], 2);
+    block_read((uint8_t *)&ds.VecLoad_FaceCount[s], 2);
     block_read(faces_dst, (uint16_t)(ds.VecLoad_FaceCount[s] * 0x14));
 
     // Coordinates div 10.
     int16_t n = ds.VecLoad_VertCount[s];
-    FarPtr verts = ds.VecLoad_Verts[s];
+    uint8_t *verts = ds.VecLoad_Verts[s];
     for (int16_t i = 1; i <= n; i++) {
         for (int j = 0; j < 3; j++) {
-            uint8_t *p = far_host(far_ptr((uint16_t)(verts >> 16),
-                                          (uint16_t)((uint16_t)verts + i * 6 - 6 + j * 2)));
+            uint8_t *p = verts + i * 6 - 6 + j * 2;
             int16_t v = (int16_t)(p[0] | p[1] << 8);
             v = (int16_t)(v / 10);
             p[0] = (uint8_t)v;
@@ -135,12 +124,12 @@ void VecLoad_DrawObject(int16_t slot)
     ds.Vec3D_Slot = slot;
     int16_t s = (int16_t)(slot - 1);
     int16_t mode = ds.VecLoad_ModelMode[ds.Vec3D_Model - 1];
-    Vec3D_Project(deg(0), deg(1), deg(2), far_host(ds.VecLoad_Verts[s]),
-                  far_host(ds.VecLoad_Projected), ds.VecLoad_Scale, ds.VecLoad_VertCount[s], mode);
-    Vec3D_Project(deg(0), deg(1), deg(2), far_host(ds.VecLoad_Normals[slot]),
-                  far_host(ds.VecLoad_Normals[0]), 0x40, ds.VecLoad_FaceCount[s], mode);
-    Vec3D_DrawFaces(buffer_base(), far_host(ds.VecLoad_Projected), far_host(ds.VecLoad_Faces[s]),
-                    far_host(ds.VecLoad_Normals[0]), (uint8_t)ds.VecLoad_FaceCount[s]);
+    Vec3D_Project(deg(0), deg(1), deg(2), ds.VecLoad_Verts[s], ds.VecLoad_Projected,
+                  ds.VecLoad_Scale, ds.VecLoad_VertCount[s], mode);
+    Vec3D_Project(deg(0), deg(1), deg(2), ds.VecLoad_Normals[slot], ds.VecLoad_Normals[0], 0x40,
+                  ds.VecLoad_FaceCount[s], mode);
+    Vec3D_DrawFaces(buffer_base(), ds.VecLoad_Projected, ds.VecLoad_Faces[s],
+                    ds.VecLoad_Normals[0], (uint8_t)ds.VecLoad_FaceCount[s]);
 }
 
 // The depth (projected z) of object obj.
@@ -282,9 +271,9 @@ void VecLoad_DrawBlueFrame(void)
 void VecLoad_DrawWireObject(int16_t idx)
 {
     int16_t s = (int16_t)(idx - 1);
-    Vec3D_Project(deg(0), deg(1), deg(2), far_host(ds.VecLoad_Verts[s]),
-                  far_host(ds.VecLoad_Projected), ds.VecLoad_WireScale, ds.VecLoad_VertCount[s], 1);
-    Vec3D_DrawEdges(buffer_base(), far_host(ds.VecLoad_Projected), far_host(ds.VecLoad_Edges[s]),
+    Vec3D_Project(deg(0), deg(1), deg(2), ds.VecLoad_Verts[s], ds.VecLoad_Projected,
+                  ds.VecLoad_WireScale, ds.VecLoad_VertCount[s], 1);
+    Vec3D_DrawEdges(buffer_base(), ds.VecLoad_Projected, ds.VecLoad_Edges[s],
                     ds.VecLoad_EdgeCount[s], 0x41);
 }
 
@@ -398,8 +387,8 @@ void VecLoad_LoadVec(int16_t n)
     int16_t count = ds.VecLoad_ObjectCount;
     if (count > 0)
         for (int16_t i = 1;; i++) {
-            Vec3D_PrepareObject(n, i, far_host(ds.VecLoad_Verts[i - 1]),
-                                far_host(ds.VecLoad_Faces[i - 1]), far_host(ds.VecLoad_Normals[i]),
+            Vec3D_PrepareObject(n, i, ds.VecLoad_Verts[i - 1], ds.VecLoad_Faces[i - 1],
+                                ds.VecLoad_Normals[i],
                                 (uint8_t)ds.VecLoad_VertCount[i - 1],
                                 (uint8_t)ds.VecLoad_FaceCount[i - 1]);
             if (i == count)

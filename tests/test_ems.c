@@ -24,18 +24,18 @@ int main(int argc, char *argv[])
     TEmsBlock *blk = Ems_GameDataBlock();
     Ems_Init();
     CHECK(blk->State == 1 && blk->Size == 0x8770 && blk->Data == ds.Ems_Buffer);
-    CHECK(ds.Game_Groups == ds.Ems_Buffer);
-    CHECK(ds.Game_Buildings == far_ptr((uint16_t)(ds.Ems_Buffer >> 16), (uint16_t)ds.Ems_Buffer + 0x2840));
-    CHECK(ds.Gfx_Charset == far_ptr((uint16_t)(ds.Ems_Buffer >> 16), (uint16_t)ds.Ems_Buffer + 0x5EF0));
+    CHECK((uint8_t *)ds.Game_Groups == ds.Ems_Buffer);
+    CHECK((uint8_t *)ds.Game_Buildings == ds.Ems_Buffer + 0x2840);
+    CHECK(ds.Gfx_Charset == ds.Ems_Buffer + 0x5EF0);
     CHECK(ds.Ems_RestoreProc == far_ptr(0x4719, 0x0317));
     CHECK(system_heap_free() == avail - 0x8770);
 
     // Another block keeps its own copy; mapping changes nothing.
     TEmsBlock *tb = Ems_ToolbarBlock();
-    FarPtr src = System_GetMem(0xC000);
+    uint8_t *src = System_GetMem(0xC000);
     Ems_EmsMoveToEms(tb, 0xC000, src);
     CHECK(tb->State == 1 && tb->Data == src && tb->Size == 0xC000);
-    FarPtr groups = ds.Game_Groups;
+    TGroup (*groups)[32] = ds.Game_Groups;
     Ems_EmsMapAll(tb);
     Ems_EmsMapGameData();
     CHECK(ds.Game_Groups == groups && blk->State == 1);

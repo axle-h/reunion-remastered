@@ -261,22 +261,22 @@
 # ---------------------------------------------------------------------------
 4a81:759e OvrCodeList: word
 4a81:75a0 OvrHeapSize: word
-4a81:75a2 OvrDebugPtr: pointer
+4a81:75a2 OvrDebugPtr: farptr
 4a81:75a6 OvrHeapOrg: word
 4a81:75a8 OvrHeapPtr: word
 4a81:75aa OvrHeapEnd: word
 4a81:75ac OvrLoadList: word
 4a81:75ae OvrDosHandle: word
 4a81:75b0 OvrEmsHandle: word
-4a81:75b2 HeapOrg: pointer
-4a81:75b6 HeapPtr: pointer
-4a81:75ba HeapEnd: pointer
-4a81:75be FreeList: pointer
-4a81:75c2 FreeZero: pointer
-4a81:75c6 HeapError: pointer
-4a81:75ca ExitProc: pointer
+4a81:75b2 HeapOrg: farptr
+4a81:75b6 HeapPtr: farptr
+4a81:75ba HeapEnd: farptr
+4a81:75be FreeList: farptr
+4a81:75c2 FreeZero: farptr
+4a81:75c6 HeapError: procedure
+4a81:75ca ExitProc: procedure
 4a81:75ce ExitCode: integer
-4a81:75d0 ErrorAddr: pointer
+4a81:75d0 ErrorAddr: farptr
 4a81:75d4 PrefixSeg: word
 4a81:75d6 StackLimit: word
 4a81:75d8 InOutRes: integer
@@ -292,7 +292,7 @@
 4a81:75ec CrLf: array[0..1] of char
 4a81:a2f6 Input: TextRec
 4a81:a3f6 Output: TextRec
-4a81:a4f6 SavedVectors: array[0..18] of pointer    // Vectors 00,02,1B,21,23,24,34-3F,75 saved at startup
+4a81:a4f6 SavedVectors: array[0..18] of farptr    // Vectors 00,02,1B,21,23,24,34-3F,75 saved at startup
 4a81:a542 HeapAllocSize: word
 
 # ---------------------------------------------------------------------------
@@ -396,14 +396,14 @@
 4a81:9278 Game::HeroSpriteX: integer           // 45h for hero 1, 1 for hero 2. X offset into the command centre sprite sheet (3abd:163f)
 4a81:927a Game::SatButtons: integer            // Bit mask of the satellite menu buttons shown (28cd:03fb). Redrawn when it changes; -1 forces a redraw
 4a81:927c Game::ShipInfoButtons: integer       // The same for the ship info menu (28cd:0542); -1 forces a redraw
-4a81:9272 Blit::CursorHook: pointer           // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
-4a81:927e Groups::UpdateSatMenu: pointer      // = 28cd:03fb (Satellite)
-4a81:9282 Groups::IntelHook: pointer          // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
-4a81:9286 Game::FindBuildingProc: pointer      // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
-4a81:928a Game::FindPlanetForceProc: pointer   // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
-4a81:928e Game::GrWarProc: pointer             // = 1537:11f2 (GrWar)
-4a81:9292 Game::GfxPathProc: pointer           // = 3a1b:09a3 (GfxPath)
-4a81:9296 Ems::RestoreProc: pointer           // = 4719:0317 (Ems)
+4a81:9272 Blit::CursorHook: procedure           // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
+4a81:927e Groups::UpdateSatMenu: procedure      // = 28cd:03fb (Satellite)
+4a81:9282 Groups::IntelHook: procedure          // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
+4a81:9286 Game::FindBuildingProc: procedure      // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
+4a81:928a Game::FindPlanetForceProc: procedure   // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
+4a81:928e Game::GrWarProc: procedure             // = 1537:11f2 (GrWar)
+4a81:9292 Game::GfxPathProc: procedure           // = 3a1b:09a3 (GfxPath)
+4a81:9296 Ems::RestoreProc: procedure           // = 4719:0317 (Ems)
 4a81:926e Music::MainThemeOn: boolean         // ? Set when main1/main2 is playing; 424a:017e restarts the theme if clear
 4a81:929a Gfx::Palette: array[0..255] of array[0..2] of byte  // Current VGA palette (RGB 0..63). Passed to Gfx::LoadPic and set with 405f:0089
 4a81:959a Gfx::ReadPos: word                  // ? Read position in a buffer, advanced by 405f:09f3
@@ -452,7 +452,7 @@
 # ---------------------------------------------------------------------------
 4a81:013a Pub::People: array[1..10] of TPubPerson   // folded 011f; 1b8a:006e, 1fd2:01ef, Main 1000:1271
 4a81:0248 Pub::MenuData                              // 10 consts: array[1..n] of TMenu, n = 5,11,3,5,6,11,7,6,7,6
-4a81:03da Pub::MenuLists: array[1..10] of pointer   // folded 03d6; ^array of TMenu per person (1fd2:0788)
+4a81:03da Pub::MenuLists: array[1..10] of ^TMenu   // folded 03d6; ^array of TMenu per person (1fd2:0788)
 4a81:0402 Pub::CurMenu: TMenu                       // copied from MenuLists (1fd2:0788), then extended
 4a81:0408 Pub::ItemQty: array[1..12] of byte        // folded 0407; multiplied by ItemPrice (1fd2:05fe)
 4a81:0414 Pub::ItemPrice: array[10..13] of longint  // folded 03ec; 10000, 14000, 20000, 7000
@@ -460,8 +460,8 @@
 4a81:0514 Pub::Anims: array[1..9] of TPubAnim       // folded 0500; 1fd2:0ec1
 4a81:00c2 Advisor::Menus: array[1..3] of TMenu      // folded 00bc; 1991:08de
 4a81:00d4 Advisor::CurMenu: TMenu
-4a81:0c2e Alien::MenuData                           // lists of 4-byte menus (count + 3), 2e4b
-4a81:0ce2 Alien::MenuLists: array[1..10] of pointer  // by race (0cde + race * 4); 2e4b:0780. Races 2..10 point into Alien_MenuData; race 1's entry is not a pointer
+4a81:0c2e Alien::MenuData: array[0..183] of byte   // lists of 4-byte menus {count, 3 question lines}, 2e4b. The last 4 bytes (01 06 FF FF) sit where MenuLists' race-1 entry would be: race 10's last menu (question 6)
+4a81:0ce6 Alien::MenuLists: array[2..10] of pointer  // by race (folded 0cde, + race * 4); 2e4b:0780. Each points into MenuData
 4a81:0d0a Alien::CurMenu: array[0..3] of byte
 4a81:1a3a Surface::Tileset: array[1..11] of integer   // SurfaceType -> FELSZ/FANIM sheet and map template (1,8,2,7,10,3,9,5,4,6,11)
 4a81:1a50 Galaxy::SurfaceColonisable: array[1..11] of boolean  // folded 1a4f; 1390:0047, 357b
@@ -489,9 +489,9 @@
 4a81:3d0e Galaxy::SunMoons: array[1..8] of TMoonList
 4a81:3d56 Galaxy::SunNames: array[1..32] of TBodyName      // Mercury..Neptune, Moon, Phobos, ... Triton, Nereid
 4a81:3ef6 Galaxy::SunBodies: array[1..32] of TBody
-4a81:4716 Galaxy::Names: array[1..8] of pointer           // folded 4712; -> <Sys>Names (34b0:0bbe, 357b)
-4a81:4736 Galaxy::MoonLists: array[1..8] of pointer       // folded 4732; -> <Sys>Moons (1390:02b6)
-4a81:4756 Galaxy::Bodies: array[1..8] of pointer          // folded 4752; -> <Sys>Bodies (41 uses)
+4a81:4716 Galaxy::Names: array[1..8] of ^TBodyName           // folded 4712; -> <Sys>Names (34b0:0bbe, 357b)
+4a81:4736 Galaxy::MoonLists: array[1..8] of ^TMoonList       // folded 4732; -> <Sys>Moons (1390:02b6)
+4a81:4756 Galaxy::Bodies: array[1..8] of ^TBody          // folded 4752; -> <Sys>Bodies (41 uses)
 4a81:4776 Galaxy::PlanetCount: array[1..8] of integer     // folded 4774; 7,5,5,3,3,7,2,8
 4a81:4786 Galaxy::MoonCount: array[1..8] of integer       // 25,7,13,4,10,16,3,24 (P+M = array sizes above)
 4a81:4796 Galaxy::BodyIcon: array[1..8,1..8] of byte      // folded 478d; copied into the planet-list hotspot (357b:23db). Meaning?
@@ -595,7 +595,7 @@
 3955:02d3 ScaleRow31(src, dst: pointer)
 3955:02f4 ScaleRow32(src, dst: pointer)
 3955:030e ScaleSprite(src, dst: pointer; size: integer)   // Scales a 32x32 sprite to size x size using RowProcs
-4a81:4830 Scale::RowProcs: array[16..32] of pointer       // ScaleRow16..ScaleRow32
+4a81:4830 Scale::RowProcs: array[16..32] of procedure       // ScaleRow16..ScaleRow32
 
 # ---------------------------------------------------------------------------
 # Vector models (docs/formats/vec.md)
@@ -1029,7 +1029,7 @@
 4a81:8a46 Gus::PortVoice: word             // base+102h
 4a81:8a48 Gus::PortRegSel: word            // base+103h (data lo +1, data hi +2)
 4a81:8a4a Gus::PortDram: word              // base+107h
-4a81:8a60 Sb::DriverEntry: pointer         // far entry of CT-VOICE driver blob (BX = function no.)
+4a81:8a60 Sb::DriverEntry: procedure         // far entry of CT-VOICE driver blob (BX = function no.)
 
 # ---------------------------------------------------------------------------
 # Functions: graphics core, blitters, toolbar, line editor (agent proposals)
@@ -1372,7 +1372,7 @@
 4a81:89d0 Sound::SbPort: word               // From save\setup.spd
 4a81:89d2 Sound::SbIrq: word
 4a81:89d4 Sound::SbDma: word
-4a81:89ba Gfx::SavedExitProc: pointer     // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
+4a81:89ba Gfx::SavedExitProc: procedure     // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
 405f:1a62 ExitHandler                       // ExitProc: shows the error screen and waits for a key
 
 # ---------------------------------------------------------------------------
@@ -1386,7 +1386,7 @@
 4a81:8a4e Ems::GameData: TEmsBlock          // Block holding Groups, Buildings and Charset
 4a81:54ca GfxPath::IconAllSize: word        // Size of ICON\ICON.ALL
 4a81:4e06 GfxPath::CommandIcon: array[0..77] of shortint  // icon number (ICON.ALL) per menu command id, 0 = none (3a1b:00bf)
-4a81:789c Groups::PlanetForceList: pointer  // ^TGroup: the planet force at the shown group's location (2b8d:11bf)
+4a81:789c Groups::PlanetForceList: ^TGroup  // ^TGroup: the planet force at the shown group's location (2b8d:11bf)
 4a81:78a6 Groups::IconBuffer: pointer
 4a81:7802 ShipMove::BlinkCounter: word
 4a81:7804 ShipMove::SpinnerCounter: word

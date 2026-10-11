@@ -70,7 +70,7 @@ static void group_changed(void)
 
 static int16_t *planet_force_item(uint8_t b)
 {
-    return (int16_t *)((uint8_t *)far_host(ds.Groups_PlanetForceList) + 0x83 + b * 2);
+    return (int16_t *)((uint8_t *)ds.Groups_PlanetForceList + 0x83 + b * 2);
 }
 
 // The stock a slot draws from: the home planet's product stock or the planet force's item.
@@ -183,7 +183,7 @@ void Groups_GroupsScreen(void)
     // Ship slot buttons: the button moves units between the group and the planet's stock
     if ((uint16_t)ds.Game_HotspotHit > 0x1B && (uint16_t)ds.Game_HotspotHit < 0x21) {
         TGroup *g = Groups_Selected();
-        const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
+        const uint8_t *layout = Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory);
         ds.Groups_SlotShip = ds.Game_HotspotHit - 0x1B;
         // Units[row][j]; row from SlotA
         uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
@@ -225,7 +225,7 @@ void Groups_GroupsScreen(void)
     // Weapon buttons
     if ((uint16_t)ds.Game_HotspotHit > 0x20 && (uint16_t)ds.Game_HotspotHit < 0x35) {
         TGroup *g = Groups_Selected();
-        const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
+        const uint8_t *layout = Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory);
         uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
         uint16_t k = (uint16_t)(ds.Game_HotspotHit - 0x21);
         ds.Groups_SlotShip = (int16_t)(k / 5 + 1);
@@ -295,14 +295,14 @@ void Groups_NewGroupScreen(void)
 void Groups_LoadGroupsGfx(void)
 {
     ds.Groups_IconBuffer = System_GetMem(0x2300);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), far_host(ds.Groups_IconBuffer), 1, 0x1C,
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), ds.Groups_IconBuffer, 1, 0x1C,
                 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
 }
 
 static uint8_t *screen_at(uint16_t offset) { return gfx_screen() + offset; }
 static const uint8_t *icon_at(uint16_t offset)
 {
-    return (const uint8_t *)far_host(ds.Groups_IconBuffer) + offset;
+    return ds.Groups_IconBuffer + offset;
 }
 
 static void prefix_location(PString *loc, const char *prefix, uint8_t len)
@@ -362,7 +362,7 @@ void Groups_DrawGroupPanel(bool full)
     }
 
     uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
-    const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
+    const uint8_t *layout = Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory);
     int ships = layout[0];
     int weapons = ds.Groups_SlotB[g->Kind - 1][ds.Groups_SlotCategory - 1];
 
@@ -445,7 +445,7 @@ void Groups_SetupGroupsHotspots(void)
     const TGroup *g = Groups_Selected();
     ds.Groups_AtHomePlanet = g->System == 1 && g->Planet == 5 && g->Moon == 0;
     int16_t pf = Groups_FindPlanetForce(g->System, g->Planet, g->Moon);
-    ds.Groups_PlanetForceList = ds.Game_Groups + (uint16_t)((32 + pf - 1) * (int)sizeof(TGroup));
+    ds.Groups_PlanetForceList = (TGroup *)ds.Game_Groups + (32 + pf - 1); // Groups^[1][pf]
     ds.Game_CurSystem = g->System;
     ds.Game_CurPlanet[ds.Game_CurSystem - 1] = g->Planet;
     ds.Game_CurMoon[ds.Game_CurSystem - 1] = g->Moon;
@@ -466,7 +466,7 @@ void Groups_SetupGroupsHotspots(void)
     Mouse_ClearHotspots(7, 7);
 
     const uint8_t kind = g->Kind;
-    const uint8_t *layout = far_host(Groups_SlotLayout(kind, ds.Groups_SlotCategory));
+    const uint8_t *layout = Groups_SlotLayout(kind, ds.Groups_SlotCategory);
     Mouse_ClearHotspots(8, 0x20);
     int ships = layout[0];
     int weapons = ds.Groups_SlotB[kind - 1][ds.Groups_SlotCategory - 1];
@@ -558,7 +558,7 @@ void Groups_InitGroupOfKind(void)
         if (!Groups_SlotUsed(g->Kind, cat))
             continue;
         uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
-        const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, cat));
+        const uint8_t *layout = Groups_SlotLayout(g->Kind, cat);
         for (int s = 1; s <= layout[0]; s++) {
             int16_t *unit = (int16_t *)((uint8_t *)g + row * 0x28 + s * 10 - 21);
             unit[0] = 0;

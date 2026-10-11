@@ -32,16 +32,6 @@ static void reset(void)
     system_init();
     Ems_Init();
     Message_Init();
-    // dseg_init copies the typed constants without the EXE's relocations:
-    // the far pointers to the per-system tables still hold the file's DS
-    // segment (3A81h). The DOS loader adds the load segment.
-    for (int s = 0; s < 8; s++) {
-        uint32_t *tables[3] = {&ds.Galaxy_Names[s], &ds.Galaxy_MoonLists[s], &ds.Galaxy_Bodies[s]};
-        for (int t = 0; t < 3; t++) {
-            if (*tables[t] >> 16 == 0x3A81)
-                *tables[t] = far_ptr(MEM_DS_SEG, (uint16_t)*tables[t]);
-        }
-    }
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Game_ProductionRate = 10;
@@ -252,7 +242,7 @@ static void test_mine_all_systems(void)
     reset();
     const int16_t sys = 3;  // Mirach, body 1
     ds.Galaxy_SystemStatus[sys - 1] = 1;
-    TBody *b = (TBody *)far_host(ds.Galaxy_Bodies[sys - 1]);
+    TBody *b = ds.Galaxy_Bodies[sys - 1];
     b->Owner = 1;
     b->Colony = 1;
     b->_0A = 2;
@@ -292,7 +282,7 @@ static int16_t planet_with_moon(void)
 
 static TBuilding *add_building(uint8_t kind, int16_t planet, int16_t moon, uint8_t health)
 {
-    TBuilding *bl = (TBuilding *)far_host(ds.Game_Buildings) + ds.Game_BuildingCount++;
+    TBuilding *bl = &ds.Game_Buildings[ds.Game_BuildingCount++];
     *bl = (TBuilding){.Kind = kind, .System = 1, .Planet = (uint8_t)planet,
                       .Moon = (uint8_t)moon, .Health = health, .Flag = 1};
     return bl;
@@ -365,7 +355,7 @@ static void test_meteorite_droids(void)
         TBody *shown = &ds.Galaxy_AmnestyBodies[0];
         CHECK(hit->Owner == 1 && hit->Colony != 0);
         hit->_0A = shown->_0A = 5;
-        ds.Game_CurBody = far_ptr(MEM_DS_SEG, (uint16_t)offsetof(DSeg, Galaxy_AmnestyBodies));
+        ds.Game_CurBody = shown;
         for (int k = 0; k < 20; k++)
             add_building(2, 5, 0, 0);
         fixes.meteorite_droids = fix;

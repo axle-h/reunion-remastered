@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     }
     system_init();
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
+    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
     ds.Game_GroupCount = 3;
     ds.Game_CurrentScreen = 8;
 
@@ -67,16 +67,16 @@ int main(int argc, char *argv[])
     ds.Game_CurPlanet[0] = 3;
     ds.Game_CurMoon[0] = 0;
     Satellite_DeployStockSatellite();
-    const TBody *body = far_host(ds.Game_CurBody);
+    const TBody *body = ds.Game_CurBody;
     CHECK(body->Satellite == 0xE2);
     CHECK(ds.Research_Products[2].Stock == 1 && ds.Research_Products[1].Stock == 7);
     ds.Game_CurPlanet[0] = 5;
     Satellite_DeployStockSatellite();
-    body = far_host(ds.Game_CurBody);
+    body = ds.Game_CurBody;
     CHECK(body->Satellite == 1);
     CHECK(ds.Research_Products[2].Stock == 0 && ds.Research_Products[1].Stock == 7);
     // No satellites left: no 0x46 item even with droids in stock.
-    TBody *other = (TBody *)far_host(ds.Galaxy_Bodies[0]) + 1; // planet 2
+    TBody *other = ds.Galaxy_Bodies[0] + 1; // planet 2
     other->Satellite = 0; other->Colony = 0; other->_0A = 0; other->Owner = 0; other->InfoLevel = 0;
     bool any = true;
     Satellite_AddBodyActionItems(1, 2, 0, &any);
