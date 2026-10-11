@@ -220,7 +220,6 @@ static PlayResult boot_and_run(const char *script)
             system_init();
             Game_InitUnits();
             Options_Init();
-            system_add_exit_proc(far_ptr(0x405F, 0x1A62), Gfx_ExitHandler);
             Game_Main();
         }
     }

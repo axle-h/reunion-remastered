@@ -187,7 +187,7 @@ static void model(void)
     CHECK(dseg_init());
     system_init();
     VecLoad_Init();
-    ds.VecLoad_Buffer = System_GetMem(0xAF00);  // as Shop::ShopScreen
+    ds.VecLoad_Buffer = System_GetSegment();  // GetMem(0xAF00)  // as Shop::ShopScreen
     VecLoad_AllocVecBuffers();
     VecLoad_LoadVec(3);
     int16_t objects = ds.VecLoad_ObjectCount;
@@ -206,7 +206,7 @@ static void model(void)
     CHECK(len);
     VecLoad_DrawFrame();
     // Only the window changed, and only to background and blue-ramp colours.
-    uint8_t *buf = far_seg_start(ds.VecLoad_Buffer);
+    uint8_t *buf = ds.VecLoad_Buffer;
     int shaded = 0;
     bool colours = true;
     for (int y = 10; y < 10 + 0x73; y++)

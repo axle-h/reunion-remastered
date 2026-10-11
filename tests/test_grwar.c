@@ -28,7 +28,7 @@ static uint16_t path(int sx, int sy, int gx, int gy)
 static void find_path(void)
 {
     ds.GrWar_BattleGrids = System_GetMem(0xC6);
-    int32_t free_before = system_heap_free();
+    uint32_t used_before = system_heap_used();
 
     clear_grid();
     CHECK(path(0, 4, 5, 4) == 3);  // east
@@ -60,7 +60,7 @@ static void find_path(void)
     CHECK(path(4, 4, 10, 4) == 0);
 
     // FindPath gives back everything it took from the heap.
-    CHECK(system_heap_free() == free_before);
+    CHECK(system_heap_used() == used_before);
 }
 
 // Unit lists as the unit assignment screen leaves them.
@@ -72,7 +72,7 @@ static GrBattleUnit *list(int side)
 static void setup_field(void)
 {
     for (int s = 1; s <= 2; s++) {
-        ds.GrWarUnits_UnitLists[s - 1] = System_GetMem(21 * 0x27);
+        ds.GrWarUnits_UnitLists[s - 1] = System_GetSegment();  // as InitBattleUnits
         System_FillChar(ds.GrWarUnits_UnitLists[s - 1], 21 * 0x27, 0);
     }
     ds.GrWarUnits_AttackerSlotCount = 1;
@@ -220,7 +220,7 @@ static void pick_anim(void)
         CHECK(id >= 1 && id <= 14);
     }
     GrWar_Init();
-    CHECK(ds.Game_GrWarProc == far_ptr(0x1537, 0x11F2));
+    CHECK(ds.Game_GrWarProc == GrWar_PickBattleAnim);
 }
 
 int main(int argc, char *argv[])

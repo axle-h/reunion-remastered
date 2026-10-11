@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
     CHECK(!any);
 
     Satellite_Init();
-    CHECK(ds.Groups_UpdateSatMenu == 0x28CD03FB);
+    CHECK(ds.Groups_UpdateSatMenu == Satellite_UpdateGroupsMenu);
     printf(ok ? "ok\n" : "FAILED\n");
     return ok ? 0 : 1;
 }

@@ -42,6 +42,13 @@ typedef struct PStr18 { uint8_t len; char s[18]; } PStr18;
 typedef struct PStr20 { uint8_t len; char s[20]; } PStr20;
 typedef struct PStr30 { uint8_t len; char s[30]; } PStr30;
 
+// Procedural types from ghidra/types.pas: the port's C functions.
+typedef void (*TProc)(void);
+typedef void (*TDisbandProc)(int16_t, int16_t);
+typedef int16_t (*TCountBuildingsProc)(int16_t, int16_t, int16_t, int16_t, bool);
+typedef int16_t (*TFindForceProc)(int16_t, int16_t, int16_t);
+typedef int16_t (*TIntFunc)(void);
+
 // Records from ghidra/types.pas. Array comments give the Pascal bounds;
 // the C index is the Pascal index minus the lower bound.
 typedef struct TextRec {
@@ -531,6 +538,12 @@ static_assert(sizeof(TCatRange) == 2);
 static_assert(offsetof(TCatRange, Lo) == 0x00);
 static_assert(offsetof(TCatRange, Hi) == 0x01);
 
+typedef struct TAnimRecord {
+    uint8_t Loaded;
+    uint8_t *Frames[140]; // [1..140]
+    uint16_t Sizes[140]; // [1..140]
+} TAnimRecord;
+
 typedef struct TVecPoint {
     int16_t X;
     int16_t Y;
@@ -829,7 +842,7 @@ typedef struct DSeg {
     int8_t Galaxy_SystemStatus[8]; // [1..8] folded 4815; 1 open, 0 known, -1 unknown (cheat sets -1 -> 0)
     int16_t Sim_Observatories[8]; // [1..8] folded 481c; completed observatories (building kind 6) per system (1b8a:2178)
     int16_t Sim_UniversityCount; // completed universities (building kind 13) anywhere (1b8a:2178)
-    uint32_t Scale_RowProcs[17]; // [16..32] ScaleRow16..ScaleRow32
+    uint32_t Scale_RowProcs[17]; // [16..32] ScaleRow16..ScaleRow32 (unused: the port calls Scale_RowProcTable)
     uint8_t Ui_RowOffset[21]; // rows scrolled per step of the toolbar scroll, 21 steps of 33 rows in all (3a1b:0586 reads 4874 + i, i = 0..20)
     uint8_t _pad_4889[0x1];
     PStr17 Ui_ButtonLabels[78]; // was 489c [1..77]; [0] is 17 spaces, the label of an empty slot (3a1b:00bf copies 488a + 18 * id with id 0); 'DISK OPERATIONS' .. 'ALIEN PLANETS'
@@ -996,7 +1009,7 @@ typedef struct DSeg {
     uint32_t System_FreeList;
     uint32_t System_FreeZero;
     uint32_t System_HeapError;
-    uint32_t System_ExitProc;
+    TProc System_ExitProc;
     int16_t System_ExitCode;
     uint32_t System_ErrorAddr;
     uint16_t System_PrefixSeg;
@@ -1319,7 +1332,7 @@ typedef struct DSeg {
     uint8_t _pad_7E3B[0x1];
     int16_t Command_StaffPicked; // staff kind picked in the command centre: the advisor's kind 1..4 (1991)
     int16_t Command_AdvisorLine; // advisor menu line under the mouse, 0 = none (1991:09e8)
-    uint8_t *Anim_Record; // 349h bytes: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
+    TAnimRecord *Anim_Record; // ^TAnimRecord GetMem(349h) in the original: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
     uint8_t *Anim_Script; // 230h bytes: 140 entries {anim, frame, sound, delay} of an anim.def script (SpWar, Command)
     uint16_t VecLoad_Angles[3]; // [1..3] model rotation, 1/3 degrees (0..1079) (3d38:01aa)
     uint8_t VecLoad_Spinning; // the model view turns: Main calls DrawFrame every frame (Shop 32b4:0057)
@@ -1358,7 +1371,7 @@ typedef struct DSeg {
     uint8_t *RawText_SzFaj; // text\sz_faj.raw (5184 bytes)
     uint8_t Gfx_KeyAbort; // set when a key was pressed during WaitFramesOrClick; if already set the wait returns at once
     uint8_t _pad_89B9[0x1];
-    uint32_t Gfx_SavedExitProc; // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
+    TProc Gfx_SavedExitProc; // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
     uint8_t Music_Backend; // 0 none, 1 AdLib, 2 GUS MOD
     uint8_t _pad_89BF[0x1];
     uint8_t AdlibMusic_Present;
@@ -1448,18 +1461,18 @@ typedef struct DSeg {
     uint8_t Music_MainThemeOn; // ? Set when main1/main2 is playing; 424a:017e restarts the theme if clear
     uint8_t _pad_926F[0x1];
     int16_t Blit_HookRow; // row index passed to Blit::CursorHook (999 = end of blit)
-    uint32_t Blit_CursorHook; // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
+    TProc Blit_CursorHook; // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
     int16_t Game_Hero; // 1 or 2, chosen at the title screen (321d:026f). Built into picture names (grafika\deathsz<n>)
     int16_t Game_HeroSpriteX; // 45h for hero 1, 1 for hero 2. X offset into the command centre sprite sheet (3abd:163f)
     int16_t Game_SatButtons; // Bit mask of the satellite menu buttons shown (28cd:03fb). Redrawn when it changes; -1 forces a redraw
     int16_t Game_ShipInfoButtons; // The same for the ship info menu (28cd:0542); -1 forces a redraw
-    uint32_t Groups_UpdateSatMenu; // = 28cd:03fb (Satellite)
-    uint32_t Groups_IntelHook; // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
-    uint32_t Game_FindBuildingProc; // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
-    uint32_t Game_FindPlanetForceProc; // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
-    uint32_t Game_GrWarProc; // = 1537:11f2 (GrWar)
-    uint32_t Game_GfxPathProc; // = 3a1b:09a3 (GfxPath)
-    uint32_t Ems_RestoreProc; // = 4719:0317 (Ems)
+    TProc Groups_UpdateSatMenu; // = 28cd:03fb (Satellite)
+    TDisbandProc Groups_IntelHook; // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
+    TCountBuildingsProc Game_FindBuildingProc; // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
+    TFindForceProc Game_FindPlanetForceProc; // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
+    TIntFunc Game_GrWarProc; // = 1537:11f2 (GrWar)
+    TProc Game_GfxPathProc; // = 3a1b:09a3 (GfxPath)
+    TProc Ems_RestoreProc; // = 4719:0317 (Ems)
     uint8_t Gfx_Palette[256][3]; // Current VGA palette (RGB 0..63). Passed to Gfx::LoadPic and set with 405f:0089
     uint16_t Gfx_ReadPos; // ? Read position in a buffer, advanced by 405f:09f3
     int16_t Gfx_FlashStep; // Palette flash (alert): counts down 61..0 and writes DAC 3C9h (405f:1c21)

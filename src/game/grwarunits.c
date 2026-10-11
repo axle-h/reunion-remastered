@@ -166,8 +166,8 @@ void GrWarUnits_CollectAvailableForces(void)
         ds.GrWarUnits_Defence[1][t - 1] = 0;
         ds.GrWarUnits_Totals[1][t - 1] = 0;
     }
-    ds.GrWarUnits_UnitLists[0] = System_GetMem(0x333);
-    ds.GrWarUnits_UnitLists[1] = System_GetMem(0x333);
+    ds.GrWarUnits_UnitLists[0] = System_GetSegment();  // GetMem(0x333)
+    ds.GrWarUnits_UnitLists[1] = System_GetSegment();  // GetMem(0x333)
     ds.GrWarUnits_AttackerSlotCount = 0;
     ds.GrWarUnits_DefenderSlotCount = 0;
 

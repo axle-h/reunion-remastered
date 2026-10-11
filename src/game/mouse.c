@@ -171,7 +171,7 @@ void Mouse_InitMouse(void)
     ds.Mouse_X = 160;
     ds.Mouse_Y = 70;
     Mouse_CursorSaveBackground();
-    ds.Blit_CursorHook = far_ptr(0x4758, 0x012D);  // Mouse_CursorBlitHook
+    ds.Blit_CursorHook = Mouse_CursorBlitHook;
     ds.Mouse_CursorHidden = 0;
     timing_set_mouse_hook(retrace_hook);
 }

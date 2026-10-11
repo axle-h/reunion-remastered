@@ -63,8 +63,8 @@ static void setup(void)
     CHECK(dseg_init());
     system_init();
     // The record Anim::Record points to (InitRoomAnim allocates it).
-    ds.Anim_Record = System_GetMem(0x349);
-    SDL_memset(ds.Anim_Record, 0, 0x349);
+    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
+    SDL_memset(ds.Anim_Record, 0, sizeof(TAnimRecord));
 }
 
 // MAIN8 (320x200, delta frames) straight onto the screen, as the cut-scene
@@ -72,7 +72,7 @@ static void setup(void)
 static void main_anim(void)
 {
     setup();
-    int32_t before = system_heap_free();
+    uint32_t before = system_heap_used();
     uint8_t frames = ds.Cc_Doors[8 - 1].Frames;
     Ani ani;
     CHECK(ani_load("ANIM\\MAIN8.ANI", &ani));
@@ -90,16 +90,16 @@ static void main_anim(void)
     }
     CHECK(same);
     // The record holds the sizes (stream + 13) and the loaded flag.
-    const uint8_t *r = ds.Anim_Record;
-    CHECK(r[0] == 1);
-    CHECK((size_t)(r[0x231] | r[0x232] << 8) == ani.frames[0].size + 13);
+    const TAnimRecord *r = ds.Anim_Record;
+    CHECK(r->Loaded == 1);
+    CHECK((size_t)r->Sizes[0] == ani.frames[0].size + 13);
     // A second load while one is loaded does nothing.
-    int32_t loaded = system_heap_free();
+    uint32_t loaded = system_heap_used();
     Anim_LoadGrAnim(1);
-    CHECK(system_heap_free() == loaded);
+    CHECK(system_heap_used() == loaded);
     Anim_FreeMainAnim(8);
-    CHECK(r[0] == 0);
-    CHECK(system_heap_free() == before);
+    CHECK(r->Loaded == 0);
+    CHECK(system_heap_used() == before);
     CHECK(ds.Game_MinMemAvail <= SYSTEM_MEM_PLENTY);
     // Nothing loaded: ok stays true and nothing is drawn.
     uint32_t crc = SDL_crc32(0, scr(), 64000);

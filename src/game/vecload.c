@@ -15,10 +15,11 @@ enum : uint16_t {
     WINDOW_SCREEN = 0x44C6, // where it goes on screen (x 6, y 55)
 };
 
-// The start of the off-screen buffer's segment.
+// The off-screen buffer, addressed by its segment (a whole segment in the
+// port: System_GetSegment).
 static inline uint8_t *buffer_base(void)
 {
-    return far_seg_start(ds.VecLoad_Buffer);
+    return ds.VecLoad_Buffer;
 }
 
 // Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
@@ -362,7 +363,9 @@ void VecLoad_FreeWireBuffers(void)
 bool VecLoad_ReadObject(int16_t model, int16_t slot)
 {
     ds.Vec3D_Model = model;
-    return read_object(slot, ds.VecLoad_Faces[slot - 1]);
+    // LoadModel asks for the slot after the last object to read the end
+    // marker; with 17 objects that slot has no buffer (and none is used).
+    return read_object(slot, slot <= 17 ? ds.VecLoad_Faces[slot - 1] : nullptr);
 }
 
 static void set_angles(uint16_t a, uint16_t b, uint16_t c)

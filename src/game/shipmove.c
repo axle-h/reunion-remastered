@@ -260,11 +260,29 @@ void ShipMove_SetupGroupScreenHotspots(void)
     Mouse_Hotspot(6)->Repeat_ = 1;
 }
 
+// The backdrop and the star table (ShipMove_InitStarfield) share one
+// segment, as the original's heap always leaves them: the backdrop at offset
+// 8 of its segment, the stars right after it. Stars that leave the view are
+// still drawn, at a 16-bit offset in the segment that lands in the star
+// table and changes those stars, as in the original (the game's random
+// numbers depend on it).
+enum : uint16_t { BACKDROP_AT = 8, BACKDROP_SIZE = 0xBCC0 };
+
+static uint8_t *backdrop_segment(void)
+{
+    return ds.ShipMove_Backdrop - BACKDROP_AT;
+}
+
+void ShipMove_FreeBackdrop(void)
+{
+    System_FreeSegment(backdrop_segment());
+}
+
 // Shared tail of the two view initialisers: animation buffers.
 static void alloc_anim_buffers(void)
 {
     ds.ShipMove_AnimSheet = System_GetMem(0x9100);
-    ds.ShipMove_Backdrop = System_GetMem(0xBCC0);
+    ds.ShipMove_Backdrop = System_GetSegment() + BACKDROP_AT;  // GetMem(BCC0h)
     Gfx_LoadPic(PS("planets\\muszianm"), ds.ShipMove_AnimSheet, 0, 0x74, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x3F, 0x40, 0, 0x3F);
 }
@@ -560,11 +578,11 @@ void ShipMove_AnimateStarfield(void)
             System_RunError(200);
         int16_t px = (int16_t)((int16_t)(s->x * 100) / d);
         int16_t py = (int16_t)((int16_t)(s->y * 100) / d);
-        // 16-bit offset from the block's segment, wrapping as the original's
-        uint8_t *seg = far_seg_start(ds.ShipMove_Backdrop);
-        uint16_t off = (uint16_t)((uint16_t)(ds.ShipMove_Backdrop - seg)
-                                  + (uint16_t)((py + 0x31) * 0x140) + (uint16_t)px + 0xA0);
-        seg[off] = (uint8_t)(s->depth / 0x3C + 0x70);
+        // The original's 16-bit offset in the backdrop's segment (see
+        // backdrop_segment): out-of-view stars land past the backdrop.
+        uint16_t off = (uint16_t)(BACKDROP_AT + (uint16_t)((py + 0x31) * 0x140) + (uint16_t)px
+                                  + 0xA0);
+        backdrop_segment()[off] = (uint8_t)(s->depth / 0x3C + 0x70);
         s->depth = (int16_t)(s->depth - s->speed);
         if (abs16(px) > 0x8C || abs16(py) > 0x2D)
             s->depth = (int16_t)(System_Random(500) + 500);
@@ -577,7 +595,7 @@ void ShipMove_AnimateStarfield(void)
 // 22ca:20f3: 1101 stars with random positions
 void ShipMove_InitStarfield(void)
 {
-    ds.ShipMove_Stars = System_GetMem(0x1E1B);
+    ds.ShipMove_Stars = ds.ShipMove_Backdrop + BACKDROP_SIZE;  // GetMem(1E1Bh)
     Star *stars = (Star *)ds.ShipMove_Stars;
     for (int i = 0; i <= 0x44C; i++) {
         Star *s = &stars[i];

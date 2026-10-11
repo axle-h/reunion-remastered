@@ -16,10 +16,10 @@ enum { GRID_STRIDE = 11, GRID_ORG = 0xC, BASE_SLOT = 21 };
 
 static uint8_t *screen_at(uint16_t ofs) { return gfx_screen() + ofs; }
 // The original addresses the off-screen field as RenderBuf's segment with its
-// own offsets, dropping the pointer's offset (GetMem's 0 or 8).
+// own offsets (a whole segment in the port: System_GetSegment).
 static uint8_t *render_at(uint16_t ofs)
 {
-    return far_seg_start(ds.GrWar_RenderBuf) + ofs;
+    return ds.GrWar_RenderBuf + ofs;
 }
 static const uint8_t *lit(const PString *s) { return (const uint8_t *)s; }
 
@@ -32,12 +32,11 @@ static int16_t *proj_count(int side) { return &ds.GrWar_ProjectileCount[side - 1
 
 // Slot i (1-based) of side's list. The original adds i * 27h - 27h to the
 // list's offset in 16 bits, so i = 0 (an empty grid cell, a unit without a
-// target) wraps to the end of the list's segment, not the 39 bytes before it.
+// target) wraps to the end of the list's segment, not the 39 bytes before it
+// (the lists are whole segments: System_GetSegment).
 static GrBattleUnit *unit(int side, int i)
 {
-    uint8_t *list = ds.GrWarUnits_UnitLists[side - 1];
-    uint8_t *seg = far_seg_start(list);
-    return (GrBattleUnit *)(seg + (uint16_t)(list - seg + (i - 1) * 0x27));
+    return (GrBattleUnit *)(ds.GrWarUnits_UnitLists[side - 1] + (uint16_t)((i - 1) * 0x27));
 }
 
 // Tile step of direction 1..4, read for any byte as the original does: a
@@ -410,7 +409,7 @@ static int16_t fx_frames(uint8_t e) { return ds.GrWar_Effects[e - 1].Frames; }
 void GrWar_RenderBattle(void)
 {
     GrWar_DrawSelectedUnitInfo();
-    ds.GrWar_RenderBuf = System_GetMem(0xBCD0);
+    ds.GrWar_RenderBuf = System_GetSegment();  // GetMem(0xBCD0)
     Blit_CopyRect(ds.GrWar_Background + 0x3D80, render_at(0x50), 0x100, 0x97);
     GrWar_DrawBaseSprites();
 
@@ -493,7 +492,7 @@ void GrWar_RenderBattle(void)
     }
     Blit_CopyRect(render_at(0x50), screen_at(0x3D80), 0x100, 0x97);
     Command_TickGrAnim();
-    System_FreeMem(ds.GrWar_RenderBuf, 0xBCD0);
+    System_FreeSegment(ds.GrWar_RenderBuf);
 }
 
 // 1537:11f2: war animation 1..14 whose two unit types are both on the field (Game::GrWarProc).
@@ -1269,5 +1268,5 @@ void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int
 // 1537:3a71
 void GrWar_Init(void)
 {
-    ds.Game_GrWarProc = far_ptr(0x1537, 0x11F2);
+    ds.Game_GrWarProc = GrWar_PickBattleAnim;
 }

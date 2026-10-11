@@ -50,7 +50,7 @@ static void viewport(void)
 static void starfield(void)
 {
     ds.Mouse_CursorState = 1;
-    ds.ShipMove_Backdrop = System_GetMem(0xBCC0);
+    ds.ShipMove_Backdrop = System_GetSegment() + 8;  // as alloc_anim_buffers
 
     ds.System_RandSeed = 1234;
     ShipMove_InitStarfield();

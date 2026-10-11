@@ -29,12 +29,11 @@ static int16_t cur_moon(void)
 }
 
 // Cell (x, y) of a map layer; `size` is 1 for the byte layers and 2 for the
-// word layer. The offset wraps like the original's 16-bit arithmetic, within
-// the layer's segment.
+// word layer. The offset wraps like the original's 16-bit arithmetic (x or
+// y 0 is below the layer), inside the layer's segment (System_GetSegment).
 static void *cell(uint8_t *layer, int16_t x, int16_t y, int size)
 {
-    uint8_t *seg = far_seg_start(layer);
-    return seg + (uint16_t)(layer - seg + x * 60 * size + y * size - 61 * size);
+    return layer + (uint16_t)(x * 60 * size + y * size - 61 * size);
 }
 
 static uint8_t *tile_at(int16_t x, int16_t y)
@@ -147,9 +146,9 @@ void Surface_EnterSurface(void)
     Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufB, 1, (uint16_t)felsz, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
-    ds.Surface_TileLayer = System_GetMem(0x1518);
-    ds.Surface_OccupyLayer = System_GetMem(0x1518);
-    ds.Surface_BuildingLayer = System_GetMem(0x2A30);
+    ds.Surface_TileLayer = System_GetSegment();  // GetMem(0x1518)
+    ds.Surface_OccupyLayer = System_GetSegment();  // GetMem(0x1518)
+    ds.Surface_BuildingLayer = System_GetSegment();  // GetMem(0x2A30)
     Surface_LoadMap();
 
     ds.Surface_RadarDouble = ds.Surface_MapWidth < 0x2E && ds.Surface_MapHeight < 0x1F;
@@ -1094,5 +1093,5 @@ void Surface_DrawRadar(void)
 // 2ef2:329e
 void Surface_Init(void)
 {
-    ds.Game_FindBuildingProc = far_ptr(0x2EF2, 0x2B1A);
+    ds.Game_FindBuildingProc = Surface_CountBuildings;
 }

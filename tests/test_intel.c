@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
 
     // Intel_Init installs the group hook.
     Intel_Init();
-    CHECK(ds.Groups_IntelHook == far_ptr(0x29B9, 0x0B93));
+    CHECK(ds.Groups_IntelHook == Intel_DisbandGroup);
 
     // AlienTalk: scene / talk switches and the question menu mouse mapping.
     AlienTalk_StartAlienScene(7);

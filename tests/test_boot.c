@@ -51,7 +51,6 @@ static int run(const char *script)
             return -3;
         system_init();
         Game_InitUnits();
-        system_add_exit_proc(far_ptr(0x405F, 0x1A62), Gfx_ExitHandler);
         Game_Main();
     }
     return halt_code;

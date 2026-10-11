@@ -282,7 +282,7 @@ static void load_pic(void)
     CHECK(retraces == 5);
     CHECK(seen40[0] == 32 && seen40[1] == 24 && seen40[3] == 8 && seen40[4] == 0);
     // The file buffer went back to the heap.
-    CHECK(system_heap_free() == system_heap_max_block());
+    CHECK(system_heap_used() == 0);
 
     // rows is clipped to the picture height (405f:0ccb): nothing past it.
     uint8_t *buf = System_GetMem((uint16_t)(320 * (h + 4)));

@@ -1036,14 +1036,12 @@ void Gfx_OutOfMemoryExit(void)
     System_Halt(0);
 }
 
-// call far [p] for the procedure variables the exit handler calls.
-static void call_far_proc(uint32_t p)
+// call far [p] for the procedure variables the exit handler calls. nil
+// (unit not initialised): the original would crash; nothing to do.
+static void call_proc(TProc p)
 {
-    if (p == far_ptr(0x3A1B, 0x09A3))
-        GfxPath_FreeToolbarBuffer();
-    else if (p == far_ptr(0x4719, 0x0317))
-        Ems_EmsReleaseGameData();
-    // nil (unit not initialised): the original would crash; nothing to do.
+    if (p)
+        p();
 }
 
 // 405f:1a62, installed as ExitProc by Gfx_Init.
@@ -1053,8 +1051,8 @@ void Gfx_ExitHandler(void)
     if (ds.Sound_Enabled && ds.Sound_DeviceType != 1)
         Sound_SbBreakLoop();
     Music_StopMusic();
-    call_far_proc(ds.Game_GfxPathProc);
-    call_far_proc(ds.Ems_RestoreProc);
+    call_proc(ds.Game_GfxPathProc);
+    call_proc(ds.Ems_RestoreProc);
     if (ds.System_ErrorAddr == 0)
         return;
 
@@ -1116,5 +1114,5 @@ void Gfx_Init(void)
     scanlines_pending = 0;  // port: every boot starts the same (tests replay boots)
     ds.Game_MinMemAvail = 0x009BF9B0;
     ds.Gfx_SavedExitProc = ds.System_ExitProc;
-    ds.System_ExitProc = far_ptr(0x405F, 0x1A62);  // Gfx_ExitHandler
+    ds.System_ExitProc = Gfx_ExitHandler;
 }

@@ -608,7 +608,7 @@ static int screen_pixels(void)
 // The info screens draw without trouble and use up their buffers.
 static void test_screens(void)
 {
-    int32_t free0 = system_heap_free();
+    uint32_t used0 = system_heap_used();
     ds.Game_CurSystem = 1;
     ds.Game_CurPlanet[0] = 5;
     ds.Game_CurMoon[0] = 0;
@@ -618,18 +618,18 @@ static void test_screens(void)
     ds.PlanetInfo_AlienMode = 0;
     PlanetInfo_DrawPlanetInfoScreen();
     CHECK(screen_pixels() > 20000);
-    CHECK(system_heap_free() == free0);
+    CHECK(system_heap_used() == used0);
 
     // The text only: unchanged pixel count except the text area.
     PlanetInfo_DrawPlanetInfoText();
-    CHECK(system_heap_free() == free0);
+    CHECK(system_heap_used() == used0);
 
     // An alien body.
     ds.Game_CurPlanet[0] = 7;
     PlanetInfo_SelectCurBody();
     ds.Game_CurBody->InfoLevel = 50;
     RawText_LoadSzFaj();
-    free0 = system_heap_free();  // the race texts stay loaded
+    used0 = system_heap_used();  // the race texts stay loaded
     ds.PlanetInfo_AlienMode = 1;
     System_FillChar(vid_screen, 320 * 200, 0);
     PlanetInfo_DrawAlienInfoScreen();
@@ -639,7 +639,7 @@ static void test_screens(void)
     PlanetInfo_DrawPlanetInfoScreen();
     CHECK(screen_pixels() > 20000);
     PlanetInfo_DrawPlanetSurfaceBackdrop();
-    CHECK(system_heap_free() == free0);
+    CHECK(system_heap_used() == used0);
 
     // Colony set-up screen.
     ds.Game_CurPlanet[0] = 4;
@@ -650,7 +650,7 @@ static void test_screens(void)
     Colonize_DrawColonizeScreen();
     CHECK(screen_pixels() > 20000);
     System_FreeMem(ds.Surface_BufC, 0xF000);
-    CHECK(system_heap_free() == free0);
+    CHECK(system_heap_used() == used0);
 }
 
 int main(int argc, char *argv[])

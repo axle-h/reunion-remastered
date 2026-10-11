@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     GfxPath_Init();
     TEmsBlock *blk = Ems_ToolbarBlock();
     CHECK(blk->State == 1 && blk->Data != nullptr);  // a heap copy
-    CHECK(ds.Game_GfxPathProc == far_ptr(0x3A1B, 0x09A3));
+    CHECK(ds.Game_GfxPathProc == GfxPath_FreeToolbarBuffer);
     GfxPath_IconAllIndex();
 
     Icons icons;

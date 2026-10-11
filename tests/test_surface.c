@@ -46,13 +46,13 @@ static void setup(int surface, int variant)
     ds.Surface_TileSet = ds.Surface_Tileset[surface - 1];
     ds.Surface_MapVariant = (int16_t)variant;
     if (ds.Surface_TileLayer) {
-        System_FreeMem(ds.Surface_TileLayer, 0x1518);
-        System_FreeMem(ds.Surface_OccupyLayer, 0x1518);
-        System_FreeMem(ds.Surface_BuildingLayer, 0x2A30);
+        System_FreeSegment(ds.Surface_TileLayer);
+        System_FreeSegment(ds.Surface_OccupyLayer);
+        System_FreeSegment(ds.Surface_BuildingLayer);
     }
-    ds.Surface_TileLayer = System_GetMem(0x1518);
-    ds.Surface_OccupyLayer = System_GetMem(0x1518);
-    ds.Surface_BuildingLayer = System_GetMem(0x2A30);
+    ds.Surface_TileLayer = System_GetSegment();  // GetMem(0x1518)
+    ds.Surface_OccupyLayer = System_GetSegment();  // GetMem(0x1518)
+    ds.Surface_BuildingLayer = System_GetSegment();  // GetMem(0x2A30)
 }
 
 static void load_map(void)
@@ -215,7 +215,7 @@ static void counting(void)
     CHECK(ds.Game_BuildingCount == 3);
 
     Surface_Init();
-    CHECK(ds.Game_FindBuildingProc == far_ptr(0x2EF2, 0x2B1A));
+    CHECK(ds.Game_FindBuildingProc == Surface_CountBuildings);
 }
 
 static void hotspots_and_blits(void)

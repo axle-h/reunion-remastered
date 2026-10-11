@@ -6,47 +6,9 @@
 #include "game/gfx.h"
 #include "game/system.h"
 
-// The animation record (Anim::Record) and the frame counts of the three
-// kinds: SpWar::SpriteRects (war), Cc::Doors (main) and Cc::Rooms (gr).
-enum : uint16_t {
-    // Offsets in the record (frames count from 1).
-    REC_LOADED = 0x000,
-    REC_PTRS = 0x001,   // 140 far pointers (see frame_ptr)
-    REC_SIZES = 0x231,  // 140 words
-};
-
-static inline uint16_t rd16(const uint8_t *rec, uint16_t off)
-{
-    return (uint16_t)(rec[off] | rec[off + 1] << 8);
-}
-
-static inline void wr16(uint8_t *rec, uint16_t off, uint16_t v)
-{
-    rec[off] = (uint8_t)v;
-    rec[off + 1] = (uint8_t)(v >> 8);
-}
-
-// The frame pointers stay 4-byte far values in the record, as the original
-// stores them: host pointers would not fit the 349h bytes its users allocate.
-static inline uint8_t *frame_ptr(const uint8_t *rec, uint16_t frame)
-{
-    uint16_t off = (uint16_t)(REC_PTRS + (frame - 1) * 4);
-    FarPtr p = (FarPtr)rd16(rec, (uint16_t)(off + 2)) << 16 | rd16(rec, off);
-    return p == 0 ? nullptr : far_host(p);
-}
-
-static inline void set_frame_ptr(uint8_t *rec, uint16_t frame, const uint8_t *p)
-{
-    uint16_t off = (uint16_t)(REC_PTRS + (frame - 1) * 4);
-    FarPtr fp = far_from_host(p);
-    wr16(rec, off, (uint16_t)fp);
-    wr16(rec, (uint16_t)(off + 2), (uint16_t)(fp >> 16));
-}
-
-static inline uint16_t frame_size(const uint8_t *rec, uint16_t frame)
-{
-    return rd16(rec, (uint16_t)(REC_SIZES + (frame - 1) * 2));
-}
+// The animation record (Anim::Record, TAnimRecord) and the frame counts of
+// the three kinds: SpWar::SpriteRects (war), Cc::Doors (main) and Cc::Rooms
+// (gr). Frames count from 1.
 
 // Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
 static void track_min_mem(void)
@@ -61,9 +23,9 @@ static void track_min_mem(void)
 static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16_t str_max,
                       bool keep_nil)
 {
-    uint8_t *rec = ds.Anim_Record;
-    if (rec[REC_LOADED] == 0) {
-        rec[REC_LOADED] = 1;
+    TAnimRecord *rec = ds.Anim_Record;
+    if (rec->Loaded == 0) {
+        rec->Loaded = 1;
         PString num, path;
         System_StrLong((int16_t)id, 0, &num, str_max);
         System_StrLoad(&path, prefix);
@@ -76,9 +38,9 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
                 uint8_t *buf;
                 uint16_t size;
                 Gfx_ReadChunk(&buf, &size);
-                wr16(rec, (uint16_t)(REC_SIZES + (i - 1) * 2), size);
+                rec->Sizes[i - 1] = size;
                 if (!keep_nil || size != 0)
-                    set_frame_ptr(rec, i, buf);
+                    rec->Frames[i - 1] = buf;
                 if (i == count)
                     break;
             }
@@ -92,14 +54,14 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
 // whose size is 0; War frees every frame (FreeMem of nil/0 does nothing).
 static void free_anim(uint8_t frames, bool check_size)
 {
-    uint8_t *rec = ds.Anim_Record;
-    if (rec[REC_LOADED] != 0) {
-        rec[REC_LOADED] = 0;
+    TAnimRecord *rec = ds.Anim_Record;
+    if (rec->Loaded != 0) {
+        rec->Loaded = 0;
         uint16_t count = frames;
         if (count != 0) {
             for (uint16_t i = 1;; i++) {
-                if (!check_size || frame_size(rec, i) != 0)
-                    System_FreeMem(frame_ptr(rec, i), frame_size(rec, i));
+                if (!check_size || rec->Sizes[i - 1] != 0)
+                    System_FreeMem(rec->Frames[i - 1], rec->Sizes[i - 1]);
                 if (i == count)
                     break;
             }
@@ -146,13 +108,13 @@ void Anim_FreeGrAnim(uint16_t id)
 // 3c64:0496
 void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest)
 {
-    uint8_t *rec = ds.Anim_Record;
-    if (rec[REC_LOADED] != 0) {
-        Anim_DecodeAnimFrame(frame_ptr(rec, 1), dest, 0x40);
+    const TAnimRecord *rec = ds.Anim_Record;
+    if (rec->Loaded != 0) {
+        Anim_DecodeAnimFrame(rec->Frames[0], dest, 0x40);
         uint16_t f = frame;
-        while (frame_size(rec, f) == 0 && (int16_t)f > 1)
+        while (rec->Sizes[f - 1] == 0 && (int16_t)f > 1)
             f--;
-        Anim_DecodeAnimFrame(frame_ptr(rec, f), dest, 0x40);
+        Anim_DecodeAnimFrame(rec->Frames[f - 1], dest, 0x40);
     }
 }
 
@@ -160,12 +122,12 @@ void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest)
 void Anim_DrawAnimFrame(uint16_t frame, uint8_t *dest, bool *ok)
 {
     *ok = true;
-    uint8_t *rec = ds.Anim_Record;
-    if (rec[REC_LOADED] != 0) {
-        if (frame_ptr(rec, frame) == nullptr)
+    const TAnimRecord *rec = ds.Anim_Record;
+    if (rec->Loaded != 0) {
+        if (rec->Frames[frame - 1] == nullptr)
             *ok = false;
         else
-            Anim_DecodeAnimFrame(frame_ptr(rec, frame), dest, 0x40);
+            Anim_DecodeAnimFrame(rec->Frames[frame - 1], dest, 0x40);
     }
 }
 

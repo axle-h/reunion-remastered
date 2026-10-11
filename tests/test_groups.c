@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
     CHECK(Groups_IsGroupEmptyOfCargo(0, ds.Game_SelGroup));
 
     Groups_Init();
-    CHECK(ds.Game_FindPlanetForceProc == 0x2B8D1C9F);
+    CHECK(ds.Game_FindPlanetForceProc == Groups_FindPlanetForce);
 
     printf(ok ? "ok\n" : "FAILED\n");
     return ok ? 0 : 1;

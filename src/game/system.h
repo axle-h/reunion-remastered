@@ -13,9 +13,8 @@
 #include "game/dseg.h"
 #include "game/mem.h"
 
-// 48c7:0000 InitSystem, the part the port needs: sets the heap variables
-// (an empty heap from MEM_HEAP_SEG to A000:0000), PrefixSeg, HeapError and
-// Test8086. Needs mem_init() and dseg_init() first.
+// 48c7:0000 InitSystem, the part the port needs: the selector variables and
+// Test8086, and an empty heap. Needs dseg_init() first.
 void system_init(void);
 
 // Called instead of terminating on a run-time error (tests use it to catch
@@ -34,10 +33,6 @@ extern void (*system_exit_handler)(uint8_t code);
 // 48c7:0116: ends the program with exit code `code` (ErrorAddr := nil),
 // running the ExitProc chain first.
 [[noreturn]] void System_Halt(uint16_t code);
-// Tells Halt which C function ports the far procedure `proc` (Ghidra
-// segment numbering, as the game stores it) when it finds it in ExitProc.
-void system_add_exit_proc(FarPtr proc, void (*fn)(void));
-
 // ---------------------------------------------------------------------------
 // Pascal strings. Any string[N] (PStrN in dseg.h) has the same layout as
 // PString, so pass it cast to PString *; `maxLen` is the declared N.
@@ -76,8 +71,7 @@ int32_t System_ValLong(const PString *s, int16_t *code);
 char System_UpCase(char c);
 
 // ---------------------------------------------------------------------------
-// Memory. The original takes far pointers; these take host pointers (from
-// far_host()).
+// Memory. The original takes far pointers; these take host pointers.
 // ---------------------------------------------------------------------------
 
 // 48c7:0b4f: forward byte copy (the compiler's record/array assignment), so
@@ -91,24 +85,28 @@ void System_Move(const void *src, void *dst, uint16_t count);
 void System_FillChar(void *dst, uint16_t count, uint8_t value);
 
 // ---------------------------------------------------------------------------
-// Heap: BP7's free list in the emulated address space, between HeapOrg and
-// HeapEnd (A000:0000, then F000:0000 around video memory; heap_alloc).
-// Blocks are multiples of 8 bytes, at the original's addresses; the game
-// gets host pointers to them.
+// Heap. Blocks come from the C allocator, zeroed (the original's held
+// whatever the heap held before; the game reads nothing it hasn't written).
 // ---------------------------------------------------------------------------
 
 // 48c7:028a: GetMem(size). nil for size 0; run-time error 203 when full.
 void *System_GetMem(uint16_t size);
-// 48c7:029f: run-time error 204 for a pointer that is not a heap block.
+// 48c7:029f: FreeMem. Run-time error 204 for nil (size 0 is ignored).
 void System_FreeMem(void *p, uint16_t size);
 // 48c7:02e7 / 0303: total free bytes and the largest free block, as the
 // game sees them: always SYSTEM_MEM_PLENTY, so its memory checks pass.
 enum : int32_t { SYSTEM_MEM_PLENTY = 0xA0000 };
 int32_t System_MemAvail(void);
 int32_t System_MaxAvail(void);
-// The heap's real free bytes and largest free block (tests: leak checks).
-int32_t system_heap_free(void);
-int32_t system_heap_max_block(void);
+// Port addition: a buffer the original addressed through its 64 KB segment
+// (drawing routines' 16-bit offsets, indices that wrap below the block): a
+// whole zeroed segment, so the wrapped offsets stay inside it. The block
+// starts at its start (the original's was at offset 0 or 8 of its segment;
+// the game never depends on which).
+uint8_t *System_GetSegment(void);
+void System_FreeSegment(uint8_t *seg);
+// Bytes in use (GetMem sizes rounded to 8, segments), for tests' leak checks.
+uint32_t system_heap_used(void);
 
 // ---------------------------------------------------------------------------
 // Random numbers (Borland's LCG on ds.System_RandSeed).

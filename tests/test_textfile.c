@@ -77,12 +77,12 @@ static void run(uint8_t *s, const char *keys, int width, bool cancel)
 static void editing(void)
 {
     uint8_t s[256];
-    int32_t avail = system_heap_free();
+    uint32_t used = system_heap_used();
 
     set(s, "ab");
     run(s, "cd\r", 8, false);
     CHECK(eq(s, "abcd"));
-    CHECK(system_heap_free() == avail);  // the backup copy is freed
+    CHECK(system_heap_used() == used);  // the backup copy is freed
 
     set(s, "");
     run(s, "x\b\by\r", 8, false);  // backspace on empty is harmless
@@ -110,7 +110,7 @@ static void editing(void)
     set(s, "keep");
     run(s, "xyz\x1b", 8, true);
     CHECK(eq(s, "keep"));
-    CHECK(system_heap_free() == avail);
+    CHECK(system_heap_used() == used);
 
     // The text is drawn in the field (glyph pixels + colour FCh).
     CHECK(retraces > 0);

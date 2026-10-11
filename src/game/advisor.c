@@ -144,23 +144,22 @@ int16_t Advisor_FindAdvisorItem(bool flag)
 void Advisor_LoadAdvisorPictures(void)
 {
     ds.Advisor_MenuLines = System_GetMem(0x131);
-    uint8_t *buf = System_GetMem(0xFFFF);
-    // Offsets into buf wrap inside its segment, as in the original.
-    uint8_t *seg = far_seg_start(buf);
-    uint16_t off = (uint16_t)(buf - seg);
+    // GetMem(0FFFFh) in the original; offsets into it wrap inside the
+    // segment.
+    uint8_t *buf = System_GetSegment();
     Gfx_LoadPic(ps(PSTR("grafika\\you")), buf, 1, 0x6E, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0xAF, 0x40, 0, 0xAF);
     // Our own face: hero 2 sits at the left of the sheet, hero 1 further right.
     uint16_t hero_off = ds.Game_Hero == 2 ? 0x141 : 0x1A5;
-    Blit_CopyRect(seg + (uint16_t)(off + hero_off), gfx_screen() + 0x7159, 0x64, 0x6D);
+    Blit_CopyRect(buf + hero_off, gfx_screen() + 0x7159, 0x64, 0x6D);
     PString name;
     System_StrLoad(&name, PSTR("grafika\\"));
     System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[ds.Command_StaffPicked - 1]);
     Gfx_LoadPic(ps(&name), buf, 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x8F,
                 0x40, 0, 0x8F);
     int16_t col = (int16_t)((int16_t)(ds.Game_StaffHired[ds.Command_StaffPicked - 1] - 1) * 0x6A);
-    Blit_CopyRect(seg + (uint16_t)(off + 0x145 + col), gfx_screen() + 0x7085, 0x62, 0x6D);
-    System_FreeMem(buf, 0xFFFF);
+    Blit_CopyRect(buf + (uint16_t)(0x145 + col), gfx_screen() + 0x7085, 0x62, 0x6D);
+    System_FreeSegment(buf);
 }
 
 // 1991:0487

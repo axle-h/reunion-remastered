@@ -436,7 +436,7 @@ static void free_left_screen_buffers(void)
     if (leaving(5)) {
         ds.VecLoad_Spinning = 0;
         VecLoad_FreeVecBuffers();
-        System_FreeMem(ds.VecLoad_Buffer, 0xAF00);
+        System_FreeSegment(ds.VecLoad_Buffer);
         System_FreeMem(ds.RawText_SzTalal, 0x1DAB);
     }
     if (leaving(7)) {
@@ -454,7 +454,7 @@ static void free_left_screen_buffers(void)
     }
     if (leaving(12)) {
         Anim_FreeMainAnim(0x11);
-        System_FreeMem(ds.Anim_Record, 0x349);
+        System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
         System_FreeMem(ds.Anim_Script, 0x230);
         System_FreeMem(ds.SaveLoad_BufFrame, 0x1324);
         System_FreeMem(ds.SaveLoad_BufBack, 0xBCC0);
@@ -462,8 +462,7 @@ static void free_left_screen_buffers(void)
     }
     if (leaving(17)) {
         System_FreeMem(ds.ShipMove_AnimSheet, 0x9100);
-        System_FreeMem(ds.ShipMove_Backdrop, 0xBCC0);
-        System_FreeMem(ds.ShipMove_Stars, 0x1E1B);
+        ShipMove_FreeBackdrop();  // and the star table in its segment
     }
     if (leaving(18)) {
         System_FreeMem(ds.PlanetInfo_Sprites, 0x6900);
@@ -472,8 +471,8 @@ static void free_left_screen_buffers(void)
     }
     if (leaving(19)) {
         if (ds.Game_CurrentScreen != 32) {
-            System_FreeMem(ds.GrWarUnits_UnitLists[0], 0x333);
-            System_FreeMem(ds.GrWarUnits_UnitLists[1], 0x333);
+            System_FreeSegment(ds.GrWarUnits_UnitLists[0]);
+            System_FreeSegment(ds.GrWarUnits_UnitLists[1]);
         }
         System_FreeMem(ds.GrWar_UnitIcons, 0x3C00);
         if (ds.Game_CurrentScreen == 7)
@@ -492,9 +491,9 @@ static void free_left_screen_buffers(void)
         if (ds.Surface_FanimHeight[t - 1] != 0)
             System_FreeMem(ds.Surface_BufD, (uint16_t)(ds.Surface_FanimHeight[t - 1] * 0x140));
         System_FreeMem(ds.Surface_BufB, (uint16_t)(ds.Surface_FelszHeight[t - 1] * 0x140));
-        System_FreeMem(ds.Surface_BuildingLayer, 0x2A30);
-        System_FreeMem(ds.Surface_OccupyLayer, 0x1518);
-        System_FreeMem(ds.Surface_TileLayer, 0x1518);
+        System_FreeSegment(ds.Surface_BuildingLayer);
+        System_FreeSegment(ds.Surface_OccupyLayer);
+        System_FreeSegment(ds.Surface_TileLayer);
     }
     if (leaving(22))
         System_FreeMem(ds.Groups_IconBuffer, 0x2300);
@@ -513,14 +512,14 @@ static void free_left_screen_buffers(void)
         System_FreeMem(ds.SpWar_Face, 0x1180);
         System_FreeMem(ds.SpWar_AttackerList, 0x177C);
         System_FreeMem(ds.SpWar_DefenderList, 0x177C);
-        System_FreeMem(ds.Anim_Record, 0x349);
+        System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
         System_FreeMem(ds.Anim_Script, 0x230);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(32)) {
-        System_FreeMem(ds.GrWarUnits_UnitLists[0], 0x333);
-        System_FreeMem(ds.GrWarUnits_UnitLists[1], 0x333);
+        System_FreeSegment(ds.GrWarUnits_UnitLists[0]);
+        System_FreeSegment(ds.GrWarUnits_UnitLists[1]);
         System_FreeMem(ds.GrWar_LostFrames, 0x2860);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();

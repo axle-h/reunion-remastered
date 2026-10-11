@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
         return 77;
     }
     system_init();
-    const int32_t heap_start = system_heap_free();
+    const uint32_t heap_start = system_heap_used();
     SDL_setenv_unsafe("SDL_AUDIO_DRIVER", "dummy", 1);
     Sound_Init();
     if (!Sound_DeviceOpen()) {
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     Music_InitMusicDevices();
     CHECK(ds.AdlibMusic_Present && ds.AdlibMusic_Inited);
     // The tune buffer is not on the emulated heap.
-    CHECK(ds.AdlibMusic_TuneBuf == 0 && system_heap_free() == heap_start);
+    CHECK(ds.AdlibMusic_TuneBuf == 0 && system_heap_used() == heap_start);
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
     CHECK(!Adlib_Playing());
 
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
     config.music = CONFIG_MUSIC_SOUND_BLASTER;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1 && Adlib_Playing());
-    CHECK(ds.AdlibMusic_TuneBuf == 0 && system_heap_free() == heap_start);
+    CHECK(ds.AdlibMusic_TuneBuf == 0 && system_heap_used() == heap_start);
 
     // The start menu's hero voice stays held back when the music switches to
     // the modules there, and comes in when let go.

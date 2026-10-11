@@ -765,5 +765,5 @@ void Intel_Init(void)
 {
     // The group screen calls this through a far code pointer; code segments
     // use Ghidra's numbering here.
-    ds.Groups_IntelHook = far_ptr(0x29B9, 0x0B93);
+    ds.Groups_IntelHook = Intel_DisbandGroup;
 }

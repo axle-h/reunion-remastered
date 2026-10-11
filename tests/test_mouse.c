@@ -139,7 +139,7 @@ static void cursor(void)
     // InitMouse puts the pointer at 160,70 and installs the hook.
     Mouse_InitMouse();
     CHECK(ds.Mouse_Present == 1 && ds.Mouse_X == 160 && ds.Mouse_Y == 70);
-    CHECK(ds.Blit_CursorHook == far_ptr(0x4758, 0x012D) && ds.Mouse_CursorState == 1);
+    CHECK(ds.Blit_CursorHook == Mouse_CursorBlitHook && ds.Mouse_CursorState == 1);
 }
 
 static void button(int b, bool down, float x, float y)

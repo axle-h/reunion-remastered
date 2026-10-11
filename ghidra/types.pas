@@ -228,7 +228,21 @@ type
     Lo, Hi: byte;
   end;
 
+  { --- Procedure variables (the port stores its C functions) --- }
+
+  TProc = procedure;
+  TDisbandProc = procedure(list, group: integer);
+  TCountBuildingsProc = function(kind, system, planet, moon: integer; activeOnly: boolean): integer;
+  TFindForceProc = function(system, planet, moon: integer): integer;
+  TIntFunc = function: integer;
+
   { --- Tables found while naming the data segment (2026-10-11) --- }
+
+  TAnimRecord = record       { 841 bytes; Anim::Record, the loaded animation (3c64) }
+    Loaded: boolean;                   { +000 }
+    Frames: array[1..140] of pointer;  { +001  frame blocks (.ani chunks), nil if not loaded }
+    Sizes:  array[1..140] of word;     { +231  their sizes (stream + 13), 0 for a skipped chunk }
+  end;
 
   TVecPoint = record         { 6 bytes; a model point or centroid }
     X, Y, Z:     integer;    { +00 }

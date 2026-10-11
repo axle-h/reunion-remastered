@@ -238,7 +238,7 @@ void ShipInfo_DrawAllGroupIcons(void)
 // 26fe:056d: as DrawGroupIcon into the off-screen copy (a full 320x200 image)
 void ShipInfo_DrawGroupIconBuffered(int16_t icon, int16_t slot)
 {
-    draw_icon(icon, slot, far_seg_start(ds.ShipInfo_Buffer), ROW49, 0xB, 0xC, 0x11);
+    draw_icon(icon, slot, ds.ShipInfo_Buffer, ROW49, 0xB, 0xC, 0x11);
     int16_t saved = ds.Game_SelGroup;
     ds.Game_SelGroup = slot;
     if (saved < 0 || slot != saved)
@@ -256,9 +256,10 @@ void ShipInfo_SwitchGroupList(void)
     ship_backdrop_name(&name);
     Gfx_LoadPic((const uint8_t *)&name, ds.ShipInfo_Backdrop, 1, 0x97, 0, 0, 320, false,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    ds.ShipInfo_Buffer = System_GetMem(0xFB40);
-    // 26fe:0710: only the buffer's segment is used, as in the icon routines.
-    Blit_CopyBytes(ds.ShipInfo_Backdrop, far_seg_start(ds.ShipInfo_Buffer) + ROW49, 0xBCC0);
+    ds.ShipInfo_Buffer = System_GetSegment();  // GetMem(0xFB40)
+    // 26fe:0710: the buffer is addressed by its segment, as in the icon
+    // routines (a whole segment in the port: System_GetSegment).
+    Blit_CopyBytes(ds.ShipInfo_Backdrop, ds.ShipInfo_Buffer + ROW49, 0xBCC0);
     int16_t n = ds.Game_ShownGroupCount;
     for (int16_t i = 1; i <= n; i++)
         ShipInfo_DrawGroupIconBuffered(icon_of(Groups_At(ds.Game_GroupList, i)), i);
@@ -268,7 +269,7 @@ void ShipInfo_SwitchGroupList(void)
             break;
     }
 
-    uint8_t *bseg = far_seg_start(ds.ShipInfo_Buffer);
+    uint8_t *bseg = ds.ShipInfo_Buffer;
     Mouse_HideCursor();
     // Lines from the fixed point (95,125) around the edge of the view (rows 49..199).
     for (int16_t x = 0x5F; x <= 0xBE; x++) {
@@ -297,7 +298,7 @@ void ShipInfo_SwitchGroupList(void)
         Gfx_DrawLineCopy(gfx_screen(), x, 0x31, 0x5F, 0x7D, bseg);
     }
     Mouse_ShowCursor();
-    System_FreeMem(ds.ShipInfo_Buffer, 0xFB40);
+    System_FreeSegment(ds.ShipInfo_Buffer);
 }
 
 static void store30(const PString *src, PString *dst) { System_StrStore(src, dst, 0x1E); }
@@ -479,12 +480,12 @@ void ShipInfo_EraseSelectionMarker(void)
 
 void ShipInfo_DrawSelectionMarkerBuffered(void)
 {
-    marker(MARKER_ON, far_seg_start(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
+    marker(MARKER_ON, ds.ShipInfo_Buffer, ROW49 + 0x10 * 320);
 }
 
 void ShipInfo_EraseSelectionMarkerBuffered(void)
 {
-    marker(MARKER_OFF, far_seg_start(ds.ShipInfo_Buffer), ROW49 + 0x10 * 320);
+    marker(MARKER_OFF, ds.ShipInfo_Buffer, ROW49 + 0x10 * 320);
 }
 
 // 26fe:1278: hotspot 1 = Change mode, 2 = unused, 3..34 = icons, 35.. = names

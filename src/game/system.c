@@ -8,8 +8,7 @@
 void (*system_runerror_handler)(uint16_t code) = nullptr;
 void (*system_exit_handler)(uint8_t code) = nullptr;
 
-// Segment the original's System code runs in (Ghidra 48c7h).
-enum : uint16_t { SYSTEM_SEG = 0x48C7 - 0x1000 + MEM_LOAD_SEG };
+static void heap_reset(void);  // see Heap
 
 // ===========================================================================
 // Start-up and termination
@@ -18,7 +17,6 @@ enum : uint16_t { SYSTEM_SEG = 0x48C7 - 0x1000 + MEM_LOAD_SEG };
 // 48c7:0000
 void system_init(void)
 {
-    ds.System_PrefixSeg = MEM_PSP_SEG;
     // The real-mode values of the selector variables.
     ds.System_Seg0040 = 0x0040;
     ds.System_SegA000 = 0xA000;
@@ -27,64 +25,24 @@ void system_init(void)
     // 48c7:00b1 DetectCPU: a 386 or better.
     ds.System_Test8086 = 2;
 
-    // The heap starts after the stack (and the overlay buffer, empty here);
-    // HeapEnd is the top of memory from the PSP (heap_alloc may move it).
-    // ClearBss left the offsets 0 and FreeList = HeapPtr means "no free
-    // blocks".
-    ds.System_OvrHeapOrg = MEM_HEAP_SEG;
-    ds.System_OvrHeapPtr = MEM_HEAP_SEG;
-    uint16_t org = MEM_HEAP_SEG + ds.System_OvrHeapSize;
-    ds.System_OvrHeapEnd = org;
-    ds.System_HeapOrg = far_ptr(org, 0);
-    ds.System_HeapPtr = far_ptr(org, 0);
-    ds.System_FreeList = far_ptr(org, 0);
-    ds.System_FreeZero = 0;
-    ds.System_HeapEnd = far_ptr(MEM_VIDEO_SEG, 0);
-    // 48c7:00d6, the default heap error function (returns 0: run-time error).
-    ds.System_HeapError = far_ptr(SYSTEM_SEG, 0x00D6);
+    heap_reset();
 
-    // Not done: saving/hooking interrupt vectors and opening Input/Output.
-}
-
-// C functions for the far procedure values the game stores in ExitProc.
-static struct {
-    FarPtr proc;
-    void (*fn)(void);
-} exit_procs[8];
-
-void system_add_exit_proc(FarPtr proc, void (*fn)(void))
-{
-    for (size_t i = 0; i < SDL_arraysize(exit_procs); i++) {
-        if (!exit_procs[i].fn || exit_procs[i].proc == proc) {
-            exit_procs[i].proc = proc;
-            exit_procs[i].fn = fn;
-            return;
-        }
-    }
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Too many exit procedures");
+    // Not done: the heap variables (the heap is the C allocator's),
+    // saving/hooking interrupt vectors and opening Input/Output.
 }
 
 // 48c7:0116 from the instruction after the entry's CX/BX := 0: runs the
 // ExitProc chain (each procedure may install the next), then reports the
 // error and exits with ExitCode.
-[[noreturn]] static void terminate(uint16_t code, FarPtr error_addr)
+[[noreturn]] static void terminate(uint16_t code, uint32_t error_addr)
 {
     ds.System_ExitCode = (int16_t)code;
     ds.System_ErrorAddr = error_addr;
     while (ds.System_ExitProc) {
-        FarPtr proc = ds.System_ExitProc;
-        ds.System_ExitProc = 0;
+        TProc proc = ds.System_ExitProc;
+        ds.System_ExitProc = nullptr;
         ds.System_InOutRes = 0;
-        void (*fn)(void) = nullptr;
-        for (size_t i = 0; i < SDL_arraysize(exit_procs) && !fn; i++)
-            if (exit_procs[i].fn && exit_procs[i].proc == proc)
-                fn = exit_procs[i].fn;
-        if (!fn) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "ExitProc %04X:%04X has no port",
-                         (unsigned)(proc >> 16), (unsigned)(proc & 0xFFFF));
-            break;
-        }
-        fn();
+        proc();
     }
     // Not done: closing Input/Output and restoring the interrupt vectors.
     if (ds.System_ErrorAddr)
@@ -101,9 +59,10 @@ void System_RunError(uint16_t code)
 {
     if (system_runerror_handler)
         system_runerror_handler(code);
-    // The original reports the caller's address (relative to the program);
-    // the port has none, so any non-nil value that marks an error.
-    terminate(code, far_ptr(0xFFFF, 0x000F));
+    // The original reports the caller's address (segment:offset, relative to
+    // the program); the port has none, so any non-nil value that marks an
+    // error.
+    terminate(code, 0xFFFF000Fu);
 }
 
 // 48c7:0116
@@ -372,265 +331,92 @@ void System_FillChar(void *dst, uint16_t count, uint8_t value)
 }
 
 // ===========================================================================
-// Heap
-//
-// A free block holds {next: pointer; size: pointer} where size is a
-// normalised byte count (paragraphs in the segment word, 0 or 8 in the
-// offset word). The list is sorted by address and ends with a link equal to
-// HeapPtr; FreeList itself acts as the head "block" (with FreeZero as its
-// size, so nothing ever merges into it).
+// Heap. The original's is BP7's free list between HeapOrg and HeapEnd; the
+// port's blocks come from the C allocator, zeroed, and nothing depends on
+// where they are. They are kept in a list, so that a new start (system_init)
+// frees what the last run left, as DOS did with the program's memory.
+// heap_used counts the bytes in use as GetMem rounded them (multiples of 8),
+// for tests' leak checks.
 // ===========================================================================
 
-enum : uint16_t { FREELIST_OFF = offsetof(DSeg, System_FreeList) };
+typedef struct HeapBlock {
+    struct HeapBlock *prev, *next;
+    alignas(16) uint8_t data[];
+} HeapBlock;
 
-static uint16_t rd16(uint16_t seg, uint16_t off)
+static HeapBlock heap_blocks = {&heap_blocks, &heap_blocks};
+static uint32_t heap_used;
+
+static void *heap_new(size_t size)
 {
-    const uint8_t *p = far_host(far_ptr(seg, off));
-    return (uint16_t)(p[0] | p[1] << 8);
+    HeapBlock *b = SDL_calloc(1, sizeof(HeapBlock) + size);
+    if (!b)
+        System_RunError(203);
+    b->prev = heap_blocks.prev;
+    b->next = &heap_blocks;
+    b->prev->next = b;
+    heap_blocks.prev = b;
+    return b->data;
 }
 
-static void wr16(uint16_t seg, uint16_t off, uint16_t v)
+static void heap_delete(void *p)
 {
-    uint8_t *p = far_host(far_ptr(seg, off));
-    p[0] = (uint8_t)v;
-    p[1] = (uint8_t)(v >> 8);
+    HeapBlock *b = (HeapBlock *)((uint8_t *)p - offsetof(HeapBlock, data));
+    b->prev->next = b->next;
+    b->next->prev = b->prev;
+    SDL_free(b);
 }
 
-static uint16_t seg_of(FarPtr p) { return (uint16_t)(p >> 16); }
-static uint16_t off_of(FarPtr p) { return (uint16_t)p; }
-
-// seg:off + 16-bit offset sum, normalised the original's way: only AL is
-// checked for a paragraph carry (the sums stay below 32 for heap blocks).
-static FarPtr heap_norm(uint16_t seg, uint16_t off)
+static void heap_reset(void)
 {
-    if ((off & 0xFF) >= 0x10)
-        seg++;
-    return far_ptr(seg, (uint16_t)(off & 0xFF0F));
+    while (heap_blocks.next != &heap_blocks)
+        heap_delete(heap_blocks.next->data);
+    heap_used = 0;
 }
 
-// 48c7:04dc HeapSizeToParas: size rounded up to 8, as paragraphs + 0/8.
-static void heap_size(uint16_t size, uint16_t *paras, uint16_t *off)
+static uint32_t heap_rounded(uint16_t size)
 {
-    uint32_t s = (uint32_t)size + 7;
-    *paras = (uint16_t)(s >> 4);
-    *off = (uint16_t)(s & 8);
-}
-
-// The default HeapError (48c7:00d6) returns 0: "fail with a run-time
-// error". The game never installs another one.
-static uint16_t heap_error(uint16_t size)
-{
-    (void)size;
-    return 0;
-}
-
-// 48c7:0353 HeapAlloc: first fit; the block is cut from the low end of a
-// free block, or taken from HeapPtr. Returns false when out of memory.
-static bool heap_alloc(uint16_t size, FarPtr *out)
-{
-    *out = 0;
-    if (size == 0)
-        return true;
-    ds.System_HeapAllocSize = size;
-    for (;;) {
-        uint16_t paras, off;
-        heap_size(ds.System_HeapAllocSize, &paras, &off);
-
-        uint16_t prev_seg = MEM_DS_SEG, prev_off = FREELIST_OFF;
-        for (;;) {
-            uint16_t blk_off = rd16(prev_seg, prev_off);
-            uint16_t blk_seg = rd16(prev_seg, prev_off + 2);
-            if (blk_seg == seg_of(ds.System_HeapPtr)) {
-                // End of the list: grow the heap. The new top is computed
-                // from the list's last link, which equals HeapPtr.
-                FarPtr top = heap_norm((uint16_t)(blk_seg + paras), (uint16_t)(blk_off + off));
-                uint16_t end_seg = seg_of(ds.System_HeapEnd);
-                if (seg_of(top) > end_seg ||
-                    (seg_of(top) == end_seg && off_of(top) > off_of(ds.System_HeapEnd)))
-                    break;
-                ds.System_HeapPtr = top;
-                wr16(prev_seg, prev_off, off_of(top));
-                wr16(prev_seg, prev_off + 2, seg_of(top));
-                heap_error(0); // the original notifies HeapError with size 0
-                *out = far_ptr(blk_seg, blk_off);
-                return true;
-            }
-            uint16_t bsize_off = rd16(blk_seg, blk_off + 4);
-            uint16_t bsize_seg = rd16(blk_seg, blk_off + 6);
-            if (paras > bsize_seg || (paras == bsize_seg && off > bsize_off)) {
-                prev_seg = blk_seg;
-                prev_off = blk_off;
-                continue;
-            }
-            uint16_t next_off = rd16(blk_seg, blk_off);
-            uint16_t next_seg = rd16(blk_seg, blk_off + 2);
-            if (paras == bsize_seg && off == bsize_off) {
-                wr16(prev_seg, prev_off, next_off);
-                wr16(prev_seg, prev_off + 2, next_seg);
-            } else {
-                // The rest of the block stays free, in its place in the list.
-                uint32_t left = ((uint32_t)bsize_seg << 16 | bsize_off) - ((uint32_t)paras << 16 | off);
-                FarPtr rest = heap_norm((uint16_t)(blk_seg + paras), (uint16_t)(blk_off + off));
-                wr16(seg_of(rest), off_of(rest), next_off);
-                wr16(seg_of(rest), off_of(rest) + 2, next_seg);
-                wr16(seg_of(rest), off_of(rest) + 4, (uint16_t)(left & 0xF));
-                wr16(seg_of(rest), off_of(rest) + 6, (uint16_t)(left >> 16));
-                wr16(prev_seg, prev_off, off_of(rest));
-                wr16(prev_seg, prev_off + 2, seg_of(rest));
-            }
-            *out = far_ptr(blk_seg, blk_off);
-            return true;
-        }
-
-        // Port addition. The game moved its two big blocks into EMS, which
-        // the port doesn't have (game/ems.h), so the heap can run out where
-        // the original's didn't. When the heap reaches video memory it goes
-        // on above it, to F000:0000 (so that segment + block size can't
-        // wrap): what is left below A000:0000 becomes a free block, and
-        // video memory a block that is never freed. Until then the heap is
-        // the original's. (It goes when its blocks move out of mem[];
-        // docs/native-memory-plan.md.)
-        if (seg_of(ds.System_HeapEnd) == MEM_VIDEO_SEG) {
-            FarPtr top = ds.System_HeapPtr, above = far_ptr(MEM_VIDEO_SEG + 0x1000, 0);
-            uint32_t gap = MEM_VIDEO_SEG * 16u - far_linear(top);  // a multiple of 8
-            ds.System_HeapEnd = far_ptr(0xF000, 0);
-            ds.System_HeapPtr = above;
-            // The list's last link (to the old HeapPtr) goes to the gap, or
-            // above video memory if there is none.
-            uint16_t ls = MEM_DS_SEG, lo = FREELIST_OFF;
-            while (rd16(ls, lo + 2) != seg_of(top)) {
-                uint16_t ns = rd16(ls, lo + 2), no = rd16(ls, lo);
-                ls = ns;
-                lo = no;
-            }
-            FarPtr next = gap ? top : above;
-            wr16(ls, lo, off_of(next));
-            wr16(ls, lo + 2, seg_of(next));
-            if (gap) {
-                wr16(seg_of(top), off_of(top), off_of(above));
-                wr16(seg_of(top), off_of(top) + 2, seg_of(above));
-                wr16(seg_of(top), off_of(top) + 4, (uint16_t)(gap & 0xF));
-                wr16(seg_of(top), off_of(top) + 6, (uint16_t)(gap >> 4));
-            }
-            continue;
-        }
-
-        // 48c7:040a: 0 = run-time error, 1 = return nil, else retry.
-        uint16_t r = heap_error(ds.System_HeapAllocSize) & 0xFF;
-        if (r == 0)
-            return false;
-        if (r == 1)
-            return true;
-    }
-}
-
-// 48c7:047d HeapMerge: joins block a with the following free block b if
-// they touch (or lowers HeapPtr to a if b is HeapPtr); else links a -> b.
-static void heap_merge(uint16_t a_seg, uint16_t a_off, uint16_t b_seg, uint16_t b_off)
-{
-    uint16_t end_off = (uint16_t)(a_off + rd16(a_seg, a_off + 4));
-    uint16_t end_seg = (uint16_t)(a_seg + rd16(a_seg, a_off + 6));
-    FarPtr end = heap_norm(end_seg, end_off);
-    if (end != far_ptr(b_seg, b_off)) {
-        wr16(a_seg, a_off, b_off);
-        wr16(a_seg, a_off + 2, b_seg);
-        return;
-    }
-    if (end == ds.System_HeapPtr) {
-        ds.System_HeapPtr = far_ptr(a_seg, a_off);
-        return;
-    }
-    wr16(a_seg, a_off, rd16(b_seg, b_off));
-    wr16(a_seg, a_off + 2, rd16(b_seg, b_off + 2));
-    uint16_t size_off = (uint16_t)(rd16(b_seg, b_off + 4) + rd16(a_seg, a_off + 4));
-    uint16_t size_seg = (uint16_t)(rd16(b_seg, b_off + 6) + rd16(a_seg, a_off + 6));
-    FarPtr size = heap_norm(size_seg, size_off);
-    wr16(a_seg, a_off + 4, off_of(size));
-    wr16(a_seg, a_off + 6, seg_of(size));
-}
-
-// 48c7:041e HeapFree: inserts the block into the address-sorted free list
-// and merges it with its neighbours. Returns false for an invalid pointer
-// (offset not 0/8, outside HeapOrg..HeapPtr, or already free).
-static bool heap_free(FarPtr p, uint16_t size)
-{
-    if (size == 0)
-        return true;
-    uint16_t seg = seg_of(p), off = off_of(p);
-    if (off & 0xFFF7)
-        return false;
-    if (seg < seg_of(ds.System_HeapOrg) ||
-        (seg == seg_of(ds.System_HeapOrg) && off < off_of(ds.System_HeapOrg)))
-        return false;
-    if (seg > seg_of(ds.System_HeapPtr) ||
-        (seg == seg_of(ds.System_HeapPtr) && off >= off_of(ds.System_HeapPtr)))
-        return false;
-
-    uint16_t paras, size_off;
-    heap_size(size, &paras, &size_off);
-    wr16(seg, off + 4, size_off);
-    wr16(seg, off + 6, paras);
-
-    uint16_t prev_seg = MEM_DS_SEG, prev_off = FREELIST_OFF;
-    for (;;) {
-        uint16_t next_off = rd16(prev_seg, prev_off);
-        uint16_t next_seg = rd16(prev_seg, prev_off + 2);
-        if (seg > next_seg || (seg == next_seg && off > next_off)) {
-            prev_seg = next_seg;
-            prev_off = next_off;
-            continue;
-        }
-        if (seg == next_seg && off == next_off)
-            return false;
-        heap_merge(seg, off, next_seg, next_off);
-        heap_merge(prev_seg, prev_off, seg, off);
-        return true;
-    }
-}
-
-// 48c7:0323 HeapWalk: walks the free list starting with the space above
-// HeapPtr; `max` picks MaxAvail's callback (48c7:031c) over MemAvail's
-// (48c7:02fc). Sizes are paragraphs:offset pairs until the end.
-static int32_t heap_walk(bool max)
-{
-    uint32_t end = ds.System_HeapEnd, ptr = ds.System_HeapPtr;
-    uint16_t ax = (uint16_t)((uint16_t)end - (uint16_t)ptr);
-    uint16_t dx = (uint16_t)((end >> 16) - (ptr >> 16) - ((uint16_t)end < (uint16_t)ptr));
-    ax &= 0xF;
-    FarPtr cur = ds.System_FreeList;
-    while (seg_of(cur) != seg_of(ds.System_HeapPtr)) {
-        uint16_t b_off = rd16(seg_of(cur), off_of(cur) + 4);
-        uint16_t b_seg = rd16(seg_of(cur), off_of(cur) + 6);
-        if (max) {
-            if (dx < b_seg || (dx == b_seg && ax < b_off)) {
-                ax = b_off;
-                dx = b_seg;
-            }
-        } else {
-            if ((uint32_t)ax + b_off > 0xFFFF)
-                dx += 0x1000;
-            ax += b_off;
-            dx += b_seg;
-        }
-        cur = far_ptr(rd16(seg_of(cur), off_of(cur) + 2), rd16(seg_of(cur), off_of(cur)));
-    }
-    return (int32_t)((uint32_t)dx * 16 + ax);
+    return ((uint32_t)size + 7) & ~7u;
 }
 
 // 48c7:028a
 void *System_GetMem(uint16_t size)
 {
-    FarPtr p;
-    if (!heap_alloc(size, &p))
-        System_RunError(203);
-    return p ? far_host(p) : nullptr;
+    if (size == 0)
+        return nullptr;
+    heap_used += heap_rounded(size);
+    return heap_new(size);
 }
 
-// 48c7:029f
+// 48c7:029f: freeing nil is run-time error 204 unless size is 0 (the
+// original's FreeMem rejects a pointer outside the heap).
 void System_FreeMem(void *p, uint16_t size)
 {
-    if (!heap_free(p ? far_from_host(p) : 0, size))
+    if (size == 0)
+        return;
+    if (!p)
         System_RunError(204);
+    heap_delete(p);
+    heap_used -= heap_rounded(size);
+}
+
+uint8_t *System_GetSegment(void)
+{
+    heap_used += 0x10000;
+    return heap_new(0x10000);
+}
+
+void System_FreeSegment(uint8_t *seg)
+{
+    if (!seg)
+        return;
+    heap_delete(seg);
+    heap_used -= 0x10000;
+}
+
+uint32_t system_heap_used(void)
+{
+    return heap_used;
 }
 
 // 48c7:02e7. The game asks before it loads something big (the start-up
@@ -648,15 +434,7 @@ int32_t System_MaxAvail(void)
     return SYSTEM_MEM_PLENTY;
 }
 
-int32_t system_heap_free(void)
-{
-    return heap_walk(false);
-}
 
-int32_t system_heap_max_block(void)
-{
-    return heap_walk(true);
-}
 
 // ===========================================================================
 // Random numbers

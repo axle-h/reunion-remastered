@@ -93,7 +93,7 @@ void Shop_ShopScreen(void)
         ds.Gfx_Palette[0xC0][0] = 0;
         ds.Gfx_Palette[0xC0][1] = 0;
         ds.Gfx_Palette[0xC0][2] = 0x3C;
-        ds.VecLoad_Buffer = System_GetMem(0xAF00);
+        ds.VecLoad_Buffer = System_GetSegment();  // GetMem(0xAF00)
         VecLoad_LoadVec(SEL_PRODUCT_ID);
         VecLoad_DrawBlueFrame();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());

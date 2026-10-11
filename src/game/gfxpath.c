@@ -331,5 +331,5 @@ void GfxPath_Init(void)
     ds.GfxPath_InitBlock = System_GetMem(size);
     System_FillChar(ds.GfxPath_InitBlock, size, 2);
     Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, ds.GfxPath_InitBlock);
-    ds.Game_GfxPathProc = far_ptr(0x3A1B, 0x09A3);
+    ds.Game_GfxPathProc = GfxPath_FreeToolbarBuffer;
 }

@@ -63,14 +63,6 @@ static int16_t cur_moon(void)
     return ds.Game_CurMoon[ds.Game_CurSystem - 1];
 }
 
-// A pointer delta bytes from p, keeping the original's 16-bit offset wrap
-// inside p's segment: a sprite at the top edge of the frame has a negative
-// origin. p must be a heap block's start.
-static uint8_t *buf_at_wrapped(uint8_t *p, int32_t delta)
-{
-    uint8_t *seg = far_seg_start(p);
-    return seg + (uint16_t)(p - seg + delta);
-}
 
 // The system view's pictures.
 static uint8_t *icons_at(int32_t delta)
@@ -88,9 +80,12 @@ static uint8_t *frame_at(int32_t delta)
     return ds.PlanetInfo_Frame + delta;
 }
 
+// The original's 16-bit offset wraps inside the frame's segment (a whole
+// segment: System_GetSegment): a sprite at the frame's top edge has a
+// negative origin.
 static uint8_t *frame_at_wrapped(int32_t delta)
 {
-    return buf_at_wrapped(ds.PlanetInfo_Frame, delta);
+    return ds.PlanetInfo_Frame + (uint16_t)delta;
 }
 
 static uint8_t *screen_at(uint16_t off)
@@ -1161,14 +1156,14 @@ void PlanetInfo_DrawOrbitingMoon(int16_t k)
                              o->Size, 0x80);
         if (o->Flag != 0) {
             Blit_BlitTransparent(icons_at(0x2A81 + (o->Flag - 1) * 8),
-                                 buf_at_wrapped(ds.PlanetInfo_Frame,
+                                 frame_at_wrapped(
                                                 (int16_t)((int16_t)(o->Y - o->Half - 3) * 0x140)
                                                     + (int16_t)(o->X - o->Half) - 3),
                                  7, 7, 0x40);
         }
         if (is_marked(k + 1)) {
             Blit_BlitTransparent(icons_at(0x2AE9),
-                                 buf_at_wrapped(ds.PlanetInfo_Frame,
+                                 frame_at_wrapped(
                                                 (int16_t)((int16_t)(o->Y - o->Half + 9) * 0x140)
                                                     + (int16_t)(o->X - o->Half) - 3),
                                  7, 7, 0x40);
@@ -1180,7 +1175,7 @@ void PlanetInfo_DrawOrbitingMoon(int16_t k)
 void PlanetInfo_RenderSystemView(void)
 {
     int16_t sys = ds.Game_CurSystem;
-    ds.PlanetInfo_Frame = System_GetMem(0xBCC0);
+    ds.PlanetInfo_Frame = System_GetSegment();  // GetMem(0xBCC0)
     ds.PlanetInfo_MoonSprite = System_GetMem(0x2A80);
     ds.PlanetInfo_PlanetSprite = System_GetMem(0x2A80);
     if (System_MemAvail() < ds.Game_MinMemAvail)
@@ -1277,7 +1272,7 @@ void PlanetInfo_RenderSystemView(void)
         ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(hit - 0x14))->_1A;
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = System_MemAvail();
-    System_FreeMem(ds.PlanetInfo_Frame, 0xBCC0);
+    System_FreeSegment(ds.PlanetInfo_Frame);
     System_FreeMem(ds.PlanetInfo_MoonSprite, 0x2A80);
     System_FreeMem(ds.PlanetInfo_PlanetSprite, 0x2A80);
 }

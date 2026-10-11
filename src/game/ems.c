@@ -63,5 +63,5 @@ void Ems_Init(void)
     ds.Ems_Buffer = System_GetMem(GAME_DATA_SIZE);
     Ems_EmsMoveToEms(Ems_GameDataBlock(), GAME_DATA_SIZE, ds.Ems_Buffer);
     Ems_EmsMapGameData();
-    ds.Ems_RestoreProc = far_ptr(0x4719, 0x0317);
+    ds.Ems_RestoreProc = Ems_EmsReleaseGameData;
 }

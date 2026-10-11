@@ -273,8 +273,8 @@
 4a81:75ba HeapEnd: farptr
 4a81:75be FreeList: farptr
 4a81:75c2 FreeZero: farptr
-4a81:75c6 HeapError: procedure
-4a81:75ca ExitProc: procedure
+4a81:75c6 HeapError: farptr
+4a81:75ca ExitProc: TProc
 4a81:75ce ExitCode: integer
 4a81:75d0 ErrorAddr: farptr
 4a81:75d4 PrefixSeg: word
@@ -396,14 +396,14 @@
 4a81:9278 Game::HeroSpriteX: integer           // 45h for hero 1, 1 for hero 2. X offset into the command centre sprite sheet (3abd:163f)
 4a81:927a Game::SatButtons: integer            // Bit mask of the satellite menu buttons shown (28cd:03fb). Redrawn when it changes; -1 forces a redraw
 4a81:927c Game::ShipInfoButtons: integer       // The same for the ship info menu (28cd:0542); -1 forces a redraw
-4a81:9272 Blit::CursorHook: procedure           // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
-4a81:927e Groups::UpdateSatMenu: procedure      // = 28cd:03fb (Satellite)
-4a81:9282 Groups::IntelHook: procedure          // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
-4a81:9286 Game::FindBuildingProc: procedure      // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
-4a81:928a Game::FindPlanetForceProc: procedure   // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
-4a81:928e Game::GrWarProc: procedure             // = 1537:11f2 (GrWar)
-4a81:9292 Game::GfxPathProc: procedure           // = 3a1b:09a3 (GfxPath)
-4a81:9296 Ems::RestoreProc: procedure           // = 4719:0317 (Ems)
+4a81:9272 Blit::CursorHook: TProc           // = 4758:012d (Mouse). Called around blits to hide/restore the software cursor
+4a81:927e Groups::UpdateSatMenu: TProc      // = 28cd:03fb (Satellite)
+4a81:9282 Groups::IntelHook: TDisbandProc          // = 29b9:0b93 (Intel), called with (SelGroup, GroupList)
+4a81:9286 Game::FindBuildingProc: TCountBuildingsProc      // = 2ef2:2b1a (Surface) ? called as f(1, moon, planet, system, kind)
+4a81:928a Game::FindPlanetForceProc: TFindForceProc   // = 2b8d:1c9f (Groups). Finds the planet-force group of (moon, planet, system)
+4a81:928e Game::GrWarProc: TIntFunc             // = 1537:11f2 (GrWar)
+4a81:9292 Game::GfxPathProc: TProc           // = 3a1b:09a3 (GfxPath)
+4a81:9296 Ems::RestoreProc: TProc           // = 4719:0317 (Ems)
 4a81:926e Music::MainThemeOn: boolean         // ? Set when main1/main2 is playing; 424a:017e restarts the theme if clear
 4a81:929a Gfx::Palette: array[0..255] of array[0..2] of byte  // Current VGA palette (RGB 0..63). Passed to Gfx::LoadPic and set with 405f:0089
 4a81:959a Gfx::ReadPos: word                  // ? Read position in a buffer, advanced by 405f:09f3
@@ -595,7 +595,7 @@
 3955:02d3 ScaleRow31(src, dst: pointer)
 3955:02f4 ScaleRow32(src, dst: pointer)
 3955:030e ScaleSprite(src, dst: pointer; size: integer)   // Scales a 32x32 sprite to size x size using RowProcs
-4a81:4830 Scale::RowProcs: array[16..32] of procedure       // ScaleRow16..ScaleRow32
+4a81:4830 Scale::RowProcs: array[16..32] of farptr       // ScaleRow16..ScaleRow32  (unused: the port calls Scale_RowProcTable)
 
 # ---------------------------------------------------------------------------
 # Vector models (docs/formats/vec.md)
@@ -1029,7 +1029,7 @@
 4a81:8a46 Gus::PortVoice: word             // base+102h
 4a81:8a48 Gus::PortRegSel: word            // base+103h (data lo +1, data hi +2)
 4a81:8a4a Gus::PortDram: word              // base+107h
-4a81:8a60 Sb::DriverEntry: procedure         // far entry of CT-VOICE driver blob (BX = function no.)
+4a81:8a60 Sb::DriverEntry: farptr         // far entry of CT-VOICE driver blob (BX = function no.)
 
 # ---------------------------------------------------------------------------
 # Functions: graphics core, blitters, toolbar, line editor (agent proposals)
@@ -1372,7 +1372,7 @@
 4a81:89d0 Sound::SbPort: word               // From save\setup.spd
 4a81:89d2 Sound::SbIrq: word
 4a81:89d4 Sound::SbDma: word
-4a81:89ba Gfx::SavedExitProc: procedure     // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
+4a81:89ba Gfx::SavedExitProc: TProc     // Previous ExitProc, chained by Gfx_ExitHandler (405f:1a62)
 405f:1a62 ExitHandler                       // ExitProc: shows the error screen and waits for a key
 
 # ---------------------------------------------------------------------------
@@ -1709,7 +1709,7 @@
 4a81:7e34 Command::AnimSpeed: integer                // war animation: AnimTick reload (Cc::Rooms.Speed)
 4a81:7e3c Command::StaffPicked: integer              // staff kind picked in the command centre: the advisor's kind 1..4 (1991)
 4a81:7e3e Command::AdvisorLine: integer  // advisor menu line under the mouse, 0 = none (1991:09e8)
-4a81:7e40 Anim::Record: pointer  // 349h bytes: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
+4a81:7e40 Anim::Record: ^TAnimRecord  // GetMem(349h) in the original: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
 4a81:7e44 Anim::Script: pointer  // 230h bytes: 140 entries {anim, frame, sound, delay} of an anim.def script (SpWar, Command)
 4a81:7e48 VecLoad::Angles: array[1..3] of word  // model rotation, 1/3 degrees (0..1079) (3d38:01aa)
 4a81:7e50 VecLoad::ObjectCount: integer  // objects in the loaded model (3d38:084a)

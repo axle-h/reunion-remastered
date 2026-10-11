@@ -13,8 +13,8 @@
 // and the original would jump to 0000:0000, so there is nothing to call.
 static void call_cursor_hook(void)
 {
-    if (ds.Blit_CursorHook == far_ptr(0x4758, 0x012D))
-        Mouse_CursorBlitHook();
+    if (ds.Blit_CursorHook)
+        ds.Blit_CursorHook();
 }
 
 // 47da:0000

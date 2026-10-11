@@ -77,12 +77,18 @@ class TypeError_(Exception):
 class CType:
     """A laid-out type: C base type, array dimensions (lo, hi), size."""
 
-    def __init__(self, base, size, dims=(), note="", pointer=False, target=None):
+    def __init__(self, base, size, dims=(), note="", pointer=False, target=None, code=False):
         self.base, self.size, self.dims, self.note = base, size, list(dims), note
         self.pointer = pointer
         # Host pointers: (pointed-to C type, its array dimensions). size and
         # the layout stay the original's 4-byte far pointer.
         self.target = target
+        # A procedural type: base is a C function pointer typedef.
+        self.code = code
+
+    @property
+    def host(self):
+        return bool(self.target) or self.code
 
     def decl(self, name):
         dims = "".join(f"[{hi - lo + 1}]" for lo, hi in self.dims)
@@ -106,6 +112,7 @@ class Types:
     def __init__(self, warn):
         self.warn = warn
         self.records = {}   # lower name -> (name, size, fields)
+        self.procs = {}     # lower name -> (name, C typedef)
         self.order = []     # record names in definition order
         self.strings = set()
 
@@ -146,7 +153,7 @@ class Types:
             for lo, hi in dims:
                 count *= hi - lo + 1
             return CType(elem.base, elem.size * count, dims + elem.dims, elem.note, elem.pointer,
-                         elem.target)
+                         elem.target, elem.code)
         m = re.fullmatch(r"string\s*\[\s*(\S+?)\s*\]", low)
         if m:
             n = self.parse_int(m.group(1))
@@ -164,6 +171,8 @@ class Types:
         if low in self.records:
             name, size, _ = self.records[low]
             return CType(name, size)
+        if low in self.procs:
+            return CType(self.procs[low][0], 4, pointer=True, code=True)
         raise TypeError_(f"unknown type '{t}'")
 
     def parse_file(self, text, source):
@@ -184,6 +193,20 @@ class Types:
 
         code = re.sub(r"\{.*?\}|\(\*.*?\*\)", " ", text, flags=re.S)
         code = re.sub(r"//[^\n]*", " ", code)
+        # Procedural types: Name = procedure[(params)]; or function[(params)]: T;
+        proc_re = r"(\w+)\s*=\s*(procedure|function)\s*(?:\((.*?)\))?\s*(?::\s*(\w+))?\s*;"
+        for m in re.finditer(proc_re, code, re.I | re.S):
+            name, kind, params, result = m.groups()
+            c_params = []
+            for group in (params or "").split(";"):
+                if not group.strip():
+                    continue
+                names, ptype = group.split(":", 1)
+                c_type = proc_c_type(ptype)
+                c_params += [c_type] * len(names.split(","))
+            c_result = proc_c_type(result) if kind.lower() == "function" else "void"
+            self.procs[name.lower()] = (
+                name, f"typedef {c_result} (*{name})({', '.join(c_params) or 'void'});")
         for m in re.finditer(r"(\w+)\s*=\s*(?:packed\s+)?record\b(.*?)\bend\s*;", code, re.I | re.S):
             name, body = m.group(1), m.group(2)
             try:
@@ -217,6 +240,16 @@ class Types:
                 self.order.remove(self.records[name.lower()][0])
             self.records[name.lower()] = (name, ofs, fields)
             self.order.append(name)
+
+
+def proc_c_type(pascal):
+    """C type of a procedural type's parameter or result."""
+    low = pascal.strip().lower()
+    if low == "boolean":
+        return "bool"
+    if low not in SCALARS or low in ("pointer", "farptr", "procedure"):
+        raise TypeError_(f"unsupported parameter type '{pascal}'")
+    return SCALARS[low][0]
 
 
 def c_ident(name):
@@ -353,6 +386,9 @@ def generate(types, kept, dropped):
     for n in sorted(types.strings):
         out.append(f"typedef struct PStr{n} {{ uint8_t len; char s[{n}]; }} PStr{n};")
     out.append("")
+    out.append("// Procedural types from ghidra/types.pas: the port's C functions.")
+    out += [typedef for _, typedef in types.procs.values()]
+    out.append("")
     out.append("// Records from ghidra/types.pas. Array comments give the Pascal bounds;")
     out.append("// the C index is the Pascal index minus the lower bound.")
     for name in types.order:
@@ -360,7 +396,7 @@ def generate(types, kept, dropped):
         out.append(f"typedef struct {name} {{")
         out += [field_line(ct, f) for f, ct, _ in fields]
         out.append(f"}} {name};")
-        if not any(ct.target for _, ct, _ in fields):
+        if not any(ct.host for _, ct, _ in fields):
             out.append(f"static_assert(sizeof({name}) == {size});")
             out += [f"static_assert(offsetof({name}, {f}) == 0x{o:02X});" for f, _, o in fields]
         out.append("")
@@ -429,7 +465,7 @@ def generate_fields(types, kept):
         for lo, hi in ct.dims:
             count *= hi - lo + 1
         rec = rec_index.get(ct.base, -1)
-        flags = ("DSF_POINTER | DSF_HOST" if ct.target else "DSF_POINTER") if ct.pointer else "0"
+        flags = ("DSF_POINTER | DSF_HOST" if ct.host else "DSF_POINTER") if ct.pointer else "0"
         return (f'    {{"{cname}", 0x{ofs:04X}, {at}, {ct.size // count}, {count}, '
                 f'{rec}, {flags}, {{{dims_of(ct, count)}}}}},')
 

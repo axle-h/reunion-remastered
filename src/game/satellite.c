@@ -437,5 +437,5 @@ void Satellite_TakeTradeShips(int16_t system, int16_t planet, int16_t moon, int3
 // 28cd:0ea4: Groups::UpdateSatMenu := 28cd:03fb
 void Satellite_Init(void)
 {
-    ds.Groups_UpdateSatMenu = far_ptr(0x28CD, 0x03FB);
+    ds.Groups_UpdateSatMenu = Satellite_UpdateGroupsMenu;
 }

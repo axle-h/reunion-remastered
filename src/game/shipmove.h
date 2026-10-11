@@ -38,4 +38,7 @@ void ShipMove_AnimateLights(void);
 // 22ca:1fb5 / 20f3 / 21ef
 void ShipMove_AnimateStarfield(void);
 void ShipMove_InitStarfield(void);
+// Port addition: frees the backdrop's segment, which holds the star table
+// too (main's FreeMem of both).
+void ShipMove_FreeBackdrop(void);
 void ShipMove_AnimateGroupView(void);

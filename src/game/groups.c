@@ -631,5 +631,5 @@ void Groups_InitPlanetForce(void)
 // 2b8d:1d6f
 void Groups_Init(void)
 {
-    ds.Game_FindPlanetForceProc = far_ptr(0x2B8D, 0x1C9F);
+    ds.Game_FindPlanetForceProc = Groups_FindPlanetForce;
 }

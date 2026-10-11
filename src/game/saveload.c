@@ -376,10 +376,10 @@ static void DiskScreenCloseAnim(void)
 // 1a3e:0ee5
 static void DiskScreenInit(void)
 {
-    ds.Anim_Record = System_GetMem(0x349);
+    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
     ds.Anim_Script = System_GetMem(0x230);
     ds.SaveLoad_BufFrame = System_GetMem(0x1324);
-    *ds.Anim_Record = 0;
+    ds.Anim_Record->Loaded = 0;
     Anim_LoadMainAnim(0x11);
     ds.SaveLoad_BufBack = System_GetMem(0xBCC0);
     ds.SaveLoad_BufButtons = System_GetMem(0x5140);

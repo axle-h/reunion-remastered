@@ -157,12 +157,12 @@ void SpWar_InitSpaceFleets(void)
     ds.SpWar_StepNo = 0;
     ds.SpWar_AttackerList = System_GetMem(0x177C);
     ds.SpWar_DefenderList = System_GetMem(0x177C);
-    ds.Anim_Record = System_GetMem(0x349);
+    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
     ds.Anim_Script = System_GetMem(0x230);
     ds.SpWar_Script = 0;
     ds.SpWar_ScriptStep = 0;
     ds.SpWar_RepeatsLeft = 0;
-    *ds.Anim_Record = 0;
+    ds.Anim_Record->Loaded = 0;
     // Scripts 2..25 are available to be picked (set constant at 20d4:01b3).
     ds.SpWar_ScriptsLeft[0] = 0xFC;
     ds.SpWar_ScriptsLeft[1] = 0xFF;
