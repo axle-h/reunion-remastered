@@ -160,6 +160,12 @@ if(BUILD_TESTING)
         else()
             target_link_libraries(${name} PRIVATE reunion_core)
         endif()
+        if(name STREQUAL "test_play_game" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+            # The whole game and its two replays take ~26 minutes in a debug
+            # build and 3-4 in a release one, which also catches what only
+            # goes wrong optimised. Run it from build/release.
+            continue()
+        endif()
         add_test(NAME ${name} COMMAND ${name} "${REUNION_DATA_DIR}")
         set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77)
         if(name MATCHES "^test_play_")
@@ -169,8 +175,7 @@ if(BUILD_TESTING)
                 ENVIRONMENT "REUNION_BIN=$<TARGET_FILE:reunion>")
         endif()
         if(name STREQUAL "test_play_game")
-            # The whole game and its two replays: ~26 minutes in a debug build.
-            set_tests_properties(${name} PROPERTIES TIMEOUT 3600)
+            set_tests_properties(${name} PROPERTIES TIMEOUT 900)
         endif()
     endforeach()
 endif()

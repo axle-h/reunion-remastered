@@ -60,8 +60,10 @@ Milestones: Jade 2927-09-08, Jaanosian contact 2928-03-02, the Galleon
 [playthrough-policy.md](playthrough-policy.md) §1 "As run"). The Earth
 invasion: 60H 60SF 12D 10C against 80H 80SF 7D 5C in space (won, lost
 48H 42SF), 40T 20Air 40ML against 30Tr 90T 50Air 30ML on the ground (won,
-lost 10T 20Air 30ML). `test_play_game` takes about 26 minutes in a debug
-build (ctest `TIMEOUT` 3600 s), 3-4 minutes in a release build.
+lost 10T 20Air 30ML). `test_play_game` takes 3-4 minutes in a release build
+(ctest `TIMEOUT` 900 s) and about 26 in a debug one, so ctest runs it only
+in non-Debug builds (`ctest --test-dir build/release -R test_play_game`);
+the debug binary still builds for running by hand.
 
 ### Robustness: other seeds
 
