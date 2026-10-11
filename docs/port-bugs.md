@@ -561,3 +561,21 @@ the original), fix, and how it was verified. Status: **open**,
 - **Verified:** `test_play_ships` passes in the release build (it failed
   before) and in the debug build.
 - **Status:** fixed
+
+## 33. The alien menu lists were declared one entry short
+
+- **Seen:** found by the sanitizer build (`cmake --preset asan`):
+  `tests/test_play_talk.c` reported `index 9 out of bounds for type
+  'uint32_t [9]'` at `AlienTalk_BuildQuestionMenu`
+  (`src/game/alientalk.c:275`) when talking to race 10.
+- **Cause:** `2e4b:0780` reads the race's menu list from `DS:0cde + race *
+  4`, so races 1..10 use DS:0CE2..0D09. `Alien_MenuLists` in
+  `src/game/dseg.h` had 9 entries and a 4-byte pad after it; race 10's list
+  was the pad. The bytes were right (the pad holds the original's pointer to
+  DS:0CCA), so the game behaved, but indexing past the array is undefined
+  and an optimiser may assume it does not happen.
+- **Fix:** the array has 10 entries and no pad.
+- **Verified:** `test_play_talk` passes in the sanitizer build with no
+  report; the playthrough proof (`tests/play/proof_12345.txt`) replays to the
+  same hash.
+- **Status:** fixed
