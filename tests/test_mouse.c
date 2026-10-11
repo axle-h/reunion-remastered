@@ -200,7 +200,7 @@ static void poll(void)
 
     // Poll swallows one key (an extended key takes two reads).
     ds.Mouse_CursorState = 1;
-    SDL_Event k = {.key = {.type = SDL_EVENT_KEY_DOWN, .key = SDLK_F1, .down = true}};
+    SDL_Event k = {.key = {.type = SDL_EVENT_KEY_DOWN, .key = SDLK_F2, .down = true}};
     SDL_PushEvent(&k);
     input_pump();
     CHECK(Crt_KeyPressed());

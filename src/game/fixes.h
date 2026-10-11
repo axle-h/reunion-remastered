@@ -1,6 +1,7 @@
 // Fixes to the original game (docs/bugs.md, "Fixed in the port"). Each fix is
-// a switch so the original behaviour stays reproducible: all are on in the
-// game unless REUNION_ORIGINAL=1, and the differential tests turn them off.
+// a switch so the original behaviour stays reproducible: all are on unless
+// the port menu's config (platform/config.h) turns one off; REUNION_ORIGINAL=1
+// turns them all off, and so do the differential tests.
 #pragma once
 
 typedef struct Fixes {
@@ -42,6 +43,18 @@ typedef struct Fixes {
 
 extern Fixes fixes;
 
+// Every fix, for the port menu and the config file ([fixes] key = on|off).
+// A new field of Fixes needs an entry here (test_options checks).
+typedef struct FixInfo {
+    const char *key;    // the field's name
+    const char *label;  // at most 20 characters
+    const char *help;   // at most 72 characters
+    bool *value;
+} FixInfo;
+
+extern const FixInfo Fixes_List[];
+extern const int Fixes_Count;
+
 enum : int {
     // 2928-04-01 00:00, game hour 5,449: 551 hours (23 days) before the
     // earliest Jaanosian deadline (6,000 h after the start, 2928-04-23 23:00).
@@ -52,7 +65,10 @@ enum : int {
     JADE_FOUND_BY_DAY = 1,
 };
 
-// All fixes on, or all off if the environment says REUNION_ORIGINAL=1.
+// Each fix as the config says (on by default), or all off if the
+// environment says REUNION_ORIGINAL=1.
 void Fixes_Init(void);
+// REUNION_ORIGINAL=1 is set.
+bool Fixes_Locked(void);
 // All fixes off (original behaviour).
 void Fixes_Original(void);

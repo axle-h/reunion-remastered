@@ -142,7 +142,7 @@ Script (cues `(order,row)`):
 
 ## 6. Port
 
-`src/cutscene/`: `cutscene.c` holds the shared units (palette ops, WaitPos, Pic, Strips, Anim, Shake, exit) and the runner `cutscene_play`; `credits.c`, `intro.c` and `victory.c` hold each program's script and its own routines (ScrollPic, Flyby, the scripted anim, PicCue, ScrollCredits). Routine names and addresses: `ghidra/{credits,intro,victory}.symbols.txt`. `main.c` runs CREDITS and INTRO before the game (unless `--skip-intro`, `REUNION_SKIP_INTRO=1` or an autopilot script) and VICTORY on exit code 10; `--cutscene=NAME` plays one and exits.
+`src/cutscene/`: `cutscene.c` holds the shared units (palette ops, WaitPos, Pic, Strips, Anim, Shake, exit) and the runner `cutscene_play`; `credits.c`, `intro.c` and `victory.c` hold each program's script and its own routines (ScrollPic, Flyby, the scripted anim, PicCue, ScrollCredits). Routine names and addresses: `ghidra/{credits,intro,victory}.symbols.txt`. `main.c` runs CREDITS and INTRO before the game (unless Skip intro is on in the port menu or an autopilot script runs) and VICTORY on exit code 10; `--cutscene=NAME` plays one and exits.
 
 - Configuration: the GUS one (1-based positions without the SB row correction, the 1 ms timer, the CREDITS retrace pacing). SETUP.SPD device 4/5 plays the music silently, as the originals did.
 - Music: libxmp through `platform/audio` (`audio_music_position`). Without an audio device a silent libxmp sequencer stepped by the retrace clock gives the same cue timeline.

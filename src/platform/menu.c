@@ -1,0 +1,748 @@
+#include "platform/menu.h"
+
+#include <SDL3/SDL.h>
+
+#include "platform/audio.h"
+#include "platform/config.h"
+#include "platform/input.h"
+#include "platform/video.h"
+
+// Layout, in a 320x240 space scaled to the window (8x8 debug font).
+enum : int {
+    VW = 320,
+    VH = 240,
+    CHAR = 8,
+    PANEL_X = 8,
+    PANEL_Y = 8,
+    PANEL_W = 304,
+    PANEL_H = 224,
+    TAB_X = 16,
+    TAB_W = 76,
+    TAB_H = 14,
+    TOP_Y = 32,
+    SPLIT_X = 98,
+    ROW_X = 106,
+    ROW_W = 192,
+    ROW_H = 13,
+    VISIBLE_ROWS = 12,
+    HELP_Y = 198,
+    HELP_COLS = 36,
+    MAX_ROWS = 48,
+    MAX_SIZES = 32,
+};
+
+typedef enum : int {
+    SEC_CHEATS,
+    SEC_SOUND,
+    SEC_VIDEO,
+    SEC_GAME,
+    SEC_FIXES,
+    SEC_RESTART,
+    SEC_QUIT,
+    SECTIONS,
+} Section;
+
+static const char *const SECTION_NAMES[SECTIONS] = {"Cheats", "Sound", "Video", "Game",
+                                                    "Fixes", "Restart", "Quit"};
+
+typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION } RowKind;
+
+typedef enum : int {
+    R_FREEZE_MONEY,
+    R_FREEZE_ORE,
+    R_ADD_MONEY,
+    R_ADD_ORE,
+    R_MUSIC,
+    R_MUSIC_VOLUME,
+    R_EFFECTS,
+    R_EFFECTS_VOLUME,
+    R_DISPLAY,
+    R_SIZE,
+    R_SKIP_INTRO,
+    R_FIXES_ON,
+    R_FIXES_OFF,
+    R_RESTART,
+    R_QUIT,
+    R_FIX,  // + the fix's index
+} RowId;
+
+typedef struct Row {
+    RowKind kind;
+    int id;
+    bool on;       // toggle
+    bool enabled;
+    char label[32];
+    char value[24];  // choice
+    const char *help;
+} Row;
+
+static MenuHooks hooks;
+static bool open;
+static Section section;
+static int focus = -1;  // row, or -1: the section list
+static int scroll[SECTIONS];
+static char status[48];  // replaces the help line until the focus moves
+static Row rows[MAX_ROWS];
+static int row_count;
+static char row_text[64];
+
+void menu_set_hooks(const MenuHooks *h)
+{
+    hooks = *h;
+}
+
+static void changed(MenuChange c)
+{
+    if (hooks.changed)
+        hooks.changed(c);
+}
+
+// --- Rows ---------------------------------------------------------------------
+
+static Row *add(RowKind kind, int id, const char *label, const char *help)
+{
+    Row *r = &rows[row_count++];
+    *r = (Row){.kind = kind, .id = id, .enabled = true, .help = help};
+    SDL_strlcpy(r->label, label, sizeof r->label);
+    return r;
+}
+
+static const char *music_label(ConfigMusic m)
+{
+    static const char *const names[] = {"Setup file", "None", "AdLib", "UltraSound", "Amiga"};
+    return names[m];
+}
+
+// Window sizes or full-screen modes, and which one is current (-1: none).
+static int window_sizes[MAX_SIZES][2];
+static SDL_DisplayMode modes[MAX_SIZES];
+
+static int size_choices(int *current)
+{
+    *current = -1;
+    if (config.display == CONFIG_WINDOWED) {
+        int n = vid_window_sizes(window_sizes, MAX_SIZES);
+        for (int i = 0; i < n; i++)
+            if (window_sizes[i][0] == config.window_width && window_sizes[i][1] == config.window_height)
+                *current = i;
+        return n;
+    }
+    // Entry 0 is the desktop's resolution (width 0).
+    int n = 1 + vid_fullscreen_modes(modes + 1, MAX_SIZES - 1);
+    modes[0] = (SDL_DisplayMode){};
+    for (int i = 0; i < n; i++)
+        if (modes[i].w == config.fullscreen_width && modes[i].h == config.fullscreen_height
+            && (i == 0 || config.fullscreen_refresh == 0
+                || SDL_lroundf(modes[i].refresh_rate) == SDL_lroundf(config.fullscreen_refresh)))
+            *current = i;
+    return n;
+}
+
+static void size_text(char *out, size_t size)
+{
+    int current;
+    size_choices(&current);
+    if (config.display == CONFIG_WINDOWED)
+        SDL_snprintf(out, size, "%dx%d", config.window_width, config.window_height);
+    else if (config.fullscreen_width == 0)
+        SDL_snprintf(out, size, "Desktop");
+    else if (config.fullscreen_refresh > 0)
+        SDL_snprintf(out, size, "%dx%d %ldHz", config.fullscreen_width, config.fullscreen_height,
+                     SDL_lroundf(config.fullscreen_refresh));
+    else
+        SDL_snprintf(out, size, "%dx%d", config.fullscreen_width, config.fullscreen_height);
+}
+
+static void build_rows(void)
+{
+    row_count = 0;
+    Row *r;
+    bool running = hooks.game_running && hooks.game_running();
+    char label[32];
+    switch (section) {
+    case SEC_CHEATS:
+        r = add(ROW_TOGGLE, R_FREEZE_MONEY, "Freeze money",
+                "Credits stay where they are: purchases cost nothing.");
+        r->on = config.freeze_money;
+        r = add(ROW_TOGGLE, R_FREEZE_ORE, "Freeze ore",
+                "New Earth's ore stays where it is: production uses none.");
+        r->on = config.freeze_ore;
+        SDL_snprintf(label, sizeof label, "Add %d credits", hooks.add_money);
+        r = add(ROW_ACTION, R_ADD_MONEY, label, "Only during a game.");
+        r->enabled = running;
+        SDL_snprintf(label, sizeof label, "Add %d ore each", hooks.add_ore);
+        r = add(ROW_ACTION, R_ADD_ORE, label, "To each of New Earth's six ores. Only during a game.");
+        r->enabled = running;
+        break;
+    case SEC_SOUND:
+        r = add(ROW_CHOICE, R_MUSIC, "Music",
+                "AdLib: the OPL2 tunes. UltraSound: the modules. Amiga: the modules, Amiga mixer.");
+        SDL_strlcpy(r->value, music_label(config.music), sizeof r->value);
+        r = add(ROW_CHOICE, R_MUSIC_VOLUME, "Music volume", nullptr);
+        SDL_snprintf(r->value, sizeof r->value, "%d%%", config.music_volume);
+        r = add(ROW_TOGGLE, R_EFFECTS, "Sound effects", nullptr);
+        r->on = config.effects;
+        r = add(ROW_CHOICE, R_EFFECTS_VOLUME, "Effects volume", nullptr);
+        SDL_snprintf(r->value, sizeof r->value, "%d%%", config.effects_volume);
+        r->enabled = config.effects;
+        break;
+    case SEC_VIDEO: {
+        static const char *const names[] = {"Window", "Full screen", "Desktop"};
+        r = add(ROW_CHOICE, R_DISPLAY, "Display",
+                "Full screen changes the display's mode; Desktop keeps it. Alt+Enter toggles.");
+        SDL_strlcpy(r->value, names[config.display], sizeof r->value);
+        if (config.display != CONFIG_DESKTOP) {
+            r = add(ROW_CHOICE, R_SIZE, "Size", nullptr);
+            size_text(r->value, sizeof r->value);
+        }
+        break;
+    }
+    case SEC_GAME:
+        r = add(ROW_TOGGLE, R_SKIP_INTRO, "Skip intro",
+                "Start at the title screen, without the credits and intro.");
+        r->on = config.skip_intro;
+        break;
+    case SEC_FIXES:
+        r = add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
+        r->enabled = !hooks.fixes_locked;
+        r = add(ROW_ACTION, R_FIXES_OFF, "All off (original)", "The original game, bugs and all.");
+        r->enabled = !hooks.fixes_locked;
+        for (int i = 0; i < hooks.fix_count && row_count < MAX_ROWS; i++) {
+            const MenuFix *f = &hooks.fixes[i];
+            r = add(ROW_TOGGLE, R_FIX + i, f->label,
+                    hooks.fixes_locked ? "Off: REUNION_ORIGINAL is set." : f->help);
+            r->on = !hooks.fixes_locked && config_fix(f->key);
+            r->enabled = !hooks.fixes_locked;
+        }
+        break;
+    case SEC_RESTART:
+        add(ROW_ACTION, R_RESTART, "Restart now", "Back to the title screen. Unsaved progress is lost.");
+        break;
+    case SEC_QUIT:
+        add(ROW_ACTION, R_QUIT, "Quit now", "Unsaved progress is lost.");
+        break;
+    default:
+        break;
+    }
+}
+
+// --- Changes ------------------------------------------------------------------
+
+static void apply_volumes(void)
+{
+    audio_set_user_volumes(config.music_volume / 100.0f,
+                           config.effects ? config.effects_volume / 100.0f : 0.0f);
+}
+
+static int step(int v, int dir, int lo, int hi, bool wrap)
+{
+    v += dir;
+    if (v < lo)
+        return wrap ? hi : lo;
+    if (v > hi)
+        return wrap ? lo : hi;
+    return v;
+}
+
+static void change_size(int dir)
+{
+    int current;
+    int n = size_choices(&current);
+    if (n == 0)
+        return;
+    int i;
+    if (current >= 0) {
+        i = step(current, dir, 0, n - 1, true);
+    } else if (config.display == CONFIG_WINDOWED) {
+        // A size set by hand: the next listed one up or down.
+        int area = config.window_width * config.window_height;
+        i = dir > 0 ? 0 : n - 1;
+        for (int k = 0; k < n; k++) {
+            int a = window_sizes[k][0] * window_sizes[k][1];
+            if (dir > 0 && a <= area)
+                i = SDL_min(k + 1, n - 1);
+            if (dir < 0 && a < area)
+                i = k;
+        }
+    } else {
+        i = 0;
+    }
+    if (config.display == CONFIG_WINDOWED) {
+        config.window_width = window_sizes[i][0];
+        config.window_height = window_sizes[i][1];
+    } else {
+        config.fullscreen_width = modes[i].w;
+        config.fullscreen_height = modes[i].h;
+        config.fullscreen_refresh = modes[i].refresh_rate;
+    }
+    vid_apply_display();
+}
+
+static void close_menu(void)
+{
+    open = false;
+}
+
+// dir: -1 / +1 for a choice's previous / next value, 0 to activate.
+static void act(const Row *r, int dir)
+{
+    if (!r->enabled)
+        return;
+    switch (r->id) {
+    case R_FREEZE_MONEY:
+        config.freeze_money = !config.freeze_money;
+        changed(MENU_CHANGED_CHEATS);
+        break;
+    case R_FREEZE_ORE:
+        config.freeze_ore = !config.freeze_ore;
+        changed(MENU_CHANGED_CHEATS);
+        break;
+    case R_ADD_MONEY:
+        changed(MENU_ADD_MONEY);
+        SDL_snprintf(status, sizeof status, "Added %d credits.", hooks.add_money);
+        return;
+    case R_ADD_ORE:
+        changed(MENU_ADD_ORE);
+        SDL_snprintf(status, sizeof status, "Added %d of each ore.", hooks.add_ore);
+        return;
+    case R_MUSIC:
+        config.music = step(config.music, dir ? dir : 1, CONFIG_MUSIC_NONE, CONFIG_MUSIC_AMIGA, true);
+        audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
+        changed(MENU_CHANGED_MUSIC);
+        break;
+    case R_MUSIC_VOLUME:
+        config.music_volume = step(config.music_volume, (dir ? dir : 1) * 10, 0, 100, !dir);
+        apply_volumes();
+        break;
+    case R_EFFECTS:
+        config.effects = !config.effects;
+        apply_volumes();
+        break;
+    case R_EFFECTS_VOLUME:
+        config.effects_volume = step(config.effects_volume, (dir ? dir : 1) * 10, 0, 100, !dir);
+        apply_volumes();
+        break;
+    case R_DISPLAY:
+        config.display = step(config.display, dir ? dir : 1, CONFIG_WINDOWED, CONFIG_DESKTOP, true);
+        vid_apply_display();
+        break;
+    case R_SIZE:
+        change_size(dir ? dir : 1);
+        break;
+    case R_SKIP_INTRO:
+        config.skip_intro = !config.skip_intro;
+        break;
+    case R_FIXES_ON:
+    case R_FIXES_OFF:
+        for (int i = 0; i < hooks.fix_count; i++)
+            config_set_fix(hooks.fixes[i].key, r->id == R_FIXES_ON);
+        changed(MENU_CHANGED_FIXES);
+        break;
+    case R_RESTART:
+        input_request_restart();
+        close_menu();
+        return;
+    case R_QUIT:
+        input_request_quit();
+        close_menu();
+        return;
+    default:
+        if (r->id >= R_FIX && r->id - R_FIX < hooks.fix_count) {
+            const char *key = hooks.fixes[r->id - R_FIX].key;
+            config_set_fix(key, !config_fix(key));
+            changed(MENU_CHANGED_FIXES);
+        }
+        break;
+    }
+    config_save();
+}
+
+// --- Navigation ---------------------------------------------------------------
+
+static void set_focus(int row)
+{
+    if (row != focus)
+        status[0] = '\0';
+    focus = row;
+    if (focus >= 0) {
+        if (focus < scroll[section])
+            scroll[section] = focus;
+        if (focus >= scroll[section] + VISIBLE_ROWS)
+            scroll[section] = focus - VISIBLE_ROWS + 1;
+    }
+}
+
+static void set_section(int s, bool keep_focus_on_rows)
+{
+    section = (Section)((s + SECTIONS) % SECTIONS);
+    status[0] = '\0';
+    build_rows();
+    focus = keep_focus_on_rows && row_count > 0 ? 0 : -1;
+    scroll[section] = 0;
+}
+
+void menu_open(void)
+{
+    open = true;
+    status[0] = '\0';
+    focus = -1;
+    build_rows();
+}
+
+bool menu_is_open(void)
+{
+    return open;
+}
+
+static void key(SDL_Keycode k, SDL_Keymod mod)
+{
+    build_rows();
+    const Row *r = focus >= 0 && focus < row_count ? &rows[focus] : nullptr;
+    switch (k) {
+    case SDLK_ESCAPE:
+    case SDLK_F1:
+        close_menu();
+        break;
+    case SDLK_TAB:
+        set_section(section + ((mod & SDL_KMOD_SHIFT) ? -1 : 1), focus >= 0);
+        break;
+    case SDLK_PAGEUP:
+        set_section(section - 1, focus >= 0);
+        break;
+    case SDLK_PAGEDOWN:
+        set_section(section + 1, focus >= 0);
+        break;
+    case SDLK_UP:
+        if (focus < 0)
+            set_section(section - 1, false);
+        else if (focus > 0)
+            set_focus(focus - 1);
+        break;
+    case SDLK_DOWN:
+        if (focus < 0)
+            set_section(section + 1, false);
+        else if (focus + 1 < row_count)
+            set_focus(focus + 1);
+        break;
+    case SDLK_LEFT:
+        if (r && r->kind == ROW_CHOICE)
+            act(r, -1);
+        else
+            set_focus(-1);
+        break;
+    case SDLK_RIGHT:
+        if (!r && row_count > 0)
+            set_focus(0);
+        else if (r && r->kind == ROW_CHOICE)
+            act(r, 1);
+        break;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+    case SDLK_SPACE:
+        if (k == SDLK_RETURN && (mod & SDL_KMOD_ALT))
+            vid_toggle_fullscreen();
+        else if (r)
+            act(r, 0);
+        else if (row_count > 0)
+            set_focus(0);
+        break;
+    default:
+        break;
+    }
+}
+
+// --- Drawing and the mouse ----------------------------------------------------
+
+// Scale and offset of the 320x240 space in render output pixels.
+static float scale = 1, origin_x, origin_y;
+
+static void layout(SDL_Renderer *r)
+{
+    int w = VW, h = VH;
+    if (r)
+        SDL_GetCurrentRenderOutputSize(r, &w, &h);
+    float s = SDL_min((float)w / VW, (float)h / VH);
+    scale = s >= 1 ? SDL_floorf(s) : s;  // whole pixels keep the font sharp
+    origin_x = SDL_floorf((w / scale - VW) / 2);
+    origin_y = SDL_floorf((h / scale - VH) / 2);
+}
+
+// The mouse in the 320x240 space.
+static void to_menu(float wx, float wy, float *x, float *y)
+{
+    SDL_Window *win = vid_window();
+    int ww = 1, wh = 1, pw = 1, ph = 1;
+    if (win) {
+        SDL_GetWindowSize(win, &ww, &wh);
+        SDL_GetWindowSizeInPixels(win, &pw, &ph);
+    }
+    layout(vid_renderer());
+    *x = wx * pw / SDL_max(ww, 1) / scale - origin_x;
+    *y = wy * ph / SDL_max(wh, 1) / scale - origin_y;
+}
+
+static bool inside(float x, float y, float rx, float ry, float rw, float rh)
+{
+    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+}
+
+static int row_at(float x, float y)
+{
+    if (!inside(x, y, ROW_X - 2, TOP_Y, ROW_W + 4, VISIBLE_ROWS * ROW_H))
+        return -1;
+    int i = (int)((y - TOP_Y) / ROW_H) + scroll[section];
+    return i < row_count ? i : -1;
+}
+
+static int tab_at(float x, float y)
+{
+    if (!inside(x, y, TAB_X - 2, TOP_Y, TAB_W, SECTIONS * TAB_H))
+        return -1;
+    return (int)((y - TOP_Y) / TAB_H);
+}
+
+static void mouse(const SDL_Event *e)
+{
+    float x, y;
+    if (e->type == SDL_EVENT_MOUSE_WHEEL) {
+        int max = SDL_max(row_count - VISIBLE_ROWS, 0);
+        scroll[section] = SDL_clamp(scroll[section] - (int)e->wheel.y, 0, max);
+        return;
+    }
+    if (e->type == SDL_EVENT_MOUSE_MOTION)
+        to_menu(e->motion.x, e->motion.y, &x, &y);
+    else
+        to_menu(e->button.x, e->button.y, &x, &y);
+    build_rows();
+    int row = row_at(x, y), tab = tab_at(x, y);
+    if (e->type == SDL_EVENT_MOUSE_MOTION) {
+        if (row >= 0)
+            set_focus(row);
+        return;
+    }
+    if (e->type != SDL_EVENT_MOUSE_BUTTON_DOWN)
+        return;
+    if (e->button.button == SDL_BUTTON_RIGHT) {
+        close_menu();
+        return;
+    }
+    if (e->button.button != SDL_BUTTON_LEFT)
+        return;
+    if (tab >= 0) {
+        set_section(tab, false);
+    } else if (row >= 0) {
+        set_focus(row);
+        const Row *r = &rows[row];
+        // A choice goes back on its "<", on anywhere else.
+        int dir = 0;
+        if (r->kind == ROW_CHOICE) {
+            float value_x = ROW_X + ROW_W - (float)(SDL_strlen(r->value) + 2) * CHAR;
+            dir = x >= value_x - CHAR / 2 && x < value_x + CHAR * 3 / 2 ? -1 : 1;
+        }
+        act(r, dir);
+    } else if (!inside(x, y, PANEL_X, PANEL_Y, PANEL_W, PANEL_H)) {
+        close_menu();
+    }
+}
+
+void menu_handle_event(const SDL_Event *e)
+{
+    switch (e->type) {
+    case SDL_EVENT_QUIT:
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+        input_request_quit();
+        close_menu();
+        break;
+    case SDL_EVENT_KEY_DOWN:
+        key(e->key.key, e->key.mod);
+        break;
+    case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_WHEEL:
+        mouse(e);
+        break;
+    case SDL_EVENT_WINDOW_RESIZED:
+        vid_window_event(e);
+        break;
+    default:
+        break;
+    }
+    build_rows();
+    if (focus >= row_count)
+        focus = row_count - 1;
+}
+
+static void color(SDL_Renderer *r, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
+{
+    SDL_SetRenderDrawColor(r, red, green, blue, alpha);
+}
+
+static void fill(SDL_Renderer *r, float x, float y, float w, float h)
+{
+    SDL_FRect rect = {origin_x + x, origin_y + y, w, h};
+    SDL_RenderFillRect(r, &rect);
+}
+
+static void text(SDL_Renderer *r, float x, float y, const char *s)
+{
+    SDL_RenderDebugText(r, origin_x + x, origin_y + y, s);
+}
+
+// Word-wraps `s` into lines of HELP_COLS characters.
+static void help(SDL_Renderer *r, const char *s)
+{
+    float y = HELP_Y;
+    while (*s && y < PANEL_Y + PANEL_H - CHAR) {
+        int n = (int)SDL_strlen(s);
+        if (n > HELP_COLS) {
+            n = HELP_COLS;
+            while (n > 0 && s[n] != ' ')
+                n--;
+            if (n == 0)
+                n = HELP_COLS;
+        }
+        char line[HELP_COLS + 1];
+        SDL_strlcpy(line, s, (size_t)n + 1);
+        text(r, TAB_X, y, line);
+        s += n;
+        while (*s == ' ')
+            s++;
+        y += 10;
+    }
+}
+
+static void draw_row(SDL_Renderer *r, const Row *row, float y, bool focused)
+{
+    if (focused) {
+        color(r, 50, 70, 130, 255);
+        fill(r, ROW_X - 2, y - 3, ROW_W + 4, ROW_H);
+    }
+    if (!row->enabled)
+        color(r, 110, 110, 125, 255);
+    else if (focused)
+        color(r, 255, 255, 255, 255);
+    else
+        color(r, 215, 215, 228, 255);
+    char buf[64];
+    switch (row->kind) {
+    case ROW_TOGGLE:
+        SDL_snprintf(buf, sizeof buf, "[%c] %s", row->on ? 'x' : ' ', row->label);
+        text(r, ROW_X, y, buf);
+        break;
+    case ROW_ACTION:
+        SDL_snprintf(buf, sizeof buf, "> %s", row->label);
+        text(r, ROW_X, y, buf);
+        break;
+    case ROW_CHOICE:
+        text(r, ROW_X, y, row->label);
+        SDL_snprintf(buf, sizeof buf, "<%s>", row->value);
+        text(r, ROW_X + ROW_W - (float)SDL_strlen(buf) * CHAR, y, buf);
+        break;
+    }
+}
+
+void menu_draw(SDL_Renderer *r)
+{
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    color(r, 0, 0, 0, 150);
+    SDL_RenderFillRect(r, nullptr);
+
+    layout(r);
+    SDL_SetRenderScale(r, scale, scale);
+    color(r, 100, 120, 180, 255);
+    fill(r, PANEL_X - 1, PANEL_Y - 1, PANEL_W + 2, PANEL_H + 2);
+    color(r, 14, 18, 36, 225);
+    fill(r, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
+
+    color(r, 255, 215, 120, 255);
+    text(r, TAB_X, PANEL_Y + 7, "REUNION");
+    color(r, 140, 150, 180, 255);
+    text(r, PANEL_X + PANEL_W - 8 - 11 * CHAR, PANEL_Y + 7, "F1: return");
+    color(r, 60, 72, 110, 255);
+    fill(r, PANEL_X + 4, TOP_Y - 8, PANEL_W - 8, 1);
+    fill(r, SPLIT_X, TOP_Y - 4, 1, VISIBLE_ROWS * ROW_H + 2);
+    fill(r, PANEL_X + 4, HELP_Y - 7, PANEL_W - 8, 1);
+
+    for (int i = 0; i < SECTIONS; i++) {
+        float y = TOP_Y + i * TAB_H;
+        if (i == section) {
+            color(r, focus < 0 ? 50 : 34, focus < 0 ? 70 : 46, focus < 0 ? 130 : 86, 255);
+            fill(r, TAB_X - 4, y - 3, TAB_W, TAB_H - 1);
+            color(r, 255, 255, 255, 255);
+        } else {
+            color(r, 175, 185, 210, 255);
+        }
+        text(r, TAB_X, y, SECTION_NAMES[i]);
+    }
+
+    build_rows();
+    int first = scroll[section];
+    for (int i = first; i < row_count && i < first + VISIBLE_ROWS; i++)
+        draw_row(r, &rows[i], TOP_Y + (i - first) * ROW_H, i == focus);
+    color(r, 140, 150, 180, 255);
+    if (first > 0)
+        text(r, ROW_X + ROW_W - CHAR, TOP_Y - 12, "^");
+    if (first + VISIBLE_ROWS < row_count)
+        text(r, ROW_X + ROW_W - CHAR, TOP_Y + VISIBLE_ROWS * ROW_H - 4, "v");
+
+    color(r, 170, 190, 225, 255);
+    if (status[0])
+        help(r, status);
+    else if (focus >= 0 && focus < row_count && rows[focus].help)
+        help(r, rows[focus].help);
+    else if (focus < 0)
+        help(r, "Up/Down: section. Right/Enter: settings. Tab: next section.");
+    SDL_SetRenderScale(r, 1, 1);
+}
+
+void menu_run(void)
+{
+    menu_open();
+    SDL_ShowCursor();
+    vid_set_overlay(menu_draw);
+    while (open) {
+        SDL_Event e;
+        while (open && SDL_PollEvent(&e))
+            menu_handle_event(&e);
+        vid_present();
+        SDL_Delay(15);
+    }
+    vid_set_overlay(nullptr);
+    SDL_HideCursor();
+    // Leaves no click or key for the game, and a frame without the menu.
+    input_release();
+    vid_present();
+}
+
+// --- Tests --------------------------------------------------------------------
+
+int menu_row_count(void)
+{
+    build_rows();
+    return row_count;
+}
+
+const char *menu_row_text(int row)
+{
+    build_rows();
+    if (row < 0 || row >= row_count)
+        return "";
+    const Row *r = &rows[row];
+    if (r->kind == ROW_TOGGLE)
+        SDL_snprintf(row_text, sizeof row_text, "[%c] %s", r->on ? 'x' : ' ', r->label);
+    else if (r->kind == ROW_CHOICE)
+        SDL_snprintf(row_text, sizeof row_text, "%s <%s>", r->label, r->value);
+    else
+        SDL_snprintf(row_text, sizeof row_text, "> %s", r->label);
+    return row_text;
+}
+
+int menu_section(void)
+{
+    return section;
+}
+
+int menu_focus(void)
+{
+    return focus;
+}

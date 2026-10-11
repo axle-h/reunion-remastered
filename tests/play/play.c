@@ -12,6 +12,7 @@
 #include "game/main_program.h"
 #include "game/mem.h"
 #include "game/options.h"
+#include "platform/config.h"
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
@@ -89,13 +90,11 @@ static void set_failure(const char *fmt, va_list ap)
     input_request_quit();
 }
 
-// The Options panel (cheats) shows BACK TO DISK OPS in the toolbar.
-static bool options_panel_open(void)
+// A cheat of the port menu is on (scripted runs can't open the menu, and
+// never load the config file, so this only guards against code that does).
+static bool cheating(void)
 {
-    for (int slot = 1; slot <= 12; slot++)
-        if (*(int16_t *)ds_at((uint16_t)(0x7C64 + slot * 21)) == OPTIONS_BACK)
-            return true;
-    return options.freeze_money || options.freeze_ore;
+    return config.freeze_money || config.freeze_ore;
 }
 
 // PLAY_TRACE=path: one line per retrace with the memory hash (debugging
@@ -160,9 +159,8 @@ static void on_retrace(uint64_t frame)
         ctl.rebaseline = false;
     else
         check_write_barrier(frame);
-    if (options_panel_open())
-        fail_from_game("the Options panel (cheats) was opened at frame %llu",
-                       (unsigned long long)frame);
+    if (cheating())
+        fail_from_game("a cheat was on at frame %llu", (unsigned long long)frame);
 }
 
 [[gnu::format(printf, 1, 2)]] static void record_line(const char *fmt, ...)

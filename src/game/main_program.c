@@ -403,7 +403,7 @@ static bool wait_for_event(void)
         Mouse_Poll();
         if (ds.Cheat_Requested)
             Cheat_Apply();
-        Options_ApplyCheats();  // port addition
+        Options_Frame();  // port addition: the port menu's changes, frozen cheats
         if (!wait_retrace())
             return false;
         Game_EventWaitFrames++;  // port addition

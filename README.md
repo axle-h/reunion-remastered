@@ -23,16 +23,20 @@ build/debug/reunion
 `reunion [DATA_DIR]` looks for the game data (the directory holding `GRWAR`,
 `GRAFIKA`, ...) in `DATA_DIR`, else in `$REUNION_DATA`, else in the
 `REUNION_DATA_DIR` CMake setting (default `vendor/Reunion_DOS_EN`).
-Alt+Enter toggles full screen; F12 saves a BMP screenshot to the SDL pref
-directory (`~/.local/share/Reunion/Reunion/screenshots` on Linux).
+F1 opens the port menu over the game: cheats, music (None, AdLib,
+UltraSound, Amiga), effects and volumes, display mode and size, skipping the
+intro, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
+the SDL pref directory (`~/.local/share/Reunion/Reunion` on Linux).
+Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
+`screenshots` directory there.
 
 The port fixes a few things in the original that can make the game
-unwinnable (docs/bugs.md, "Fixed in the port"); `REUNION_ORIGINAL=1` plays
-without those fixes.
+unwinnable (docs/bugs.md, "Fixed in the port"); each can be switched off in
+the port menu, and `REUNION_ORIGINAL=1` plays without any of them.
 
 Like the original `start.exe`, the port plays the CREDITS and INTRO
-cut-scenes before the game and VICTORY after it is won. `--skip-intro` (or
-`REUNION_SKIP_INTRO=1`) goes straight to the game, as does any autopilot run;
+cut-scenes before the game and VICTORY after it is won. Skip intro in the
+port menu goes straight to the game, as does any autopilot run;
 `--cutscene=credits|intro|victory` plays one cut-scene and exits.
 
 Headless runs take a script of mouse clicks, key presses and frame dumps by

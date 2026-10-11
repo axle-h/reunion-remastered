@@ -5,8 +5,9 @@
 // many waiting loops never return. The port unwinds instead of returning:
 // System_Halt (after the ExitProc chain) and a window-close request (seen by
 // timing_wait_retrace at the next retrace, i.e. inside every waiting loop)
-// both longjmp back to main(). Game state lives in the emulated memory, which
-// boot() rebuilds from scratch, so nothing on the abandoned C stack matters.
+// both longjmp back to main(), and so does the port menu's Restart. Game state
+// lives in the emulated memory, which boot() rebuilds from scratch, so
+// nothing on the abandoned C stack matters.
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <setjmp.h>
@@ -22,8 +23,10 @@
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 #include "platform/input.h"
+#include "platform/menu.h"
 #include "platform/timing.h"
 #include "platform/video.h"
 
@@ -53,10 +56,17 @@ static int exit_code;
     longjmp(exit_jump, 1);
 }
 
-// Command line: [--skip-intro] [--cutscene=credits|intro|victory]
-// [--replay=SCRIPT] [DATA_DIR].
-// REUNION_SKIP_INTRO=1 also skips the credits and intro before the game, and
-// so does an autopilot script (its frame numbers count from the game's start).
+[[noreturn]] static void on_restart(void)
+{
+    exit_code = EXIT_RESTART;
+    longjmp(exit_jump, 1);
+}
+
+// Command line: [--cutscene=credits|intro|victory] [--replay=SCRIPT]
+// [DATA_DIR].
+// The port menu's Skip intro skips the credits and intro before the game, and
+// so does an autopilot script (its frame numbers count from the game's
+// start).
 static bool skip_intro;
 static const char *only_cutscene;
 // --replay=SCRIPT checks a recorded autopilot script (the playthrough
@@ -74,9 +84,7 @@ static const char *find_data_dir(int argc, char *argv[])
 {
     const char *dir = nullptr;
     for (int i = 1; i < argc; i++) {
-        if (SDL_strcmp(argv[i], "--skip-intro") == 0)
-            skip_intro = true;
-        else if (SDL_strncmp(argv[i], "--cutscene=", 11) == 0)
+        if (SDL_strncmp(argv[i], "--cutscene=", 11) == 0)
             only_cutscene = argv[i] + 11;
         else if (SDL_strncmp(argv[i], "--replay=", 9) == 0)
             replay = argv[i] + 9;
@@ -105,6 +113,52 @@ static bool boot(void)
     return true;
 }
 
+// The port menu's link to the game: requests go to the main loop.
+static void menu_changed(MenuChange change)
+{
+    static const OptionsRequest requests[] = {
+        [MENU_CHANGED_CHEATS] = OPTIONS_CHEATS,
+        [MENU_ADD_MONEY] = OPTIONS_ADD_MONEY_ONCE,
+        [MENU_ADD_ORE] = OPTIONS_ADD_ORE_ONCE,
+        [MENU_CHANGED_MUSIC] = OPTIONS_MUSIC,
+        [MENU_CHANGED_FIXES] = OPTIONS_FIXES,
+    };
+    Options_Request(requests[change]);
+}
+
+// The config file (not for scripted runs, which must replay the same
+// anywhere) and what it sets before the game starts.
+static void setup_config(void)
+{
+    if (!replay && !autopilot_init()) {
+        char *path = config_default_path();
+        config_load(path);
+        SDL_free(path);
+    }
+    // Every fix gets a line in the file.
+    for (int i = 0; i < Fixes_Count; i++)
+        config_set_fix(Fixes_List[i].key, config_fix(Fixes_List[i].key));
+    Fixes_Init();
+    audio_set_user_volumes(config.music_volume / 100.0f,
+                           config.effects ? config.effects_volume / 100.0f : 0.0f);
+    audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
+    skip_intro |= config.skip_intro;
+
+    static MenuFix fixes[CONFIG_MAX_FIXES];
+    int n = SDL_min(Fixes_Count, CONFIG_MAX_FIXES);
+    for (int i = 0; i < n; i++)
+        fixes[i] = (MenuFix){Fixes_List[i].key, Fixes_List[i].label, Fixes_List[i].help};
+    menu_set_hooks(&(MenuHooks){
+        .game_running = Options_GameRunning,
+        .changed = menu_changed,
+        .add_money = OPTIONS_ADD_MONEY,
+        .add_ore = OPTIONS_ADD_ORE,
+        .fixes = fixes,
+        .fix_count = n,
+        .fixes_locked = Fixes_Locked(),
+    });
+}
+
 // --replay: the script, with a frame limit so that a replay that goes wrong
 // still ends.
 static bool start_replay(void)
@@ -123,6 +177,7 @@ static bool start_replay(void)
 int main(int argc, char *argv[])
 {
     const char *data_dir = find_data_dir(argc, argv);
+    setup_config();
     // Headless unless SDL_VIDEO_DRIVER says otherwise (the replay is then
     // shown fast-forward).
     if (replay)
@@ -136,8 +191,6 @@ int main(int argc, char *argv[])
         return 1;
     }
     input_init();
-    autopilot_init();
-    Fixes_Init();
     if (replay && !start_replay()) {
         vid_shutdown();
         SDL_Quit();
@@ -166,8 +219,7 @@ int main(int argc, char *argv[])
     // return false if the window was closed).
     bool play_game = true;
     Cutscene cutscene;
-    const char *skip_env = SDL_getenv("REUNION_SKIP_INTRO");
-    skip_intro |= (skip_env && *skip_env && *skip_env != '0') || autopilot_active();
+    skip_intro |= autopilot_active();
     if (only_cutscene) {
         play_game = false;
         if (cutscene_from_name(only_cutscene, &cutscene))
@@ -175,14 +227,19 @@ int main(int argc, char *argv[])
         else
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unknown cut-scene %s", only_cutscene);
     } else if (!skip_intro) {
-        play_game = cutscene_play(CUTSCENE_CREDITS) && cutscene_play(CUTSCENE_INTRO);
+        // Restart in a cut-scene goes on to the game.
+        play_game = cutscene_play(CUTSCENE_CREDITS)
+                    && (input_restart_requested() || cutscene_play(CUTSCENE_INTRO));
     }
+    if (input_restart_requested())
+        input_reset();
 
-    system_exit_handler = on_halt;
-    timing_set_quit_handler(on_quit);
     int result = 0;
     uint64_t replay_start = timing_frames();
     while (play_game) {
+        system_exit_handler = on_halt;
+        timing_set_quit_handler(on_quit);
+        timing_set_restart_handler(on_restart);
         // volatile: read after longjmp.
         volatile bool booted = false;
         if (setjmp(exit_jump) == 0) {
@@ -227,7 +284,12 @@ int main(int argc, char *argv[])
         if (exit_code == EXIT_VICTORY) {
             system_exit_handler = nullptr;  // VICTORY.PRG has its own
             timing_set_quit_handler(nullptr);
+            timing_set_restart_handler(nullptr);
             cutscene_play(CUTSCENE_VICTORY);
+            if (input_restart_requested()) {
+                input_reset();
+                continue;
+            }
         }
         result = exit_code == EXIT_QUIT ? 0 : exit_code;
         break;
@@ -235,6 +297,8 @@ int main(int argc, char *argv[])
 
     system_exit_handler = nullptr;
     timing_set_quit_handler(nullptr);
+    timing_set_restart_handler(nullptr);
+    config_save();  // the window's size
     audio_shutdown();
     fs_shutdown();
     vid_shutdown();

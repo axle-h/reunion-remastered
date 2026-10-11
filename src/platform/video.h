@@ -2,6 +2,7 @@
 // presented through SDL at the original 4:3 display aspect.
 #pragma once
 
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_render.h>
 #include <stdint.h>
 
@@ -57,7 +58,24 @@ void vid_shutdown(void);
 // vsync; timing.c paces frames).
 void vid_present(void);
 
+// Alt+Enter: between the window and the last full-screen choice (desktop
+// by default); updates the config.
 void vid_toggle_fullscreen(void);
+// Applies config.display and the window or full-screen size.
+void vid_apply_display(void);
+// Window events from the event loops: a window resized by hand keeps its
+// size in config.window_width / _height.
+void vid_window_event(const SDL_Event *e);
+// Window sizes for the port menu: 320x240 times 2, 3, ... up to what fits
+// the display (at least one). Returns the count.
+int vid_window_sizes(int sizes[][2], int max);
+// The display's full-screen modes, largest first, one per size and refresh
+// rate. Returns the count.
+int vid_fullscreen_modes(SDL_DisplayMode *modes, int max);
+// Drawn over every presented frame, in render output pixels with no
+// logical presentation (the port menu). nullptr: none.
+void vid_set_overlay(void (*draw)(SDL_Renderer *));
+SDL_Window *vid_window(void);
 
 // Saves the current frame (framebuffer through the palette, at its native
 // size) as an 8-bit indexed image: PNG if `path` ends in ".png", else BMP.

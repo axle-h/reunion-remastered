@@ -18,9 +18,6 @@ void GfxPath_WaitVRetrace(void);
 void GfxPath_SetToolbarAndShow(int16_t screen);
 // 3a1b:0030
 void GfxPath_SetToolbar(int16_t screen);
-// Port addition: SetToolbar with an explicit list of `count` command ids
-// (as for a screen other than 1).
-void GfxPath_SetToolbarCommands(const int8_t *ids, int16_t count);
 // 3a1b:00bf
 void GfxPath_RedrawToolbar(void);
 // 3a1b:0366
@@ -36,8 +33,7 @@ bool GfxPath_ToolbarHasIcon(int16_t id);
 // 3a1b:0810: ds index (DS:7D72) of the 68 icons in the ICON.ALL copy.
 void GfxPath_IconAllIndex(void);
 // 3a1b:0864: draws icon number `icon` (an ICON.ALL index, not a command id)
-// 40x24 into the 320-wide image at dest + 504h. Port addition: OPTIONS_ICON
-// (game/options.h) draws the port's own icon.
+// 40x24 into the 320-wide image at dest + 504h.
 void GfxPath_DrawIcon(int16_t icon, FarPtr dest);
 // 3a1b:0932
 void GfxPath_ShowScreenBackdrop(void);

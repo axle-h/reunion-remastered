@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "platform/autopilot.h"
 #include "platform/video.h"
 
 enum : int {
@@ -14,6 +15,8 @@ enum : int {
 
 static InputMouse mouse;
 static bool quit;
+static bool restart;
+static bool menu_request;
 static int queue[QUEUE_SIZE];
 static int queue_head, queue_count;
 
@@ -67,6 +70,12 @@ static void key_down(const SDL_KeyboardEvent *e)
     }
     if (key == SDLK_F12) {
         vid_screenshot();
+        return;
+    }
+    // The port menu; scripted runs keep F1 as the game key it was.
+    if (key == SDLK_F1 && !autopilot_active()) {
+        if (!e->repeat)
+            menu_request = true;
         return;
     }
     if (e->mod & SDL_KMOD_ALT) {
@@ -138,6 +147,9 @@ void input_pump(void)
                 if ((uint8_t)*p >= 32 && (uint8_t)*p < 127)
                     push_key(*p);
             break;
+        case SDL_EVENT_WINDOW_RESIZED:
+            vid_window_event(&e);
+            break;
         default:
             break;
         }
@@ -148,11 +160,33 @@ bool input_quit_requested(void) { return quit; }
 
 void input_request_quit(void) { quit = true; }
 
+void input_request_restart(void) { restart = true; }
+
+bool input_restart_requested(void) { return restart; }
+
+bool input_take_menu_request(void)
+{
+    bool r = menu_request;
+    menu_request = false;
+    return r;
+}
+
 void input_reset(void)
 {
     quit = false;
+    restart = false;
+    menu_request = false;
     queue_head = queue_count = 0;
     mouse.left = mouse.right = mouse.middle = 0;
+}
+
+void input_release(void)
+{
+    queue_head = queue_count = 0;
+    mouse.left = mouse.right = mouse.middle = 0;
+    float x, y;
+    SDL_GetMouseState(&x, &y);
+    set_position(x, y);
 }
 
 void input_set_mouse(int x, int y, uint8_t left, uint8_t right)

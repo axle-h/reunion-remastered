@@ -14,15 +14,25 @@ typedef struct {
 // Starts SDL text input on the video window. Call after vid_init.
 void input_init(void);
 
-// Processes pending SDL events. Handles quit, Alt+Enter, F12 (screenshot) and
-// mouse/keyboard state.
+// Processes pending SDL events. Handles quit, Alt+Enter, F1 (port menu),
+// F12 (screenshot) and mouse/keyboard state.
 void input_pump(void);
 
 bool input_quit_requested(void);
 // Asks the game to quit, as closing the window does.
 void input_request_quit(void);
-// Clears the quit request, the key queue and the mouse buttons (restart).
+// Asks the game to restart (port menu): timing_wait_retrace calls the
+// restart handler.
+void input_request_restart(void);
+bool input_restart_requested(void);
+// True once per F1 press (not in scripted runs): open the port menu.
+bool input_take_menu_request(void);
+// Clears the quit and restart requests, the key queue and the mouse
+// buttons (restart).
 void input_reset(void);
+// Drops the key queue and the mouse buttons and re-reads the pointer
+// position, so nothing done in the port menu reaches the game.
+void input_release(void);
 
 // Sets the mouse state as if the user moved/clicked (test autopilot). The
 // state holds until the next real mouse event or the next call.

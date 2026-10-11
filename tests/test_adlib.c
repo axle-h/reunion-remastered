@@ -11,6 +11,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 #include "platform/audio.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 
 static int16_t buf[AUDIO_RATE * 2];
@@ -52,8 +53,8 @@ int main(int argc, char *argv[])
         return 77;
     }
     system_init();
+    const int32_t heap_start = System_MemAvail();
     SDL_setenv_unsafe("SDL_AUDIO_DRIVER", "dummy", 1);
-    SDL_unsetenv_unsafe("REUNION_MUSIC");
     Sound_Init();
     if (!Sound_DeviceOpen()) {
         printf("no audio, skipping\n");
@@ -69,13 +70,14 @@ int main(int argc, char *argv[])
     AdlibMusic_Init();
     Music_InitMusicDevices();
     CHECK(ds.AdlibMusic_Present && ds.AdlibMusic_Inited);
-    CHECK(ds.AdlibMusic_TuneBuf != 0);
+    // The tune buffer is not on the emulated heap.
+    CHECK(ds.AdlibMusic_TuneBuf == 0 && System_MemAvail() == heap_start);
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
     CHECK(!Adlib_Playing());
 
     // Un-obfuscated MAIN1 starts with its order list 0, 1, 2, ...
     AdlibMusic_LoadMusicFile((const uint8_t *)"\x05" "main1");
-    const uint8_t *tune = far_host(ds.AdlibMusic_TuneBuf);
+    const uint8_t *tune = AdlibMusic_Tune();
     CHECK(tune[0] == 0 && tune[1] == 1 && tune[2] == 2 && tune[11] == 11);
 
     // Silence before anything plays (the mixer skips an untouched OPL).
@@ -137,12 +139,38 @@ int main(int argc, char *argv[])
     CHECK(render(1, nullptr) > 1000);
     audio_opl_write(0xB0, 0x00);
 
-    // REUNION_MUSIC=mod picks the modules even with an SB setup.
-    SDL_setenv_unsafe("REUNION_MUSIC", "mod", 1);
+    // The port menu's music choice picks the modules even with an SB setup.
+    config.music = CONFIG_MUSIC_GUS;
     ds.Music_Backend = 0;
     Music_InitMusicDevices();
     CHECK(ds.Music_Backend == 2);
-    SDL_unsetenv_unsafe("REUNION_MUSIC");
+
+    // The port menu switches the music while a tune plays: the tune goes on
+    // on the new hardware (talk is not the main theme, so it is the one).
+    config.music = CONFIG_MUSIC_ADLIB;
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
+    Music_PlayTrack((const uint8_t *)"\x04" "talk");
+    CHECK(Adlib_Playing());
+    config.music = CONFIG_MUSIC_GUS;
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 2 && !Adlib_Playing() && audio_music_playing());
+    CHECK(!audio_music_amiga_mixer());
+    config.music = CONFIG_MUSIC_AMIGA;
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 2 && audio_music_playing() && audio_music_amiga_mixer());
+    config.music = CONFIG_MUSIC_NONE;
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 0 && ds.Game_MusicTrack == 0 && !audio_music_playing());
+    // From no music back to AdLib, as if the game had started without it.
+    ds.AdlibMusic_Inited = false;
+    config.music = CONFIG_MUSIC_ADLIB;
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1 && Adlib_Playing());
+    CHECK(ds.AdlibMusic_TuneBuf == 0 && System_MemAvail() == heap_start);
+    Music_StopMusic();
+    audio_set_amiga_mixer(false);
+    config_reset();
 
     audio_shutdown();
     printf(ok ? "ok\n" : "FAILED\n");

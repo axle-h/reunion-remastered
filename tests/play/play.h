@@ -12,7 +12,7 @@
 // - Input only: every input goes through play_mouse()/play_key(), which also
 //   record it. The emulated memory is compared before and after each policy
 //   slice and any change fails the run (write barrier).
-// - No cheats: the run fails if the Options panel (playtest cheats) opens.
+// - No cheats: the run fails if a port menu cheat is on.
 // Policies decide only on what a player can see (docs/playthrough.md); that
 // part is a review rule, not checked here.
 //

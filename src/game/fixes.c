@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "platform/config.h"
+
 static constexpr Fixes ALL = {
     .find_jade = true,
     .mine_all_systems = true,
@@ -16,13 +18,47 @@ static constexpr Fixes ALL = {
 
 Fixes fixes = ALL;
 
-void Fixes_Init(void)
+const FixInfo Fixes_List[] = {
+    {"find_jade", "Jade found in time",
+     "Jade is found by 1 April 2928 at the latest, so the game can be won.", &fixes.find_jade},
+    {"mine_all_systems", "All systems mine",
+     "Every system's colonies and droids mine, not only the selected one's.",
+     &fixes.mine_all_systems},
+    {"meteorite_droids", "Meteorite droids",
+     "A meteorite takes a droid from the colony it hit.", &fixes.meteorite_droids},
+    {"build_on_moons", "Building on moons",
+     "Buildings on a moon are built at the moon's speed.", &fixes.build_on_moons},
+    {"derricks_on_moons", "Derricks on moons",
+     "A Derrick on a moon fills the moon's store, not the planet's.", &fixes.derricks_on_moons},
+    {"drifting_ship", "Drifting ship",
+     "The drifting Morgrul ship is found by a group arriving at Phoenix 1.",
+     &fixes.drifting_ship},
+    {"disband_list_count", "Disbanding groups",
+     "Disbanding a group no longer wipes or doubles other fleets.", &fixes.disband_list_count},
+    {"annihilate_leaves_screen", "Annihilation",
+     "The annihilation first leaves screens showing what it destroys.",
+     &fixes.annihilate_leaves_screen},
+    {"autoplace_when_full", "New colony buildings",
+     "A new colony's buildings are kept when its surface is shown and full.",
+     &fixes.autoplace_when_full},
+};
+
+const int Fixes_Count = (int)SDL_arraysize(Fixes_List);
+
+bool Fixes_Locked(void)
 {
     const char *env = SDL_getenv("REUNION_ORIGINAL");
-    if (env && *env && *env != '0')
+    return env && *env && *env != '0';
+}
+
+void Fixes_Init(void)
+{
+    if (Fixes_Locked()) {
         Fixes_Original();
-    else
-        fixes = ALL;
+        return;
+    }
+    for (int i = 0; i < Fixes_Count; i++)
+        *Fixes_List[i].value = config_fix(Fixes_List[i].key);
 }
 
 void Fixes_Original(void)

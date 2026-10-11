@@ -110,8 +110,7 @@ static union {
 static AdlibCs *const cs = &cs_image.v;
 
 // The tune's segment (the player's DS), copied when a tune starts so the
-// audio thread never reads the emulated memory the game is changing. The
-// player only reads it, and the game doesn't touch the buffer while playing.
+// audio thread never reads the buffer the game loads the next tune into.
 static uint8_t tune[0x10000];
 
 static uint16_t cs_word(uint16_t off)
@@ -366,15 +365,17 @@ static void StopPlayerInternal(void)
     cs->Playing = 0;
 }
 
-// 428e:021d: ES:SI = tune.
-static void StartPlayerInternal(FarPtr p)
+// 428e:021d: ES:SI = tune. The tune is at offset 0 of the player's copy
+// (TuneSeg is left 0); beyond it the copy is zero.
+static void StartPlayerInternal(const uint8_t *buf, size_t size)
 {
-    uint16_t seg = (uint16_t)(p >> 16), off = (uint16_t)p;
-    memcpy(tune, far_host(far_ptr(seg, 0)), sizeof tune);
-    cs->TuneSeg = seg;
-    cs->OrderOff = off;
-    cs->InstrOff = (uint16_t)(off + 0x33);
-    cs->PatternOff = (uint16_t)(off + 0x633);
+    size = size < sizeof tune ? size : sizeof tune;
+    memcpy(tune, buf, size);
+    memset(tune + size, 0, sizeof tune - size);
+    cs->TuneSeg = 0;
+    cs->OrderOff = 0;
+    cs->InstrOff = 0x33;
+    cs->PatternOff = 0x633;
     SilenceAll();
     OplWrite(0x01, 0x20); // waveform select on
     OplWrite(0x08, 0x40); // keyboard split by F-number bit 8
@@ -409,12 +410,12 @@ int16_t Adlib_DetectAdlib(void)
 
 // 428e:0012. The lock stands in for the original's single CPU: the timer
 // can't run in the middle.
-void Adlib_StartPlayer(FarPtr tune_buf)
+void Adlib_StartPlayer(const uint8_t *tune_buf, size_t size)
 {
     audio_lock();
     if (cs->Playing)
         StopPlayerInternal();
-    StartPlayerInternal(tune_buf);
+    StartPlayerInternal(tune_buf, size);
     audio_unlock();
 }
 

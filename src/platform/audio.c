@@ -38,6 +38,11 @@ static bool music_loop;
 static bool music_ended;
 static int music_gain = GAIN_ONE;
 static int sfx_gain = GAIN_ONE;
+// The player's volumes (port menu), on top of the game's; they outlive
+// audio_shutdown, as does the mixer choice.
+static int user_music_gain = GAIN_ONE;
+static int user_sfx_gain = GAIN_ONE;
+static bool amiga_mixer;
 static Voice voices[AUDIO_VOICES];
 static uint32_t voice_serial;
 // OPL2: generated only once something has been written to it.
@@ -65,8 +70,8 @@ static void mix_opl(int32_t *acc, int frames, bool render)
         if (opl_active && render) {
             int16_t s[2];
             OPL3_GenerateResampled(&opl, s);
-            acc[2 * i] += s[0] * music_gain / GAIN_ONE;
-            acc[2 * i + 1] += s[1] * music_gain / GAIN_ONE;
+            acc[2 * i] += s[0] * music_gain / GAIN_ONE * user_music_gain / GAIN_ONE;
+            acc[2 * i + 1] += s[1] * music_gain / GAIN_ONE * user_music_gain / GAIN_ONE;
         }
     }
 }
@@ -85,7 +90,7 @@ static void mix_chunk(int16_t *out, int frames)
             music_ended = true;
         } else {
             for (int i = 0; i < frames * 2; i++)
-                acc[i] = mod[i] * music_gain / GAIN_ONE;
+                acc[i] = mod[i] * music_gain / GAIN_ONE * user_music_gain / GAIN_ONE;
         }
     }
 
@@ -114,7 +119,7 @@ static void mix_chunk(int16_t *out, int frames)
             int s1 = idx + 1 < vc->len ? vc->data[idx + 1] - 128 : s0;
             int frac = (int)(vc->pos & 0xffff);
             int s = s0 * 256 + (s1 - s0) * frac / 256;
-            s = s * sfx_gain / GAIN_ONE;
+            s = s * sfx_gain / GAIN_ONE * user_sfx_gain / GAIN_ONE;
             acc[2 * i] += s;
             acc[2 * i + 1] += s;
             vc->pos += vc->step;
@@ -215,6 +220,14 @@ bool audio_play_music(const char *dos_path, bool loop)
     bool ok = ctx && xmp_load_module_from_memory(ctx, data, (long)size) == 0
               && xmp_start_player(ctx, AUDIO_RATE, 0) == 0;
     SDL_free(data);
+#ifdef XMP_FLAGS_A500
+    // Paula's output, hard-panned as on an Amiga. The flags only take hold
+    // once the player runs.
+    if (ok && amiga_mixer) {
+        xmp_set_player(ctx, XMP_PLAYER_CFLAGS, xmp_get_player(ctx, XMP_PLAYER_CFLAGS) | XMP_FLAGS_A500);
+        xmp_set_player(ctx, XMP_PLAYER_MIX, 100);
+    }
+#endif
     if (!ok) {
         SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Music %s: not a module", dos_path);
         if (ctx)
@@ -423,6 +436,35 @@ void audio_set_sfx_volume(float volume)
     SDL_LockAudioStream(stream);
     sfx_gain = to_gain(volume);
     SDL_UnlockAudioStream(stream);
+}
+
+void audio_set_user_volumes(float music, float sfx)
+{
+    if (stream)
+        SDL_LockAudioStream(stream);
+    user_music_gain = to_gain(music);
+    user_sfx_gain = to_gain(sfx);
+    if (stream)
+        SDL_UnlockAudioStream(stream);
+}
+
+void audio_set_amiga_mixer(bool on)
+{
+    amiga_mixer = on;
+}
+
+bool audio_music_amiga_mixer(void)
+{
+#ifdef XMP_FLAGS_A500
+    if (!stream)
+        return false;
+    SDL_LockAudioStream(stream);
+    bool on = music && xmp_get_player(music, XMP_PLAYER_MIXER_TYPE) >= XMP_MIXER_A500;
+    SDL_UnlockAudioStream(stream);
+    return on;
+#else
+    return false;
+#endif
 }
 
 void audio_set_paused(bool paused)

@@ -9,6 +9,13 @@
 
 enum : uint16_t { TUNE_BUF_SIZE = 0x7BD4 };
 
+// The original allocated the tune buffer on its heap when it found an AdLib
+// (ds.AdlibMusic_TuneBuf). Here it is the port's own, so the heap and the
+// memory the game has left are the same whatever music it started with, and
+// the port menu can switch to AdLib at any time. ds.AdlibMusic_TuneBuf stays
+// nil.
+static uint8_t tune_buf[TUNE_BUF_SIZE];
+
 // 4265:000c
 void AdlibMusic_LoadMusicFile(const uint8_t *name)
 {
@@ -23,7 +30,7 @@ void AdlibMusic_LoadMusicFile(const uint8_t *name)
     if (data == nullptr)
         System_RunError(2); // CheckIO after Reset: File not found
     if (size < TUNE_BUF_SIZE + 1) {
-        uint8_t *buf = far_host(ds.AdlibMusic_TuneBuf);
+        uint8_t *buf = tune_buf;
         SDL_memset(buf, 0, TUNE_BUF_SIZE);
         SDL_memcpy(buf, data, size);
         uint16_t n = (uint16_t)size;
@@ -41,7 +48,7 @@ void AdlibMusic_LoadMusicFile(const uint8_t *name)
 // 4265:0290
 void AdlibMusic_StartAdlibTune(void)
 {
-    Adlib_StartPlayer(ds.AdlibMusic_TuneBuf);
+    Adlib_StartPlayer(tune_buf, sizeof tune_buf);
 }
 
 // 4265:0296
@@ -67,13 +74,16 @@ void AdlibMusic_PlayMusic(const uint8_t *name)
     AdlibMusic_StartAdlibTune();
 }
 
-// 4265:0242
+// 4265:0242, without the heap allocation (tune_buf).
 void AdlibMusic_InitMusic(void)
 {
     ds.AdlibMusic_Present = Adlib_DetectAdlib() != -1;
-    if (ds.AdlibMusic_Present && !ds.AdlibMusic_Inited)
-        ds.AdlibMusic_TuneBuf = System_GetMem(TUNE_BUF_SIZE);
     ds.AdlibMusic_Inited = true;
+}
+
+const uint8_t *AdlibMusic_Tune(void)
+{
+    return tune_buf;
 }
 
 // 4265:027c

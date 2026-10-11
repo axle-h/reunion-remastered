@@ -15,6 +15,11 @@ bool timing_wait_retrace(void);
 // waiting loop ends without checking the return value. nullptr: none.
 void timing_set_quit_handler(void (*fn)(void));
 
+// Called by timing_wait_retrace() when the port menu asked for a restart;
+// like the quit handler, it does not return. nullptr: none (the request
+// waits).
+void timing_set_restart_handler(void (*fn)(void));
+
 // Called by timing_wait_retrace() once the frame's events (and autopilot
 // input) are in: the game's stand-in for the INT 33h callback, which on DOS
 // moved the cursor whatever the game was doing. nullptr: none.

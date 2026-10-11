@@ -46,11 +46,15 @@ int main(void)
     key(SDLK_RETURN, 0);
     key(SDLK_ESCAPE, 0);
     key(SDLK_UP, 0);
-    key(SDLK_F1, 0);
+    key(SDLK_F2, 0);
     key(SDLK_X, SDL_KMOD_LALT);
     key(SDLK_DELETE, 0);
+    // F1 opens the port menu instead of reaching the game.
+    key(SDLK_F1, 0);
+    CHECK(!input_take_menu_request());
     input_pump();
-    int expect[] = {'a', 13, 27, 0, 72, 0, 59, 0, 45, 0, 83};
+    CHECK(input_take_menu_request() && !input_take_menu_request());
+    int expect[] = {'a', 13, 27, 0, 72, 0, 60, 0, 45, 0, 83};
     for (size_t i = 0; i < SDL_arraysize(expect); i++) {
         CHECK(input_key_pressed());
         CHECK(input_read_key() == expect[i]);

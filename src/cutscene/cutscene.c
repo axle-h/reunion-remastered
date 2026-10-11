@@ -8,11 +8,12 @@
 //   player's (1-based order and row, no Sound Blaster row correction). Without
 //   an audio device a silent libxmp sequencer, stepped by the retrace clock,
 //   provides the same timeline. SETUP.SPD device 4/5 (AdLib/none) plays the
-//   music silently, as the original did.
+//   music silently, as the original did; with a config file, music None in
+//   the port menu does.
 // - The 1 ms timer (GUS ISR) is derived from the retrace count, so pacing is
 //   identical in real time and in unpaced autopilot runs.
-// - Halt (the exit routine, ESC, window close) unwinds with longjmp to
-//   cutscene_play, like main.c does for the game.
+// - Halt (the exit routine, ESC, window close, the port menu's Restart)
+//   unwinds with longjmp to cutscene_play, like main.c does for the game.
 #include "cutscene/cutscene.h"
 
 #include <SDL3/SDL.h>
@@ -23,6 +24,7 @@
 #include "assets/pic.h"
 #include "cutscene/cs.h"
 #include "platform/audio.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 #include "platform/input.h"
 #include "platform/timing.h"
@@ -87,6 +89,12 @@ int cs_frame_count(int anim)
 [[noreturn]] static void on_quit(void)
 {
     longjmp(exit_jump, JUMP_QUIT);
+}
+
+// The port menu's Restart ends the cut-scene; main.c then boots the game.
+[[noreturn]] static void on_restart(void)
+{
+    longjmp(exit_jump, JUMP_HALT);
 }
 
 // --- Graphics unit ----------------------------------------------------------------
@@ -630,9 +638,11 @@ bool cutscene_from_name(const char *name, Cutscene *out)
 }
 
 // SAVE\SETUP.SPD byte 0, as the programs read it: 4 (AdLib) and 5 (none) run
-// the GUS player silently.
+// the GUS player silently. The port menu's music choice replaces the file.
 static bool music_silent(void)
 {
+    if (config.music != CONFIG_MUSIC_SETUP)
+        return config.music == CONFIG_MUSIC_NONE;
     size_t size = 0;
     uint8_t *setup = fs_load("SAVE\\SETUP.SPD", &size);
     bool silent = setup && size >= 1 && (setup[0] == 4 || setup[0] == 5);
@@ -664,12 +674,14 @@ bool cutscene_play(Cutscene which)
     volatile bool quit = false;
     timing_set_mouse_hook(nullptr);  // the game's cursor stays off the cut-scene
     timing_set_quit_handler(on_quit);
+    timing_set_restart_handler(on_restart);
     int jumped = setjmp(exit_jump);
     if (jumped == 0)
         cs_prog->run();
     else
         quit = jumped == JUMP_QUIT;
     timing_set_quit_handler(nullptr);
+    timing_set_restart_handler(nullptr);
 
     cs_anim_close();
     cs_music_stop();

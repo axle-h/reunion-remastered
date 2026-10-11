@@ -14,6 +14,7 @@
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 #include "platform/input.h"
 #include "platform/timing.h"
@@ -154,9 +155,9 @@ int main(int argc, char *argv[])
 
     // The same with the GUS music (modules): the start-up memory check asks
     // for 28,000 bytes more, which needs the EMS (game/emm.h) as in DOS.
-    SDL_setenv_unsafe("REUNION_MUSIC", "mod", 1);
+    config.music = CONFIG_MUSIC_GUS;
     CHECK(run("40:click:160,60;120:click:80,100;1000:quit") == -1);
-    SDL_unsetenv_unsafe("REUNION_MUSIC");
+    config_reset();
     CHECK(ds.SoundDrv_GusReady);
     CHECK(Ems_GameDataBlock()->State == 2 && Ems_ToolbarBlock()->State == 2);
     CHECK(ds.Game_CurrentScreen == 1);

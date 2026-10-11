@@ -5,6 +5,7 @@
 #include "platform/audio.h"
 #include "platform/autopilot.h"
 #include "platform/input.h"
+#include "platform/menu.h"
 #include "platform/video.h"
 
 // VGA mode 13h: 25.175 MHz / (800 * 449) = 70.086 Hz.
@@ -13,6 +14,7 @@ static const double RETRACE_NS = 1e9 * 800.0 * 449.0 / 25175000.0;
 static uint64_t frames;
 static uint64_t next_ns;
 static void (*quit_handler)(void);
+static void (*restart_handler)(void);
 static void (*mouse_hook)(void);
 static unsigned idle_polls;
 
@@ -21,6 +23,11 @@ enum : unsigned { IDLE_POLLS_PER_RETRACE = 4 };
 void timing_set_quit_handler(void (*fn)(void))
 {
     quit_handler = fn;
+}
+
+void timing_set_restart_handler(void (*fn)(void))
+{
+    restart_handler = fn;
 }
 
 void timing_set_mouse_hook(void (*fn)(void))
@@ -76,6 +83,9 @@ bool timing_wait_retrace(void)
     idle_polls = 0;
     present();
     input_pump();
+    // The port menu holds the game here until it is closed.
+    if (input_take_menu_request())
+        menu_run();
     if (autopilot_init())
         autopilot_frame(frames);
     if (mouse_hook && !input_quit_requested())
@@ -86,6 +96,8 @@ bool timing_wait_retrace(void)
             quit_handler();
         return false;
     }
+    if (input_restart_requested() && restart_handler)
+        restart_handler();
     if (autopilot_active()) {
         mix_one_retrace();
         frames++;  // headless script: no pacing

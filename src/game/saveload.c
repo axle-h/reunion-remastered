@@ -159,15 +159,11 @@ bool SaveLoad_Transfer(bool save)
         void *p = blocks[i].ptr ? far_host(*(FarPtr *)ds_at(blocks[i].off)) : ds_at(blocks[i].off);
         ok = block(f, p, blocks[i].size, save);
     }
-    // Port addition: the cheats' trailer (game/options.h), only in saves of
-    // games with one on.
-    uint8_t trailer[OPTIONS_SAVE_SIZE];
-    if (ok && save) {
-        size_t n = Options_SaveState(trailer);
-        ok = fwrite(trailer, 1, n, f) == n;
-    } else if (ok) {
-        Options_LoadState(trailer, fread(trailer, 1, sizeof trailer, f));
-    }
+    // Port addition: frozen cheats (game/options.h) hold the loaded stocks.
+    // Saves of earlier port versions may end in a cheats trailer; it is
+    // never read.
+    if (ok && !save)
+        Options_Rebase();
     fclose(f);
     return ok;
 }
@@ -403,126 +399,14 @@ static void SetupDiskHotspots(void)
     Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, (const uint8_t *)PSTR("Select slot"), 0, 0);
 }
 
-// --- Options panel (port addition, game/options.h) -----------------------------
-//
-// OPTIONS swaps the toolbar for BACK TO M.SCREEN and BACK TO DISK OPS and
-// draws the panel in place of the slot list, in the same 12 rows. The music
-// and effects buttons stay; hotspots 5..8 (5 was the slot list) are the cheat
-// rows: hits 19h..1Ch.
-
-enum { ROW_MONEY = 4, ROW_ORE = 5, ROW_ADD_MONEY = 7, ROW_ADD_ORE = 8 };
-
-static bool options_open;
-
-static void DrawOptionsRow(int16_t row, const char *text, bool on)
-{
-    uint8_t s[32];
-    s[0] = (uint8_t)SDL_snprintf((char *)s + 1, sizeof s - 1, "%s", text);
-    if (on)
-        Gfx_DrawTextB3(s, 0x10, (row - 1) * 9 + 0x40, 0x13);
-    else
-        Gfx_DrawTextB0(s, 0x10, (row - 1) * 9 + 0x40, 0x13);
-}
-
-static void DrawAddRow(int16_t row, bool pressed)
-{
-    char text[32];
-    if (row == ROW_ADD_MONEY)
-        SDL_snprintf(text, sizeof text, "Add %d credits", OPTIONS_ADD_MONEY);
-    else
-        SDL_snprintf(text, sizeof text, "Add %d ore each", OPTIONS_ADD_ORE);
-    DrawOptionsRow(row, text, pressed);
-}
-
-static void DrawOptionsPanel(void)
-{
-    for (int16_t row = 1; row <= SLOT_COUNT; row++)
-        DrawOptionsRow(row, "", false);
-    DrawOptionsRow(1, "Options", false);
-    DrawOptionsRow(2, "-------------------", false);
-    DrawOptionsRow(ROW_MONEY, options.freeze_money ? "Freeze money:    on" : "Freeze money:   off",
-                   options.freeze_money);
-    DrawOptionsRow(ROW_ORE, options.freeze_ore ? "Freeze ore:      on" : "Freeze ore:     off",
-                   options.freeze_ore);
-    DrawAddRow(ROW_ADD_MONEY, false);
-    DrawAddRow(ROW_ADD_ORE, false);
-}
-
-static void SetOptionsRowHotspot(int16_t index, int16_t row, const uint8_t *caption)
-{
-    Mouse_SetHotspot(index, 0x10, (uint8_t)((row - 1) * 9 + 0x40), 0x72, 8, caption, 0, 0);
-}
-
-static void OpenOptions(void)
-{
-    static const int8_t toolbar[] = {0x18, OPTIONS_BACK};  // BACK TO M.SCREEN
-    options_open = true;
-    GfxPath_SetToolbarCommands(toolbar, 2);
-    GfxPath_ShowToolbar();
-    DrawOptionsPanel();
-    ds.Mouse_HotspotCount = 8;
-    SetOptionsRowHotspot(5, ROW_MONEY, (const uint8_t *)PSTR("Freeze money"));
-    SetOptionsRowHotspot(6, ROW_ORE, (const uint8_t *)PSTR("Freeze ore"));
-    SetOptionsRowHotspot(7, ROW_ADD_MONEY, (const uint8_t *)PSTR("Add money"));
-    SetOptionsRowHotspot(8, ROW_ADD_ORE, (const uint8_t *)PSTR("Add ore"));
-}
-
-static void CloseOptions(void)
-{
-    options_open = false;
-    GfxPath_SetToolbarAndShow(0x0C);
-    DrawSlotNames();
-    SetupDiskHotspots();
-}
-
-// Hits 19h..1Ch: hotspots 5..8 of OpenOptions.
-static void OptionsClick(int16_t hit)
-{
-    Sound_PlayButtonSfx((const uint8_t *)PSTR("x"));
-    if (hit == 0x19)
-        Options_SetFreezeMoney(!options.freeze_money);
-    else if (hit == 0x1A)
-        Options_SetFreezeOre(!options.freeze_ore);
-    else if (hit == 0x1B)
-        Options_AddMoney();
-    else
-        Options_AddOre();
-    // An add row lights up while the button is down.
-    if (hit >= 0x1B)
-        DrawAddRow(hit == 0x1B ? ROW_ADD_MONEY : ROW_ADD_ORE, true);
-    else
-        DrawOptionsPanel();
-    // The main loop hands a non-repeating hotspot over on every frame the
-    // button is down (dragging across the slot list selects as it goes):
-    // act once per click.
-    do {
-        Mouse_Poll();
-        Gfx_WaitFrames(1);
-    } while (ds.Mouse_Buttons != 0);
-    if (hit >= 0x1B)
-        DrawOptionsPanel();
-}
-
 // 1a3e:0008
 void SaveLoad_DiskScreen(void)
 {
     if (ds.Game_ScreenEntered) {
-        options_open = false;
         GfxPath_SetToolbarAndShow(FIRST_SHOW == 2 ? 0x26 : 0x0C);
         SaveLoad_ReadSlotNames();
         DiskScreenInit();
         SetupDiskHotspots();
-    }
-    // Port addition: the options panel.
-    if (ds.Game_MenuCommand == OPTIONS_COMMAND)
-        OpenOptions();
-    if (options_open) {
-        if (ds.Game_MenuCommand == OPTIONS_BACK)
-            CloseOptions();
-        else if (ds.Game_HotspotHit >= 0x19 && ds.Game_HotspotHit <= 0x1C)
-            OptionsClick(ds.Game_HotspotHit);
-        if (options_open && (uint16_t)ds.Game_HotspotHit >= 0x19)
-            return;
     }
     if (ds.Game_MenuCommand == 0x2F && *slot_entry(SLOT_SEL) != 0) {
         SaveLoad_LoadGame();

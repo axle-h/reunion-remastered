@@ -12,7 +12,6 @@
 # (UBSan in trap mode: undefined behaviour stops with SIGILL).
 # Replay one seed: REUNION_AUTOPILOT=random:SEED:FRAMES build/trap/reunion
 # SOAK_VIDEO=dummy runs about twice as fast as the default offscreen driver.
-# SOAK_MUSIC sets REUNION_MUSIC (mod/adlib); default: as SAVE\SETUP.SPD says.
 # Exit status: 0 if every seed finished, 1 otherwise.
 set -u
 
@@ -20,7 +19,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 seeds=20 first=1 frames=30000 limit=120 jobs=$(nproc)
 build="$root/build/trap" data="$root/vendor/Reunion_DOS_EN" logs="" prefix="" start=0
 
-usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 while getopts "n:s:f:t:j:b:d:o:p:r:h" opt; do
     case $opt in
     n) seeds=$OPTARG ;; s) first=$OPTARG ;; f) frames=$OPTARG ;; t) limit=$OPTARG ;;
@@ -42,7 +41,7 @@ run_seed() {
     rm -rf "$home"; mkdir -p "$home"
     # The software renderer: parallel runs on the GPU renderer stall each other.
     local -a env=(SDL_VIDEO_DRIVER="${SOAK_VIDEO:-offscreen}" SDL_RENDER_DRIVER=software
-                  SDL_AUDIO_DRIVER=dummy REUNION_MUSIC="${SOAK_MUSIC:-}" XDG_DATA_HOME="$home"
+                  SDL_AUDIO_DRIVER=dummy XDG_DATA_HOME="$home"
                   HOME="$home" REUNION_AUTOPILOT="$prefix;random:$seed:$frames:$start")
     env "${env[@]}" timeout -k 5 "$limit" "$exe" "$data" >"$log" 2>&1
     local rc=$? status detail=""

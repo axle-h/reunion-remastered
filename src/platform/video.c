@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "platform/config.h"
+
 // Both modes were shown on a 4:3 monitor (13h pixels are 20% taller than wide).
 enum : int { DISPLAY_HEIGHT = VID_WIDTH * 3 / 4 };
 
@@ -16,6 +18,9 @@ static VidMode mode = VID_MODE_13H;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
+static void (*overlay)(SDL_Renderer *);
+// What Alt+Enter goes back to from a window.
+static ConfigDisplay last_fullscreen = CONFIG_DESKTOP;
 
 static bool make_texture(void)
 {
@@ -83,7 +88,7 @@ void vid12_planar_write(int offset, uint8_t color, uint8_t bitmask, uint8_t plan
 
 bool vid_init(const char *title)
 {
-    if (!SDL_CreateWindowAndRenderer(title, VID_WIDTH * 4, DISPLAY_HEIGHT * 4,
+    if (!SDL_CreateWindowAndRenderer(title, config.window_width, config.window_height,
                                      SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Window: %s", SDL_GetError());
         return false;
@@ -94,7 +99,11 @@ bool vid_init(const char *title)
     SDL_SetRenderVSync(renderer, 0);
     // The game draws its own mouse pointer into the frame.
     SDL_HideCursor();
-    return make_texture();
+    if (!make_texture())
+        return false;
+    if (config.display != CONFIG_WINDOWED)
+        vid_apply_display();
+    return true;
 }
 
 void vid_shutdown(void)
@@ -143,13 +152,103 @@ void vid_present(void)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+    if (overlay) {
+        int w, h;
+        SDL_RendererLogicalPresentation lp;
+        SDL_GetRenderLogicalPresentation(renderer, &w, &h, &lp);
+        SDL_SetRenderLogicalPresentation(renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+        overlay(renderer);
+        SDL_SetRenderLogicalPresentation(renderer, w, h, lp);
+    }
     SDL_RenderPresent(renderer);
+}
+
+void vid_set_overlay(void (*draw)(SDL_Renderer *))
+{
+    overlay = draw;
+}
+
+void vid_apply_display(void)
+{
+    if (!window)
+        return;
+    if (config.display == CONFIG_WINDOWED) {
+        SDL_SetWindowFullscreen(window, false);
+        SDL_SetWindowSize(window, config.window_width, config.window_height);
+        return;
+    }
+    last_fullscreen = config.display;
+    SDL_DisplayMode mode;
+    SDL_DisplayID display = SDL_GetDisplayForWindow(window);
+    if (config.display == CONFIG_DESKTOP) {
+        SDL_SetWindowFullscreenMode(window, nullptr);
+    } else if (config.fullscreen_width > 0
+               && SDL_GetClosestFullscreenDisplayMode(display, config.fullscreen_width,
+                                                      config.fullscreen_height,
+                                                      config.fullscreen_refresh, true, &mode)) {
+        SDL_SetWindowFullscreenMode(window, &mode);
+    } else {
+        const SDL_DisplayMode *desktop = SDL_GetDesktopDisplayMode(display);
+        SDL_SetWindowFullscreenMode(window, desktop);
+    }
+    SDL_SetWindowFullscreen(window, true);
 }
 
 void vid_toggle_fullscreen(void)
 {
-    bool fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
-    SDL_SetWindowFullscreen(window, !fullscreen);
+    config.display = config.display == CONFIG_WINDOWED ? last_fullscreen : CONFIG_WINDOWED;
+    vid_apply_display();
+    config_save();
+}
+
+void vid_window_event(const SDL_Event *e)
+{
+    // A window resized by hand keeps its size.
+    if (e->type == SDL_EVENT_WINDOW_RESIZED && config.display == CONFIG_WINDOWED && window
+        && !(SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {
+        config.window_width = e->window.data1;
+        config.window_height = e->window.data2;
+    }
+}
+
+int vid_window_sizes(int sizes[][2], int max)
+{
+    SDL_Rect bounds = {.w = 1920, .h = 1080};
+    if (window)
+        SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(window), &bounds);
+    int n = 0;
+    for (int k = 2; n < max; k++) {
+        int w = VID_WIDTH * k, h = DISPLAY_HEIGHT * k;
+        if ((w > bounds.w || h > bounds.h) && n > 0)
+            break;
+        sizes[n][0] = w;
+        sizes[n][1] = h;
+        n++;
+    }
+    return n;
+}
+
+int vid_fullscreen_modes(SDL_DisplayMode *modes, int max)
+{
+    int count = 0, n = 0;
+    SDL_DisplayMode **all = window ? SDL_GetFullscreenDisplayModes(SDL_GetDisplayForWindow(window), &count)
+                                   : nullptr;
+    for (int i = 0; all && i < count && n < max; i++) {
+        // Largest first; one entry per size and (whole) refresh rate.
+        bool dup = false;
+        for (int j = 0; j < n && !dup; j++)
+            dup = modes[j].w == all[i]->w && modes[j].h == all[i]->h
+                  && SDL_lroundf(modes[j].refresh_rate) == SDL_lroundf(all[i]->refresh_rate);
+        if (!dup)
+            modes[n++] = *all[i];
+    }
+    SDL_free(all);
+    return n;
+}
+
+SDL_Window *vid_window(void)
+{
+    return window;
 }
 
 bool vid_save_image(const char *path)

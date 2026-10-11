@@ -12,16 +12,15 @@
 //          instrument (no effect then), 0 = none; byte 1: effect (see adlib.c)
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
-
-#include "game/mem.h"
 
 // 428e:000c: AX = port, or -1 (the original returned CF set). The port has no
 // ports to probe: the emulated OPL sits at 388h whenever audio is available.
 int16_t Adlib_DetectAdlib(void);
-// 428e:0012: ES:SI = tune. Stops a playing tune, programs the OPL and hooks
-// the timer.
-void Adlib_StartPlayer(FarPtr tune);
+// 428e:0012: ES:SI = tune (here a host buffer of size bytes). Stops a
+// playing tune, programs the OPL and hooks the timer.
+void Adlib_StartPlayer(const uint8_t *tune, size_t size);
 // 428e:0029: unhooks the timer and silences the OPL, if playing.
 void Adlib_StopPlayer(void);
 // CS:0743, for tests: a tune is playing.

@@ -10,9 +10,13 @@ void Music_PlayTrack(const uint8_t *name);
 // 424a:0095
 void Music_StopMusic(void);
 // 424a:00b2: chooses ds.Music_Backend from ds.Sound_DeviceType (GUS 1 -> modules,
-// SB/AdLib 2, 3, 4, 6 -> AdLib; REUNION_MUSIC=mod|adlib overrides) and sets
-// Game_MusicTrack. The AdLib path needs the heap (system_init).
+// SB/AdLib 2, 3, 4, 6 -> AdLib; config.music overrides it) and sets
+// Game_MusicTrack.
 void Music_InitMusicDevices(void);
+// Port addition: the music hardware changed (port menu). Stops the music,
+// chooses again as Music_InitMusicDevices does and starts the last track on
+// the new hardware.
+void Music_SwitchDevice(void);
 // 424a:0137: starts the track selected by ds.Game_MusicTrack.
 void Music_ApplyMusicTrack(void);
 // 424a:017e

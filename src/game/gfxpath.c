@@ -1,13 +1,11 @@
 #include "game/gfxpath.h"
 
-#include <string.h>
 
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/ems.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
-#include "game/options.h"
 #include "game/sound.h"
 #include "game/system.h"
 
@@ -112,15 +110,6 @@ void GfxPath_SetToolbar(int16_t screen)
         *slot_id(i) = rec[0x0C + i];
     for (int16_t i = (int16_t)(count + 1); i <= 12; i++)
         *slot_id(i) = 0;
-    GfxPath_RedrawToolbar();
-    ds.Game_HotspotHit = 0;
-}
-
-void GfxPath_SetToolbarCommands(const int8_t *ids, int16_t count)
-{
-    CUR_PAGE = 1;
-    for (int16_t i = 1; i <= 12; i++)
-        *slot_id(i) = i <= count ? ids[i - 1] : 0;
     GfxPath_RedrawToolbar();
     ds.Game_HotspotHit = 0;
 }
@@ -305,10 +294,6 @@ void GfxPath_DrawIcon(int16_t icon, FarPtr dest)
     uint16_t out = (uint16_t)TMP_PTR;
     uint16_t tseg = (uint16_t)(TMP_PTR >> 16);
     int16_t left = 0x3C0;
-    if (icon == OPTIONS_ICON) {
-        memcpy(far_host(TMP_PTR), Options_Icon, sizeof Options_Icon);
-        left = 0;
-    }
     while (left > 0) {
         uint8_t b = *(uint8_t *)far_host(far_ptr(seg, src++));
         if (b < 0xC0) {

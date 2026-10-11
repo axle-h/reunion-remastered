@@ -61,6 +61,10 @@ one 1 MB (+64 KB) array, `mem[]`, with everything at its original address:
 | Heap | from `MEM_HEAP_SEG` (after the stack) to `A000:0000`, managed by `System_GetMem`/`System_FreeMem` (`src/game/system.c`) exactly as Borland's System unit does |
 | EMS | page frame `E000:0000` (4 × 16 KB), driver header at `C800:0000` behind INT 67h's vector; `src/game/emm.c` emulates a LIM 4.0 driver with 256 KB, which unit Ems (`src/game/ems.c`) uses for the game data and toolbar blocks as on a DOS machine with EMS |
 
+One exception: the AdLib tune buffer, which only the port's own player
+reads, is a C array rather than a heap block (docs/audio.md), so the heap
+doesn't depend on the music chosen at start-up.
+
 `far_host(p)` turns a stored far pointer into a host pointer, and
 `ghidra_host(seg, off)` does the same for Ghidra's segment numbering.
 Far *code* pointers (procedure variables such as `Game::GrWarProc`) will need
@@ -93,34 +97,56 @@ Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
 All game state is in the emulated memory, which the next boot rebuilds, so
 nothing left on the abandoned C stack matters.
 
-## Options panel (port addition)
+## Port menu (port addition)
 
-The disk operations toolbar (screen 0Ch) has a sixth button, OPTIONS, using
-command id 3Dh: the original's tables have an entry for it with a blank label
-and no use. `Options_Init` (`src/game/options.c`) fills in its label,
-icon and sound and adds it to the screen's button list at boot. Its icon,
-number 44h (one past ICON.ALL's 68), is the port's own
-(`src/game/options_icon.c`, made from a picture by `tools/icon_png.py`);
-`GfxPath_DrawIcon` draws it from there.
+F1 opens a menu drawn over the game (`src/platform/menu.c`): Cheats, Sound,
+Video, Game, Fixes, Restart and Quit. Scripted runs keep F1 as an ordinary
+key, so they never open it. `timing_wait_retrace` runs the menu when F1 was
+pressed, so the game is held wherever it was waiting for the retrace; the
+menu pumps its own events and draws with SDL's 8x8 debug font in a 320x240
+space over the presented frame (`vid_set_overlay`). On closing it drops the
+keys and buttons it saw, so none reach the game.
 
-Clicking it swaps the toolbar for BACK TO M.SCREEN and BACK TO DISK OPS (the
-unused command 3Fh, with RETREAT's arrow) and shows a panel in place of the
-save slot list (`src/game/saveload.c`) with the playtest cheats. The music and
-effects buttons still work.
+Every setting is kept in `reunion.ini` in the SDL pref directory
+(`~/.local/share/Reunion/Reunion/` on Linux; `src/platform/config.c`),
+rewritten on every change. Scripted runs and tests never read or write it,
+and without it the game behaves as before the menu: music from
+`SAVE\SETUP.SPD`, every fix on. `REUNION_ORIGINAL` still takes precedence
+over the file.
 
-- Freeze money / freeze ore hold `Game_Credits` / New Earth's six ore
-  stocks (`Game_HomeStock`, what production draws on; colonies' stores are
-  left alone) at their value when switched on. Every frame of the main loop
-  puts them back, so purchases cost nothing (and income is lost while
-  frozen). Unfreezing leaves the stock where it is.
-- Add 100000 credits / add 10000 ore each raise the stock (and the frozen
-  value) once per click, for purchases larger than the balance.
+The platform layer knows nothing of the game. Display and volumes apply at
+once. Everything that touches game state is only asked for
+(`MenuHooks.changed` → `Options_Request`, `src/game/options.c`) and carried
+out by `Options_Frame` at the main loop's next frame, since the menu may have
+been opened in the middle of anything:
 
-The main loop hands a non-repeating hotspot to the screen on every frame the
-button is held (that is how dragging across the slot list selects), so a
-toggle waits for the button to be released.
-
-Cheats belong to a game. Every boot starts with them off, and a save of a
-game with one on carries their state in a trailer after the original
-blocks (`docs/formats/save.md`), so loading it brings them back. Loading a
-save without the trailer turns them off.
+- **Cheats.** Freeze money / freeze ore hold `Game_Credits` / New Earth's six
+  ore stocks (`Game_HomeStock`, what production draws on; colonies' stores
+  are left alone). Every frame of the main loop puts them back, so purchases
+  cost nothing (and income is lost while frozen). The value held is taken
+  when a freeze is switched on and again at boot and after a load, so a
+  freeze outlasting a game holds the new game's stock. Unfreezing leaves the
+  stock where it is. Add 100000 credits / add 10000 ore each raise the stock
+  (and the frozen value) once per click, during a game only. Saves carry no
+  cheat state: they are byte-for-byte the original format.
+- **Sound.** Music None, AdLib, UltraSound (the `ANIM\*.SPD` modules) or
+  Amiga (the same modules through libxmp's Paula mixer; they are the Amiga
+  version's music, see `docs/formats/amiga.md`). A change stops the music
+  and starts the last track again on the new hardware (`Music_SwitchDevice`).
+  The AdLib tune buffer is not on the emulated heap (see Memory model), so
+  any switch works the same whatever the game started with. Music None also silences
+  the cut-scenes. Effects on/off and both volumes are the mixer's own gains
+  on top of the game's (`audio_set_user_volumes`): muted effects still play
+  silently, so the game's waits for them are unchanged.
+- **Video.** Window (in 320x240 steps that fit the display, or the size the
+  window was dragged to), full screen at a chosen display mode, or desktop
+  full screen. Alt+Enter toggles between the window and the last full-screen
+  choice.
+- **Game.** Skip intro.
+- **Fixes.** One switch per fix in `game/fixes.h`, listed in `Fixes_List`
+  (a new fix needs a line there; `test_options` checks), plus all on / all
+  off. With `REUNION_ORIGINAL=1` they show off and can't be changed.
+- **Restart** goes back to the title screen without the cut-scenes (in a
+  cut-scene, on to the game), through the same unwinding as a restart
+  request of the original. **Quit** closes the game as closing the window
+  does.
