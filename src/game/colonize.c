@@ -175,17 +175,17 @@ void Colonize_DrawColonizeScreen(void)
 {
     PlanetInfo_SelectCurBody();
     FarPtr buf = System_GetMem(0xBCC0);
-    Gfx_LoadPic(P("grafika\\koloniz"), buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40,
-                0, 0xBE);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPic(P("grafika\\koloniz"), far_host(buf), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+                0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     PString s, tmp;
     System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
     ds.Surface_BufC = System_GetMem(0xF000);
     System_StrLoad(&tmp, PSTR("planets\\epul"));
     System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false, Gfx_PalettePtr(), 0,
-                0x3F, 0x90, 0, 0xBE);
+    Gfx_LoadPic((const uint8_t *)&tmp, far_host(ds.Surface_BufC), 1, 0xC0, 0, 0, 0x140, false,
+                Gfx_PalettePtr(), 0, 0x3F, 0x90, 0, 0xBE);
     const TBody *body = far_host(ds.Game_CurBody);
     for (int16_t k = 1; k <= 6; k++) {
         const TStarterBuilding *sb = &ds.Colony_StarterBuildings[k - 1];

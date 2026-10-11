@@ -34,7 +34,7 @@ bool GfxPath_ToolbarHasIcon(int16_t id);
 void GfxPath_IconAllIndex(void);
 // 3a1b:0864: draws icon number `icon` (an ICON.ALL index, not a command id)
 // 40x24 into the 320-wide image at dest + 504h.
-void GfxPath_DrawIcon(int16_t icon, FarPtr dest);
+void GfxPath_DrawIcon(int16_t icon, uint8_t *dest);
 // 3a1b:0932
 void GfxPath_ShowScreenBackdrop(void);
 // 3a1b:09a3 (= Game::GfxPathProc)

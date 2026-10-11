@@ -53,7 +53,8 @@ void Research_ResearchScreen(void)
             ds.Game_SelInvention = ds.Game_CurResearch;
         GfxPath_ShowScreenBackdrop();
         CDS_BUF = System_GetMem(0x6901);
-        Gfx_LoadPic(pstr(PSTR("grafika\\cds")), CDS_BUF, 1, 0x54, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
+        Gfx_LoadPic(pstr(PSTR("grafika\\cds")), far_host(CDS_BUF), 1, 0x54, 0, 0, 0x140, false,
+                    Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
         Research_DrawInventionIcons();
         if (ds.Game_CurResearch > 0)
             Research_DrawInventionInfo();
@@ -221,12 +222,11 @@ void Research_DrawDeveloperSkills(void)
         Gfx_DrawTextF9(pstr(&ds.Staff_Names[3][ds.Game_StaffHired[3] - 1]), 8, 0xBC, 0xE);
     }
     // Update arrows beside the developer's name: dim when no developer can work.
-    FarPtr base = CDS_BUF;
-    uint16_t seg = (uint16_t)(base >> 16), off = (uint16_t)base;
+    const uint8_t *base = far_host(CDS_BUF);
     bool idle = ds.Game_StaffHired[3] == 0 || FLAG_5D52 != 0 || FLAG_5D9E == 4;
     uint16_t o1 = idle ? 0x62D2 : 0x62C0, o2 = idle ? 0x62DE : 0x62CC;
-    Blit_CopyRect(far_ptr(seg, (uint16_t)(off + o1)), far_ptr(ds.Gfx_ScreenSeg, 0xD4CC), 0xB, 5);
-    Blit_CopyRect(far_ptr(seg, (uint16_t)(off + o2)), far_ptr(ds.Gfx_ScreenSeg, 0xD515), 5, 5);
+    Blit_CopyRect(base + o1, gfx_screen() + 0xD4CC, 0xB, 5);
+    Blit_CopyRect(base + o2, gfx_screen() + 0xD515, 5, 5);
 }
 
 // 2d66:0891
@@ -241,8 +241,8 @@ void Research_AnimateSelectionFrame(void)
     uint8_t colour = FRAME_BLINK < 0x15 ? 0x50 : 0x41;
     Mouse_HideCursor();
     uint16_t off = frame_offset(ds.Game_SelInvention, row);
-    *(uint8_t *)far_host(far_ptr(ds.Gfx_ScreenSeg, off)) = colour;
-    *(uint8_t *)far_host(far_ptr(ds.Gfx_ScreenSeg, (uint16_t)(off + 1))) = colour;
+    gfx_screen()[off] = colour;
+    gfx_screen()[(uint16_t)(off + 1)] = colour;
     Mouse_ShowCursor();
     FRAME_BLINK--;
     if (FRAME_BLINK < 0)
@@ -267,8 +267,8 @@ void Research_ResetSelectionFrame(void)
     FRAME_BLINK = 0x14;
     uint16_t off = frame_offset(ds.Game_SelInvention, row);
     // BUG? unlike AnimateSelectionFrame this does not hide the mouse cursor.
-    *(uint8_t *)far_host(far_ptr(ds.Gfx_ScreenSeg, off)) = colour;
-    *(uint8_t *)far_host(far_ptr(ds.Gfx_ScreenSeg, (uint16_t)(off + 1))) = colour;
+    gfx_screen()[off] = colour;
+    gfx_screen()[(uint16_t)(off + 1)] = colour;
 }
 
 // 2d66:0a1a
@@ -278,17 +278,16 @@ void Research_DrawInventionIcons(void)
     for (uint16_t k = 1; k <= 0x23; k++) {
         int16_t st = PRODUCT(k).State;
         if (st >= 1 && st <= 5)
-            Research_DrawIconFrame(frame_of_state[st], icon_offset(k), ds.Gfx_ScreenSeg);
+            Research_DrawIconFrame(frame_of_state[st], icon_offset(k), gfx_screen());
     }
 }
 
 // 2d66:0b5c
-void Research_DrawIconFrame(uint8_t frame, uint16_t dest, uint16_t seg)
+void Research_DrawIconFrame(uint8_t frame, uint16_t dest, uint8_t *seg)
 {
     Mouse_HideCursor();
-    FarPtr base = CDS_BUF;
-    uint16_t off = (uint16_t)((uint16_t)base + frame / 10 * 0x12C0 + frame * 0x20);
-    Blit_CopyRect(far_ptr((uint16_t)(base >> 16), off), far_ptr(seg, (uint16_t)(dest + 0x140)), 0x1F, 0xE);
+    const uint8_t *src = (const uint8_t *)far_host(CDS_BUF) + frame / 10 * 0x12C0 + frame * 0x20;
+    Blit_CopyRect(src, seg + (uint16_t)(dest + 0x140), 0x1F, 0xE);
     Mouse_ShowCursor();
 }
 
@@ -315,7 +314,7 @@ void Research_AnimateCurrentResearch(void)
     if (ds.Game_CurResearch != 0 && ds.Game_StaffExp[3] != 0 && FLAG_5D52 == 0 && FLAG_5D9E != 4) {
         if (Research_ProgressVisible(ds.Game_CurResearch)) {
             Research_DrawIconFrame((uint8_t)(WORK_FRAME / 5 + 0x28),
-                                   icon_offset2((uint16_t)ds.Game_CurResearch), ds.Gfx_ScreenSeg);
+                                   icon_offset2((uint16_t)ds.Game_CurResearch), gfx_screen());
             WORK_FRAME++;
             if (WORK_FRAME > 0x2C)
                 WORK_FRAME = 0;
@@ -329,7 +328,7 @@ static void play_transition(int16_t kind, int16_t inv, int16_t from, int16_t to)
 {
     for (int16_t i = from; i <= to; i++) {
         Research_DrawIconFrame((uint8_t)((kind - 1) * 10 + FRAME_TABLE[i % 20]),
-                               icon_offset2((uint16_t)inv), ds.Gfx_ScreenSeg);
+                               icon_offset2((uint16_t)inv), gfx_screen());
         for (int r = 0; r < 3; r++) {
             if (ds.Game_CurResearch < 0 || inv != ds.Game_CurResearch)
                 Research_AnimateCurrentResearch();

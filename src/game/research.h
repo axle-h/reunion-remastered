@@ -18,8 +18,9 @@ void Research_AnimateSelectionFrame(void);
 void Research_ResetSelectionFrame(void);
 // 2d66:0a1a
 void Research_DrawInventionIcons(void);
-// 2d66:0b5c: 31x14 icon `frame` of the CDS picture to dest + 140h in segment seg.
-void Research_DrawIconFrame(uint8_t frame, uint16_t dest, uint16_t seg);
+// 2d66:0b5c: 31x14 icon `frame` of the CDS picture to dest + 140h in the
+// segment starting at seg.
+void Research_DrawIconFrame(uint8_t frame, uint16_t dest, uint8_t *seg);
 // 2d66:0bae
 void Research_AnimateCurrentResearch(void);
 // 2d66:0caa / 0d7b: frames 0..10 and 10..20 of the state-change animation

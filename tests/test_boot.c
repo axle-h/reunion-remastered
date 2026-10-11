@@ -66,7 +66,8 @@ static int match_percent(const char *name, uint16_t rows, uint16_t last, uint16_
     FarPtr pal = System_GetMem(768);
     uint8_t pname[64];
     pname[0] = (uint8_t)SDL_snprintf((char *)pname + 1, sizeof pname - 1, "grafika\\%s", name);
-    Gfx_LoadPic(pname, buf, 1, rows, 0, 0, 320, false, pal, 0, last, offset, 0, fade_last);
+    Gfx_LoadPic(pname, far_host(buf), 1, rows, 0, 0, 320, false, far_host(pal), 0, last, offset, 0,
+                fade_last);
     const uint8_t *pic = far_host(buf);
     int same = 0;
     for (int y = 0; y < rows; y++)

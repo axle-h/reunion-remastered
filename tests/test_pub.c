@@ -85,7 +85,6 @@ int main(int argc, char *argv[])
     // A reply's two-digit code is the next question menu, DS:7764 (0 leaves
     // the dialog); the question code at DS:776A is left alone (1fd2:075f).
     system_init();
-    ds.Gfx_ScreenSeg = 0xA000;
     *(int16_t *)ds_at(0x7738) = 1;                                 // person (not the trader)
     memcpy(ds_at(0x7760), "\x01" "1", 2);                          // NUM_STR = '1'
     for (int16_t r = 1; r <= 3; r++) {

@@ -75,20 +75,22 @@ enum : uint16_t {
     SCREEN_AT = 0x3D40, // grafika\main window: screen row 49
 };
 
-// Offset arithmetic wraps inside the segment, as in the original.
-static inline FarPtr fp_add(FarPtr p, uint16_t add)
+// The original's offsets wrap inside the segment; these stay inside their
+// buffers, so the port's pointers agree.
+static inline uint8_t *fp_add(FarPtr p, uint16_t add)
 {
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + add));
+    return (uint8_t *)far_host(p) + add;
 }
 
-static inline FarPtr fp_at(FarPtr p, uint16_t off)
+// Byte off from the start of p's segment (not from p).
+static inline uint8_t *fp_at(FarPtr p, uint16_t off)
 {
-    return far_ptr((uint16_t)(p >> 16), off);
+    return (uint8_t *)far_host(far_ptr((uint16_t)(p >> 16), 0)) + off;
 }
 
-static inline FarPtr screen_at(uint16_t off)
+static inline uint8_t *screen_at(uint16_t off)
 {
-    return far_ptr(ds.Gfx_ScreenSeg, off);
+    return gfx_screen() + off;
 }
 
 static inline const uint8_t *ps(const PString *p)
@@ -101,7 +103,8 @@ static inline const uint8_t *ps(const PString *p)
 // Gfx_LoadPic with the arguments shared by every command-centre sheet.
 static void load_sheet(const uint8_t *name, FarPtr dest, uint16_t rows, uint16_t stride)
 {
-    Gfx_LoadPic(name, dest, 1, rows, 0, 0, stride, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(name, far_host(dest), 1, rows, 0, 0, stride, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
+                0, 0xBE);
 }
 
 // Sound names of the staff kinds (pilots, builders, fighters, developers).
@@ -206,9 +209,9 @@ void Command_HandleCommandCentre(void)
 void Command_DrawCommandBackdrop(void)
 {
     FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\main"), dest, 1, 0x97, 0, 0, 200, BACKDROP_SHOWN != 0,
+    Gfx_LoadPic(LIT("grafika\\main"), far_host(dest), 1, 0x97, 0, 0, 200, BACKDROP_SHOWN != 0,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(dest, screen_at(SCREEN_AT), 0x140, 0x97);
+    Blit_CopyRect(far_host(dest), screen_at(SCREEN_AT), 0x140, 0x97);
     System_FreeMem(dest, 0xBCC0);
     Command_LoadCommandGfx();
     if (BACKDROP_SHOWN == 0)
@@ -239,9 +242,9 @@ void Command_LoadCommandGfx(void)
 // "iris" (n from 0 to 0x39 when opening, back down when closing).
 static void iris_lines(int16_t n)
 {
-    uint16_t seg = (uint16_t)(OFFSCREEN >> 16);
-    Gfx_DrawLineCopy(ds.Gfx_ScreenSeg, (int16_t)(n + 0xA6), 0x31, 0xA6, 0xBA, seg);
-    Gfx_DrawLineCopy(ds.Gfx_ScreenSeg, (int16_t)(0xA6 - n), 0x31, 0xA6, 0xBA, seg);
+    uint8_t *seg = fp_at(OFFSCREEN, 0);
+    Gfx_DrawLineCopy(gfx_screen(), (int16_t)(n + 0xA6), 0x31, 0xA6, 0xBA, seg);
+    Gfx_DrawLineCopy(gfx_screen(), (int16_t)(0xA6 - n), 0x31, 0xA6, 0xBA, seg);
     if (n % 2 == 0) {
         Command_TickAmbientLights();
         Gfx_WaitVRetrace();
@@ -251,7 +254,7 @@ static void iris_lines(int16_t n)
 // 3abd:04b4
 void Command_ShowHologram(int16_t vec)
 {
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pal = Gfx_PalettePtr();
 
     Command_FreeRoomAnim();
     System_FreeMem(MAINA4, 0x5B00);
@@ -265,10 +268,10 @@ void Command_ShowHologram(int16_t vec)
     Gfx_LoadPic(ps(&name), fp_at(OFFSCREEN, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false, pal, 0, 0xB0,
                 0x40, 0, 0xBE);
 
-    uint16_t seg = (uint16_t)(OFFSCREEN >> 16);
+    uint8_t *seg = fp_at(OFFSCREEN, 0);
     for (int16_t n = 1;; n++) {
         for (int16_t x = 0xA4; x <= 0xA8; x++)
-            Gfx_DrawLineCopy(ds.Gfx_ScreenSeg, x, 0xBA, x, (int16_t)(0xBA - n), seg);
+            Gfx_DrawLineCopy(gfx_screen(), x, 0xBA, x, (int16_t)(0xBA - n), seg);
         if (n % 6 == 0) {
             Command_TickAmbientLights();
             Gfx_WaitVRetrace();
@@ -434,7 +437,7 @@ void Command_TickRoomAnim(void)
                          (int16_t)(ROOM_H(id) - 2), 0x140, (int16_t)w);
     Mouse_ShowCursor();
     bool ok;
-    Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, buf, &ok);
+    Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, far_host(buf), &ok);
     uint16_t fighter = ds.Game_StaffHired[2];
     Mouse_HideCursor();
     if ((int16_t)fighter > 0 && ANIM_ID < 7) {
@@ -505,7 +508,7 @@ void Command_TickGrAnim(void)
     } else {
         Anim_LoadGrAnim((uint16_t)ANIM_ID);
         bool ok;
-        Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, GR_BUF, &ok);
+        Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, far_host(GR_BUF), &ok);
         if (!ok) {
             ANIM_FRAME = GR_FRAMES(ANIM_ID);
             ANIM_REPEAT = 1;
@@ -652,7 +655,7 @@ void Command_TickAmbientLights(void)
                       0xE);
     }
     for (uint16_t i = 1;; i++) {
-        uint8_t *px = (uint8_t *)far_host(screen_at((uint16_t)(LIGHT_OFS(i) + SCREEN_AT)));
+        uint8_t *px = screen_at((uint16_t)(LIGHT_OFS(i) + SCREEN_AT));
         if (i < 0xC) {
             *px = (uint8_t)(System_Random(0xB0) + 0x40);
         } else {
@@ -716,7 +719,7 @@ void Command_DrawAllStaffIcons(void)
 // pictures and animations, then the program ends.
 void Command_ShowDeathEnding(void)
 {
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pal = Gfx_PalettePtr();
     PString num, name;
     if (ds.Game_PrevScreen == 0x20)
         System_StrStore(PSTR("1"), &num, 0xFF);
@@ -725,16 +728,16 @@ void Command_ShowDeathEnding(void)
     FarPtr buf = System_GetMem(64000);
     System_StrLoad(&name, PSTR("grafika\\deathsz"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0), 0x140, 200);
+    Gfx_LoadPic(ps(&name), far_host(buf), 0, 200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
+    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     Gfx_WaitFrames(0x2D0);
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
     System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("grafika\\death"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0), 0x140, 200);
+    Gfx_LoadPic(ps(&name), far_host(buf), 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
+    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     if (ds.Game_Hero == 2) {
         Command_InitRoomAnim();
@@ -750,8 +753,9 @@ void Command_ShowDeathEnding(void)
         Gfx_WaitFrames(0x67C);
     }
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
-    Gfx_LoadPic(LIT("grafika\\death"), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0), 0x140, 200);
+    Gfx_LoadPic(LIT("grafika\\death"), far_host(buf), 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40,
+                0, 0xB0);
+    Blit_CopyRect(far_host(buf), gfx_screen(), 0x140, 200);
     System_FreeMem(buf, 64000);
     Gfx_WaitFrames(0x46);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x46);

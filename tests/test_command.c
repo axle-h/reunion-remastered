@@ -30,8 +30,6 @@ static void reset(void)
     SDL_memset(vid_palette, 0, sizeof vid_palette);
     CHECK(dseg_init());
     system_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Mouse_CursorState = 1; // hidden

@@ -1022,7 +1022,7 @@ void Sim_ProcessTravellingGroups(void)
                 *b8(0x5D48) = 1;
             } else if (ds.Game_CurrentScreen == 0x11 && i >= 0 && ds.Game_SelGroup == i) {
                 Gfx_FadeToWhite(0x70, 0x84, Gfx_PalettePtr(), 0x14);
-                Blit_FillBytes(ds.ShipMove_Backdrop, 0x8980, 0x7F);
+                Blit_FillBytes(far_host(ds.ShipMove_Backdrop), 0x8980, 0x7F);
                 ShipMove_AnimateStarfield();
                 Gfx_FadeFromWhite(0x70, 0x84, Gfx_PalettePtr(), 0x14);
             }

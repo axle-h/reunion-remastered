@@ -227,6 +227,15 @@ These are small, contained changes. The game code calling them stays as it is.
 
 ### Stage 3: typed pointers, leaf first
 
+**Order as done (2026-10-11).** A typed pointer field needs 8 bytes, but
+the packed DS mirror has 4-byte slots until Stage 4 drops it. So storage
+waits for Stage 4: (1) interfaces and the screen (3.1, 3.2) with
+`far_host` at call sites; (2) name the unnamed globals (4.1); (3) explicit
+saves (4.2); (4) DS unpacked and out of `mem[]`, its pointer fields typed,
+pointing into `mem[]` where heap blocks still live (4.3, 4.4, 3.5, 3.7);
+(5) heap blocks to `malloc` and the procedure pointers (3.3, 3.4, 3.6);
+(6) Stage 5.
+
 Two independent axes:
 
 - **(a) Interfaces.** A function taking or returning a `FarPtr` takes a

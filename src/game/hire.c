@@ -153,9 +153,9 @@ void Hire_LoadHireBackground(void)
     PString name;
     System_StrLoad(&name, PSTR("grafika\\"));
     System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[KIND - 1]);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x6E, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0x8F, 0x40, 0, 0x8F);
-    Blit_CopyRect(far_ptr((uint16_t)(buf >> 16), (uint16_t)((uint16_t)buf + 0x141)),
-                  far_ptr(ds.Gfx_ScreenSeg, 0x3E81), 0x140, 0x6D);
+    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x6E, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0x8F,
+                0x40, 0, 0x8F);
+    Blit_CopyRect((uint8_t *)far_host(buf) + 0x141, gfx_screen() + 0x3E81, 0x140, 0x6D);
     Gfx_FadeIn(0x40, 0xCF, Gfx_PalettePtr());
     System_FreeMem(buf, 0x8AC0);
 }

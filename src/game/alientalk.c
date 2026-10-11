@@ -35,7 +35,7 @@
 #define ROOM_FRAMES(a) U8((uint16_t)(0x55D7 + 7 * (a)))
 
 static const uint8_t *ps(const PString *p) { return &p->len; }
-static FarPtr screen_at(uint16_t off) { return far_ptr(ds.Gfx_ScreenSeg, off); }
+static uint8_t *screen_at(uint16_t off) { return gfx_screen() + off; }
 
 // "<prefix><race><suffix>" as a Pascal string.
 static void text_name(PString *out, const char *prefix, const char *suffix)
@@ -64,7 +64,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     Mouse_HideCursor();
     FarPtr save = System_GetMem(0x1540);
     FarPtr buf = System_GetMem(64000);
-    Blit_CopyRect(screen_at(0x2800), save, 0x140, 0x11);
+    Blit_CopyRect(screen_at(0x2800), far_host(save), 0x140, 0x11);
     uint8_t old_pal[0x300];
     System_MoveFwd(ds.Gfx_Palette, old_pal, 0x300);
 
@@ -72,9 +72,9 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     System_StrLong(scene, 0, &num, 255);
     System_StrLoad(&name, PSTR("pics\\pic"));
     System_StrConcat(&name, &num);
-    FarPtr pal = Gfx_PalettePtr();
-    Gfx_LoadPic(ps(&name), buf, 1, 200, 0, 0, 0x140, true, pal, 0, 0xBF, 0x40, 0, 0xBF);
-    Blit_CopyRect(buf, screen_at(0), 0x140, 200);
+    uint8_t *pal = Gfx_PalettePtr();
+    Gfx_LoadPic(ps(&name), far_host(buf), 1, 200, 0, 0, 0x140, true, pal, 0, 0xBF, 0x40, 0, 0xBF);
+    Blit_CopyRect(far_host(buf), screen_at(0), 0x140, 200);
     System_FreeMem(buf, 64000);
     Gfx_FadeIn(0, 0xFF, pal);
 
@@ -167,7 +167,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     }
 
     Gfx_FadeOut(0, 0xFF, pal);
-    Blit_CopyRect(save, screen_at(0x2800), 0x140, 0x11);
+    Blit_CopyRect(far_host(save), screen_at(0x2800), 0x140, 0x11);
     System_MoveFwd(old_pal, ds.Gfx_Palette, 0x300);
     System_FreeMem(save, 0x1540);
     Mouse_ShowCursor();
@@ -188,34 +188,36 @@ void AlienTalk_DrawAlienTalkScreen(void)
 {
     ds.AlienTalk_QuestionBuf = System_GetMem(0x300);
     FarPtr buf = System_GetMem(0xBCC0);
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pic = far_host(buf);
+    uint8_t *pal = Gfx_PalettePtr();
     PString num, name;
     // The portrait number of the alien: byte table at DS:0D0E, indexed by race.
     uint8_t portrait = U8((uint16_t)(0x0D0D + ds.AlienTalk_Race));
 
-    Gfx_LoadPic(P("pics\\atvezeto"), buf, 1, 0x97, 0, 0, 0x140, BACKDROP_SHOWN != 0, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPic(P("pics\\atvezeto"), pic, 1, 0x97, 0, 0, 0x140, BACKDROP_SHOWN != 0, pal, 0, 0xB0,
+                0x40, 0, 0xBE);
+    Blit_CopyRect(pic, screen_at(0x3D40), 0x140, 0x97);
     if (ds.AlienTalk_Race == 6)
         GfxPath_ShowToolbarInstant();
 
     System_StrLong(portrait, 0, &num, 255);
     System_StrLoad(&name, PSTR("pics\\szek"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x52, 0, 0, 0x6C, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRectStrided(buf + 0x6D, screen_at(0x3EF3), 0x6A, 0x50, 0x6C, 0x140);
+    Gfx_LoadPic(ps(&name), pic, 1, 0x52, 0, 0, 0x6C, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRectStrided(pic + 0x6D, screen_at(0x3EF3), 0x6A, 0x50, 0x6C, 0x140);
 
     System_StrLong(ds.Game_Hero, 0, &num, 255);
     System_StrLoad(&name, PSTR("pics\\sajat"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x52, 0, 0, 0x44, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRectStrided(buf + 0x45, screen_at(0x3E97), 0x41, 0x50, 0x44, 0x140);
+    Gfx_LoadPic(ps(&name), pic, 1, 0x52, 0, 0, 0x44, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRectStrided(pic + 0x45, screen_at(0x3E97), 0x41, 0x50, 0x44, 0x140);
 
     System_StrLong(portrait, 0, &num, 255);
     System_StrLoad(&name, PSTR("alien\\alien"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x97, 0, 0, 0x62, false, pal, 0, 0x3F, 0xB0, 0, 0xBE);
+    Gfx_LoadPic(ps(&name), pic, 1, 0x97, 0, 0, 0x62, false, pal, 0, 0x3F, 0xB0, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(buf + 100, screen_at(0x3F60), 0x5F, 0x95, 0x62, 0x140);
+    Blit_CopyRectStrided(pic + 100, screen_at(0x3F60), 0x5F, 0x95, 0x62, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xBCC0);
 }

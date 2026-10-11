@@ -73,5 +73,5 @@ static inline void *ds_at(uint16_t off)
     return mem + MEM_DS_SEG * 16 + off;
 }
 
-// Clears the address space and points the video layer at A000:0000.
+// Clears the address space and video memory.
 void mem_init(void);

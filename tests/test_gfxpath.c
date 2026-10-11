@@ -23,7 +23,6 @@ int main(int argc, char *argv[])
     mem_init();
     CHECK(dseg_init());
     system_init();
-    ds.Gfx_ScreenSeg = 0xA000;
 
     GfxPath_Init();
     TEmsBlock *blk = Ems_ToolbarBlock();
@@ -38,7 +37,7 @@ int main(int argc, char *argv[])
     const int picks[] = {0, 1, 10, 33, 67};
     for (size_t k = 0; k < SDL_arraysize(picks); k++) {
         SDL_memset(img, 0, 0x4000);
-        GfxPath_DrawIcon((int16_t)picks[k], canvas);
+        GfxPath_DrawIcon((int16_t)picks[k], img);
         const uint8_t *want = icons_pixels(&icons, picks[k]);
         bool same = true;
         // 39 of the 40 columns, 24 rows, at +504h with a 320 stride.

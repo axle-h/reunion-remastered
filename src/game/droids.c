@@ -35,9 +35,9 @@ static int16_t cur_moon(void)
     return ds.Game_CurMoon[ds.Game_CurSystem - 1];
 }
 
-static FarPtr far_add(FarPtr p, uint16_t delta)
+static uint8_t *far_add(FarPtr p, uint16_t delta)
 {
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
+    return (uint8_t *)far_host(p) + delta;
 }
 
 // 2527:001f
@@ -48,8 +48,8 @@ void Droids_DroidsScreen(void)
         Droids_SetupDroidsHotspots();
         GfxPath_ShowScreenBackdrop();
         DIGITS_BUF = System_GetMem(0x8980);
-        Gfx_LoadPic(P("grafika\\szamok"), DIGITS_BUF, 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(),
-                    0, 0xB0, 0x40, 0, 0xB0);
+        Gfx_LoadPic(P("grafika\\szamok"), far_host(DIGITS_BUF), 1, 0x6E, 0, 0, 0x140, false,
+                    Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xB0);
         Droids_DrawDroidsScreen();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     }
@@ -100,13 +100,13 @@ void Droids_DrawDroidsScreen(void)
     if (cap > 99)
         cap = 99;
 
-    FarPtr scr = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *scr = gfx_screen();
     Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)((droids % 5) * 0x40 + (droids / 5) * 0x2BC0)),
-                  far_add(scr, 0xB422), 0x30, 0x23);
-    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5780 + (stock / 10) * 0x10)), far_add(scr, 0xB470), 0x10, 0x23);
-    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5780 + (stock % 10) * 0x10)), far_add(scr, 0xB480), 0x10, 0x23);
-    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5963 + (cap / 10) * 13)), far_add(scr, 0x8DB1), 13, 9);
-    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5963 + (cap % 10) * 13)), far_add(scr, 0x8DBE), 13, 9);
+                  scr + 0xB422, 0x30, 0x23);
+    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5780 + (stock / 10) * 0x10)), scr + 0xB470, 0x10, 0x23);
+    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5780 + (stock % 10) * 0x10)), scr + 0xB480, 0x10, 0x23);
+    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5963 + (cap / 10) * 13)), scr + 0x8DB1, 13, 9);
+    Blit_CopyRect(far_add(DIGITS_BUF, (uint16_t)(0x5963 + (cap % 10) * 13)), scr + 0x8DBE, 13, 9);
 
     PString s;
     for (int16_t k = 1; k <= 6; k++) {

@@ -145,11 +145,11 @@ void GrWarUnits_UnitAssignDrawScreen(void)
     GfxPath_ShowToolbar();
     UNIT_ICONS = System_GetMem(0x3C00);
     FarPtr buf = System_GetMem(0xBCC0);
-    Gfx_LoadPic(ps("\x0C" "war\\grbeoszt"), buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0,
-                0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
-    Gfx_LoadPic(ps("\x0A" "war\\gricon"), UNIT_ICONS, 1, 0x30, 0, 0, 0x140, false, Gfx_PalettePtr(), 0,
-                0x6F, 0x40, 0, 0x6F);
+    Gfx_LoadPic(ps("\x0C" "war\\grbeoszt"), far_host(buf), 1, 0x97, 0, 0, 0x140, true,
+                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
+    Gfx_LoadPic(ps("\x0A" "war\\gricon"), far_host(UNIT_ICONS), 1, 0x30, 0, 0, 0x140, false,
+                Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
     GrWarUnits_DrawUnitList();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     System_FreeMem(buf, 0xBCC0);
@@ -314,8 +314,8 @@ void GrWarUnits_DrawUnitList(void)
             str = (int32_t)((uint32_t)(int32_t)u->count * (uint32_t)get32((uint16_t)(T_ATK_ATT + 4 * u->type))) / total;
         System_StrLong(str, 4, &s, 0x32);
         Gfx_DrawTextF9((uint8_t *)&s, (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
-        Blit_CopyRect(UNIT_ICONS + (uint16_t)((u->type - 1) * 0x50),
-                      far_ptr(ds.Gfx_ScreenSeg, (uint16_t)(ofs + 10 + 0x8C0)), 0x10, 0x10);
+        Blit_CopyRect((const uint8_t *)far_host(UNIT_ICONS) + (uint16_t)((u->type - 1) * 0x50),
+                      gfx_screen() + (uint16_t)(ofs + 10 + 0x8C0), 0x10, 0x10);
     }
     for (int i = n + 1; i <= 0x14; i++) {
         int16_t col = (int16_t)((i - 1) % 4 * 0x4D);

@@ -11,8 +11,8 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-static const FarPtr SRC = (FarPtr)0x50000000;  // 5000:0000, 320 wide
-static const FarPtr DST = (FarPtr)0x60000000;
+#define SRC ((uint8_t *)far_host(far_ptr(0x5000, 0)))  // 320 wide
+#define DST ((uint8_t *)far_host(far_ptr(0x6000, 0)))
 
 static const uint16_t entry[17] = {0x0000, 0x0034, 0x0068, 0x009a, 0x00ca, 0x00f8,
                                    0x0124, 0x0150, 0x017d, 0x01aa, 0x01dd, 0x0215,
@@ -59,7 +59,7 @@ static void fill_source(void)
 {
     for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
-            *((uint8_t *)far_host(SRC) + y * 320 + x) = (uint8_t)(y * 7 + x * 3 + 1);
+            *(SRC + y * 320 + x) = (uint8_t)(y * 7 + x * 3 + 1);
 }
 
 static void rows(const uint8_t *code)
@@ -72,9 +72,9 @@ static void rows(const uint8_t *code)
             continue;
         mem_init();
         fill_source();
-        SDL_memset(far_host(DST), 0xEE, 64);
+        SDL_memset(DST, 0xEE, 64);
         Scale_RowProcTable[w - 16](SRC, DST);
-        const uint8_t *s = far_host(SRC), *d = far_host(DST);
+        const uint8_t *s = SRC, *d = DST;
         bool same = true;
         for (int i = 0; i < w; i++)
             same = same && d[i] == s[cols[i]];
@@ -92,7 +92,7 @@ static void sprite(void)
         mem_init();
         fill_source();
         Scale_ScaleSprite(SRC, DST, (int16_t)size);
-        const uint8_t *d = far_host(DST);
+        const uint8_t *d = DST;
         // Each destination row equals some source row (scaled the same way)
         // and the source rows are increasing.
         uint8_t ref[32];
@@ -100,9 +100,9 @@ static void sprite(void)
         bool same = true;
         for (int r = 0; r < 32; r++) {
             if (err >= 0) {
-                Scale_RowProcTable[clamped - 16](far_ptr(0x5000, (uint16_t)(r * 320)),
-                                                 far_ptr(0x7000, 0));
-                SDL_memcpy(ref, far_host(far_ptr(0x7000, 0)), (size_t)clamped);
+                uint8_t *tmp = far_host(far_ptr(0x7000, 0));
+                Scale_RowProcTable[clamped - 16](SRC + r * 320, tmp);
+                SDL_memcpy(ref, tmp, (size_t)clamped);
                 same = same && SDL_memcmp(ref, d + kept * 320, (size_t)clamped) == 0;
                 kept++;
                 err += 2 * clamped - 64;
@@ -120,8 +120,7 @@ static void sprite(void)
     Scale_ScaleSprite(SRC, DST, 32);
     bool same = true;
     for (int y = 0; y < 32; y++)
-        same = same && SDL_memcmp((uint8_t *)far_host(SRC) + y * 320,
-                                  (uint8_t *)far_host(DST) + y * 320, 32) == 0;
+        same = same && SDL_memcmp(SRC + y * 320, DST + y * 320, 32) == 0;
     CHECK(same);
 }
 

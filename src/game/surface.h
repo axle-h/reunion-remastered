@@ -38,8 +38,8 @@ void Surface_BlinkModeButton(void);
 void Surface_DrawKindArrows(void);
 // 2ef2:1924 / 198a: 16x16 (14x14 inner) tile `tile` (0-based, 20 per sheet
 // row) of the sheet at src to map-window cell (x, y), both 1-based.
-void Surface_BlitTile(FarPtr src, uint16_t tile, int16_t x, int16_t y);
-void Surface_BlitTileInner(FarPtr src, uint16_t tile, int16_t x, int16_t y);
+void Surface_BlitTile(const uint8_t *src, uint16_t tile, int16_t x, int16_t y);
+void Surface_BlitTileInner(const uint8_t *src, uint16_t tile, int16_t x, int16_t y);
 // 2ef2:19f7
 void Surface_DrawBuildingPreview(int16_t kind);
 // 2ef2:1b98: all footprint tiles of `kind` with BufC at screen (x, y).

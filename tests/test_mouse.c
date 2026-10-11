@@ -89,8 +89,7 @@ static void hotspots(void)
 static void cursor(void)
 {
     mem_init();
-    ds.Gfx_ScreenSeg = MEM_VIDEO_SEG;
-    uint8_t *scr = far_host(far_ptr(MEM_VIDEO_SEG, 0));
+    uint8_t *scr = &vid_screen[0][0];
     for (int i = 0; i < 320 * 200; i++)
         scr[i] = (uint8_t)(i % 251 + 1);
     // Shape 2: column x (0..10) of every row has colour x+1 except column 5 (transparent).
@@ -153,7 +152,6 @@ static void button(int b, bool down, float x, float y)
 static void poll(void)
 {
     mem_init();
-    ds.Gfx_ScreenSeg = MEM_VIDEO_SEG;
     ds.Mouse_CursorState = 1;  // hidden: the poll must not draw
     Mouse_SetHotspot(1, 150, 90, 20, 20, cap_a, 0, 3);
     ds.Mouse_HotspotCount = 1;

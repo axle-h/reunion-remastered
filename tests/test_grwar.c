@@ -235,8 +235,6 @@ int main(int argc, char *argv[])
         return 77;
     }
     system_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;

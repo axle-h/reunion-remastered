@@ -10,6 +10,7 @@
 #include "game/mouse.h"
 #include "game/shipinfo.h"
 #include "game/system.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -17,8 +18,6 @@ static bool ok = true;
 static void reset(void)
 {
     mem_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Mouse_CursorState = 1;  // hidden: Hide/ShowCursor leave the screen alone
     ds.Game_Groups = far_ptr(0x3000, 0);
     ds.ShipInfo_Sprites = far_ptr(0x4000, 0);
@@ -61,7 +60,7 @@ static void markers(void)
         memset((uint8_t *)far_host(ds.ShipInfo_Sprites) + 0x1C55 + r * 320, 0x77, 7);
     ds.Game_SelGroup = 10;  // column 1, row 1
     ShipInfo_DrawSelectionMarker();
-    uint8_t *scr = far_host(far_ptr(0xA000, 0));
+    uint8_t *scr = &vid_screen[0][0];
     CHECK(scr[(1 * 16 + 0x41) * 320 + 5 + 0x30] == 0x77);
     CHECK(scr[(1 * 16 + 0x41 + 5) * 320 + 5 + 0x30 + 6] == 0x77);
     CHECK(scr[(1 * 16 + 0x41) * 320 + 5 + 0x30 + 7] == 0);
@@ -86,7 +85,7 @@ static void icons(void)
         memset(spr + 32 + 1 + 320 + r * 320, 0x55, 31);
     ds.Game_SelGroup = 0;
     ShipInfo_DrawGroupIcon(2, 9);  // column 1, row 0
-    uint8_t *scr = far_host(far_ptr(0xA000, 0));
+    uint8_t *scr = &vid_screen[0][0];
     CHECK(scr[0x3C * 320 + 0x30 + 0x10] == 0x22);        // backdrop copy
     CHECK(scr[0x3D * 320 + 0x30 + 0x11] == 0x55);        // icon top-left
     CHECK(scr[(0x3D + 13) * 320 + 0x30 + 0x11 + 30] == 0x55);

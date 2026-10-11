@@ -9,5 +9,5 @@ uint8_t mem[MEM_SIZE];
 void mem_init(void)
 {
     SDL_memset(mem, 0, sizeof mem);
-    vid_screen = (uint8_t (*)[VID_WIDTH])(mem + MEM_VIDEO_SEG * 16);
+    SDL_memset(vid_screen, 0, 0x10000);
 }

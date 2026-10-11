@@ -12,12 +12,12 @@ static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
 // Two off-screen 320-wide buffers.
-static const FarPtr SRC = (FarPtr)0x50000000;   // 5000:0000
-static const FarPtr DST = (FarPtr)0x60000000;   // 6000:0000
+#define SRC ((uint8_t *)far_host(far_ptr(0x5000, 0)))
+#define DST ((uint8_t *)far_host(far_ptr(0x6000, 0)))
 
-static uint8_t *px(FarPtr p, int x, int y)
+static uint8_t *px(uint8_t *p, int x, int y)
 {
-    return (uint8_t *)far_host(p) + y * 320 + x;
+    return p + y * 320 + x;
 }
 
 static int retraces;
@@ -30,8 +30,6 @@ static bool count_retrace(void)
 static void reset(void)
 {
     mem_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     gfx_wait_retrace = count_retrace;
     retraces = 0;
 }
@@ -72,17 +70,17 @@ static void copies(void)
             *px(SRC, x, y) = (uint8_t)(y * 16 + x + 1);
     Blit_CopyRect(SRC, DST, 4, 3);
     CHECK(*px(DST, 3, 2) == 0x24 && *px(DST, 4, 2) == 0 && *px(DST, 0, 3) == 0);
-    Blit_CopyRect(SRC, far_ptr(0xA000, 10 * 320 + 5), 4, 3);
+    Blit_CopyRect(SRC, gfx_screen() + 10 * 320 + 5, 4, 3);
     CHECK(vid_screen[10][5] == 0x01 && vid_screen[12][8] == 0x24 && vid_screen[13][5] == 0);
     CHECK(ds.Blit_HookRow == 999);
 
     // Strided: 2x2 from a 4-wide source into an 8-wide destination.
     reset();
-    uint8_t *s = far_host(SRC);
+    uint8_t *s = SRC;
     for (int i = 0; i < 8; i++)
         s[i] = (uint8_t)(i + 1);
     Blit_CopyRectStrided(SRC, DST, 2, 2, 4, 8);
-    uint8_t *d = far_host(DST);
+    uint8_t *d = DST;
     CHECK(d[0] == 1 && d[1] == 2 && d[8] == 5 && d[9] == 6 && d[2] == 0);
 
     // Copy16x16 to the screen.
@@ -90,7 +88,7 @@ static void copies(void)
     for (int y = 0; y < 17; y++)
         for (int x = 0; x < 17; x++)
             *px(SRC, x, y) = (uint8_t)(x + y + 1);
-    Blit_Copy16x16(SRC, far_ptr(0xA000, 0));
+    Blit_Copy16x16(SRC, gfx_screen());
     CHECK(vid_screen[15][15] == 31 && vid_screen[15][16] == 0 && vid_screen[16][0] == 0);
 }
 

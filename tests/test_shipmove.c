@@ -9,6 +9,7 @@
 #include "game/shipmove.h"
 #include "game/system.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -16,11 +17,10 @@ static bool ok = true;
 static void viewport(void)
 {
     mem_init();
-    ds.Gfx_ScreenSeg = 0xA000;
     uint8_t *src = (uint8_t *)far_host(far_ptr(0x3000, 0));
     for (uint32_t i = 0; i < 0xBCC0; i++)
         src[i] = (uint8_t)(i % 251 + 1);
-    ShipMove_BlitViewport(far_ptr(0x3000, 0));
+    ShipMove_BlitViewport(src);
 
     // Runs stay inside the 151-row image and do not overlap.
     uint32_t total = 0, prev_end = 0;
@@ -32,7 +32,7 @@ static void viewport(void)
     }
     CHECK(total == 19423);
 
-    const uint8_t *scr = mem + 0xA0000 + 0x3D40;
+    const uint8_t *scr = &vid_screen[0][0] + 0x3D40;
     uint32_t nonzero = 0;
     bool same = true;
     for (uint32_t i = 0; i < 0xBCC0; i++) {
@@ -44,12 +44,11 @@ static void viewport(void)
     CHECK(nonzero == total && same);
     // First row: bytes 30..288 are copied (81h words + 1 byte), 29 and 289 are not.
     CHECK(scr[29] == 0 && scr[30] != 0 && scr[288] != 0 && scr[289] == 0);
-    CHECK(mem[0xA0000 + 0x3D40 - 1] == 0);
+    CHECK((&vid_screen[0][0])[0x3D40 - 1] == 0);
 }
 
 static void starfield(void)
 {
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Mouse_CursorState = 1;
     ds.ShipMove_Backdrop = System_GetMem(0xBCC0);
 
@@ -87,7 +86,7 @@ static void starfield(void)
     ds.Game_GroupList = 0;
     ds.Game_SelGroup = 1;
     Groups_Selected()->Status = 4;
-    memset(mem + 0xA0000, 0, 64000);
+    memset(&vid_screen[0][0], 0, 64000);
     ShipMove_AnimateStarfield();
     const uint8_t *bd = far_host(ds.ShipMove_Backdrop);
     int stars = 0;
@@ -96,13 +95,13 @@ static void starfield(void)
     CHECK(stars > 500);
     int on_screen = 0;
     for (uint32_t i = 0; i < 0xBCC0; i++)
-        on_screen += mem[0xA0000 + 0x3D40 + i] != 0;
+        on_screen += (&vid_screen[0][0])[0x3D40 + i] != 0;
     CHECK(on_screen == 19423);
     // Status 3 (docked/orbit): nothing is drawn.
     Groups_Selected()->Status = 3;
-    memset(mem + 0xA0000, 0, 64000);
+    memset(&vid_screen[0][0], 0, 64000);
     ShipMove_AnimateStarfield();
-    CHECK(mem[0xA0000 + 0x3D40 + 0x1E] == 0);
+    CHECK((&vid_screen[0][0])[0x3D40 + 0x1E] == 0);
 }
 
 static void hotspots(void)

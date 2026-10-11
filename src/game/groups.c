@@ -300,11 +300,15 @@ void Groups_NewGroupScreen(void)
 void Groups_LoadGroupsGfx(void)
 {
     ICONS_PTR = System_GetMem(0x2300);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), ICONS_PTR, 1, 0x1C, 0, 0, 0x140, false,
-                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), far_host(ICONS_PTR), 1, 0x1C, 0, 0, 0x140,
+                false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
 }
 
-static FarPtr screen_at(uint16_t offset) { return far_ptr(ds.Gfx_ScreenSeg, offset); }
+static uint8_t *screen_at(uint16_t offset) { return gfx_screen() + offset; }
+static const uint8_t *icon_at(uint16_t offset)
+{
+    return (const uint8_t *)far_host(ICONS_PTR) + offset;
+}
 
 static void prefix_location(PString *loc, const char *prefix, uint8_t len)
 {
@@ -342,21 +346,21 @@ void Groups_DrawGroupPanel(bool full)
         if (no_prev)
             Blit_FillRect(9, 0x35, 10, 12, 0x40);
         else
-            Blit_CopyRect(ICONS_PTR + 0x24, screen_at(0x4249), 10, 12);
+            Blit_CopyRect(icon_at(0x24), screen_at(0x4249), 10, 12);
         bool no_next = ds.Groups_PlanetForceMode
             || (ds.Game_GroupList == 1
                 && (int32_t)ds.Game_ShownGroupCount == (int32_t)(uint16_t)ds.Game_SelGroup);
         if (no_next)
             Blit_FillRect(0x83, 0x35, 10, 12, 0x40);
         else
-            Blit_CopyRect(ICONS_PTR + 0x2F, screen_at(0x42C3), 10, 12);
+            Blit_CopyRect(icon_at(0x2F), screen_at(0x42C3), 10, 12);
         // Page up / down arrows for the slot categories (CatRange at DS:0BB4, 2 bytes per kind)
         if (*(uint8_t *)ds_at(0x0BB2 + g->Kind * 2) < ds.Groups_SlotCategory)
-            Blit_CopyRect(ICONS_PTR, screen_at(0x6DE6), 0x11, 0x1C);
+            Blit_CopyRect(icon_at(0), screen_at(0x6DE6), 0x11, 0x1C);
         else
             Blit_FillRect(0x126, 0x57, 0x11, 0x1C, 0x40);
         if (*(uint8_t *)ds_at(0x0BB3 + g->Kind * 2) > ds.Groups_SlotCategory)
-            Blit_CopyRect(ICONS_PTR + 0x12, screen_at(0x9C26), 0x11, 0x1C);
+            Blit_CopyRect(icon_at(0x12), screen_at(0x9C26), 0x11, 0x1C);
         else
             Blit_FillRect(0x126, 0x7C, 0x11, 0x1C, 0x40);
         Mouse_ShowCursor();

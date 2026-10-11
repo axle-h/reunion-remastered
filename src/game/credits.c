@@ -12,7 +12,7 @@
 // 264a:01b8
 void Credits_ShowCredits(void)
 {
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pal = Gfx_PalettePtr();
     Gfx_FadeOut(0x40, 0xFE, pal);
     Mouse_HideCursor();
     Blit_FillRect(0, 0x31, 0x140, 0x97, 0x40);

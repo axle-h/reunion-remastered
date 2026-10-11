@@ -33,8 +33,6 @@ static void reset(void)
 {
     mem_init();
     SDL_memset(vid_palette, 0, sizeof vid_palette);
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Mouse_CursorState = 1;  // hidden: Hide/ShowCursor leave the screen alone
@@ -48,8 +46,6 @@ static void reset_data(void)
     reset();
     CHECK(dseg_init());
     system_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Mouse_CursorState = 1;
@@ -60,7 +56,7 @@ static void reset_data(void)
 static void palette(void)
 {
     reset();
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pal = Gfx_PalettePtr();
     for (int i = 0; i < 256; i++)
         for (int c = 0; c < 3; c++)
             ds.Gfx_Palette[i][c] = (uint8_t)((i + c) & 63);
@@ -105,9 +101,9 @@ static void palette(void)
     CHECK(retraces == 6 && SDL_memcmp(vid_palette, ds.Gfx_Palette, sizeof vid_palette) == 0);
 
     // GetPalette reads the DAC back.
-    FarPtr buf = far_ptr(0x6000, 0);
+    uint8_t *buf = far_host(far_ptr(0x6000, 0));
     Gfx_GetPalette(buf);
-    CHECK(SDL_memcmp(far_host(buf), vid_palette, 768) == 0);
+    CHECK(SDL_memcmp(buf, vid_palette, 768) == 0);
 
     // Blank zeroes the source too; the DAC keeps 6 bits of what it is given.
     retraces = 0;
@@ -157,32 +153,32 @@ static void lines(void)
     static const int rising[5][2] = {{0, 2}, {1, 1}, {2, 1}, {3, 0}, {4, 0}};
 
     reset();
-    Gfx_DrawLine(0xA000, 0, 0, 4, 2, 7);
+    Gfx_DrawLine(gfx_screen(), 0, 0, 4, 2, 7);
     CHECK(line_is(shallow, 5, 7));
     reset();
-    Gfx_DrawLine(0xA000, 4, 2, 0, 0, 7);  // endpoints swapped: same pixels
+    Gfx_DrawLine(gfx_screen(), 4, 2, 0, 0, 7);  // endpoints swapped: same pixels
     CHECK(line_is(shallow, 5, 7));
     reset();
-    Gfx_DrawLine(0xA000, 0, 0, 2, 4, 7);
+    Gfx_DrawLine(gfx_screen(), 0, 0, 2, 4, 7);
     CHECK(line_is(steep, 5, 7));
     reset();
-    Gfx_DrawLine(0xA000, 0, 2, 4, 0, 7);
+    Gfx_DrawLine(gfx_screen(), 0, 2, 4, 0, 7);
     CHECK(line_is(rising, 5, 7));
 
     static const int hline[4][2] = {{1, 3}, {2, 3}, {3, 3}, {4, 3}};
     static const int vline[3][2] = {{5, 2}, {5, 3}, {5, 4}};
     reset();
-    Gfx_DrawLine(0xA000, 4, 3, 1, 3, 9);
+    Gfx_DrawLine(gfx_screen(), 4, 3, 1, 3, 9);
     CHECK(line_is(hline, 4, 9));
     reset();
-    Gfx_DrawLine(0xA000, 5, 4, 5, 2, 9);
+    Gfx_DrawLine(gfx_screen(), 5, 4, 5, 2, 9);
     CHECK(line_is(vline, 3, 9));
 
     // DrawLineCopy takes the pixels from the source segment.
     reset();
     for (int i = 0; i < 4 * 320; i++)
         ((uint8_t *)far_host(far_ptr(0x6000, 0)))[i] = (uint8_t)(i % 320 + 1);
-    Gfx_DrawLineCopy(0xA000, 0, 0, 4, 2, 0x6000);
+    Gfx_DrawLineCopy(gfx_screen(), 0, 0, 4, 2, far_host(far_ptr(0x6000, 0)));
     CHECK(vid_screen[0][0] == 1 && vid_screen[1][1] == 2 && vid_screen[2][4] == 5 && vid_screen[0][1] == 0);
 
     // HLine/VLine/outline are 1-based.
@@ -217,8 +213,8 @@ static void text(void)
     // As Title::InitTitleAndMainMenu: charset1 at Charset + 80h, 32 rows.
     ds.Gfx_Charset = System_GetMem(10368);
     uint8_t name[] = "\x10grafika\\charset1";
-    FarPtr tmp_pal = far_ptr(0x9000, 0);
-    Gfx_LoadPic(name, ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
+    uint8_t *tmp_pal = far_host(far_ptr(0x9000, 0));
+    Gfx_LoadPic(name, (uint8_t *)far_host(ds.Gfx_Charset) + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
 
     Pic pic;
     CHECK(pic_load("GRAFIKA\\CHARSET1.PIC", &pic));
@@ -264,7 +260,7 @@ static void load_pic(void)
     vid_palette[0xFE][0] = 33;
     vid_palette[0xFF][0] = 33;
     uint8_t name[] = "\x0cgrafika\\main";
-    Gfx_LoadPicScreen(name, far_ptr(0xA000, 0), rows, Gfx_PalettePtr());
+    Gfx_LoadPicScreen(name, gfx_screen(), rows, Gfx_PalettePtr());
 
     static uint8_t want[320 * 200];
     static uint8_t want_pal[256][3];
@@ -290,7 +286,7 @@ static void load_pic(void)
     // rows is clipped to the picture height (405f:0ccb): nothing past it.
     FarPtr buf = System_GetMem((uint16_t)(320 * (h + 4)));
     SDL_memset(far_host(buf), 0xEE, (size_t)320 * (h + 4));
-    Gfx_LoadPic(name, buf, 1, (uint16_t)(h + 4), 0, 0, 320, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
+    Gfx_LoadPic(name, far_host(buf), 1, (uint16_t)(h + 4), 0, 0, 320, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
                 0, 0xBE);
     CHECK(SDL_memcmp(far_host(buf), want, (size_t)w * h) == 0);
     const uint8_t *tail = (const uint8_t *)far_host(buf) + w * h;

@@ -5,6 +5,7 @@
 #include "game/dseg.h"
 #include "game/mem.h"
 #include "game/mouse.h"
+#include "platform/video.h"
 #include "play/play.h"
 #include "play/ui.h"
 #include "play/ui_message.h"
@@ -72,7 +73,7 @@ static int icon_mismatch(int k, int frame)
     uint16_t off = (uint16_t)((uint16_t)base + frame / 10 * 0x12C0 + frame * 0x20);
     const uint8_t *src = far_host(far_ptr((uint16_t)(base >> 16), off));
     int dest = (k - 1) / 5 * 0x1400 + 0x4100 + (k - 1) % 5 * 0x20 + 0x140;
-    const uint8_t *screen = mem + MEM_VIDEO_SEG * 16 + dest;
+    const uint8_t *screen = &vid_screen[0][0] + dest;
     int x0 = dest % SCREEN_W, y0 = dest / SCREEN_W;
     int cx = ds.Mouse_CursorSaveX, cy = ds.Mouse_CursorSaveY;
     bool cursor = ds.Mouse_CursorState == 0 && !ds.Mouse_CursorFrozen;

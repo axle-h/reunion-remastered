@@ -54,10 +54,11 @@
 #define CURTAIN_B W(0x77F4)
 #define USED_SCRIPTS(i) B(0x77F6 + (i)) // set of anim.def scripts not played yet (bits 2..25)
 
-// Scratch palette for the picture loads (the original used 768 bytes of its
-// stack); the port's stack segment is otherwise unused.
 #define NAME(lit) ((const uint8_t *)PSTR(lit))
-#define SCRATCH_PAL far_ptr(MEM_SS_SEG, 0x0400)
+
+// Scratch palette for the picture loads (the original used 768 bytes of its
+// stack).
+static uint8_t scratch_pal[768];
 
 static inline SpShip *Ship(FarPtr list, int16_t i)
 {
@@ -74,25 +75,25 @@ void SpWar_EnterSpaceBattle(void)
 {
     Sound_AllocWarSndBuf();
     FarPtr buf = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(NAME("war\\spwar"), buf, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(NAME("war\\spwar"), far_host(buf), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     VIEW = System_GetMem(0x5E60);
     BACKGROUND = System_GetMem(0x5E60);
     SPRITES = System_GetMem(0xF00);
     FACE = System_GetMem(0x1180);
-    Gfx_LoadPic(NAME("war\\sphatter"), BACKGROUND, 1, 0x97, 0, 0, 0xA0, false, SCRATCH_PAL, 0, 0xB0,
-                0x40, 0, 0xBE);
-    Gfx_LoadPic(NAME("war\\spants"), SPRITES, 1, 0x30, 0, 0, 0x50, false, SCRATCH_PAL, 0, 0xB0, 0x40,
-                0, 0xBE);
+    Gfx_LoadPic(NAME("war\\sphatter"), far_host(BACKGROUND), 1, 0x97, 0, 0, 0xA0, false,
+                scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(NAME("war\\spants"), far_host(SPRITES), 1, 0x30, 0, 0, 0x50, false, scratch_pal, 0,
+                0xB0, 0x40, 0, 0xBE);
     // The picture of the hired fighter (Game::StaffHired[2] in the decompile
     // is 0-based: the third of pilot, builder, fighter, developer).
     PString num, name;
     System_StrLong(ds.Game_StaffHired[2], 0, &num, 10);
     System_StrLoad(&name, PSTR("war\\spface"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic((const uint8_t *)&name, FACE, 1, 0x50, 0, 0, 0x38, false, SCRATCH_PAL, 0, 0xB0, 0x40,
-                0, 0xBE);
+    Gfx_LoadPic((const uint8_t *)&name, far_host(FACE), 1, 0x50, 0, 0, 0x38, false, scratch_pal, 0,
+                0xB0, 0x40, 0, 0xBE);
     SpWar_StepSpaceBattle();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     RETREATED = 0;
@@ -331,9 +332,9 @@ static void play_entry(void)
     if (e[0] != 0) {
         uint8_t *r = sa_rect(e[0]);
         Anim_LoadWarAnim(e[0]);
-        Anim_DrawAnimKeyed(e[1], VIEW);
+        Anim_DrawAnimKeyed(e[1], far_host(VIEW));
         Mouse_HideCursor();
-        Blit_CopyRectStrided(VIEW, far_ptr(ds.Gfx_ScreenSeg, (uint16_t)(r[4] * 0x140 + r[3])), r[1],
+        Blit_CopyRectStrided(far_host(VIEW), gfx_screen() + (uint16_t)(r[4] * 0x140 + r[3]), r[1],
                              r[2], r[1], 0x140);
         Mouse_ShowCursor();
         if (e[2] != 0)
@@ -423,7 +424,7 @@ void SpWar_PlayWarAnimScript(void)
 // 20d4:0dcc
 void SpWar_DrawPilotFace(void)
 {
-    Blit_BlitTransparentStrided(FACE, far_ptr(ds.Gfx_ScreenSeg, 0xB42A), 0x50, 0x38, 0x50, 0x140,
+    Blit_BlitTransparentStrided(far_host(FACE), gfx_screen() + 0xB42A, 0x50, 0x38, 0x50, 0x140,
                                 0x40);
 }
 
@@ -581,13 +582,13 @@ void SpWar_StepSpaceBattle(void)
     if (STEP_NO != 1)
         return;
     STEP_FLAG = 0;
-    Blit_CopyBytes(BACKGROUND, VIEW, 0x5E60);
+    Blit_CopyBytes(far_host(BACKGROUND), far_host(VIEW), 0x5E60);
     step_side(ATT_LIST, ds.SpWar_AttackerShipCount, DEF_LIST, &ds.SpWar_DefenderShipCount, false);
     step_side(DEF_LIST, ds.SpWar_DefenderShipCount, ATT_LIST, &ds.SpWar_AttackerShipCount, true);
     draw_explosions(ATT_LIST, ds.SpWar_AttackerShipCount, ATT_START);
     draw_explosions(DEF_LIST, ds.SpWar_DefenderShipCount, DEF_START);
     Mouse_HideCursor();
-    Anim_BlitWedgeToScreen(VIEW);
+    Anim_BlitWedgeToScreen(far_host(VIEW));
     SpWar_DrawPilotFace();
     Mouse_ShowCursor();
     if (ds.SpWar_AttackerShipCount == 0)
@@ -708,9 +709,9 @@ void SpWar_EndSpaceBattle(void)
     PString name;
     System_StrLoad(&name, PSTR("war\\"));
     System_StrConcat(&name, ds.SpWar_PlayerWon ? PSTR("spvict") : PSTR("splost"));
-    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0,
-                0x40, 0, 0xBE);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPic((const uint8_t *)&name, far_host(buf), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+                0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     PString num;
     for (int c = 1; c <= 4; c++) {

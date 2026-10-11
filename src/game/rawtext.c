@@ -51,13 +51,13 @@ void RawText_Init(void)
 
 // 4049:0160: `rep outsb` of (last - first + 1) * 3 bytes to port 3C9h after
 // 3C8h := first; the DAC index advances every 3 bytes and wraps at 256.
-void RawText_SetPaletteRange(int16_t first, int16_t last, FarPtr pal)
+void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal)
 {
     uint16_t count = (uint16_t)((last - first + 1) * 3);
     uint16_t entry = (uint8_t)first, comp = 0;
+    const uint8_t *src = pal + first * 3;
     for (uint16_t i = 0; i < count; i++) {
-        uint8_t *src = far_host(far_ptr((uint16_t)(pal >> 16), (uint16_t)((uint16_t)pal + first * 3 + i)));
-        vid_palette[entry][comp] = *src & 0x3F;
+        vid_palette[entry][comp] = src[i] & 0x3F;
         if (++comp == 3) {
             comp = 0;
             entry = (entry + 1) & 0xFF;

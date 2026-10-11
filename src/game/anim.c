@@ -1,5 +1,7 @@
 #include "game/anim.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/system.h"
@@ -154,20 +156,20 @@ void Anim_FreeGrAnim(uint16_t id)
 }
 
 // 3c64:0496
-void Anim_DrawAnimKeyed(uint16_t frame, FarPtr dest)
+void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest)
 {
     FarPtr rec = record();
     if (*at(rec, REC_LOADED) != 0) {
-        Anim_DecodeAnimFrame(frame_ptr(rec, 1), dest, 0x40);
+        Anim_DecodeAnimFrame(far_host(frame_ptr(rec, 1)), dest, 0x40);
         uint16_t f = frame;
         while (frame_size(rec, f) == 0 && (int16_t)f > 1)
             f--;
-        Anim_DecodeAnimFrame(frame_ptr(rec, f), dest, 0x40);
+        Anim_DecodeAnimFrame(far_host(frame_ptr(rec, f)), dest, 0x40);
     }
 }
 
 // 3c64:0516
-void Anim_DrawAnimFrame(uint16_t frame, FarPtr dest, bool *ok)
+void Anim_DrawAnimFrame(uint16_t frame, uint8_t *dest, bool *ok)
 {
     *ok = true;
     FarPtr rec = record();
@@ -175,46 +177,44 @@ void Anim_DrawAnimFrame(uint16_t frame, FarPtr dest, bool *ok)
         if (frame_ptr(rec, frame) == 0)
             *ok = false;
         else
-            Anim_DecodeAnimFrame(frame_ptr(rec, frame), dest, 0x40);
+            Anim_DecodeAnimFrame(far_host(frame_ptr(rec, frame)), dest, 0x40);
     }
 }
 
 // 3c64:057c: width and height are the words at block offsets 9 and 11; the
 // 16-bit pixel counter starts at width * height and decoding stops when an
 // opcode brings it to exactly 0 (see docs/formats/ani.md).
-void Anim_DecodeAnimFrame(FarPtr frame, FarPtr dest, uint8_t colourOffset)
+void Anim_DecodeAnimFrame(const uint8_t *frame, uint8_t *dest, uint8_t colourOffset)
 {
-    uint16_t width = (uint16_t)(*at(frame, 10) << 8) + *at(frame, 9);
-    uint16_t height = (uint16_t)(*at(frame, 12) << 8) + *at(frame, 11);
+    uint16_t width = (uint16_t)(frame[10] << 8) + frame[9];
+    uint16_t height = (uint16_t)(frame[12] << 8) + frame[11];
     uint16_t left = (uint16_t)(width * height);
-    uint16_t si = (uint16_t)((uint16_t)frame + 13);
-    FarPtr src = far_ptr((uint16_t)(frame >> 16), 0);
-    uint16_t di = (uint16_t)dest;
-    uint16_t es = (uint16_t)(dest >> 16);
+    const uint8_t *src = frame + 13;
+    uint16_t di = 0;
     for (;;) {
-        uint8_t op = *at(src, si++);
+        uint8_t op = *src++;
         uint16_t n;
         if (op < 0x80) {
-            *(uint8_t *)far_host(far_ptr(es, di++)) = (uint8_t)(op + colourOffset);
+            dest[di++] = (uint8_t)(op + colourOffset);
             n = 1;
         } else if (op < 0xC0) {
             if (op == 0x80) {
-                n = rd16(src, si);
-                si += 2;
+                n = (uint16_t)(src[0] | src[1] << 8);
+                src += 2;
             } else {
                 n = op & 0x3F;
             }
             di += n;
         } else {
             if (op == 0xC0) {
-                n = rd16(src, si);
-                si += 2;
+                n = (uint16_t)(src[0] | src[1] << 8);
+                src += 2;
             } else {
                 n = op & 0x3F;
             }
-            uint8_t v = (uint8_t)(*at(src, si++) + colourOffset);
+            uint8_t v = (uint8_t)(*src++ + colourOffset);
             for (uint16_t i = 0; i < n; i++)
-                *(uint8_t *)far_host(far_ptr(es, di++)) = v;
+                dest[di++] = v;
         }
         left -= n;
         if (left == 0)
@@ -364,12 +364,9 @@ static const struct {
 };
 
 // 3c64:0666
-void Anim_BlitWedgeToScreen(FarPtr src)
+void Anim_BlitWedgeToScreen(const uint8_t *src)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
-    for (int r = 0; r < 132; r++) {
-        for (uint16_t i = 0; i < wedge_rows[r].len; i++)
-            *at(screen, (uint16_t)(wedge_rows[r].dst + i)) =
-                *at(src, (uint16_t)(wedge_rows[r].src + i));
-    }
+    uint8_t *screen = gfx_screen();
+    for (int r = 0; r < 132; r++)
+        SDL_memcpy(screen + wedge_rows[r].dst, src + wedge_rows[r].src, wedge_rows[r].len);
 }

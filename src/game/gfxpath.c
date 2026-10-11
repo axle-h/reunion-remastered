@@ -53,14 +53,19 @@ static FarPtr bar(uint16_t extra)
     return far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + ICON_SIZE + extra));
 }
 
-static FarPtr near_add(FarPtr p, uint16_t n)
+static uint8_t *bar_host(uint16_t extra)
 {
-    return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + n));
+    return far_host(bar(extra));
 }
 
-static void copy_to_screen(FarPtr src, uint16_t ofs)
+static uint8_t *near_add(FarPtr p, uint16_t n)
 {
-    Blit_CopyRect(src, far_ptr(ds.Gfx_ScreenSeg, ofs), 0x140, 0x20);
+    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + n)));
+}
+
+static void copy_to_screen(const uint8_t *src, uint16_t ofs)
+{
+    Blit_CopyRect(src, gfx_screen() + ofs, 0x140, 0x20);
 }
 
 // Cell k (0..11) of the bar: page k / 6, column k % 6.
@@ -72,8 +77,8 @@ static uint16_t cell_ofs(uint16_t k)
 static void draw_slot(uint16_t k, bool check_icon)
 {
     int slot = k + 1;
-    FarPtr cell = bar(cell_ofs(k));
-    Blit_CopyRectStrided(BG_PTR, cell, 0x30, 0x20, 0xF0, 0x140);
+    uint8_t *cell = bar_host(cell_ofs(k));
+    Blit_CopyRectStrided(far_host(BG_PTR), cell, 0x30, 0x20, 0xF0, 0x140);
     int16_t id = *slot_id(slot);
     int8_t icon = (int8_t)*(uint8_t *)ds_at((uint16_t)(0x4E06 + id));
     if (!check_icon || icon != 0)
@@ -124,12 +129,12 @@ void GfxPath_RedrawToolbar(void)
     for (uint16_t k = 0; k <= 5; k++)
         draw_slot(k, true);
     if (PAGE2_FLAG == 0) {
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x70), bar(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+        Blit_CopyRectStrided(near_add(BG_PTR, 0x70), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
     } else {
         for (uint16_t k = 6; k <= 11; k++)
             draw_slot(k, true);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar_host(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
+        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
     }
     System_FreeMem(TMP_PTR, 0x3C0);
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -154,16 +159,17 @@ void GfxPath_AddToolbarIcon(int16_t id)
     PAGE2_FLAG = (PAGE2_FLAG == 0 && slot != 7) ? 0 : 1;
 
     uint16_t k = (uint16_t)(slot - 1);
-    FarPtr cell = bar(cell_ofs(k));
-    Blit_CopyRectStrided(BG_PTR, cell, 0x30, 0x20, 0xF0, 0x140);
+    uint8_t *cell = bar_host(cell_ofs(k));
+    Blit_CopyRectStrided(far_host(BG_PTR), cell, 0x30, 0x20, 0xF0, 0x140);
     GfxPath_DrawIcon((int8_t)*(uint8_t *)ds_at((uint16_t)(0x4E06 + id)), cell);
     System_StrStore((const PString *)ds_at((uint16_t)(0x488A + id * 18)),
                     (PString *)slot_label(slot), 18);
     if (slot == 7) {
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar_host(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
+        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
         for (uint16_t s = 8; s <= 12; s++) {
-            Blit_CopyRectStrided(BG_PTR, bar(cell_ofs((uint16_t)(s - 1))), 0x30, 0x20, 0xF0, 0x140);
+            Blit_CopyRectStrided(far_host(BG_PTR), bar_host(cell_ofs((uint16_t)(s - 1))), 0x30,
+                                 0x20, 0xF0, 0x140);
             slot_label(s)[0] = 0;
         }
     }
@@ -207,7 +213,7 @@ void GfxPath_ScrollToolbarNext(void)
     uint16_t ofs = 0x140;
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
-        copy_to_screen(bar((uint16_t)(ofs + 1)), 0);
+        copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
         ofs = (uint16_t)(row_offset(i) * 0x140 + ofs);
         scroll_extras();
     }
@@ -224,7 +230,7 @@ void GfxPath_ScrollToolbarPrev(void)
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
         ofs = (uint16_t)(ofs - row_offset(i) * 0x140);
-        copy_to_screen(bar((uint16_t)(ofs + 1)), 0);
+        copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
         scroll_extras();
     }
     toggle_pages();
@@ -238,7 +244,7 @@ void GfxPath_ShowToolbar(void)
     Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
     uint16_t page = CUR_PAGE == 0 ? (uint16_t)(PAGE_SIZE + 1) : 1;
-    Blit_InterlaceReveal(bar(page), far_ptr(ds.Gfx_ScreenSeg, 0), 0x140, 0x20);
+    Blit_InterlaceReveal(bar_host(page), gfx_screen(), 0x140, 0x20);
     Mouse_ShowCursor();
     Sound_FreeSampleIfIdle();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -250,7 +256,7 @@ void GfxPath_ShowToolbarInstant(void)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
-    copy_to_screen(bar(1), 0);
+    copy_to_screen(bar_host(1), 0);
     Mouse_ShowCursor();
     Ems_EmsNop(Ems_ToolbarBlock());
     Ems_EmsMapGameData();
@@ -285,7 +291,7 @@ void GfxPath_IconAllIndex(void)
 }
 
 // 3a1b:0864: RLE-decodes the icon (+2 on every pixel) into the scratch buffer.
-void GfxPath_DrawIcon(int16_t icon, FarPtr dest)
+void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
     FarPtr base = block_base();
@@ -307,7 +313,7 @@ void GfxPath_DrawIcon(int16_t icon, FarPtr dest)
                 *(uint8_t *)far_host(far_ptr(tseg, out++)) = (uint8_t)(v + 2);
         }
     }  // the original tests != 0 after each run; a damaged icon would run on
-    Blit_CopyRectStrided(TMP_PTR, near_add(dest, 0x504), 0x27, 0x18, 0x28, 0x140);
+    Blit_CopyRectStrided(far_host(TMP_PTR), dest + 0x504, 0x27, 0x18, 0x28, 0x140);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = (int32_t)System_MemAvail();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -321,8 +327,8 @@ void GfxPath_ShowScreenBackdrop(void)
     const uint8_t *name = ds_at((uint16_t)(0x50FB + ds.Game_CurrentScreen * 25));
     for (uint8_t i = 1; i <= name[0] && path[0] < 255; i++)
         path[++path[0]] = name[i];
-    Gfx_LoadPicScreen(path, buf, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(path, far_host(buf), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
 }
 

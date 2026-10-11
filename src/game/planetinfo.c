@@ -109,9 +109,22 @@ static FarPtr far_add(FarPtr p, int32_t delta)
     return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
 }
 
-static FarPtr screen_at(uint16_t off)
+// Host pointer into a heap block, for the blitters.
+static uint8_t *buf_at(FarPtr p, int32_t delta)
 {
-    return far_ptr(ds.Gfx_ScreenSeg, off);
+    return (uint8_t *)far_host(p) + delta;
+}
+
+// The same, keeping the original's 16-bit offset wrap: a sprite at the top
+// edge of the frame has a negative origin.
+static uint8_t *buf_at_wrapped(FarPtr p, int32_t delta)
+{
+    return far_host(far_add(p, delta));
+}
+
+static uint8_t *screen_at(uint16_t off)
+{
+    return gfx_screen() + off;
 }
 
 static TBody *body_at(int16_t sys, int16_t idx)
@@ -472,8 +485,8 @@ void PlanetInfo_DrawPlanetInfoScreen(void)
     FarPtr buf = System_GetMem(0xBCC0);
     PString name, tmp;
     str_cat2(&name, 0xFF, PSTR("grafika\\"), (const PString *)&ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name);
-    Gfx_LoadPicScreen(PS(&name), buf, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS(&name), far_host(buf), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
     int16_t n = b->InfoLevel < 6 ? 0 : (int8_t)b->SurfaceType;
     PlanetInfo_LoadPlanetPlanetPic(n, false);
     if ((int8_t)b->Owner < 2)
@@ -489,15 +502,15 @@ void PlanetInfo_DrawPlanetInfoScreen(void)
     // the original (InitSystemView allocates it again).
     SV_SPRITES = System_GetMem(0x5500);
     numbered_name(&tmp, PSTR("planets\\napr"), ds.Game_CurSystem);
-    Gfx_LoadPic(PS(&tmp), SV_SPRITES, 1, 0x44, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6F, 0x80, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(SV_SPRITES), 1, 0x44, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6F, 0x80, 0, 0xBE);
     Mouse_HideCursor();
     if (cur_moon() == 0) {
-        Blit_BlitTransparent(far_add(SV_SPRITES, (cur_planet() - 1) * 0x20 + 0x180), screen_at(0x834D), 0x20,
+        Blit_BlitTransparent(buf_at(SV_SPRITES, (cur_planet() - 1) * 0x20 + 0x180), screen_at(0x834D), 0x20,
                              0x20, 0x80);
     } else {
         int16_t m = (int16_t)(moon_body(ds.Game_CurSystem, cur_planet(), cur_moon())
                               - ds.Galaxy_PlanetCount[ds.Game_CurSystem - 1]);
-        Blit_BlitTransparent(far_add(SV_SPRITES, ((m - 1) / 0xE) * 0x1540 + ((m - 1) % 0xE) * 0x11 + 0x2AC2),
+        Blit_BlitTransparent(buf_at(SV_SPRITES, ((m - 1) / 0xE) * 0x1540 + ((m - 1) % 0xE) * 0x11 + 0x2AC2),
                              screen_at(0x8D55), 0x10, 0x10, 0x80);
     }
     System_FreeMem(SV_SPRITES, 0x5500);
@@ -514,9 +527,9 @@ void PlanetInfo_LoadPlanetFajPic(int16_t n, bool setPalette)
     FarPtr buf = System_GetMem(0xAA6);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\faj"), n);
-    Gfx_LoadPic(PS(&tmp), buf, 1, 0x2F, 0, 0, 0x3A, false, Gfx_PalettePtr(), 0, 0xF, 0x70, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x2F, 0, 0, 0x3A, false, Gfx_PalettePtr(), 0, 0xF, 0x70, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_add(buf, 0x76), screen_at(0x3FC2), 0x35, 0x2B, 0x3A, 0x140);
+    Blit_CopyRectStrided(buf_at(buf, 0x76), screen_at(0x3FC2), 0x35, 0x2B, 0x3A, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xAA6);
     if (setPalette)
@@ -531,9 +544,9 @@ void PlanetInfo_LoadPlanetPlanetPic(int16_t n, bool setPalette)
     FarPtr buf = System_GetMem(0x14A0);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\planet"), n);
-    Gfx_LoadPic(PS(&tmp), buf, 1, 0x37, 0, 0, 0x60, false, Gfx_PalettePtr(), 0, 0x1F, 0x50, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x37, 0, 0, 0x60, false, Gfx_PalettePtr(), 0, 0x1F, 0x50, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_add(buf, 0xC2), screen_at(0xB7C2), 0x5C, 0x33, 0x60, 0x140);
+    Blit_CopyRectStrided(buf_at(buf, 0xC2), screen_at(0xB7C2), 0x5C, 0x33, 0x60, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0x14A0);
     if (setPalette)
@@ -546,12 +559,12 @@ void PlanetInfo_DrawAlienInfoScreen(void)
     const TBody *b = far_host(ds.Game_CurBody);
     FarPtr buf = System_GetMem(0xBCC0);
     PString tmp;
-    Gfx_LoadPicScreen(P("grafika\\aliennfo"), buf, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(P("grafika\\aliennfo"), far_host(buf), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
     numbered_name(&tmp, PSTR("alien\\alien"), (int8_t)b->Owner);
-    Gfx_LoadPic(PS(&tmp), buf, 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x8F, 0x60, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(buf), 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x8F, 0x60, 0, 0xBE);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_add(buf, 0x63), screen_at(0x4382), 0x5E, 0x8F, 0x62, 0x140);
+    Blit_CopyRectStrided(buf_at(buf, 0x63), screen_at(0x4382), 0x5E, 0x8F, 0x62, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xBCC0);
     // The race's text: 12 strings of 36 bytes, 1B0h bytes per race.
@@ -601,8 +614,8 @@ void PlanetInfo_DrawPlanetSurfaceBackdrop(void)
     FarPtr buf = System_GetMem(0xBCC0);
     PString tmp;
     numbered_name(&tmp, PSTR("planets\\nagy"), (int8_t)b->SurfaceType);
-    Gfx_LoadPicScreen(PS(&tmp), buf, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(buf, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS(&tmp), far_host(buf), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), screen_at(0x3D40), 0x140, 0x97);
     System_FreeMem(buf, 0xBCC0);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }
@@ -1066,17 +1079,20 @@ void PlanetInfo_LoadSystemViewAssets(void)
 {
     int16_t sys = ds.Game_CurSystem;
     PString s, tmp;
-    FarPtr pal = Gfx_PalettePtr();
+    uint8_t *pal = Gfx_PalettePtr();
     Gfx_DrawStatusText(P(""));
 
     System_StrStore(cur_planet() == 0 ? PSTR("hatter1") : PSTR("hatter2"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), SV_BACKDROP, 1, 0x97, 0, 0, 0x140, true, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(SV_BACKDROP), 1, 0x97, 0, 0, 0x140, true, pal, 0,
+                0xB0, 0x40, 0, 0xBE);
     System_StrStore(cur_planet() == 0 ? PSTR("hatter3") : PSTR("hatter4"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), SV_ICONS, 1, 0x4B, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(SV_ICONS), 1, 0x4B, 0, 0, 0x140, false, pal, 0,
+                0xB0, 0x40, 0, 0xBE);
     numbered_name(&tmp, PSTR("planets\\napr"), sys);
-    Gfx_LoadPic(PS(&tmp), SV_SPRITES, 1, 0x44, 0, 0, 0x140, false, pal, 0, 0x6F, 0x80, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(SV_SPRITES), 1, 0x44, 0, 0, 0x140, false, pal, 0,
+                0x6F, 0x80, 0, 0xBE);
 
     if (cur_planet() == 0) {
         for (int16_t k = 1; k <= ds.Galaxy_PlanetCount[sys - 1]; k++) {
@@ -1135,8 +1151,9 @@ void PlanetInfo_DrawOrbitingPlanet(int16_t k)
         // (The original also computes (ang / 71h + 19h) mod 20h into a local
         // here and never uses it.)
         const OrbitRec *o = orbit(k);
-        Scale_ScaleSprite(far_add(SV_SPRITES, (k - 1) * 0x20 + 0x180), SV_PLANET, o->size);
-        Blit_BlitTransparent(SV_PLANET, far_add(SV_FRAME, sprite_origin(o)), o->size, o->size, 0x80);
+        Scale_ScaleSprite(buf_at(SV_SPRITES, (k - 1) * 0x20 + 0x180), far_host(SV_PLANET), o->size);
+        Blit_BlitTransparent(far_host(SV_PLANET), buf_at_wrapped(SV_FRAME, sprite_origin(o)), o->size,
+                             o->size, 0x80);
     }
 }
 
@@ -1147,20 +1164,23 @@ void PlanetInfo_DrawOrbitingMoon(int16_t k)
     if (planet_status(sys, cur_planet()) > 0) {
         const OrbitRec *o = orbit(k);
         int16_t m = (int16_t)(moon_body(sys, cur_planet(), k) - ds.Galaxy_PlanetCount[sys - 1]);
-        Scale_ScaleSprite(far_add(SV_SPRITES, ((m - 1) % 0xE) * 0x11 + 0x2AC2 + ((m - 1) / 0xE) * 0x1540),
-                          SV_MOON, (int16_t)(o->size << 1));
+        Scale_ScaleSprite(buf_at(SV_SPRITES, ((m - 1) % 0xE) * 0x11 + 0x2AC2 + ((m - 1) / 0xE) * 0x1540),
+                          far_host(SV_MOON), (int16_t)(o->size << 1));
         int32_t origin = sprite_origin(o);
-        Blit_BlitTransparent(SV_MOON, far_add(SV_FRAME, origin), o->size, o->size, 0x80);
+        Blit_BlitTransparent(far_host(SV_MOON), buf_at_wrapped(SV_FRAME, origin), o->size, o->size,
+                             0x80);
         if (o->flag != 0) {
-            Blit_BlitTransparent(far_add(SV_ICONS, 0x2A81 + (o->flag - 1) * 8),
-                                 far_add(SV_FRAME, (int16_t)((int16_t)(o->y - o->half - 3) * 0x140)
-                                                       + (int16_t)(o->x - o->half) - 3),
+            Blit_BlitTransparent(buf_at(SV_ICONS, 0x2A81 + (o->flag - 1) * 8),
+                                 buf_at_wrapped(SV_FRAME,
+                                                (int16_t)((int16_t)(o->y - o->half - 3) * 0x140)
+                                                    + (int16_t)(o->x - o->half) - 3),
                                  7, 7, 0x40);
         }
         if (k + 1 == SV_MARK_BODY && sys == SV_MARK_SYS && cur_planet() == SV_MARK_PLANET) {
-            Blit_BlitTransparent(far_add(SV_ICONS, 0x2AE9),
-                                 far_add(SV_FRAME, (int16_t)((int16_t)(o->y - o->half + 9) * 0x140)
-                                                       + (int16_t)(o->x - o->half) - 3),
+            Blit_BlitTransparent(buf_at(SV_ICONS, 0x2AE9),
+                                 buf_at_wrapped(SV_FRAME,
+                                                (int16_t)((int16_t)(o->y - o->half + 9) * 0x140)
+                                                    + (int16_t)(o->x - o->half) - 3),
                                  7, 7, 0x40);
         }
     }
@@ -1175,7 +1195,7 @@ void PlanetInfo_RenderSystemView(void)
     SV_PLANET = System_GetMem(0x2A80);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = System_MemAvail();
-    Blit_CopyBytes(SV_BACKDROP, SV_FRAME, 0xBCC0);
+    Blit_CopyBytes(far_host(SV_BACKDROP), far_host(SV_FRAME), 0xBCC0);
 
     if (SV_HIDDEN == 0) {
         if (cur_planet() == 0) {
@@ -1185,7 +1205,7 @@ void PlanetInfo_RenderSystemView(void)
                 if (orbit(k)->y < 0x4B)
                     PlanetInfo_DrawOrbitingPlanet(k);
             }
-            Blit_BlitTransparent(far_add(SV_SPRITES, 0x140), far_add(SV_FRAME, 0x3640), 0x40, 0x40, 0x80);
+            Blit_BlitTransparent(buf_at(SV_SPRITES, 0x140), buf_at(SV_FRAME, 0x3640), 0x40, 0x40, 0x80);
             for (int16_t k = 1; k <= n; k++) {
                 if (orbit(k)->y > 0x4A)
                     PlanetInfo_DrawOrbitingPlanet(k);
@@ -1196,13 +1216,13 @@ void PlanetInfo_RenderSystemView(void)
                 if ((uint16_t)(orbit(k)->y + 8) < 0x4B)
                     PlanetInfo_DrawOrbitingMoon(k);
             }
-            Blit_BlitTransparent(far_add(SV_SPRITES, 0x180 + (cur_planet() - 1) * 0x20),
-                                 far_add(SV_FRAME, 0x4A50), 0x20, 0x20, 0x80);
+            Blit_BlitTransparent(buf_at(SV_SPRITES, 0x180 + (cur_planet() - 1) * 0x20),
+                                 buf_at(SV_FRAME, 0x4A50), 0x20, 0x20, 0x80);
             if (orbit(0)->flag != 0)
-                Blit_BlitTransparent(far_add(SV_ICONS, 0x2A81 + (orbit(0)->flag - 1) * 8),
-                                     far_add(SV_FRAME, 0x4A50), 7, 7, 0x40);
+                Blit_BlitTransparent(buf_at(SV_ICONS, 0x2A81 + (orbit(0)->flag - 1) * 8),
+                                     buf_at(SV_FRAME, 0x4A50), 7, 7, 0x40);
             if (SV_MARK_BODY == 1 && sys == SV_MARK_SYS && cur_planet() == SV_MARK_PLANET)
-                Blit_BlitTransparent(far_add(SV_ICONS, 0x2AE9), far_add(SV_FRAME, 0x6E90), 7, 7, 0x40);
+                Blit_BlitTransparent(buf_at(SV_ICONS, 0x2AE9), buf_at(SV_FRAME, 0x6E90), 7, 7, 0x40);
             for (int16_t k = 1; k <= moons; k++) {
                 if ((uint16_t)(orbit(k)->y + 8) > 0x4A)
                     PlanetInfo_DrawOrbitingMoon(k);
@@ -1213,19 +1233,19 @@ void PlanetInfo_RenderSystemView(void)
     if (cur_planet() > 0) {
         int8_t status = planet_status(sys, cur_planet());
         if (status == 0)
-            Blit_BlitTransparent(far_add(SV_ICONS, 0x1742), far_add(SV_FRAME, 0x74E), 0x21, 9, 0x40);
+            Blit_BlitTransparent(buf_at(SV_ICONS, 0x1742), buf_at(SV_FRAME, 0x74E), 0x21, 9, 0x40);
         if (status == 1 && SV_HAS_BASE == 0 && SV_HAS_GROUPS == 0)
-            Blit_BlitTransparent(far_add(SV_ICONS, 0x23C2), far_add(SV_FRAME, 0x74E), 0x21, 9, 0x40);
+            Blit_BlitTransparent(buf_at(SV_ICONS, 0x23C2), buf_at(SV_FRAME, 0x74E), 0x21, 9, 0x40);
     }
 
     // The list of systems down the right side (screen 7).
     if ((ds.Research_Products[0xD].State == 5 || ds.Research_Products[0xE].State == 5) && cur_planet() == 0) {
         for (int16_t i = 0; i <= 0x12; i++)
-            Blit_FillBytes(far_add(SV_FRAME, i * 0x140 + (sys - 1) * 0x17C0 + 0x100), 0x40, 0x48);
+            Blit_FillBytes(buf_at(SV_FRAME, i * 0x140 + (sys - 1) * 0x17C0 + 0x100), 0x40, 0x48);
         for (int16_t k = 1; k <= 8; k++) {
             if (ds.Galaxy_SystemStatus[k - 1] >= 0)
-                Blit_BlitTransparent(far_add(SV_ICONS, ((k - 1) / 4) * 0x17C0 + ((k - 1) % 4) * 0x40),
-                                     far_add(SV_FRAME, (k - 1) * 0x17C0 + 0x100), 0x40, 0x13, 0x40);
+                Blit_BlitTransparent(buf_at(SV_ICONS, ((k - 1) / 4) * 0x17C0 + ((k - 1) % 4) * 0x40),
+                                     buf_at(SV_FRAME, (k - 1) * 0x17C0 + 0x100), 0x40, 0x13, 0x40);
         }
     }
 
@@ -1235,12 +1255,12 @@ void PlanetInfo_RenderSystemView(void)
             int16_t kind = group_tab(i)->kind;
             if (kind > 0)
                 Blit_BlitTransparent(
-                    far_add(SV_ICONS, ((kind - 1) % 10) * 0x20 + 1 + (((kind - 1) / 10) * 0x10 + 1) * 0x140),
-                    far_add(SV_FRAME, ((i - 1) % 2) * 0x20 + ((i - 1) / 2) * 0x1400 + 0x241), 0x1F, 0xF, 0x40);
+                    buf_at(SV_ICONS, ((kind - 1) % 10) * 0x20 + 1 + (((kind - 1) / 10) * 0x10 + 1) * 0x140),
+                    buf_at(SV_FRAME, ((i - 1) % 2) * 0x20 + ((i - 1) / 2) * 0x1400 + 0x241), 0x1F, 0xF, 0x40);
         }
         if (SV_SELECTED > 0)
-            Blit_BlitTransparent(far_add(SV_ICONS, 0x15E1),
-                                 far_add(SV_FRAME, ((SV_SELECTED - 1) % 2) * 0x1F + ((SV_SELECTED - 1) / 2) * 0x1400
+            Blit_BlitTransparent(buf_at(SV_ICONS, 0x15E1),
+                                 buf_at(SV_FRAME, ((SV_SELECTED - 1) % 2) * 0x1F + ((SV_SELECTED - 1) / 2) * 0x1400
                                                        + 0x241),
                                  0x1F, 0xF, 0x40);
     }
@@ -1250,11 +1270,11 @@ void PlanetInfo_RenderSystemView(void)
     else
         SV_BLINK--;
     if (ds.Game_CurrentScreen == 0x12 && SV_BLINK > 7) {
-        Blit_BlitTransparent(far_add(SV_ICONS, 0x2187), far_add(SV_FRAME, 0xADCA), 0x39, 5, 0x40);
-        Blit_BlitTransparent(far_add(SV_ICONS, 0x2906), far_add(SV_FRAME, 0xAE03), 0x39, 5, 0x40);
+        Blit_BlitTransparent(buf_at(SV_ICONS, 0x2187), buf_at(SV_FRAME, 0xADCA), 0x39, 5, 0x40);
+        Blit_BlitTransparent(buf_at(SV_ICONS, 0x2906), buf_at(SV_FRAME, 0xAE03), 0x39, 5, 0x40);
     }
 
-    Blit_CopyRect(SV_FRAME, screen_at(0x3D40), 0x140, 0x97);
+    Blit_CopyRect(far_host(SV_FRAME), screen_at(0x3D40), 0x140, 0x97);
     Mouse_HitTestCursor(&SV_HIT);
     ds.Mouse_SavedCursorShape = ds.Mouse_CursorShape;
     if (SV_HIT < 0x14)

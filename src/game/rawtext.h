@@ -17,4 +17,4 @@ void RawText_Nop(void);
 void RawText_Init(void);
 // 4049:0160: writes pal[first..last] (colour-number indexed) to the DAC from
 // index first, 3 bytes per entry, wrapping at 256; the DAC keeps 6 bits.
-void RawText_SetPaletteRange(int16_t first, int16_t last, FarPtr pal);
+void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal);

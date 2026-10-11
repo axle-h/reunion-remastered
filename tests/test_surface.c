@@ -13,6 +13,7 @@
 #include "game/surface.h"
 #include "game/system.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -233,19 +234,18 @@ static void hotspots_and_blits(void)
     CHECK(ds.Mouse_HotspotCount == 2);
 
     // BlitTile: tile 21 (row 1, column 1) of a sheet to window cell (2, 3).
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Mouse_CursorState = 1;
     FarPtr sheet = System_GetMem(0x4000);
     memset(far_host(sheet), 0, 0x4000);
     for (int r = 0; r < 16; r++)
         memset((uint8_t *)far_host(sheet) + 0x1400 + 16 + r * 320, 0x77, 16);
-    Surface_BlitTile(sheet, 21, 2, 3);
-    uint8_t *scr = far_host(far_ptr(0xA000, 0));
+    Surface_BlitTile(far_host(sheet), 21, 2, 3);
+    uint8_t *scr = &vid_screen[0][0];
     CHECK(scr[(0x35 + 32) * 320 + 0x5D + 16] == 0x77);
     CHECK(scr[(0x35 + 47) * 320 + 0x5D + 31] == 0x77);
     CHECK(scr[(0x35 + 31) * 320 + 0x5D + 16] == 0);
     CHECK(scr[(0x35 + 32) * 320 + 0x5D + 32] == 0);
-    Surface_BlitTileInner(sheet, 21, 2, 3);
+    Surface_BlitTileInner(far_host(sheet), 21, 2, 3);
     CHECK(scr[(0x36 + 32) * 320 + 0x5E + 16] == 0x77);
 }
 

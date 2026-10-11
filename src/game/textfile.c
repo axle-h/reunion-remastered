@@ -60,7 +60,7 @@ static uint32_t host_to_far(const void *p)
 static void underline(uint8_t colour)
 {
     Mouse_HideCursor();
-    Gfx_DrawLine(ds.Gfx_ScreenSeg, IN_CURX, IN_CURY, (int16_t)(IN_CURX + 5), IN_CURY, colour);
+    Gfx_DrawLine(gfx_screen(), IN_CURX, IN_CURY, (int16_t)(IN_CURX + 5), IN_CURY, colour);
     Mouse_ShowCursor();
 }
 

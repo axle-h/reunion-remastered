@@ -21,9 +21,15 @@ static int32_t cos500(int i)
     return v;
 }
 
-static int16_t *words(FarPtr p)
+static int16_t *words(uint8_t *p)
 {
-    return far_host(p);
+    return (int16_t *)p;
+}
+
+// The start of segment seg.
+static uint8_t *seg_host(uint16_t seg)
+{
+    return far_host(far_ptr(seg, 0));
 }
 
 static void cos_table(void)
@@ -58,7 +64,7 @@ static void project(void)
 {
     mem_init();
     Vec3D_InitCosTable();
-    FarPtr src = far_ptr(0x5000, 0), dst = far_ptr(0x5100, 0);
+    uint8_t *src = seg_host(0x5000), *dst = seg_host(0x5100);
     int16_t *s = words(src), *d = words(dst);
     // Angles 0: the matrix is diag(500, -500, 500). Coordinates times 40
     // times the matrix entry, then the high word (rounds toward -inf).
@@ -90,7 +96,7 @@ static void project(void)
 static void trace_edge(void)
 {
     mem_init();
-    FarPtr t = far_ptr(MEM_DS_SEG, VEC3D_EDGES_A);
+    uint8_t *t = ds_at(VEC3D_EDGES_A);
     int16_t *tab = words(t);
     // Vertical: the whole y range, whatever the direction.
     Vec3D_TraceEdge(7, 12, 7, 5, t);
@@ -118,14 +124,13 @@ static void trace_edge(void)
 static void fill_poly(void)
 {
     mem_init();
-    uint16_t seg = 0x6000;
-    uint8_t *buf = far_host(far_ptr(seg, 0));
-    FarPtr pts = far_ptr(0x5000, 0);
+    uint8_t *buf = seg_host(0x6000);
+    uint8_t *pts = seg_host(0x5000);
     int16_t *p = words(pts);
     // (10, 10), (30, 10), (10, 30); the slot after the last point gets a
     // copy of the first.
     p[0] = 10, p[1] = 10, p[2] = 30, p[3] = 10, p[4] = 10, p[5] = 30;
-    Vec3D_FillPoly(seg, 3, pts, 0xC0);
+    Vec3D_FillPoly(buf, 3, pts, 0xC0);
     CHECK(p[6] == 10 && p[7] == 10);
     // Row y covers x = 10 .. 39 - y (30 - y pixels): even x colour + 1.
     bool same = true;
@@ -147,7 +152,7 @@ static void fill_poly(void)
     // A span starting on an odd column gets colour + 1 there too.
     SDL_memset(buf, 0, 320 * 40);
     p[0] = 11, p[1] = 5, p[2] = 15, p[3] = 5, p[4] = 15, p[5] = 6, p[6] = 11, p[7] = 6;
-    Vec3D_FillPoly(seg, 4, pts, 0xD0);
+    Vec3D_FillPoly(buf, 4, pts, 0xD0);
     CHECK(buf[5 * 320 + 11] == 0xD1 && buf[5 * 320 + 12] == 0xD1 && buf[5 * 320 + 13] == 0xD0 &&
           buf[5 * 320 + 14] == 0xD1 && buf[5 * 320 + 15] == 0);
 }
@@ -156,11 +161,11 @@ static void prepare(void)
 {
     mem_init();
     system_init();
-    FarPtr verts = far_ptr(0x5000, 0), faces = far_ptr(0x5100, 0), normals = far_ptr(0x5200, 0);
+    uint8_t *verts = seg_host(0x5000), *faces = seg_host(0x5100), *normals = seg_host(0x5200);
     int16_t *v = words(verts);
     static const int16_t tetra[4][3] = {{0, 0, 0}, {10, 0, 0}, {0, 10, 0}, {0, 0, 10}};
     memcpy(v, tetra, sizeof tetra);
-    uint8_t *f = far_host(faces);
+    uint8_t *f = faces;
     memset(f, 0xFF, 40);
     f[0] = 1, f[1] = 2, f[2] = 3;        // n = (0, 0, 100): toward the centroid
     f[20] = 1, f[21] = 3, f[22] = 2;     // n = (0, 0, -100): flipped
@@ -183,8 +188,6 @@ static void model(void)
     mem_init();
     CHECK(dseg_init());
     system_init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     VecLoad_Init();
     *(FarPtr *)ds_at(0x8584) = System_GetMem(0xAF00);  // as Shop::ShopScreen
     VecLoad_AllocVecBuffers();

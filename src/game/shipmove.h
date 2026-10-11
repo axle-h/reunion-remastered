@@ -21,7 +21,7 @@ void ShipMove_DockingAnimation(int16_t surfaceType);
 // 22ca:132c: copies the planet-view shape (213 runs, 19423 bytes) from the
 // 320-wide image at src to screen row 49. The original is an unrolled
 // rep-movs sequence; ShipMove_ViewRuns holds its runs.
-void ShipMove_BlitViewport(FarPtr src);
+void ShipMove_BlitViewport(const uint8_t *src);
 typedef struct {
     uint16_t offset; // from the start of the image
     uint16_t length;

@@ -7,8 +7,10 @@
 // Both modes were shown on a 4:3 monitor (13h pixels are 20% taller than wide).
 enum : int { DISPLAY_HEIGHT = VID_WIDTH * 3 / 4 };
 
-static uint8_t screen_buffer[VID_HEIGHT][VID_WIDTH];
-uint8_t (*vid_screen)[VID_WIDTH] = screen_buffer;
+// The VGA's 64 KB at A000h; rows 0..199 are shown. Games draw past row 199
+// (and wrap 16-bit offsets inside the 64 KB), as on the hardware.
+static uint8_t video_memory[0x10000];
+uint8_t (*vid_screen)[VID_WIDTH] = (uint8_t (*)[VID_WIDTH])video_memory;
 uint8_t vid_palette[256][3];
 
 uint8_t vid12_screen[VID12_HEIGHT][VID12_WIDTH];

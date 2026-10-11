@@ -251,14 +251,14 @@ static int16_t tab(uint16_t base, int16_t idx)
     return *(int16_t *)ds_at((uint16_t)(base + idx * 2));
 }
 
-static FarPtr screen_at(uint16_t off)
+static uint8_t *screen_at(uint16_t off)
 {
-    return far_ptr(ds.Gfx_ScreenSeg, off);
+    return gfx_screen() + off;
 }
 
-static FarPtr buf_at(FarPtr buf, int32_t off)
+static uint8_t *buf_at(FarPtr buf, int32_t off)
 {
-    return far_ptr(buf >> 16, (uint16_t)((uint16_t)buf + off));
+    return far_host(far_ptr(buf >> 16, (uint16_t)((uint16_t)buf + off)));
 }
 
 // 1a3e:0d39
@@ -276,9 +276,9 @@ static void DrawSlotNames(void)
 // 1a3e:0da2: animation frame 'frame' of disk.ani to the screen.
 static void DrawDiskFrame(int16_t frame)
 {
-    Anim_DrawAnimKeyed((uint16_t)(frame + 1), BUF_FRAME);
+    Anim_DrawAnimKeyed((uint16_t)(frame + 1), far_host(BUF_FRAME));
     Mouse_HideCursor();
-    Blit_CopyRectStrided(BUF_FRAME, screen_at(0xBC26), 100, 0x31, 100, 0x140);
+    Blit_CopyRectStrided(far_host(BUF_FRAME), screen_at(0xBC26), 100, 0x31, 100, 0x140);
     Mouse_ShowCursor();
 }
 
@@ -309,7 +309,7 @@ static void RestoreKnobBackground(int16_t step)
 static void DrawOptionButton(int16_t idx, bool on)
 {
     int16_t x = tab(0xD8, idx), y = tab(0xE4, idx);
-    FarPtr dest = screen_at((uint16_t)((y + 0x31) * 0x140 + x));
+    uint8_t *dest = screen_at((uint16_t)((y + 0x31) * 0x140 + x));
     if (on)
         Blit_CopyRect(buf_at(BUF_BUTTONS, (y - 0x27) * 0x140 + x - 0x89), dest, tab(0xF0, idx),
                       tab(0xFC, idx));
@@ -333,7 +333,7 @@ static void DrawOptionButtons(void)
 static void DrawPressedButton(int16_t idx, bool pressed)
 {
     int16_t x = tab(0x108, idx), y = tab(0x110, idx);
-    FarPtr dest = screen_at((uint16_t)(x + 0x110 + (y + 0x9A) * 0x140));
+    uint8_t *dest = screen_at((uint16_t)(x + 0x110 + (y + 0x9A) * 0x140));
     if (pressed)
         Blit_CopyRect(buf_at(BUF_BUTTONS, (y + 0x15) * 0x140 + x), dest, tab(0x118, idx), tab(0x120, idx));
     else
@@ -391,12 +391,12 @@ static void DiskScreenInit(void)
     Anim_LoadMainAnim(0x11);
     BUF_BACK = System_GetMem(0xBCC0);
     BUF_BUTTONS = System_GetMem(0x5140);
-    FarPtr pal = far_ptr(MEM_DS_SEG, offsetof(DSeg, Gfx_Palette));
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), BUF_BACK, 1, 0x97, 0, 0, 0x140, FIRST_SHOW != 2, pal, 0, 0xB0,
-                0x40, 0, 0xBE);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), BUF_BUTTONS, 1, 0x41, 0, 0, 0x140, false, pal, 0, 0xB0,
-                0x40, 0, 0xBE);
-    Blit_CopyRect(BUF_BACK, screen_at(0x3D40), 0x140, 0x97);
+    uint8_t *pal = Gfx_PalettePtr();
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), far_host(BUF_BACK), 1, 0x97, 0, 0, 0x140,
+                FIRST_SHOW != 2, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), far_host(BUF_BUTTONS), 1, 0x41, 0, 0,
+                0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(BUF_BACK), screen_at(0x3D40), 0x140, 0x97);
     DrawDiskFrame(ds.Game_MusicTrack == 0 ? 0x16 : 0);
     DrawOptionButtons();
     DrawSlotNames();

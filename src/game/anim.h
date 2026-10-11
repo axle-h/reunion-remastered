@@ -27,14 +27,14 @@ void Anim_FreeGrAnim(uint16_t id);
 
 // 3c64:0496: decodes frame 1 into dest, then frame `frame` (or the nearest
 // earlier one that was loaded), both with colour offset 40h.
-void Anim_DrawAnimKeyed(uint16_t frame, FarPtr dest);
+void Anim_DrawAnimKeyed(uint16_t frame, uint8_t *dest);
 // 3c64:0516: decodes frame `frame` over dest; *ok is false if that frame
 // isn't loaded (and stays true when no animation is loaded at all).
-void Anim_DrawAnimFrame(uint16_t frame, FarPtr dest, bool *ok);
+void Anim_DrawAnimFrame(uint16_t frame, uint8_t *dest, bool *ok);
 // 3c64:057c: decodes one frame block into dest (linear, no stride).
-void Anim_DecodeAnimFrame(FarPtr frame, FarPtr dest, uint8_t colourOffset);
+void Anim_DecodeAnimFrame(const uint8_t *frame, uint8_t *dest, uint8_t colourOffset);
 
 // 3c64:0666: copies a 132-row disc-shaped area (rows of 7..160 pixels) from
 // src + C28h (a 160-wide buffer) to the screen at row 59 (Gfx_ScreenSeg,
 // 320 wide).
-void Anim_BlitWedgeToScreen(FarPtr src);
+void Anim_BlitWedgeToScreen(const uint8_t *src);

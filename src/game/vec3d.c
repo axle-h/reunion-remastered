@@ -9,25 +9,27 @@
 
 // --- memory helpers ------------------------------------------------------------
 
-static inline uint8_t *at(FarPtr p, uint16_t off)
+// Byte at p + off. The original's 16-bit offsets wrap inside the segment;
+// from p's start, so does off.
+static inline uint8_t *at(uint8_t *p, uint16_t off)
 {
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + off)));
+    return p + off;
 }
 
-static inline int16_t rdw(FarPtr p, uint16_t off)
+static inline int16_t rdw(uint8_t *p, uint16_t off)
 {
     return (int16_t)(*at(p, off) | *at(p, (uint16_t)(off + 1)) << 8);
 }
 
-static inline void wrw(FarPtr p, uint16_t off, int16_t v)
+static inline void wrw(uint8_t *p, uint16_t off, int16_t v)
 {
     *at(p, off) = (uint8_t)v;
     *at(p, (uint16_t)(off + 1)) = (uint8_t)((uint16_t)v >> 8);
 }
 
-static inline FarPtr ds_ptr(uint16_t off)
+static inline uint8_t *ds_ptr(uint16_t off)
 {
-    return far_ptr(MEM_DS_SEG, off);
+    return ds_at(off);
 }
 
 static inline int16_t ds_word(uint16_t off)
@@ -62,7 +64,8 @@ static Real48 real_const(uint8_t e, uint8_t m4, uint8_t m3, uint8_t m2, uint8_t 
 // --- DrawEdges -------------------------------------------------------------------
 
 // 3e17:0000
-void Vec3D_DrawEdges(uint16_t bufSeg, FarPtr verts, FarPtr edges, int16_t count, uint8_t colour)
+void Vec3D_DrawEdges(uint8_t *bufSeg, uint8_t *verts, uint8_t *edges, int16_t count,
+                     uint8_t colour)
 {
     uint16_t n = (uint16_t)count;
     if (n < 1)
@@ -81,13 +84,9 @@ void Vec3D_DrawEdges(uint16_t bufSeg, FarPtr verts, FarPtr edges, int16_t count,
 
 // --- DrawFaces -------------------------------------------------------------------
 
-// DrawFaces' 20-point outline buffer was a local passed to FillPoly by far
-// pointer; it lives in the emulated stack segment, which nothing else uses
-// at this offset.
-static inline FarPtr face_points(void)
-{
-    return far_ptr(MEM_SS_SEG, 0x0E00);
-}
+// DrawFaces' outline buffer (a local in the original): up to 20 points and
+// the closing one FillPoly adds.
+static uint8_t face_points[21 * 4];
 
 // Faces of the two-sided objects that are never drawn. The back-face pass
 // also skips face 28h of model 7 object 1; the front-face pass doesn't.
@@ -107,11 +106,11 @@ static bool face_skipped(int16_t model, int16_t slot, uint8_t face, bool back_pa
 
 // One pass over the faces: the back faces (nz < 0) with the shading reversed,
 // or the front faces (nz >= 0).
-static void draw_face_pass(uint16_t bufSeg, FarPtr verts, FarPtr faces, FarPtr normals,
+static void draw_face_pass(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint8_t *normals,
                            uint8_t count, bool back_pass)
 {
     int16_t model = ds_word(VEC3D_MODEL), slot = ds_word(VEC3D_SLOT);
-    FarPtr pts = face_points();
+    uint8_t *pts = face_points;
     for (uint8_t f = 1;; f++) {
         int16_t nx = rdw(normals, (uint16_t)(f * 6 - 6));
         int16_t nz = rdw(normals, (uint16_t)(f * 6 - 2));
@@ -145,7 +144,8 @@ static void draw_face_pass(uint16_t bufSeg, FarPtr verts, FarPtr faces, FarPtr n
 }
 
 // 3e17:00cc
-void Vec3D_DrawFaces(uint16_t bufSeg, FarPtr verts, FarPtr faces, FarPtr normals, uint8_t count)
+void Vec3D_DrawFaces(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint8_t *normals,
+                     uint8_t count)
 {
     int16_t model = ds_word(VEC3D_MODEL), slot = ds_word(VEC3D_SLOT);
     bool two_sided = (model == 7 && slot == 1) || (model == 12 && slot == 7) ||
@@ -301,8 +301,8 @@ static void fix_centroid(int16_t model, int16_t slot, int16_t *c)
 
 // 3e17:04d2. Ghidra fails on this one; ported from the disassembly. The
 // original also computes det(P1, P2, P3) per face and never uses it.
-void Vec3D_PrepareObject(int16_t model, int16_t slot, FarPtr verts, FarPtr faces, FarPtr normals,
-                         uint8_t nVerts, uint8_t nFaces)
+void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *faces,
+                         uint8_t *normals, uint8_t nVerts, uint8_t nFaces)
 {
     // Centroid: Real sums of the vertices divided by their count.
     Real48 cx = {0}, cy = {0}, cz = {0};
@@ -315,7 +315,7 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, FarPtr verts, FarPtr faces
     cy = System_RealDiv(cy, System_LongToReal(nVerts));
     cz = System_RealDiv(cz, System_LongToReal(nVerts));
 
-    FarPtr cp = ds_ptr((uint16_t)(VEC3D_CENTROIDS + slot * 6));
+    uint8_t *cp = ds_ptr((uint16_t)(VEC3D_CENTROIDS + slot * 6));
     int16_t c[3] = {(int16_t)System_Round(cx), (int16_t)System_Round(cy),
                     (int16_t)System_Round(cz)};
     fix_centroid(model, slot, c);
@@ -367,7 +367,7 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, FarPtr verts, FarPtr faces
 // --- polygon fill ----------------------------------------------------------------
 
 // 3e17:11f9
-void Vec3D_FillPoly(uint16_t bufSeg, int16_t n, FarPtr pts, uint8_t colour)
+void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
 {
     // Close the outline: point n + 1 = point 1.
     wrw(pts, (uint16_t)((n + 1) * 4 - 4), rdw(pts, 0));
@@ -399,7 +399,7 @@ void Vec3D_FillPoly(uint16_t bufSeg, int16_t n, FarPtr pts, uint8_t colour)
     }
 
     // Edges lo..hi into table A, hi..n+1 and 1..lo into table B.
-    FarPtr a = ds_ptr(VEC3D_EDGES_A), b = ds_ptr(VEC3D_EDGES_B);
+    uint8_t *a = ds_ptr(VEC3D_EDGES_A), *b = ds_ptr(VEC3D_EDGES_B);
 #define EDGE(k, table)                                                                      \
     Vec3D_TraceEdge(rdw(pts, (uint16_t)((k) * 4 - 4)), rdw(pts, (uint16_t)((k) * 4 - 2)),   \
                     rdw(pts, (uint16_t)((k) * 4)), rdw(pts, (uint16_t)((k) * 4 + 2)), table)
@@ -426,7 +426,7 @@ void Vec3D_FillPoly(uint16_t bufSeg, int16_t n, FarPtr pts, uint8_t colour)
 }
 
 // 3e17:13d6
-void Vec3D_FillSpans(uint16_t bufSeg, int16_t firstY, int16_t lastY, int16_t colour)
+void Vec3D_FillSpans(uint8_t *bufSeg, int16_t firstY, int16_t lastY, int16_t colour)
 {
     uint16_t rows = (uint16_t)(lastY - firstY + 1);
     // xchg ah, al / shr 2 / add: y * 320 for y < 256.
@@ -434,7 +434,7 @@ void Vec3D_FillSpans(uint16_t bufSeg, int16_t firstY, int16_t lastY, int16_t col
     uint16_t row = (uint16_t)(swapped + (swapped >> 2));
     uint16_t si = (uint16_t)(firstY * 2);
     uint8_t odd = (uint8_t)colour, even = (uint8_t)(colour + 1);
-    FarPtr buf = far_ptr(bufSeg, 0);
+    uint8_t *buf = bufSeg;
     do {
         uint16_t xa = (uint16_t)ds_word((uint16_t)(VEC3D_EDGES_A + si));
         uint16_t xb = (uint16_t)ds_word((uint16_t)(VEC3D_EDGES_B + si));
@@ -472,7 +472,7 @@ void Vec3D_FillSpans(uint16_t bufSeg, int16_t firstY, int16_t lastY, int16_t col
 // address in the original): x-major steps x every pixel and y when the
 // error is non-negative before the step; y-major steps y every pixel and x
 // when the error is non-negative after it.
-void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, FarPtr table)
+void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t *table)
 {
     int16_t step = 2;
     uint16_t dx = (uint16_t)(x1 - x0);
@@ -485,10 +485,11 @@ void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, FarPtr tabl
             from = y1;
         }
         cnt++;
-        uint16_t di = (uint16_t)((uint16_t)table + from * 2);
-        FarPtr seg = far_ptr((uint16_t)(table >> 16), 0);
+        // The original's offsets wrap inside DS; the edge tables are far
+        // enough from its ends that y in -16384..16383 doesn't wrap.
+        uint8_t *di = table + from * 2;
         for (; cnt != 0; cnt--, di += 2)
-            wrw(seg, di, x0);
+            wrw(di, 0, x0);
         return;
     }
     if ((int16_t)dx < 0) {
@@ -512,17 +513,16 @@ void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, FarPtr tabl
     int16_t d1 = (int16_t)(minor * 2);
     int16_t err = (int16_t)(minor * 2 - major);
     int16_t d2 = (int16_t)(minor * 2 - major * 2);
-    uint16_t di = (uint16_t)((uint16_t)table + y0 * 2);
-    FarPtr seg = far_ptr((uint16_t)(table >> 16), 0);
+    uint8_t *di = table + y0 * 2;
     int16_t x = x0;
     uint16_t cnt = (uint16_t)(major + 1);
     bool s = err >= 0;
     if (!y_major) {
         do {
-            wrw(seg, di, x);
+            wrw(di, 0, x);
             x++;
             if (s) {
-                di += (uint16_t)step;
+                di += step;
                 err = (int16_t)(err + d2);
             } else {
                 err = (int16_t)(err + d1);
@@ -531,8 +531,8 @@ void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, FarPtr tabl
         } while (--cnt != 0);
     } else {
         do {
-            wrw(seg, di, x);
-            di += (uint16_t)step;
+            wrw(di, 0, x);
+            di += step;
             err = (int16_t)(err + (s ? d2 : d1));
             s = err >= 0;
             if (s)
@@ -544,7 +544,7 @@ void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, FarPtr tabl
 // --- projection ------------------------------------------------------------------
 
 // 3e17:1500
-void Vec3D_Project(int16_t a, int16_t b, int16_t c, FarPtr src, FarPtr dst, int16_t scale,
+void Vec3D_Project(int16_t a, int16_t b, int16_t c, uint8_t *src, uint8_t *dst, int16_t scale,
                    int16_t count, int16_t mode)
 {
     while (a >= 360)
@@ -575,8 +575,8 @@ void Vec3D_Project(int16_t a, int16_t b, int16_t c, FarPtr src, FarPtr dst, int1
         MinMax_SwapInt(&m[0][2], &m[1][2]);
     }
 
-    // Last point first; si runs down to 0 (count 0 wraps through the
-    // whole segment, as in the original).
+    // Last point first; si runs down to 0 (count 0 wraps through 64 KB, as
+    // in the original).
     int8_t s8 = (int8_t)scale;
     uint16_t si = (uint16_t)(count * 6);
     do {

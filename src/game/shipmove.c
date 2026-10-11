@@ -44,6 +44,10 @@ static FarPtr far_add(FarPtr p, int32_t delta)
     return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
 }
 
+// Host pointer into a heap block, for the blitters (the offsets stay inside
+// the block, so the original's 16-bit wrap never comes into play).
+static uint8_t *buf_at(FarPtr p, int32_t delta) { return (uint8_t *)far_host(p) + delta; }
+
 static TBody *bodyp(FarPtr p) { return (TBody *)far_host(p); }
 
 // Pascal string "planets\nagy<n>" in buf.
@@ -56,7 +60,8 @@ static const uint8_t *nagy_name(uint8_t buf[256], int16_t n)
 
 static void load_view_pic(const uint8_t *name, FarPtr dest)
 {
-    Gfx_LoadPic(name, dest, 0, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6f, 0x80, 0, 0x6f);
+    Gfx_LoadPic(name, far_host(dest), 0, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6f, 0x80,
+                0, 0x6f);
 }
 
 static void set_caption(int16_t pascalIndex, const char *text)
@@ -284,19 +289,19 @@ static void alloc_anim_buffers(void)
 {
     ds.ShipMove_AnimSheet = System_GetMem(0x9100);
     ds.ShipMove_Backdrop = System_GetMem(0xBCC0);
-    Gfx_LoadPic(PS("planets\\muszianm"), ds.ShipMove_AnimSheet, 0, 0x74, 0, 0, 0x140, false,
-                Gfx_PalettePtr(), 0, 0x3F, 0x40, 0, 0x3F);
+    Gfx_LoadPic(PS("planets\\muszianm"), far_host(ds.ShipMove_AnimSheet), 0, 0x74, 0, 0, 0x140,
+                false, Gfx_PalettePtr(), 0, 0x3F, 0x40, 0, 0x3F);
 }
 
 // 22ca:08d4
 void ShipMove_InitOrbitView(void)
 {
     FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(PS("planets\\muszi"), dest, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(dest, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS("planets\\muszi"), far_host(dest), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(dest), gfx_screen() + 0x3D40, 0x140, 0x97);
     load_view_pic(PS("planets\\nagy0"), dest);
     Mouse_HideCursor();
-    ShipMove_BlitViewport(dest);
+    ShipMove_BlitViewport(far_host(dest));
     Mouse_ShowCursor();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     System_FreeMem(dest, 0xBCC0);
@@ -308,11 +313,11 @@ void ShipMove_InitDockView(int16_t surfaceType)
 {
     uint8_t name[256];
     FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(PS("planets\\muszi"), dest, 0x97, Gfx_PalettePtr());
-    Blit_CopyRect(dest, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x140, 0x97);
+    Gfx_LoadPicScreen(PS("planets\\muszi"), far_host(dest), 0x97, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(dest), gfx_screen() + 0x3D40, 0x140, 0x97);
     load_view_pic(nagy_name(name, surfaceType), dest);
     Mouse_HideCursor();
-    ShipMove_BlitViewport(far_add(dest, 0x35C0));
+    ShipMove_BlitViewport(buf_at(dest, 0x35C0));
     Mouse_ShowCursor();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     System_FreeMem(dest, 0xBCC0);
@@ -325,14 +330,14 @@ void ShipMove_RedrawBackdrop(void)
     FarPtr dest = System_GetMem(0xBCC0);
     load_view_pic(PS("planets\\nagy0"), dest);
     Mouse_HideCursor();
-    ShipMove_BlitViewport(dest);
+    ShipMove_BlitViewport(far_host(dest));
     Mouse_ShowCursor();
     System_FreeMem(dest, 0xBCC0);
 }
 
 static void blit_row(FarPtr base, int16_t row)
 {
-    ShipMove_BlitViewport(far_add(base, row * 0x140));
+    ShipMove_BlitViewport(buf_at(base, row * 0x140));
 }
 
 // One step of the launch fade: whiten the two palette halves as the original does.
@@ -367,7 +372,7 @@ void ShipMove_LaunchAnimation(int16_t surfaceType)
     load_view_pic(PS("planets\\nagy0"), buf);
     Gfx_WaitFrames(0x14);
     Mouse_HideCursor();
-    ShipMove_BlitViewport(far_add(buf, 0x3700));
+    ShipMove_BlitViewport(buf_at(buf, 0x3700));
     Mouse_ShowCursor();
     Mouse_HideCursor();
     for (int16_t i = 0x2B; i >= 0xB; i--) {
@@ -379,28 +384,28 @@ void ShipMove_LaunchAnimation(int16_t surfaceType)
         blit_row(buf, i);
     }
     Gfx_WaitFrames(2);
-    ShipMove_BlitViewport(far_add(buf, 0xC80));
+    ShipMove_BlitViewport(buf_at(buf, 0xC80));
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0xB40));
+    ShipMove_BlitViewport(buf_at(buf, 0xB40));
     Gfx_WaitFrames(2);
-    ShipMove_BlitViewport(far_add(buf, 0xA00));
+    ShipMove_BlitViewport(buf_at(buf, 0xA00));
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0x8C0));
+    ShipMove_BlitViewport(buf_at(buf, 0x8C0));
     ShipMove_DrawDockDoorFrame(3);
     Gfx_WaitFrames(2);
-    ShipMove_BlitViewport(far_add(buf, 0x780));
+    ShipMove_BlitViewport(buf_at(buf, 0x780));
     ShipMove_DrawDockDoorFrame(2);
     Gfx_WaitFrames(2);
-    ShipMove_BlitViewport(far_add(buf, 0x640));
+    ShipMove_BlitViewport(buf_at(buf, 0x640));
     ShipMove_DrawDockDoorFrame(1);
     Gfx_WaitFrames(2);
-    ShipMove_BlitViewport(far_add(buf, 0x500));
+    ShipMove_BlitViewport(buf_at(buf, 0x500));
     Gfx_WaitFrames(3);
-    ShipMove_BlitViewport(far_add(buf, 0x3C0));
+    ShipMove_BlitViewport(buf_at(buf, 0x3C0));
     Gfx_WaitFrames(3);
-    ShipMove_BlitViewport(far_add(buf, 0x280));
+    ShipMove_BlitViewport(buf_at(buf, 0x280));
     Gfx_WaitFrames(4);
-    ShipMove_BlitViewport(far_add(buf, 0x140));
+    ShipMove_BlitViewport(buf_at(buf, 0x140));
     Mouse_ShowCursor();
     System_FreeMem(buf, 0xBCC0);
 }
@@ -437,7 +442,7 @@ void ShipMove_DockingAnimation(int16_t surfaceType)
     load_view_pic(name, buf);
     Gfx_WaitFrames(0x14);
     Mouse_HideCursor();
-    ShipMove_BlitViewport(buf);
+    ShipMove_BlitViewport(far_host(buf));
     Mouse_ShowCursor();
     Mouse_HideCursor();
     for (int16_t i = 1; i <= 0x2B; i++) {
@@ -451,19 +456,19 @@ void ShipMove_DockingAnimation(int16_t surfaceType)
     Mouse_ShowCursor();
     ShipMove_DrawDockDoorFrame(3);
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0x3480));
+    ShipMove_BlitViewport(buf_at(buf, 0x3480));
     Gfx_WaitVRetrace();
     ShipMove_DrawDockDoorFrame(2);
-    ShipMove_BlitViewport(far_add(buf, 0x3340));
+    ShipMove_BlitViewport(buf_at(buf, 0x3340));
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0x3480));
+    ShipMove_BlitViewport(buf_at(buf, 0x3480));
     Gfx_WaitVRetrace();
     ShipMove_DrawDockDoorFrame(1);
-    ShipMove_BlitViewport(far_add(buf, 0x35C0));
+    ShipMove_BlitViewport(buf_at(buf, 0x35C0));
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0x3480));
+    ShipMove_BlitViewport(buf_at(buf, 0x3480));
     Gfx_WaitVRetrace();
-    ShipMove_BlitViewport(far_add(buf, 0x35C0));
+    ShipMove_BlitViewport(buf_at(buf, 0x35C0));
     System_FreeMem(buf, 0xBCC0);
 }
 
@@ -499,10 +504,10 @@ const ShipMoveRun ShipMove_ViewRuns[] = {
 const int ShipMove_ViewRunCount = (int)(sizeof ShipMove_ViewRuns / sizeof ShipMove_ViewRuns[0]);
 
 // 22ca:132c
-void ShipMove_BlitViewport(FarPtr src)
+void ShipMove_BlitViewport(const uint8_t *src)
 {
-    const uint8_t *s = far_host(src);
-    uint8_t *d = (uint8_t *)far_host(far_ptr(ds.Gfx_ScreenSeg, 0x3D40));
+    const uint8_t *s = src;
+    uint8_t *d = gfx_screen() + 0x3D40;
     for (int i = 0; i < ShipMove_ViewRunCount; i++)
         memcpy(d + ShipMove_ViewRuns[i].offset, s + ShipMove_ViewRuns[i].offset,
                ShipMove_ViewRuns[i].length);
@@ -511,15 +516,15 @@ void ShipMove_BlitViewport(FarPtr src)
 // 22ca:1d78
 void ShipMove_DrawButtonAnimFrame(int16_t frame)
 {
-    Blit_CopyRect(far_add(ds.ShipMove_AnimSheet, (frame - 1) * 0x16 + 0x2801),
-                  far_ptr(ds.Gfx_ScreenSeg, 0xC9D7), 0x15, 0x27);
+    Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, (frame - 1) * 0x16 + 0x2801),
+                  gfx_screen() + 0xC9D7, 0x15, 0x27);
 }
 
 // 22ca:1db0
 void ShipMove_DrawDockDoorFrame(int16_t frame)
 {
-    Blit_CopyRect(far_add(ds.ShipMove_AnimSheet, (frame - 1) * 0x30 + 0x5B41),
-                  far_ptr(ds.Gfx_ScreenSeg, 0xC44F), 0x2F, 0x2B);
+    Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, (frame - 1) * 0x30 + 0x5B41),
+                  gfx_screen() + 0xC44F, 0x2F, 0x2B);
 }
 
 // 22ca:1de8: every 6th tick draws a random 24x18 blink sprite
@@ -528,8 +533,8 @@ void ShipMove_AnimateBlinkLight(void)
     BlinkCounter = (BlinkCounter + 1) % 6;
     if (BlinkCounter == 0) {
         uint16_t r = System_Random(6);
-        Blit_CopyRect(far_add(ds.ShipMove_AnimSheet, r * 0x1A + 0x3A07),
-                      far_ptr(ds.Gfx_ScreenSeg, 0xE589), 0x18, 0x12);
+        Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, r * 0x1A + 0x3A07),
+                      gfx_screen() + 0xE589, 0x18, 0x12);
     }
 }
 
@@ -537,8 +542,8 @@ void ShipMove_AnimateBlinkLight(void)
 void ShipMove_AnimateSpinner(void)
 {
     SpinnerCounter = (SpinnerCounter + 1) % 0x20;
-    Blit_CopyRect(far_add(ds.ShipMove_AnimSheet, (SpinnerCounter / 8) * 0xB + 0x43D9),
-                  far_ptr(ds.Gfx_ScreenSeg, 0xBD81), 10, 0x10);
+    Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, (SpinnerCounter / 8) * 0xB + 0x43D9),
+                  gfx_screen() + 0xBD81, 10, 0x10);
 }
 
 // 22ca:1e78: toggles one of 6 lights (1 in 2) and redraws all of them
@@ -550,8 +555,8 @@ void ShipMove_AnimateLights(void)
     for (int i = 1; i <= 6; i++) {
         int32_t base = LightOn(i) == 0 ? 0x3619 : 0x2859;
         int32_t rel = LightX(i) + LightY(i) * 0x140;
-        Blit_CopyRect(far_add(ds.ShipMove_AnimSheet, base + rel),
-                      far_ptr(ds.Gfx_ScreenSeg, (uint16_t)(rel + 0x9F89)), LightW(i), LightH(i));
+        Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, base + rel),
+                      gfx_screen() + (uint16_t)(rel + 0x9F89), LightW(i), LightH(i));
     }
 }
 
@@ -569,7 +574,7 @@ void ShipMove_AnimateStarfield(void)
     if (Groups_Selected()->Status <= 3)
         return;
     if (Groups_Selected()->Status != 5)
-        Blit_FillBytes(ds.ShipMove_Backdrop, 0x8980, 0x7F);
+        Blit_FillBytes(far_host(ds.ShipMove_Backdrop), 0x8980, 0x7F);
     Star *stars = (Star *)far_host(ds.ShipMove_Stars);
     for (int i = 0; i <= 0x44C; i++) {
         Star *s = &stars[i];
@@ -587,7 +592,7 @@ void ShipMove_AnimateStarfield(void)
             s->depth = (int16_t)(System_Random(500) + 500);
     }
     Mouse_HideCursor();
-    ShipMove_BlitViewport(ds.ShipMove_Backdrop);
+    ShipMove_BlitViewport(far_host(ds.ShipMove_Backdrop));
     Mouse_ShowCursor();
 }
 
@@ -611,7 +616,7 @@ void ShipMove_InitStarfield(void)
             s->y = (int16_t)(abs16(s->y) + 0x1E);
         }
     }
-    Blit_FillBytes(ds.ShipMove_Backdrop, 0x8980, 0x7F);
+    Blit_FillBytes(far_host(ds.ShipMove_Backdrop), 0x8980, 0x7F);
 }
 
 // 22ca:21ef

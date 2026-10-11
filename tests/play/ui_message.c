@@ -7,6 +7,7 @@
 #include "game/main_program.h"
 #include "game/mem.h"
 #include "game/mouse.h"
+#include "platform/video.h"
 #include "play/play.h"
 #include "play/ui.h"
 
@@ -44,7 +45,7 @@ enum : int {
 
 static const uint8_t *screen(void)
 {
-    return mem + MEM_VIDEO_SEG * 16;
+    return &vid_screen[0][0];
 }
 
 // Glyph g's pixel (r, c) in grafika\charset1 (gfx.c draw_glyph).

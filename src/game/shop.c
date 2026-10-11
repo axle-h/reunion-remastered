@@ -300,8 +300,8 @@ static void show_panel(const PString *name, bool keep_far)
     FarPtr buf = System_GetMem(0x9EC0);
     if (keep_far)
         PANEL_BUF = buf;
-    Gfx_LoadPic(ps(name), buf, 1, 0x7F, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 0x3D40), 0x7E, 0x7E);
+    Gfx_LoadPic(ps(name), far_host(buf), 1, 0x7F, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
+    Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x7E, 0x7E);
     System_FreeMem(buf, 0x9EC0);
 }
 
@@ -325,10 +325,10 @@ static void load_product_picture(bool fade)
     FarPtr buf = System_GetMem(24000);
     System_StrLoad(&name, PSTR("info\\info"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x79, 0, 0, 0x140, fade, Gfx_PalettePtr(), 0, 0x5F, 0x60, 0, 0x96);
+    Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x79, 0, 0, 0x140, fade, Gfx_PalettePtr(), 0, 0x5F, 0x60, 0, 0x96);
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_ptr((uint16_t)(buf >> 16), (uint16_t)((uint16_t)buf + 0x486)),
-                         far_ptr(ds.Gfx_ScreenSeg, 0x4546), 0xB4, 0x73, 0xC0, 0x140);
+    Blit_CopyRectStrided((uint8_t *)far_host(buf) + 0x486, gfx_screen() + 0x4546, 0xB4, 0x73,
+                         0xC0, 0x140);
     Mouse_ShowCursor();
     System_FreeMem(buf, 24000);
     for (int i = 0; i < 6; i++)

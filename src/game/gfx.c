@@ -16,7 +16,7 @@
 #include "game/system.h"
 
 // Not ported yet: see stubs.c.
-void RawText_SetPaletteRange(int16_t first, int16_t last, FarPtr pal);  // 4049:0160
+void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal);  // 4049:0160
 void Sound_SbBreakLoop(void);                                           // 431a:017f
 void GfxPath_FreeToolbarBuffer(void);                                   // 3a1b:09a3
 void Ems_EmsReleaseGameData(void);                                      // 4719:0317
@@ -31,28 +31,20 @@ enum : int32_t { SCANLINES_PER_FRAME = 449 };
 
 // --- helpers -----------------------------------------------------------------
 
-// Byte at p + off, the offset wrapping inside p's segment as on the 8086.
-static inline uint8_t *at(FarPtr p, uint16_t off)
+// Byte at p + off. The original's offsets wrap inside p's segment; with p
+// at the segment's start (video memory, the line routines' buffers) the
+// 16-bit off does the same.
+static inline uint8_t *at(uint8_t *p, uint16_t off)
 {
-    return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + off)));
+    return p + off;
 }
 
-static inline FarPtr ds_ptr(uint16_t off)
-{
-    return far_ptr(MEM_DS_SEG, off);
-}
+// The temporary palette the original kept on its stack.
+static uint8_t temp_palette[0x300];
 
-// Locals that the original kept on its stack and passed on by far pointer
-// (temporary palettes) live in the emulated stack segment, which nothing
-// else in the port uses.
-static inline FarPtr stack_temp(void)
+uint8_t *Gfx_PalettePtr(void)
 {
-    return far_ptr(MEM_SS_SEG, 0x0A00);
-}
-
-FarPtr Gfx_PalettePtr(void)
-{
-    return ds_ptr(offsetof(DSeg, Gfx_Palette));
+    return (uint8_t *)&ds.Gfx_Palette;
 }
 
 // Pascal string helpers (length byte + chars, at most 255).
@@ -148,7 +140,7 @@ static void file_reset(DosFile *f, const uint8_t *name)
         io_res = 2;  // file not found
 }
 
-static void file_block_read(DosFile *f, FarPtr dst, uint16_t count)
+static void file_block_read(DosFile *f, uint8_t *dst, uint16_t count)
 {
     if (io_res != 0)
         return;
@@ -160,8 +152,7 @@ static void file_block_read(DosFile *f, FarPtr dst, uint16_t count)
         io_res = 100;  // disk read error (short read with a nil result pointer)
         return;
     }
-    for (uint16_t i = 0; i < count; i++)
-        *at(dst, i) = f->data[f->pos + i];
+    SDL_memcpy(dst, f->data + f->pos, count);
     f->pos += count;
 }
 
@@ -197,7 +188,7 @@ static void cannot_open(const uint8_t *msg)
 // --- palette -------------------------------------------------------------------
 
 // 405f:002f
-void Gfx_GetPalette(FarPtr pal)
+void Gfx_GetPalette(uint8_t *pal)
 {
     for (uint16_t i = 0; i <= 0xFF; i++) {
         for (uint16_t c = 0; c < 3; c++)
@@ -206,19 +197,19 @@ void Gfx_GetPalette(FarPtr pal)
 }
 
 // 405f:0074
-void Gfx_SetPalette(FarPtr pal)
+void Gfx_SetPalette(uint8_t *pal)
 {
     RawText_SetPaletteRange(0, 0xFF, pal);
 }
 
 // 405f:0089
-void Gfx_FadeIn(int16_t first, int16_t last, FarPtr pal)
+void Gfx_FadeIn(int16_t first, int16_t last, uint8_t *pal)
 {
     Gfx_FadeInSteps(first, last, pal, 5);
 }
 
 // 405f:00a2
-void Gfx_FadeOut(int16_t first, int16_t last, FarPtr pal)
+void Gfx_FadeOut(int16_t first, int16_t last, uint8_t *pal)
 {
     Gfx_FadeOutSteps(first, last, pal, 5);
 }
@@ -245,9 +236,9 @@ static uint8_t fade_value(FadeKind kind, uint8_t v, int16_t s, int16_t steps)
     return 0;
 }
 
-static void fade_steps(FadeKind kind, int16_t first, int16_t last, FarPtr pal, int16_t steps)
+static void fade_steps(FadeKind kind, int16_t first, int16_t last, uint8_t *pal, int16_t steps)
 {
-    FarPtr tmp = stack_temp();
+    uint8_t *tmp = temp_palette;
     Gfx_GetPalette(tmp);
     if (steps < 0)
         return;
@@ -270,34 +261,34 @@ static void fade_steps(FadeKind kind, int16_t first, int16_t last, FarPtr pal, i
 }
 
 // 405f:00bb: ends with the whole of pal in the DAC.
-void Gfx_FadeInSteps(int16_t first, int16_t last, FarPtr pal, int16_t steps)
+void Gfx_FadeInSteps(int16_t first, int16_t last, uint8_t *pal, int16_t steps)
 {
     fade_steps(FADE_IN, first, last, pal, steps);
     Gfx_SetPalette(pal);
 }
 
 // 405f:01c2
-void Gfx_FadeOutSteps(int16_t first, int16_t last, FarPtr pal, int16_t steps)
+void Gfx_FadeOutSteps(int16_t first, int16_t last, uint8_t *pal, int16_t steps)
 {
     fade_steps(FADE_OUT, first, last, pal, steps);
 }
 
 // 405f:02d5
-void Gfx_FadeFromWhite(int16_t first, int16_t last, FarPtr pal, int16_t steps)
+void Gfx_FadeFromWhite(int16_t first, int16_t last, uint8_t *pal, int16_t steps)
 {
     fade_steps(FROM_WHITE, first, last, pal, steps);
 }
 
 // 405f:03fd
-void Gfx_FadeToWhite(int16_t first, int16_t last, FarPtr pal, int16_t steps)
+void Gfx_FadeToWhite(int16_t first, int16_t last, uint8_t *pal, int16_t steps)
 {
     fade_steps(TO_WHITE, first, last, pal, steps);
 }
 
 // 405f:053a
-void Gfx_WhitenPalette(int16_t first, int16_t last, int16_t level, FarPtr pal)
+void Gfx_WhitenPalette(int16_t first, int16_t last, int16_t level, uint8_t *pal)
 {
-    FarPtr tmp = stack_temp();
+    uint8_t *tmp = temp_palette;
     Gfx_GetPalette(tmp);
     if (first <= last) {
         for (int16_t i = first;; i++) {
@@ -313,7 +304,7 @@ void Gfx_WhitenPalette(int16_t first, int16_t last, int16_t level, FarPtr pal)
 }
 
 // 405f:0638
-void Gfx_BlankPalette(FarPtr pal, int16_t first, int16_t last)
+void Gfx_BlankPalette(uint8_t *pal, int16_t first, int16_t last)
 {
     if (first <= last) {
         for (int16_t i = first;; i++) {
@@ -412,7 +403,7 @@ void Gfx_LoadFile(const uint8_t *name, FarPtr *buf, uint16_t *size)
     // FileSize is a longint; only its low word is kept.
     *size = (uint16_t)f.size;
     *buf = System_GetMem(*size);
-    file_block_read(&f, *buf, *size);
+    file_block_read(&f, far_host(*buf), *size);
     check_io();
     file_close(&f);
     check_io();
@@ -456,8 +447,7 @@ void Gfx_IconAllReadChunk(const FarPtr *buf, uint16_t *len)
     *len = (uint16_t)(word[0] | word[1] << 8);
     uint16_t ofs = ds.Gfx_ReadPos;
     ds.Gfx_ReadPos = (uint16_t)(ds.Gfx_ReadPos + *len);
-    file_block_read(&data_file, far_ptr((uint16_t)(*buf >> 16), (uint16_t)((uint16_t)*buf + ofs)),
-                    *len);
+    file_block_read(&data_file, (uint8_t *)far_host(*buf) + ofs, *len);
     check_io();
 }
 
@@ -509,7 +499,7 @@ void Gfx_ReadChunk(FarPtr *buf, uint16_t *size)
         *buf = 0;
     } else {
         *buf = System_GetMem(*size);
-        file_block_read(&data_file, *buf, *size);
+        file_block_read(&data_file, far_host(*buf), *size);
         check_io();
     }
     track_min_mem();
@@ -535,8 +525,8 @@ enum : uint16_t { LOADPIC_FADE_STEPS_PER_RETRACE = 8 };
 // (the stream stays linear), and the palette index colourOffset + i is not
 // clipped. The inline-asm prologue (0c97..0cd8, which the decompile drops)
 // shifts the fade range by colourOffset and clips rows to the header height.
-void Gfx_LoadPic(const uint8_t *name, FarPtr dest, uint16_t unused, uint16_t rows, uint16_t x,
-                 uint16_t y, uint16_t stride, bool fade, FarPtr pal, uint16_t firstColour,
+void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
+                 uint16_t y, uint16_t stride, bool fade, uint8_t *pal, uint16_t firstColour,
                  uint16_t lastColour, uint16_t colourOffset, uint16_t fadeFirst, uint16_t fadeLast)
 {
     (void)unused;
@@ -545,9 +535,10 @@ void Gfx_LoadPic(const uint8_t *name, FarPtr dest, uint16_t unused, uint16_t row
     Sound_FreeSampleIfIdle();
     pstr_copy(path, nm);
     pstr_cat_c(path, ".pic");
-    FarPtr buf;
+    FarPtr buf_ptr;
     uint16_t size;
-    Gfx_LoadFile(path, &buf, &size);
+    Gfx_LoadFile(path, &buf_ptr, &size);
+    uint8_t *buf = far_host(buf_ptr);
 
     uint16_t width = (uint16_t)(*at(buf, 8) | *at(buf, 9) << 8);
     uint16_t height = (uint16_t)(*at(buf, 10) | *at(buf, 11) << 8);
@@ -564,7 +555,7 @@ void Gfx_LoadPic(const uint8_t *name, FarPtr dest, uint16_t unused, uint16_t row
     uint16_t src = 12;
     uint16_t dst = (uint16_t)(y * stride + x);
     uint8_t add = (uint8_t)colourOffset;
-    FarPtr tmp = stack_temp();
+    uint8_t *tmp = temp_palette;
 
     uint16_t col = 1, row = 1;
     do {
@@ -614,12 +605,12 @@ void Gfx_LoadPic(const uint8_t *name, FarPtr dest, uint16_t unused, uint16_t row
         }
     }
     track_min_mem();
-    System_FreeMem(buf, size);
+    System_FreeMem(buf_ptr, size);
     Sound_FreeSampleIfIdle();
 }
 
 // 405f:0f23
-void Gfx_LoadPicScreen(const uint8_t *name, FarPtr dest, uint16_t rows, FarPtr pal)
+void Gfx_LoadPicScreen(const uint8_t *name, uint8_t *dest, uint16_t rows, uint8_t *pal)
 {
     uint8_t nm[256];
     pstr_copy(nm, name);
@@ -633,8 +624,8 @@ void Gfx_ShowGrafikaPic(const uint8_t *name)
     FarPtr buf = System_GetMem(0xBCC0);
     pstr_from_c(path, "grafika\\");
     pstr_cat(path, name);
-    Gfx_LoadPicScreen(path, buf, 151, Gfx_PalettePtr());
-    Blit_CopyRect(buf, far_ptr(ds.Gfx_ScreenSeg, 49 * 320), 320, 151);
+    Gfx_LoadPicScreen(path, far_host(buf), 151, Gfx_PalettePtr());
+    Blit_CopyRect(far_host(buf), gfx_screen() + 49 * 320, 320, 151);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
     System_FreeMem(buf, 0xBCC0);
 }
@@ -645,7 +636,7 @@ void Gfx_ShowGrafikaPic(const uint8_t *name)
 // polarity) has no equivalent; the BIOS default palette is not loaded.
 void Gfx_SetVideoMode13(void)
 {
-    SDL_memset(far_host(far_ptr(MEM_VIDEO_SEG, 0)), 0, 0x10000);
+    SDL_memset(gfx_screen(), 0, 0x10000);
 }
 
 // 405f:103d: INT 10h mode 3. The window stays; text output goes to stdout.
@@ -667,12 +658,12 @@ static bool text_under_cursor(int16_t x, int16_t y, int16_t width)
 // Draws glyph g (cell in the 20-per-row charset sheet) at screen offset ofs.
 static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *screen = gfx_screen();
     uint16_t src = (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
     for (uint16_t r = 0; r < 8; r++) {
         for (uint16_t c = 0; c < 6; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);
-            *at(screen, (uint16_t)(ofs + o)) = (uint8_t)(*at(ds.Gfx_Charset, (uint16_t)(src + o)) + colour);
+            *at(screen, (uint16_t)(ofs + o)) = (uint8_t)(*at(far_host(ds.Gfx_Charset), (uint16_t)(src + o)) + colour);
         }
     }
 }
@@ -798,13 +789,13 @@ void Gfx_FlashCredits(void)
 // byte, so a character missing from the charset gives glyph 255.
 static void type_glyph(int16_t x, int16_t y, uint16_t cell, uint8_t g, uint8_t colour)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *screen = gfx_screen();
     uint16_t base = (uint16_t)(y * 320 + x + (cell - 1) * 6);
     uint16_t src = (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
     for (uint16_t r = 0; r <= 7; r++) {
         for (uint16_t c = 0; c <= 5; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);
-            *at(screen, (uint16_t)(base + o)) = (uint8_t)(colour + *at(ds.Gfx_Charset, (uint16_t)(src + o)));
+            *at(screen, (uint16_t)(base + o)) = (uint8_t)(colour + *at(far_host(ds.Gfx_Charset), (uint16_t)(src + o)));
         }
     }
 }
@@ -868,7 +859,7 @@ void Gfx_TypeTextFC(const uint8_t *s, int16_t x, int16_t y, int16_t width)
 // 405f:1808: rep stosb, so x2 < x1 draws a (very long) wrapped line.
 void Gfx_HLine(int16_t x1, int16_t x2, int16_t y, uint8_t colour)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *screen = gfx_screen();
     uint16_t d = (uint16_t)((y - 1) * 320 + x1 - 1);
     for (uint16_t n = (uint16_t)(x2 - x1 + 1); n != 0; n--)
         *at(screen, d++) = colour;
@@ -877,7 +868,7 @@ void Gfx_HLine(int16_t x1, int16_t x2, int16_t y, uint8_t colour)
 // 405f:1836
 void Gfx_VLine(int16_t x, int16_t y1, int16_t y2, uint8_t colour)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *screen = gfx_screen();
     uint16_t d = (uint16_t)((y1 - 1) * 320 + x - 1);
     uint16_t n = (uint16_t)(y2 - y1 + 1);
     do {
@@ -901,7 +892,7 @@ void Gfx_DrawRectOutline(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t
 // 405f:18be
 void Gfx_DrawDitherRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t colour)
 {
-    FarPtr screen = far_ptr(ds.Gfx_ScreenSeg, 0);
+    uint8_t *screen = gfx_screen();
     Mouse_HideCursor();
     if ((uint16_t)x1 <= (uint16_t)x2) {
         for (uint16_t x = (uint16_t)x1;; x++) {
@@ -929,11 +920,9 @@ static uint16_t line_offset(int16_t x, int16_t y)
 
 // The Bresenham loop shared by DrawLine and DrawLineCopy: either colour, or
 // (copy) the source segment's pixel at the same offset.
-static void line(uint16_t destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
-                 uint16_t stride, bool copy, uint8_t colour, uint16_t srcSeg)
+static void line(uint8_t *dest, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+                 uint16_t stride, bool copy, uint8_t colour, uint8_t *src)
 {
-    FarPtr dest = far_ptr(destSeg, 0);
-    FarPtr src = far_ptr(srcSeg, 0);
 #define PUT(o) (*at(dest, (o)) = copy ? *at(src, (o)) : colour)
 
     uint16_t si = stride;
@@ -1019,14 +1008,14 @@ static void line(uint16_t destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y
 }
 
 // 405f:1c82
-void Gfx_DrawLine(uint16_t seg, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t colour)
+void Gfx_DrawLine(uint8_t *seg, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t colour)
 {
-    line(seg, x1, y1, x2, y2, (uint16_t)ds.Gfx_LineStride, false, colour, 0);
+    line(seg, x1, y1, x2, y2, (uint16_t)ds.Gfx_LineStride, false, colour, nullptr);
 }
 
 // 405f:1d7c
-void Gfx_DrawLineCopy(uint16_t destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
-                      uint16_t srcSeg)
+void Gfx_DrawLineCopy(uint8_t *destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+                      uint8_t *srcSeg)
 {
     line(destSeg, x1, y1, x2, y2, (uint16_t)ds.Gfx_LineStrideCopy, true, 0, srcSeg);
 }

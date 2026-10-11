@@ -42,10 +42,14 @@
 enum { GRID_STRIDE = 11, GRID_ORG = 0xC, BASE_SLOT = 21 };
 
 static FarPtr fp_add(FarPtr p, uint16_t add) { return far_ptr(p >> 16, (uint16_t)(p + add)); }
-static FarPtr screen_at(uint16_t ofs) { return far_ptr(ds.Gfx_ScreenSeg, ofs); }
+static uint8_t *host_add(FarPtr p, uint16_t add) { return (uint8_t *)far_host(p) + add; }
+static uint8_t *screen_at(uint16_t ofs) { return gfx_screen() + ofs; }
 // The original addresses the off-screen field as RENDER_BUF's segment with its
 // own offsets, dropping the pointer's offset (GetMem's 0 or 8).
-static FarPtr render_at(uint16_t ofs) { return far_ptr(RENDER_BUF >> 16, ofs); }
+static uint8_t *render_at(uint16_t ofs)
+{
+    return (uint8_t *)far_host(far_ptr(RENDER_BUF >> 16, 0)) + ofs;
+}
 static const uint8_t *lit(const PString *s) { return (const uint8_t *)s; }
 
 static uint8_t *grid(void) { return (uint8_t *)far_host(ds.GrWar_BattleGrids); }
@@ -116,19 +120,19 @@ void GrWar_EnterGroundBattle(void)
     UNIT_ICONS = System_GetMem(0x3C00);
     EFFECT_ICONS = System_GetMem(0x2800);
     FarPtr side_pic = System_GetMem(0x3200);
-    Gfx_LoadPic(lit(PSTR("war\\grwar")), side_pic, 1, 200, 0, 0, 0x40, true, Gfx_PalettePtr(), 0,
-                0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(lit(PSTR("war\\grwar")), far_host(side_pic), 1, 200, 0, 0, 0x40, true,
+                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     const TBody *body = (const TBody *)far_host(ds.Game_CurBody);
     System_StrLong((int8_t)body->SurfaceType, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("war\\grf"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(lit(&name), BACKGROUND, 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0,
-                0, 0x3F);
-    Blit_CopyRectStrided(side_pic, BACKGROUND, 0x40, 200, 0x40, 0x140);
-    Blit_CopyRect(fp_add(BACKGROUND, 0x3D40), screen_at(0x3D40), 0x140, 0x97);
-    Gfx_LoadPic(lit(PSTR("war\\gricon")), UNIT_ICONS, 1, 0x30, 0, 0, 0x140, false, Gfx_PalettePtr(),
-                0, 0x6F, 0x40, 0, 0x6F);
-    Gfx_LoadPic(lit(PSTR("war\\gricon2")), EFFECT_ICONS, 1, 0x20, 0, 0, 0x140, false,
+    Gfx_LoadPic(lit(&name), far_host(BACKGROUND), 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0,
+                0x3F, 0xB0, 0, 0x3F);
+    Blit_CopyRectStrided(far_host(side_pic), far_host(BACKGROUND), 0x40, 200, 0x40, 0x140);
+    Blit_CopyRect(host_add(BACKGROUND, 0x3D40), screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPic(lit(PSTR("war\\gricon")), far_host(UNIT_ICONS), 1, 0x30, 0, 0, 0x140, false,
+                Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
+    Gfx_LoadPic(lit(PSTR("war\\gricon2")), far_host(EFFECT_ICONS), 1, 0x20, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
     GrWar_BattleRound();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -324,8 +328,9 @@ void GrWar_DrawSelectedUnitInfo(void)
 // 1537:08a4: 16x16 sprite of the gricon sheet into the off-screen field.
 void GrWar_DrawUnitSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, int16_t mode)
 {
-    FarPtr src = fp_add(UNIT_ICONS, (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10));
-    FarPtr dst = render_at((uint16_t)(x + 0x10 + y * 0x140));
+    const uint8_t *src =
+        host_add(UNIT_ICONS, (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10));
+    uint8_t *dst = render_at((uint16_t)(x + 0x10 + y * 0x140));
     switch (mode) {
     case 1: Blit_BlitTransparent(src, dst, 0x10, 0x10, 0x40); break;
     case 2: Blit_BlitTransposed(src, dst, 0x10, 0x40); break;
@@ -338,7 +343,7 @@ void GrWar_DrawUnitSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, in
 // 1537:0961
 void GrWar_DrawEffectSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, int16_t variant)
 {
-    FarPtr src = fp_add(EFFECT_ICONS,
+    const uint8_t *src = host_add(EFFECT_ICONS,
                         (uint16_t)((sheet - 1) * 0x1400 + (frame - 1) * 0x10 + (variant - 1) * 0x1400));
     Blit_BlitTransparent(src, render_at((uint16_t)(x + 0x10 + y * 0x140)), 0x10, 0x10, 0x40);
 }
@@ -346,7 +351,7 @@ void GrWar_DrawEffectSprite(int16_t frame, int16_t sheet, int16_t x, int16_t y, 
 // 1537:09c2: 11x10 projectile sprite (kind 0..15) below the effect sheets.
 void GrWar_DrawProjectile(int16_t x, int16_t y, int16_t kind)
 {
-    FarPtr src = fp_add(EFFECT_ICONS, (uint16_t)(0x1400 + kind * 11 + 1));
+    const uint8_t *src = host_add(EFFECT_ICONS, (uint16_t)(0x1400 + kind * 11 + 1));
     Blit_BlitTransparent(src, render_at((uint16_t)(x + 0x10 + y * 0x140)), 0xB, 10, 0x40);
 }
 
@@ -378,11 +383,11 @@ void GrWar_DrawSelectionMarkers(void)
 void GrWar_DrawBaseSprites(void)
 {
     if (BASE_STYLE == 0) {
-        Blit_CopyRect(fp_add(BACKGROUND, 0x40), render_at(0x5410), 0x20, 0x20);
-        Blit_BlitTransparent(fp_add(BACKGROUND, 0x29C4), render_at(0x5500), 0x10, 0x10, 0xB0);
+        Blit_CopyRect(host_add(BACKGROUND, 0x40), render_at(0x5410), 0x20, 0x20);
+        Blit_BlitTransparent(host_add(BACKGROUND, 0x29C4), render_at(0x5500), 0x10, 0x10, 0xB0);
     } else {
-        Blit_BlitTransparent(fp_add(BACKGROUND, 0x2980), render_at(0x5410), 0x10, 0x10, 0xB0);
-        Blit_BlitTransparent(fp_add(BACKGROUND, 0xC0), render_at(0x54F0), 0x20, 0x20, 0xB0);
+        Blit_BlitTransparent(host_add(BACKGROUND, 0x2980), render_at(0x5410), 0x10, 0x10, 0xB0);
+        Blit_BlitTransparent(host_add(BACKGROUND, 0xC0), render_at(0x54F0), 0x20, 0x20, 0xB0);
     }
     uint8_t *g = grid();
     g[0x10] = 0x15;
@@ -419,7 +424,7 @@ void GrWar_RenderBattle(void)
 {
     GrWar_DrawSelectedUnitInfo();
     RENDER_BUF = System_GetMem(0xBCD0);
-    Blit_CopyRect(fp_add(BACKGROUND, 0x3D80), render_at(0x50), 0x100, 0x97);
+    Blit_CopyRect(host_add(BACKGROUND, 0x3D80), render_at(0x50), 0x100, 0x97);
     GrWar_DrawBaseSprites();
 
     for (int s = 1; s <= 2; s++) {
@@ -1069,13 +1074,14 @@ void GrWar_EndGroundBattle(void)
     FarPtr pic = System_GetMem(0xBCC0);
     System_StrLoad(&tmp, PSTR("war\\"));
     System_StrConcat(&tmp, &num);
-    Gfx_LoadPic(lit(&tmp), pic, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(pic, screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPic(lit(&tmp), far_host(pic), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0,
+                0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(pic), screen_at(0x3D40), 0x140, 0x97);
     System_FreeMem(pic, 0xBCC0);
     LOST_FRAMES = System_GetMem(0x2860);
     if (ds.GrWar_PlayerWon == false)
-        Gfx_LoadPic(lit(PSTR("war\\granim")), LOST_FRAMES, 1, 0x44, 0, 0, 0x98, false, Gfx_PalettePtr(),
-                    0, 0xB0, 0x40, 0, 0xBE);
+        Gfx_LoadPic(lit(PSTR("war\\granim")), far_host(LOST_FRAMES), 1, 0x44, 0, 0, 0x98, false,
+                    Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     LOST_FRAME = 1;
     LOST_TICK = 0;
     GrWar_AnimateResultScreen();
@@ -1098,8 +1104,8 @@ void GrWar_AnimateResultScreen(void)
         LOST_TICK = (int16_t)(LOST_TICK % 13 + 1);
         if (LOST_TICK == 1) {
             Mouse_HideCursor();
-            Blit_CopyRectStrided(fp_add(LOST_FRAMES, (uint16_t)((LOST_FRAME - 1) * 0x33)), screen_at(0x3F6B),
-                                 0x32, 0x3D, 0x98, 0x140);
+            Blit_CopyRectStrided(host_add(LOST_FRAMES, (uint16_t)((LOST_FRAME - 1) * 0x33)),
+                                 screen_at(0x3F6B), 0x32, 0x3D, 0x98, 0x140);
             Mouse_ShowCursor();
             LOST_FRAME = (int16_t)(LOST_FRAME % 3 + 1);
         }

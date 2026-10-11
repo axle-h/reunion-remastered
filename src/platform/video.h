@@ -11,8 +11,8 @@ enum : int {
     VID_HEIGHT = 200,
 };
 
-// The 320x200 framebuffer (video memory at A000:0000). Points at an internal
-// buffer until the game redirects it into its emulated address space.
+// The 320x200 framebuffer: the first 64,000 bytes of the 64 KB of video
+// memory (segment A000h) it points to.
 extern uint8_t (*vid_screen)[VID_WIDTH];
 
 // VGA DAC palette, 6 bits per component (0..63), as written to port 3C9h.

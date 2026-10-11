@@ -1,38 +1,51 @@
 // Unit Gfx (405f): VGA palette and fades, retrace waits, file and .PIC
 // loading, ICON.ALL access, 6x8 text, lines, and the fatal-error exit.
 //
-// Untyped Pascal pointers (palettes, buffers) are far pointers into the
-// emulated address space; Pascal strings are host pointers to a length byte
-// followed by the characters; `var` parameters are host pointers.
+// Untyped Pascal pointers (palettes, buffers), Pascal strings (a length
+// byte followed by the characters) and `var` parameters are host pointers;
+// heap blocks the unit allocates are still far pointers (game/mem.h).
 #pragma once
 
 #include <stdint.h>
 
-#include "game/mem.h"
+#include "game/dseg.h"
+#include "platform/video.h"
+
+// The drawing target: video memory, 64 KB as the VGA's segment A000h, of
+// which rows 0..199 (64,000 bytes) are shown.
+static inline uint8_t *gfx_screen(void)
+{
+    return &vid_screen[0][0];
+}
+
+static inline bool gfx_on_screen(const uint8_t *p)
+{
+    return p >= gfx_screen() && p < gfx_screen() + 0x10000;
+}
 
 // Every vertical-retrace wait in Gfx and Blit goes through this; it is
 // timing_wait_retrace by default. Tests replace it to run without a window.
 extern bool (*gfx_wait_retrace)(void);
 
-// Far pointer to ds.Gfx_Palette (what the game passes as @Gfx::Palette).
-FarPtr Gfx_PalettePtr(void);
+// ds.Gfx_Palette (what the game passes as @Gfx::Palette).
+uint8_t *Gfx_PalettePtr(void);
 
 // 405f:002f: reads the 256 DAC entries into pal.
-void Gfx_GetPalette(FarPtr pal);
+void Gfx_GetPalette(uint8_t *pal);
 // 405f:0074
-void Gfx_SetPalette(FarPtr pal);
+void Gfx_SetPalette(uint8_t *pal);
 // 405f:0089 / 00a2: 5-step fades of first..last from black to pal / pal to black.
-void Gfx_FadeIn(int16_t first, int16_t last, FarPtr pal);
-void Gfx_FadeOut(int16_t first, int16_t last, FarPtr pal);
+void Gfx_FadeIn(int16_t first, int16_t last, uint8_t *pal);
+void Gfx_FadeOut(int16_t first, int16_t last, uint8_t *pal);
 // 405f:00bb / 01c2 / 02d5 / 03fd: steps + 1 DAC writes, one retrace before each.
-void Gfx_FadeInSteps(int16_t first, int16_t last, FarPtr pal, int16_t steps);
-void Gfx_FadeOutSteps(int16_t first, int16_t last, FarPtr pal, int16_t steps);
-void Gfx_FadeFromWhite(int16_t first, int16_t last, FarPtr pal, int16_t steps);
-void Gfx_FadeToWhite(int16_t first, int16_t last, FarPtr pal, int16_t steps);
+void Gfx_FadeInSteps(int16_t first, int16_t last, uint8_t *pal, int16_t steps);
+void Gfx_FadeOutSteps(int16_t first, int16_t last, uint8_t *pal, int16_t steps);
+void Gfx_FadeFromWhite(int16_t first, int16_t last, uint8_t *pal, int16_t steps);
+void Gfx_FadeToWhite(int16_t first, int16_t last, uint8_t *pal, int16_t steps);
 // 405f:053a: level 15 = pal, 0 = white; no wait.
-void Gfx_WhitenPalette(int16_t first, int16_t last, int16_t level, FarPtr pal);
+void Gfx_WhitenPalette(int16_t first, int16_t last, int16_t level, uint8_t *pal);
 // 405f:0638: zeroes pal[first..last] and writes it to the DAC.
-void Gfx_BlankPalette(FarPtr pal, int16_t first, int16_t last);
+void Gfx_BlankPalette(uint8_t *pal, int16_t first, int16_t last);
 
 // 405f:068d: waits n scanlines (accumulated into whole retraces here).
 void Gfx_WaitScanlines(int32_t n);
@@ -65,12 +78,12 @@ void Gfx_CloseDataFile(void);
 // fadeFirst..colourOffset + fadeLast] fades to black in the DAC while
 // decoding. Afterwards file colours firstColour..lastColour go to
 // pal[colourOffset + i] (not written to the DAC).
-void Gfx_LoadPic(const uint8_t *name, FarPtr dest, uint16_t unused, uint16_t rows, uint16_t x,
-                 uint16_t y, uint16_t stride, bool fade, FarPtr pal, uint16_t firstColour,
+void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
+                 uint16_t y, uint16_t stride, bool fade, uint8_t *pal, uint16_t firstColour,
                  uint16_t lastColour, uint16_t colourOffset, uint16_t fadeFirst, uint16_t fadeLast);
 // 405f:0f23: the game's usual options: stride 320, colours 0..B0h at +40h,
 // fading picture colours 0..BEh (DAC 40h..FEh).
-void Gfx_LoadPicScreen(const uint8_t *name, FarPtr dest, uint16_t rows, FarPtr pal);
+void Gfx_LoadPicScreen(const uint8_t *name, uint8_t *dest, uint16_t rows, uint8_t *pal);
 // 405f:0f7a: grafika\<name> (320x151) to screen row 49, then fades it in.
 void Gfx_ShowGrafikaPic(const uint8_t *name);
 
@@ -115,10 +128,11 @@ void Gfx_OutOfMemoryExit(void);
 void Gfx_ExitHandler(void);
 // 405f:1c21: one frame of the red colour-0 alert flash.
 void Gfx_PaletteFlashTick(void);
-// 405f:1c82: Bresenham line in segment seg (stride Gfx_LineStride).
-void Gfx_DrawLine(uint16_t seg, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t colour);
+// 405f:1c82: Bresenham line in the segment starting at seg (stride
+// Gfx_LineStride; 16-bit offsets from seg, as in the original).
+void Gfx_DrawLine(uint8_t *seg, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t colour);
 // 405f:1d7c: the same line, copying pixels from srcSeg into destSeg.
-void Gfx_DrawLineCopy(uint16_t destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
-                      uint16_t srcSeg);
+void Gfx_DrawLineCopy(uint8_t *destSeg, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+                      uint8_t *srcSeg);
 // 405f:1e78
 void Gfx_Init(void);

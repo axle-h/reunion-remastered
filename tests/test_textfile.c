@@ -48,8 +48,6 @@ static void reset(void)
     CHECK(dseg_init());
     system_init();
     Ems_Init();
-    ds.System_SegA000 = 0xA000;
-    ds.Gfx_ScreenSeg = 0xA000;
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Mouse_CursorState = 1;

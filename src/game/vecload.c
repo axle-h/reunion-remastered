@@ -4,6 +4,7 @@
 
 #include "game/blit.h"
 #include "game/dseg.h"
+#include "game/gfx.h"
 #include "game/minmax.h"
 #include "game/rawtext.h"
 #include "game/system.h"
@@ -51,9 +52,16 @@ static inline FarPtr *fp(uint16_t off)
     return (FarPtr *)ds_at(off);
 }
 
-static inline uint16_t buffer_seg(void)
+// Host pointer of a far pointer field.
+static inline uint8_t *hp(uint16_t off)
 {
-    return (uint16_t)(*fp(BUFFER) >> 16);
+    return far_host(*fp(off));
+}
+
+// The start of the off-screen buffer's segment.
+static inline uint8_t *buffer_base(void)
+{
+    return far_host(far_ptr((uint16_t)(*fp(BUFFER) >> 16), 0));
 }
 
 static inline uint8_t model_byte(uint16_t table, int16_t n)
@@ -182,12 +190,12 @@ void VecLoad_DrawObject(int16_t slot)
     *w(VEC3D_SLOT) = (uint16_t)slot;
     uint16_t s2 = (uint16_t)(slot * 2), s4 = (uint16_t)(slot * 4);
     int16_t mode = model_byte(MODE_TABLE, (int16_t)*w(VEC3D_MODEL));
-    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), *fp((uint16_t)(VERTS + s4)),
-                  *fp(PROJECTED), (int16_t)*w(SCALE), (int16_t)*w((uint16_t)(VERT_COUNT + s2)),
+    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), hp((uint16_t)(VERTS + s4)),
+                  hp(PROJECTED), (int16_t)*w(SCALE), (int16_t)*w((uint16_t)(VERT_COUNT + s2)),
                   mode);
-    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), *fp((uint16_t)(NORMALS + s4)),
-                  *fp(NORMALS), 0x40, (int16_t)*w((uint16_t)(FACE_COUNT + s2)), mode);
-    Vec3D_DrawFaces(buffer_seg(), *fp(PROJECTED), *fp((uint16_t)(FACES + s4)), *fp(NORMALS),
+    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), hp((uint16_t)(NORMALS + s4)),
+                  hp(NORMALS), 0x40, (int16_t)*w((uint16_t)(FACE_COUNT + s2)), mode);
+    Vec3D_DrawFaces(buffer_base(), hp(PROJECTED), hp((uint16_t)(FACES + s4)), hp(NORMALS),
                     (uint8_t)*w((uint16_t)(FACE_COUNT + s2)));
 }
 
@@ -231,16 +239,15 @@ void VecLoad_DrawFrame(void)
     *w(SCALE) += 1;
     if ((int16_t)*w(SCALE) > (int16_t)*w(ZOOM))
         *w(SCALE) = *w(ZOOM);
-    Blit_CopyRect(far_ptr(buffer_seg(), WINDOW), far_ptr(ds.Gfx_ScreenSeg, WINDOW_SCREEN), 0x72,
-                  0x73);
-    Blit_FillRectAt(far_ptr(buffer_seg(), WINDOW), 0x72, 0x73, 0x40);
+    Blit_CopyRect(buffer_base() + WINDOW, gfx_screen() + WINDOW_SCREEN, 0x72, 0x73);
+    Blit_FillRectAt(buffer_base() + WINDOW, 0x72, 0x73, 0x40);
     for (int16_t i = 1; i <= 17; i++)
         for (int j = 0; j < 3; j++)
             *(int16_t *)ds_at((uint16_t)(0x85E8 + i * 6 + j * 2)) = -999;
 
     int16_t model = (int16_t)*w(VEC3D_MODEL);
-    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), ds_ptr(VEC3D_CENTROIDS + 6),
-                  ds_ptr(PROJ_CENTROIDS), 0x40, (int16_t)*w(OBJECT_COUNT),
+    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), ds_at(VEC3D_CENTROIDS + 6),
+                  ds_at(PROJ_CENTROIDS), 0x40, (int16_t)*w(OBJECT_COUNT),
                   model_byte(MODE_TABLE, model));
     // Depth fixes: push objects to the back (+) or front (-).
     if (model == 1)
@@ -305,8 +312,7 @@ void VecLoad_DrawBlueFrame(void)
         ds.Gfx_Palette[0xC0 + i][2] = (uint8_t)((i * 40) / 48 + 10);
     }
     VecLoad_DrawFrame();
-    Blit_CopyRect(far_ptr(buffer_seg(), WINDOW), far_ptr(ds.Gfx_ScreenSeg, WINDOW_SCREEN), 0x72,
-                  0x73);
+    Blit_CopyRect(buffer_base() + WINDOW, gfx_screen() + WINDOW_SCREEN, 0x72, 0x73);
 }
 
 // --- wireframe -------------------------------------------------------------------
@@ -315,10 +321,10 @@ void VecLoad_DrawBlueFrame(void)
 void VecLoad_DrawWireObject(int16_t idx)
 {
     uint16_t s2 = (uint16_t)(idx * 2), s4 = (uint16_t)(idx * 4);
-    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), *fp((uint16_t)(VERTS + s4)),
-                  *fp(PROJECTED), (int16_t)*w(WIRE_SCALE), (int16_t)*w((uint16_t)(VERT_COUNT + s2)),
+    Vec3D_Project(deg(ANGLE_A), deg(ANGLE_B), deg(ANGLE_C), hp((uint16_t)(VERTS + s4)),
+                  hp(PROJECTED), (int16_t)*w(WIRE_SCALE), (int16_t)*w((uint16_t)(VERT_COUNT + s2)),
                   1);
-    Vec3D_DrawEdges(buffer_seg(), *fp(PROJECTED), *fp((uint16_t)(EDGES + s4)),
+    Vec3D_DrawEdges(buffer_base(), hp(PROJECTED), hp((uint16_t)(EDGES + s4)),
                     (int16_t)*w((uint16_t)(EDGE_COUNT + s2)), 0x41);
 }
 
@@ -341,7 +347,7 @@ void VecLoad_SetWirePalette(void)
     ds.Gfx_Palette[0x41][0] = 0;
     ds.Gfx_Palette[0x41][1] = 0x38;
     ds.Gfx_Palette[0x41][2] = 0;
-    RawText_SetPaletteRange(0x40, 0x41, ds_ptr(offsetof(DSeg, Gfx_Palette)));
+    RawText_SetPaletteRange(0x40, 0x41, Gfx_PalettePtr());
 }
 
 // --- buffers ---------------------------------------------------------------------
@@ -413,7 +419,7 @@ bool VecLoad_ReadObject(int16_t model, int16_t slot)
 // 3d38:084a
 void VecLoad_LoadVec(int16_t n)
 {
-    Blit_FillRectAt(far_ptr(buffer_seg(), WINDOW), 0x72, 0x73, 0x40);
+    Blit_FillRectAt(buffer_base() + WINDOW, 0x72, 0x73, 0x40);
     *w(ZOOM) = model_byte(ZOOM_TABLE, n);
     *w(OBJECT_COUNT) = 0;
     if (!file_open(n))
@@ -426,8 +432,8 @@ void VecLoad_LoadVec(int16_t n)
     if (count > 0)
         for (int16_t i = 1;; i++) {
             uint16_t s2 = (uint16_t)(i * 2), s4 = (uint16_t)(i * 4);
-            Vec3D_PrepareObject(n, i, *fp((uint16_t)(VERTS + s4)), *fp((uint16_t)(FACES + s4)),
-                                *fp((uint16_t)(NORMALS + s4)),
+            Vec3D_PrepareObject(n, i, hp((uint16_t)(VERTS + s4)), hp((uint16_t)(FACES + s4)),
+                                hp((uint16_t)(NORMALS + s4)),
                                 (uint8_t)*w((uint16_t)(VERT_COUNT + s2)),
                                 (uint8_t)*w((uint16_t)(FACE_COUNT + s2)));
             if (i == count)
@@ -476,7 +482,7 @@ void VecLoad_LoadWireVec(int16_t n)
     *w(ANGLE_B) = 0;
     *w(ANGLE_C) = 300;
     track_min_mem();
-    Blit_FillRectAt(far_ptr(buffer_seg(), 0x0010), 0x6C, 0x6A, 0x40);
+    Blit_FillRectAt(buffer_base() + 0x0010, 0x6C, 0x6A, 0x40);
 }
 
 // 3d38:0dd7
