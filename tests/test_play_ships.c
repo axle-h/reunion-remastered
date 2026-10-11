@@ -308,7 +308,9 @@ int main(int argc, char *argv[])
     }
 
     char record[1024];
-    SDL_snprintf(record, sizeof record, "%s/play_ships.txt", SDL_GetCurrentDirectory());
+    char *cwd = SDL_GetCurrentDirectory();
+    SDL_snprintf(record, sizeof record, "%s/play_ships.txt", cwd);
+    SDL_free(cwd);
     PlayResult r = show("proof run", play_run(12345, proof_policy, nullptr, record));
     CHECK(!r.failed && !r.tainted);
     CHECK(r.exit_code == -1);

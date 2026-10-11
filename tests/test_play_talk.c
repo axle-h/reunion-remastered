@@ -255,7 +255,9 @@ static void university_policy(void *unused)
 static void test_university(void)
 {
     char record[1024];
-    SDL_snprintf(record, sizeof record, "%s/play_talk_university.txt", SDL_GetCurrentDirectory());
+    char *cwd = SDL_GetCurrentDirectory();
+    SDL_snprintf(record, sizeof record, "%s/play_talk_university.txt", cwd);
+    SDL_free(cwd);
     PlayResult r = play_run(SEED, university_policy, nullptr, record);
     printf("university: exit %d after %llu frames, hash %016llx%s%s\n", r.exit_code,
            (unsigned long long)r.frames, (unsigned long long)r.state_hash, r.failed ? ", FAILED: " : "",

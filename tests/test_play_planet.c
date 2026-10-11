@@ -186,7 +186,9 @@ int main(int argc, char *argv[])
         return 1;
     }
     char record[1024];
-    SDL_snprintf(record, sizeof record, "%s/play_planet.txt", SDL_GetCurrentDirectory());
+    char *cwd = SDL_GetCurrentDirectory();
+    SDL_snprintf(record, sizeof record, "%s/play_planet.txt", cwd);
+    SDL_free(cwd);
 
     PlayResult r = play_run(12345, act1, nullptr, record);
     printf("run: exit %d after %llu frames, hash %016llx%s%s\n", r.exit_code,
