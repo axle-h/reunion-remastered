@@ -87,47 +87,58 @@ static FILE *open_slot(int16_t slot, bool write)
 // --- The block list (docs/formats/save.md) ----------------------------------
 
 typedef struct SaveBlock {
-    uint16_t off;   // DS offset, or the DS offset of the far pointer when ptr
+    uint16_t off;   // the field, or the pointer field whose block is saved (ptr)
     uint16_t size;
     bool ptr;
 } SaveBlock;
 
-#define B(o, s) { (o), (s), false }
-#define P(o, s) { (o), (s), true }
+// A field, its first `size` bytes, or `size` bytes of the block it points to.
+// The fields are the game's data in its own little-endian layout (records
+// are packed as in the original), so their bytes are the file's.
+#define F(field) { offsetof(DSeg, field), sizeof(((DSeg *)nullptr)->field), false }
+#define PART(field, size) { offsetof(DSeg, field), (size), false }
+#define P(field, size) { offsetof(DSeg, field), (size), true }
 
+// The original's order. It writes the twelve Pub_StoryFlags one by one, the
+// same bytes as the array; Staff_DevSkills only the first grade's.
 static const SaveBlock blocks[] = {
-    B(0x57CC, 0x18), B(0x57F0, 0x0C), P(0x7ADE, 0x31B), B(0x7AE2, 2), B(0x013A, 0x10E),
-    B(0x0424, 0xF0), B(0x6518, 0x0C),
-    B(0x773E, 1), B(0x773F, 1), B(0x7740, 1), B(0x7741, 1), B(0x7742, 1), B(0x7743, 1),
-    B(0x7744, 1), B(0x7745, 1), B(0x7746, 1), B(0x7747, 1), B(0x7748, 1), B(0x7749, 1),
-    B(0x1A9C, 0x1A0), B(0x1C3C, 0x820), B(0x248A, 0x9C), B(0x2526, 0x30C),
-    B(0x2860, 0xEA), B(0x294A, 0x492), B(0x2DF8, 0x5B), B(0x2E54, 0x1C7),
-    B(0x3038, 0xA9), B(0x30E2, 0x34D), B(0x3470, 0x12B), B(0x359C, 0x5D7),
-    B(0x3B86, 0x41), B(0x3BC8, 0x145), B(0x3D56, 0x1A0), B(0x3EF6, 0x820),
-    B(0x47D6, 0x40), B(0x4816, 8), B(0x481E, 0x10), B(0x482E, 2),
-    B(0x7AE4, 2), B(0x7AE6, 0x10), B(0x7AF6, 0x10), B(0x9276, 2), B(0x9278, 2),
-    B(0x5DAC, 0x73F), B(0x95A0, 2), B(0x95A2, 2), B(0x95A4, 8), B(0x95AC, 8),
-    B(0x95B4, 2), B(0x95B6, 8), B(0x95BE, 4), B(0x95C6, 0x18),
-    B(0x95DE, 2), B(0x95E0, 2), B(0x95E2, 2), B(0x95E4, 2),
-    B(0xA21A, 2), B(0xA21C, 0xA0), B(0xA2C0, 2), P(0xA2BC, 14000), B(0x6BCE, 0x9CC),
-    B(0xA2C2, 2), B(0xA2C4, 2), B(0xA2C6, 2), B(0xA2C8, 2), B(0xA2CA, 2), B(0xA2CC, 2),
-    B(0xA2CE, 2), P(0xA2D0, 0x2840), B(0xA2D4, 1), B(0xA2D6, 4), B(0x91A0, 0x46),
-    B(0x91EA, 2),
-    // 61 unnamed story/event globals, each saved on its own.
-    B(0x5D3C, 1), B(0x5D3D, 1), B(0x5D3E, 1), B(0x5D3F, 1), B(0x5D40, 2), B(0x5D42, 2),
-    B(0x5D44, 2), B(0x5D46, 2), B(0x5D48, 1), B(0x5D4A, 2), B(0x5D4C, 1), B(0x5D4E, 2),
-    B(0x5D50, 1), B(0x5D52, 2), B(0x5D54, 2), B(0x5D56, 1), B(0x5D58, 2), B(0x5D5A, 1),
-    B(0x5D5C, 2), B(0x5D5E, 1), B(0x5D60, 2), B(0x5D62, 1), B(0x5D64, 2), B(0x5D66, 1),
-    B(0x5D67, 1), B(0x5D68, 1), B(0x5D6A, 2), B(0x5D6C, 1), B(0x5D6D, 1), B(0x5D6E, 2),
-    B(0x5D70, 1), B(0x5D71, 1), B(0x5D72, 2), B(0x5D74, 1), B(0x5D75, 1), B(0x5D76, 2),
-    B(0x5D78, 1), B(0x5D7A, 2), B(0x5D7C, 1), B(0x5D7E, 2), B(0x5D80, 1), B(0x5D82, 2),
-    B(0x5D84, 1), B(0x5D86, 2), B(0x5D88, 1), B(0x5D8A, 2), B(0x5D8C, 1), B(0x5D8E, 2),
-    B(0x5D90, 1), B(0x5D91, 1), B(0x5D92, 2), B(0x5D94, 1), B(0x5D95, 1), B(0x5D96, 2),
-    B(0x5D98, 1), B(0x5D99, 1), B(0x5D9A, 1), B(0x5D9C, 2), B(0x5D9E, 2), B(0x5DA0, 2),
-    B(0x5DA2, 4),
+    F(Staff_Level), PART(Staff_DevSkills, sizeof(ds.Staff_DevSkills[0])), P(Message_Log, 0x31B),
+    F(Message_LogCount), F(Pub_People), F(Pub_Deals), F(Races_Hostile), F(Pub_StoryFlags),
+    F(Galaxy_AmnestyNames), F(Galaxy_AmnestyBodies), F(Galaxy_PhoenixNames),
+    F(Galaxy_PhoenixBodies), F(Galaxy_MirachNames), F(Galaxy_MirachBodies), F(Galaxy_AntaresNames),
+    F(Galaxy_AntaresBodies), F(Galaxy_OrionisNames), F(Galaxy_OrionisBodies), F(Galaxy_LyraeNames),
+    F(Galaxy_LyraeBodies), F(Galaxy_RigelNames), F(Galaxy_RigelBodies), F(Galaxy_SunNames),
+    F(Galaxy_SunBodies), F(Galaxy_PlanetStatus), F(Galaxy_SystemStatus), F(Sim_Observatories),
+    F(Sim_UniversityCount), F(Game_CurSystem), F(Game_CurPlanet), F(Game_CurMoon), F(Game_Hero),
+    F(Game_HeroSpriteX), F(Research_Products), F(Game_SelInvention), F(Game_CurResearch),
+    F(Game_StaffExp), F(Game_DevSkill), F(Game_ProductionRate), F(Game_StaffHired), F(Game_Credits),
+    F(Game_HomeStock), F(Game_Year), F(Game_Month), F(Game_Day), F(Game_Hour),
+    F(Game_ColonySetupCount), F(Game_ColonySetups), F(Game_BuildingCount), P(Game_Buildings, 14000),
+    F(Races_Races), F(Game_ShownGroupCount), F(Game_GroupCount), F(Game_PlanetForceCount),
+    F(Game_SelGroup), F(Game_SelGroup0), F(Game_SelGroup1), F(Game_GroupList),
+    P(Game_Groups, 0x2840), F(Game_GroupsEnabled), F(Game_GroupKindAllowed), F(Game_IdeaTimer),
+    F(Game_StoryStage), F(Intel_MorgrulAttack3Won), F(Intel_Flag5D3D), F(Intel_KallForceSent),
+    F(Intel_KallTurnCancelled), F(Intel_LaunchTimer), F(Intel_LaunchRace), F(Intel_LaunchForce),
+    F(Intel_LaunchMission), F(Intel_FirstJumpSeen), F(Intel_SatTheftTimer), F(Intel_SatTheftDone),
+    F(Intel_Race2Timer1), F(Intel_Race2Done1), F(Intel_DevAwayTimer), F(Intel_Race2Timer2),
+    F(Intel_Race2Done2), F(Intel_Race2Timer3), F(Intel_Race2Done3), F(Intel_Race2Timer4),
+    F(Intel_Race2Done4), F(Intel_Invention14Timer), F(Intel_Invention14Revealed),
+    F(Intel_MorgrulAttack1Timer), F(Intel_MorgrulAttack1Done), F(Intel_FirstBattleWon),
+    F(Intel_FirstGroundLost), F(Intel_MorgrulAttack2Timer), F(Intel_MorgrulAttack2Done),
+    F(Intel_MorgrulAttack2Open), F(Intel_Phoenix1Timer), F(Intel_Phoenix1Done),
+    F(Intel_Phoenix1Armed), F(Intel_MorgrulAttack3Timer), F(Intel_MorgrulAttack3Done),
+    F(Intel_MorgrulAttack3Open), F(Intel_Race4Timer), F(Intel_Race4Done), F(Intel_KallTurnTimer),
+    F(Intel_KallTurnDone), F(Intel_JointAttackTimer), F(Intel_JointAttackDone), F(Intel_Race5Timer),
+    F(Intel_Race5Done), F(Intel_Msg14Timer), F(Intel_Msg14Done), F(Intel_System3Timer),
+    F(Intel_MorgrulBeaten), F(Intel_System4DestroyTimer), F(Intel_System4Destroyed),
+    F(Intel_Pub4HintOff), F(Intel_System4WarnTimer), F(Intel_System4Warned),
+    F(Intel_System4TalkArmed), F(Intel_Race7to10Timer), F(Intel_Race7to10Done), F(Intel_Pub10Done),
+    F(Intel_Pub7Done), F(Advisor_TrainingTimer), F(Advisor_TrainingKind), F(Advisor_TrainingCourse),
+    F(Advisor_TrainingPrice),
 };
 
-#undef B
+#undef F
+#undef PART
 #undef P
 
 // 1a3e:0240 Block (nested in SaveLoadGame): one BlockWrite/BlockRead + CheckIO.
@@ -142,7 +153,8 @@ static bool transfer(FILE *f, uint8_t *name, bool save)
 {
     bool ok = block(f, name, 0x14, save);
     for (size_t i = 0; ok && i < sizeof blocks / sizeof blocks[0]; i++) {
-        void *p = blocks[i].ptr ? far_host(*(FarPtr *)ds_at(blocks[i].off)) : ds_at(blocks[i].off);
+        uint8_t *field = (uint8_t *)&ds + blocks[i].off;
+        void *p = blocks[i].ptr ? far_host(*(FarPtr *)field) : field;
         ok = block(f, p, blocks[i].size, save);
     }
     // Port addition: frozen cheats (game/options.h) hold the loaded stocks.

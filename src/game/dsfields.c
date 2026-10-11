@@ -580,7 +580,7 @@ const DsField ds_fields[] = {
     {"_pad_5CF2", 0x5CF2, 1, 10, -1, DSF_UNNAMED, {10, 1, 1}},
     {"Gus_RateTable", 0x5CFC, 2, 32, -1, 0, {32, 1, 1}},
     {"Intel_MorgrulAttack3Won", 0x5D3C, 1, 1, -1, 0, {1, 1, 1}},
-    {"_pad_5D3D", 0x5D3D, 1, 1, -1, DSF_UNNAMED, {1, 1, 1}},
+    {"Intel_Flag5D3D", 0x5D3D, 1, 1, -1, 0, {1, 1, 1}},
     {"Intel_KallForceSent", 0x5D3E, 1, 1, -1, 0, {1, 1, 1}},
     {"Intel_KallTurnCancelled", 0x5D3F, 1, 1, -1, 0, {1, 1, 1}},
     {"Intel_LaunchTimer", 0x5D40, 2, 1, -1, 0, {1, 1, 1}},

@@ -891,7 +891,7 @@ typedef struct DSeg {
     uint8_t _pad_5CF2[0xA];
     uint16_t Gus_RateTable[32]; // [1..32] 592 div n for n active voices (46ca: mov ax,[si+5CFC] with si = 2*(n-1)); was at 5cfe, which ran into 5D3C
     uint8_t Intel_MorgrulAttack3Won; // a battle was won while MorgrulAttack3Open: pub person 2 becomes available (Main 1000:2cd5, 329d); only set
-    uint8_t _pad_5D3D[0x1];
+    uint8_t Intel_Flag5D3D; // saved with the story flags; no routine the port has reads or writes it
     uint8_t Intel_KallForceSent; // set while the Kall's force 2 is sent to 2:5:0 (Race4Timer fired, KallTurnTimer not yet; 1b8a:3d07)
     uint8_t Intel_KallTurnCancelled; // set by the Eran talk (race 6, answer 2) with KallTurnTimer := 0 (Main)
     int16_t Intel_LaunchTimer; // hours until the scheduled race force launch (2693-independent story script, Sim)
@@ -1707,6 +1707,7 @@ static_assert(offsetof(DSeg, Gfx_LineStride) == 0x5CEE);
 static_assert(offsetof(DSeg, Gfx_LineStrideCopy) == 0x5CF0);
 static_assert(offsetof(DSeg, Gus_RateTable) == 0x5CFC);
 static_assert(offsetof(DSeg, Intel_MorgrulAttack3Won) == 0x5D3C);
+static_assert(offsetof(DSeg, Intel_Flag5D3D) == 0x5D3D);
 static_assert(offsetof(DSeg, Intel_KallForceSent) == 0x5D3E);
 static_assert(offsetof(DSeg, Intel_KallTurnCancelled) == 0x5D3F);
 static_assert(offsetof(DSeg, Intel_LaunchTimer) == 0x5D40);

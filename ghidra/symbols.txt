@@ -1742,6 +1742,7 @@
 4a81:0d18 Surface::EdgeScroll: array[1..9,1..14] of byte  // folded 0d09; edge-scroll direction 1..8 (0 none) of each cell of the 14x9 map view, for right-button clicks (Main)
 4a81:5cfc Gus::RateTable: array[1..32] of word  // 592 div n for n active voices (46ca: mov ax,[si+5CFC] with si = 2*(n-1)); was at 5cfe, which ran into 5D3C
 4a81:5d3c Intel::MorgrulAttack3Won: boolean  // a battle was won while MorgrulAttack3Open: pub person 2 becomes available (Main 1000:2cd5, 329d); only set
+4a81:5d3d Intel::Flag5D3D: byte   // saved with the story flags; no routine the port has reads or writes it
 4a81:5d67 Intel::FirstBattleWon: boolean  // the first battle (space or ground) was won: ideas 0Dh and 11h scheduled (Main 1000:2c62)
 4a81:5d68 Intel::FirstGroundLost: boolean  // the first ground battle was lost: message 0Eh, idea 11h (Main 1000:3239)
 4a81:5d8c Intel::MorgrulBeaten: boolean  // the Morgrul were eliminated in a ground battle (Main 1000:30eb); only set
