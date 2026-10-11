@@ -127,7 +127,7 @@ static void make_plan(void)
         if ((f->flags & DSF_POINTER) || layout_field(f->name, nullptr))
             continue;
         if (!record_has_layout(f->rec, f->name)) {
-            plan_range(f->name, f->ofs, f->elem * f->count, f->elem, f->rec);
+            plan_range(f->name, f->at, f->elem * f->count, f->elem, f->rec);
             continue;
         }
         const DsRecord *r = &ds_records[f->rec];
@@ -136,7 +136,7 @@ static void make_plan(void)
                 const DsField *sf = &r->fields[k];
                 if ((sf->flags & DSF_POINTER) || layout_field(f->name, sf->name))
                     continue;
-                plan_range(f->name, (uint16_t)(f->ofs + e * r->size + sf->ofs), sf->elem * sf->count,
+                plan_range(f->name, (uint16_t)(f->at + e * r->size + sf->ofs), sf->elem * sf->count,
                               1, -1);
             }
     }

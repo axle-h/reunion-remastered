@@ -381,7 +381,7 @@ void System_FillChar(void *dst, uint16_t count, uint8_t value)
 // size, so nothing ever merges into it).
 // ===========================================================================
 
-enum : uint16_t { FREELIST_OFF = 0x75BE };
+enum : uint16_t { FREELIST_OFF = offsetof(DSeg, System_FreeList) };
 
 static uint16_t rd16(uint16_t seg, uint16_t off)
 {

@@ -2275,3 +2275,7 @@ extern DSeg ds;
 // Fills DS 0000..DSEG_INIT_SIZE-1 from GRWAR\REUNION.PRG and zeroes the
 // rest, like the original at startup. Needs fs_init().
 bool dseg_init(void);
+// The byte at offset orig of the original's DS, where the port keeps it
+// (for the far pointers DS held, and code that reads past an array as
+// the original does). nullptr past the end.
+uint8_t *dseg_orig(uint16_t orig);
