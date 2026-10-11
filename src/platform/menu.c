@@ -109,7 +109,7 @@ static Row *add(RowKind kind, int id, const char *label, const char *help)
 
 static const char *music_label(ConfigMusic m)
 {
-    static const char *const names[] = {"Setup file", "None", "AdLib", "UltraSound", "Amiga"};
+    static const char *const names[] = {"Setup file", "None", "Sound Blaster", "UltraSound"};
     return names[m];
 }
 
@@ -176,7 +176,7 @@ static void build_rows(void)
         break;
     case SEC_SOUND:
         r = add(ROW_CHOICE, R_MUSIC, "Music",
-                "AdLib: the OPL2 tunes. UltraSound: the modules. Amiga: the modules, Amiga mixer.");
+                "Sound Blaster: FM music in the game. Cut-scenes sound alike on both.");
         SDL_strlcpy(r->value, music_label(config.music), sizeof r->value);
         r = add(ROW_CHOICE, R_MUSIC_VOLUME, "Music volume", nullptr);
         SDL_snprintf(r->value, sizeof r->value, "%d%%", config.music_volume);
@@ -306,8 +306,7 @@ static void act(const Row *r, int dir)
         SDL_snprintf(status, sizeof status, "Added %d of each ore.", hooks.add_ore);
         return;
     case R_MUSIC:
-        config.music = step(config.music, dir ? dir : 1, CONFIG_MUSIC_NONE, CONFIG_MUSIC_AMIGA, true);
-        audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
+        config.music = step(config.music, dir ? dir : 1, CONFIG_MUSIC_NONE, CONFIG_MUSIC_GUS, true);
         changed(MENU_CHANGED_MUSIC);
         break;
     case R_MUSIC_VOLUME:

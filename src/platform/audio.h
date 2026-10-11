@@ -56,11 +56,6 @@ void audio_set_sfx_volume(float volume);
 // at 0 still play (silently), so the game's waits on them are unchanged.
 // They survive audio_shutdown.
 void audio_set_user_volumes(float music, float sfx);
-// Modules started from now on play through libxmp's Amiga 500 (Paula)
-// mixer with full stereo separation. Survives audio_shutdown.
-void audio_set_amiga_mixer(bool on);
-// True if the current module plays through the Paula mixer (tests).
-bool audio_music_amiga_mixer(void);
 
 // Pauses or resumes the output device; playback positions are kept.
 void audio_set_paused(bool paused);

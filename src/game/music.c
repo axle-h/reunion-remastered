@@ -19,6 +19,12 @@ static bool pstr_eq(const uint8_t *p, const char *s)
 
 // The last track started, for Music_SwitchDevice.
 static uint8_t last_track[256];
+// Music_InitMusicDevices has chosen the hardware since Music_Init; until
+// then a switch is left to it.
+static bool devices_chosen;
+// Port deviation (docs/port-bugs.md #1): the start menu holds back the "choose
+// your hero" voice, sample 6 of CHOISE.SPD.
+static bool hero_voice_held;
 
 // 424a:0095
 void Music_StopMusic(void)
@@ -49,20 +55,30 @@ void Music_PlayTrack(const uint8_t *name)
             path[n++] = (char)toupper(name[1 + i]);
         memcpy(path + n, ".SPD", 5);
         ds.SoundDrv_ModLoaded = audio_play_music(path, true);
+        if (hero_voice_held && pstr_eq(name, "choise"))
+            audio_music_mute_sample(6, true);
     }
+}
+
+void Music_HoldHeroVoice(bool hold)
+{
+    hero_voice_held = hold;
+    if (ds.Music_Backend != 2)
+        return;
+    audio_music_mute_sample(6, hold);
+    if (!hold)
+        audio_restart_music();
 }
 
 // Port extension: the music hardware is the port menu's (config.music), or
 // SAVE\SETUP.SPD's card when the config has none (tests and scripted runs);
-// the sound effects always follow the setup file. Amiga is the GUS modules
-// through the Paula mixer.
+// the sound effects always follow the setup file.
 static uint8_t music_device_type(void)
 {
     switch (config.music) {
     case CONFIG_MUSIC_NONE: return 0;
-    case CONFIG_MUSIC_ADLIB: return 4;
-    case CONFIG_MUSIC_GUS:
-    case CONFIG_MUSIC_AMIGA: return 1;
+    case CONFIG_MUSIC_SOUND_BLASTER: return 2;
+    case CONFIG_MUSIC_GUS: return 1;
     default: return ds.Sound_DeviceType;
     }
 }
@@ -78,7 +94,6 @@ void Music_InitMusicDevices(void)
     // GusEnable probed the GUS; here it is ready when the audio device
     // opened. AdlibMusic_InitMusic does the same for the emulated OPL2.
     uint8_t type = music_device_type();
-    audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
     if (type == 1)
         ds.SoundDrv_GusReady = Sound_DeviceOpen();
     if (!ds.SoundDrv_GusReady && adlib_type(type))
@@ -88,14 +103,16 @@ void Music_InitMusicDevices(void)
     if (ds.SoundDrv_GusReady)
         ds.Music_Backend = 2;
     ds.Game_MusicTrack = ds.Music_Backend > 0;
+    devices_chosen = true;
 }
 
 void Music_SwitchDevice(void)
 {
+    if (!devices_chosen)
+        return;
     Music_StopMusic();
     bool had_music = ds.Music_Backend > 0;
     uint8_t type = music_device_type();
-    audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
     ds.Music_Backend = 0;
     ds.SoundDrv_GusReady = type == 1 && Sound_DeviceOpen();
     if (!ds.SoundDrv_GusReady && adlib_type(type)) {
@@ -144,6 +161,7 @@ void Music_RestartMainTheme(void)
 void Music_Init(void)
 {
     last_track[0] = 0;
+    devices_chosen = hero_voice_held = false;
     ds.Music_Backend = 0;
     ds.Music_MainThemeOn = true;
 }

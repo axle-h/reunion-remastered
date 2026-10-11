@@ -67,7 +67,7 @@ int main(void)
     };
     menu_set_hooks(&hooks);
     config_reset();
-    config.music = CONFIG_MUSIC_ADLIB;
+    config.music = CONFIG_MUSIC_SOUND_BLASTER;
 
     menu_open();
     CHECK(menu_is_open() && menu_section() == SEC_CHEATS && menu_focus() == -1);
@@ -91,17 +91,16 @@ int main(void)
     press(SDLK_RETURN);
     CHECK(changes[MENU_ADD_MONEY] == 2);
 
-    // Sound: the music cycles None, AdLib, UltraSound, Amiga; volumes step 10.
+    // Sound: the music cycles None, Sound Blaster, UltraSound; volumes step 10.
     go_to(SEC_SOUND);
-    CHECK(row_is(0, "Music <AdLib>"));
+    CHECK(row_is(0, "Music <Sound Blaster>"));
     press(SDLK_RIGHT);
     CHECK(config.music == CONFIG_MUSIC_GUS && changes[MENU_CHANGED_MUSIC] == 1);
-    press(SDLK_RIGHT);
-    CHECK(row_is(0, "Music <Amiga>"));
+    CHECK(row_is(0, "Music <UltraSound>"));
     press(SDLK_RIGHT);
     CHECK(config.music == CONFIG_MUSIC_NONE);
     press(SDLK_LEFT);
-    CHECK(config.music == CONFIG_MUSIC_AMIGA);
+    CHECK(config.music == CONFIG_MUSIC_GUS);
     press(SDLK_DOWN);
     press(SDLK_RIGHT);  // already at 100%
     press(SDLK_LEFT);

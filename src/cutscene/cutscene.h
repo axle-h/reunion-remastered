@@ -16,5 +16,10 @@ typedef enum : int {
 // (the caller should quit), true otherwise (normal end, ESC, or missing data).
 bool cutscene_play(Cutscene which);
 
+// The port menu changed the music: a running cut-scene plays its modules or
+// plays them silently (they have no AdLib music). Returns false if no
+// cut-scene is running.
+bool cutscene_music_changed(void);
+
 // "credits", "intro" or "victory" (any case). Returns false if unknown.
 bool cutscene_from_name(const char *name, Cutscene *out);

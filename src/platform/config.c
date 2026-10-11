@@ -16,7 +16,7 @@ Config config = DEFAULTS;
 
 static char *path;
 
-static const char *const MUSIC_NAMES[] = {"setup", "none", "adlib", "gus", "amiga"};
+static const char *const MUSIC_NAMES[] = {"setup", "none", "soundblaster", "gus"};
 static const char *const DISPLAY_NAMES[] = {"off", "on", "desktop"};
 
 const char *config_music_name(ConfigMusic music)
@@ -125,9 +125,11 @@ static void set_value(const char *section, const char *key, const char *v)
         config.freeze_money = b;
     else if (IS("cheats", "freeze_ore") && parse_bool(v, &b))
         config.freeze_ore = b;
-    else if (IS("sound", "music"))
+    else if (IS("sound", "music")) {
         parse_name(v, (int *)&config.music, MUSIC_NAMES, (int)SDL_arraysize(MUSIC_NAMES));
-    else if (IS("sound", "effects") && parse_bool(v, &b))
+        if (SDL_strcasecmp(v, "adlib") == 0)  // the setting's earlier name
+            config.music = CONFIG_MUSIC_SOUND_BLASTER;
+    } else if (IS("sound", "effects") && parse_bool(v, &b))
         config.effects = b;
     else if (IS("sound", "music_volume"))
         parse_int(v, &config.music_volume, 0, 100);
@@ -154,10 +156,10 @@ void config_load(const char *file)
 {
     SDL_free(path);
     path = file ? SDL_strdup(file) : nullptr;
-    // With a config file the port picks the music; AdLib is what the
-    // shipped SETUP.SPD gives.
+    // With a config file the port picks the music; Sound Blaster is
+    // what the shipped SETUP.SPD gives.
     if (config.music == CONFIG_MUSIC_SETUP)
-        config.music = CONFIG_MUSIC_ADLIB;
+        config.music = CONFIG_MUSIC_SOUND_BLASTER;
     size_t size;
     char *text = path ? SDL_LoadFile(path, &size) : nullptr;
     if (!text)
@@ -188,7 +190,7 @@ void config_load(const char *file)
     SDL_free(text);
     // The menu doesn't offer "as the setup file says".
     if (config.music == CONFIG_MUSIC_SETUP)
-        config.music = CONFIG_MUSIC_ADLIB;
+        config.music = CONFIG_MUSIC_SOUND_BLASTER;
 }
 
 // --- Writing ------------------------------------------------------------------
@@ -216,7 +218,7 @@ bool config_save(void)
                            "freeze_money = %s\n"
                            "freeze_ore = %s\n"
                            "\n[sound]\n"
-                           "music = %s ; none | adlib | gus | amiga\n"
+                           "music = %s ; none | soundblaster | gus\n"
                            "effects = %s\n"
                            "music_volume = %d\n"
                            "effects_volume = %d\n"

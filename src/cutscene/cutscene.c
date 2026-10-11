@@ -650,6 +650,16 @@ static bool music_silent(void)
     return silent;
 }
 
+// A cut-scene is running (cutscene_music_changed).
+static bool playing;
+
+bool cutscene_music_changed(void)
+{
+    if (playing)
+        audio_set_music_volume(music_silent() ? 0 : 1);
+    return playing;
+}
+
 bool cutscene_play(Cutscene which)
 {
     static const CsProgram *const programs[] = { &cs_credits, &cs_intro, &cs_victory };
@@ -675,11 +685,13 @@ bool cutscene_play(Cutscene which)
     timing_set_mouse_hook(nullptr);  // the game's cursor stays off the cut-scene
     timing_set_quit_handler(on_quit);
     timing_set_restart_handler(on_restart);
+    playing = true;
     int jumped = setjmp(exit_jump);
     if (jumped == 0)
         cs_prog->run();
     else
         quit = jumped == JUMP_QUIT;
+    playing = false;
     timing_set_quit_handler(nullptr);
     timing_set_restart_handler(nullptr);
 

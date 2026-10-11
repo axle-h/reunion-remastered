@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
 
     // The port menu switches the music while a tune plays: the tune goes on
     // on the new hardware (talk is not the main theme, so it is the one).
-    config.music = CONFIG_MUSIC_ADLIB;
+    config.music = CONFIG_MUSIC_SOUND_BLASTER;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
     Music_PlayTrack((const uint8_t *)"\x04" "talk");
@@ -155,21 +155,34 @@ int main(int argc, char *argv[])
     config.music = CONFIG_MUSIC_GUS;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 2 && !Adlib_Playing() && audio_music_playing());
-    CHECK(!audio_music_amiga_mixer());
-    config.music = CONFIG_MUSIC_AMIGA;
-    Music_SwitchDevice();
-    CHECK(ds.Music_Backend == 2 && audio_music_playing() && audio_music_amiga_mixer());
     config.music = CONFIG_MUSIC_NONE;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 0 && ds.Game_MusicTrack == 0 && !audio_music_playing());
     // From no music back to AdLib, as if the game had started without it.
     ds.AdlibMusic_Inited = false;
-    config.music = CONFIG_MUSIC_ADLIB;
+    config.music = CONFIG_MUSIC_SOUND_BLASTER;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1 && Adlib_Playing());
     CHECK(ds.AdlibMusic_TuneBuf == 0 && System_MemAvail() == heap_start);
+
+    // The start menu's hero voice stays held back when the music switches to
+    // the modules there, and comes in when let go.
+    Music_PlayTrack((const uint8_t *)"\x06" "choise");
+    Music_HoldHeroVoice(true);
+    config.music = CONFIG_MUSIC_GUS;
+    Music_SwitchDevice();
+    double held, voice;
+    render(2, &held);
+    Music_HoldHeroVoice(false);
+    render(2, &voice);
+    printf("choise: rms %.0f held, %.0f with the voice\n", held, voice);
+    CHECK(held < voice * 0.95);
     Music_StopMusic();
-    audio_set_amiga_mixer(false);
+
+    // Before Music_InitMusicDevices a switch is left to it.
+    Music_Init();
+    Music_SwitchDevice();
+    CHECK(ds.Music_Backend == 0 && !audio_music_playing());
     config_reset();
 
     audio_shutdown();

@@ -1,6 +1,7 @@
 // Port addition: the game side of the port menu (platform/menu.h). The
 // menu only changes the config and asks for changes; Options_Frame carries
-// them out at the main loop, where the game is between two frames.
+// them out at the main loop, where the game is between two frames. (The
+// music is switched at once instead, see main.c.)
 //
 // Cheats live in the config file and so outlast games and boots. Freezing
 // money or ore holds the stock at a value that is taken when the freeze is
@@ -21,7 +22,6 @@ typedef enum : int {
     OPTIONS_CHEATS,     // config.freeze_money / freeze_ore changed
     OPTIONS_ADD_MONEY_ONCE,
     OPTIONS_ADD_ORE_ONCE,
-    OPTIONS_MUSIC,      // config.music changed
     OPTIONS_FIXES,      // the fixes' switches changed
 } OptionsRequest;
 

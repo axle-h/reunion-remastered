@@ -5,19 +5,18 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
-#include "game/music.h"
 #include "platform/config.h"
 
 // The values the frozen stocks are held at.
 static int32_t money_frozen, ore_frozen[6];
-static bool rebase, running, music_changed, fixes_changed, cheats_changed;
+static bool rebase, running, fixes_changed, cheats_changed;
 static int add_money, add_ore;
 
 void Options_Init(void)
 {
     rebase = true;
     running = false;
-    music_changed = fixes_changed = cheats_changed = false;
+    fixes_changed = cheats_changed = false;
     add_money = add_ore = 0;
 }
 
@@ -27,7 +26,6 @@ void Options_Request(OptionsRequest request)
     case OPTIONS_CHEATS: cheats_changed = true; break;
     case OPTIONS_ADD_MONEY_ONCE: add_money++; break;
     case OPTIONS_ADD_ORE_ONCE: add_ore++; break;
-    case OPTIONS_MUSIC: music_changed = true; break;
     case OPTIONS_FIXES: fixes_changed = true; break;
     }
 }
@@ -47,9 +45,7 @@ void Options_Frame(void)
     running = true;
     if (fixes_changed)
         Fixes_Init();
-    if (music_changed)
-        Music_SwitchDevice();
-    fixes_changed = music_changed = false;
+    fixes_changed = false;
 
     // Switching a freeze on (or a new game under it) holds today's stock.
     if (rebase || cheats_changed) {

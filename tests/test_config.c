@@ -29,9 +29,9 @@ int main(void)
     CHECK(config_save());  // no path: nothing written
     CHECK(!SDL_GetPathInfo(path, nullptr));
 
-    // A missing file: the app's defaults, AdLib music.
+    // A missing file: the app's defaults, Sound Blaster music.
     config_load(path);
-    CHECK(config.music == CONFIG_MUSIC_ADLIB);
+    CHECK(config.music == CONFIG_MUSIC_SOUND_BLASTER);
 
     // Bad values keep the defaults; unknown keys and sections are ignored.
     write_file(path, "; comment\n"
@@ -39,7 +39,7 @@ int main(void)
                      "freeze_money = on\n"
                      "freeze_ore = maybe\n"
                      "[sound]\r\n"
-                     "  music = Amiga ; inline comment\n"
+                     "  music = GUS ; inline comment\n"
                      "effects=off\n"
                      "music_volume = 140\n"
                      "effects_volume = 30\n"
@@ -60,7 +60,7 @@ int main(void)
     config_reset();
     config_load(path);
     CHECK(config.freeze_money && !config.freeze_ore);
-    CHECK(config.music == CONFIG_MUSIC_AMIGA && !config.effects);
+    CHECK(config.music == CONFIG_MUSIC_GUS && !config.effects);
     CHECK(config.music_volume == 100 && config.effects_volume == 30);
     CHECK(config.display == CONFIG_DESKTOP && config.window_width == 960 && config.window_height == 960);
     CHECK(SDL_fabsf(config.fullscreen_refresh - 59.94f) < 0.001f);
@@ -82,11 +82,16 @@ int main(void)
     CHECK(SDL_fabsf(config.fullscreen_refresh - before.fullscreen_refresh) < 0.001f);
     CHECK(config.fix_count == 3 && !config_fix("drifting_ship") && !config_fix("find_jade"));
 
-    // "setup" is not something the menu offers: it reads as AdLib.
+    // "setup" is not something the menu offers: it reads as Sound Blaster.
     write_file(path, "[sound]\nmusic = setup\n");
     config_reset();
     config_load(path);
-    CHECK(config.music == CONFIG_MUSIC_ADLIB);
+    CHECK(config.music == CONFIG_MUSIC_SOUND_BLASTER);
+    // The setting's earlier name.
+    write_file(path, "[sound]\nmusic = AdLib\n");
+    config_reset();
+    config_load(path);
+    CHECK(config.music == CONFIG_MUSIC_SOUND_BLASTER);
 
     config_reset();
     char tmp[300];

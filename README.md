@@ -23,8 +23,8 @@ build/debug/reunion
 `reunion [DATA_DIR]` looks for the game data (the directory holding `GRWAR`,
 `GRAFIKA`, ...) in `DATA_DIR`, else in `$REUNION_DATA`, else in the
 `REUNION_DATA_DIR` CMake setting (default `vendor/Reunion_DOS_EN`).
-F1 opens the port menu over the game: cheats, music (None, AdLib,
-UltraSound, Amiga), effects and volumes, display mode and size, skipping the
+F1 opens the port menu over the game: cheats, music (None, Sound Blaster,
+UltraSound), effects and volumes, display mode and size, skipping the
 intro, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
 the SDL pref directory (`~/.local/share/Reunion/Reunion` on Linux).
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to the

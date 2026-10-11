@@ -10,7 +10,6 @@
 #include "game/music.h"
 #include "game/sound.h"
 #include "game/system.h"
-#include "platform/audio.h"
 
 // Unnamed globals.
 #define W16(off) (*(uint16_t *)ds_at(off))
@@ -99,8 +98,7 @@ void Title_StartMenu(void)
     Gfx_BlankPalette(pal, 0, 0xFF);
     Music_PlayTrack(LIT("choise"));
     // Port deviation (docs/port-bugs.md #1): no "choose your hero" voice yet.
-    if (ds.Music_Backend == 2)
-        audio_music_mute_sample(6, true);
+    Music_HoldHeroVoice(true);
     Gfx_LoadPic(LIT("grafika\\options"), far_ptr(ds.Gfx_ScreenSeg, 0), 1, 200, 0, 0, 0x140, false, pal,
                 0, 0xFF, 0, 0, 0xFF);
     Gfx_FadeIn(0, 0xFF, pal);
@@ -170,10 +168,7 @@ void Title_InitTitleAndMainMenu(void)
                     Gfx_PalettePtr(), 0, 0xFF, 0, 0, 0xFF);
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
         // Port deviation (docs/port-bugs.md #1): the voice plays from here.
-        if (ds.Music_Backend == 2) {
-            audio_music_mute_sample(6, false);
-            audio_restart_music();
-        }
+        Music_HoldHeroVoice(false);
         Title_HeroSelect();
     }
 

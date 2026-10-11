@@ -19,8 +19,10 @@ the original), fix, and how it was verified. Status: **open**,
   sample intact, then it loops as normal.
 - **Status:** fixed. `audio_music_mute_sample` / `audio_restart_music`
   (`src/platform/audio.c`) mute sample 6 by zeroing its instrument volume in
-  libxmp and restart the module; called from `Title_StartMenu` and before
-  `Title_HeroSelect` in `src/game/title.c` (module backend only).
+  libxmp and restart the module; `Music_HoldHeroVoice` (`src/game/music.c`)
+  calls them from `Title_StartMenu` and before `Title_HeroSelect`
+  (`src/game/title.c`), and mutes the voice again if the port menu switches
+  the music to UltraSound at the start menu.
   Verified by `tests/test_audio_mute.c`: over the first 2 s of CHOISE.SPD the
   muted mix is quieter than the reference, and after unmute + restart it
   matches the reference to within 1%.

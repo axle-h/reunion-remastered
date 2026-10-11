@@ -52,10 +52,11 @@ runs on `SDL_AUDIO_DRIVER=dummy` with the device paused).
 Blaster family and AdLib (2, 3, 4, 6), nothing otherwise. The shipped
 `SETUP.SPD` says 2, so the AdLib tunes are the default. The port menu's
 music setting (`config.music`, `docs/port.md`) overrides the choice for the
-music only (sound effects keep following the setup file). Amiga plays the
-modules through libxmp's Amiga 500 (Paula) mixer with full stereo
-separation; the modules are the Amiga version's music
-([formats/amiga.md](formats/amiga.md)).
+music only (sound effects keep following the setup file). The menu names
+the choices after the cards, Sound Blaster (the AdLib tunes) and
+UltraSound (the modules); `music = adlib` in the file still reads as Sound
+Blaster. The cut-scenes only have modules, which the original played on
+both cards; they play them unless the music is None.
 
 `ANIM\NO.SPD` is the "no music" track: a one-pattern module whose only
 event is a speed command (7.68 s of silence), though it still carries
@@ -104,7 +105,7 @@ The original allocates the tune buffer on its heap when it finds an AdLib.
 The port keeps it outside the emulated memory (`tune_buf` in
 `game/adlibmusic.c`; `AdlibMusic_TuneBuf` stays nil), so the heap is the
 same whatever music the game started with and the port menu can switch to
-AdLib at any time. The original's heap with an AdLib was 31,700 bytes
+the AdLib tunes at any time. The original's heap with an AdLib was 31,700 bytes
 smaller; the only effect is a little more room for the game.
 
 `tests/test_adlib.c` checks the loader, plays every tune for a few seconds

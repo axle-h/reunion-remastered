@@ -9,9 +9,8 @@
 typedef enum : int {
     CONFIG_MUSIC_SETUP,  // as SAVE\SETUP.SPD says (the default without a file)
     CONFIG_MUSIC_NONE,
-    CONFIG_MUSIC_ADLIB,
-    CONFIG_MUSIC_GUS,    // the ProTracker modules
-    CONFIG_MUSIC_AMIGA,  // the modules through libxmp's Paula (A500) mixer
+    CONFIG_MUSIC_SOUND_BLASTER,  // the AdLib (FM) tunes; cut-scenes play the modules
+    CONFIG_MUSIC_GUS,    // Gravis UltraSound: the ProTracker modules
 } ConfigMusic;
 
 typedef enum : int {

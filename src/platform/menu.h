@@ -4,8 +4,9 @@
 //
 // The menu knows nothing of the game. Settings of the platform layer
 // (volumes, display) apply at once; for the rest it calls hooks.changed and
-// the game carries the change out at a point of its own choosing (the main
-// loop), since the menu may have been opened anywhere.
+// the game carries the change out at a point of its own choosing (the music
+// at once, the rest at the main loop, since the menu may have been opened
+// anywhere).
 #pragma once
 
 #include <SDL3/SDL_events.h>
@@ -49,7 +50,7 @@ void menu_draw(SDL_Renderer *r);
 void menu_open(void);
 bool menu_is_open(void);
 void menu_handle_event(const SDL_Event *e);
-// The focused section's rows as drawn ("[x] Freeze money", "Music <AdLib>").
+// The focused section's rows as drawn ("[x] Freeze money", "Music <UltraSound>").
 int menu_row_count(void);
 const char *menu_row_text(int row);
 int menu_section(void);

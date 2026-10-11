@@ -115,10 +115,10 @@ and without it the game behaves as before the menu: music from
 over the file.
 
 The platform layer knows nothing of the game. Display and volumes apply at
-once. Everything that touches game state is only asked for
-(`MenuHooks.changed` → `Options_Request`, `src/game/options.c`) and carried
-out by `Options_Frame` at the main loop's next frame, since the menu may have
-been opened in the middle of anything:
+once, and so does the music (below). Everything else that touches game
+state is only asked for (`MenuHooks.changed` → `Options_Request`,
+`src/game/options.c`) and carried out by `Options_Frame` at the main loop's
+next frame, since the menu may have been opened in the middle of anything:
 
 - **Cheats.** Freeze money / freeze ore hold `Game_Credits` / New Earth's six
   ore stocks (`Game_HomeStock`, what production draws on; colonies' stores
@@ -129,15 +129,22 @@ been opened in the middle of anything:
   stock where it is. Add 100000 credits / add 10000 ore each raise the stock
   (and the frozen value) once per click, during a game only. Saves carry no
   cheat state: they are byte-for-byte the original format.
-- **Sound.** Music None, AdLib, UltraSound (the `ANIM\*.SPD` modules) or
-  Amiga (the same modules through libxmp's Paula mixer; they are the Amiga
-  version's music, see `docs/formats/amiga.md`). A change stops the music
-  and starts the last track again on the new hardware (`Music_SwitchDevice`).
-  The AdLib tune buffer is not on the emulated heap (see Memory model), so
-  any switch works the same whatever the game started with. Music None also silences
-  the cut-scenes. Effects on/off and both volumes are the mixer's own gains
-  on top of the game's (`audio_set_user_volumes`): muted effects still play
-  silently, so the game's waits for them are unchanged.
+- **Sound.** Music None, Sound Blaster or UltraSound, the cards of the
+  original setup program. Sound Blaster plays the AdLib (FM) tunes in the
+  game, UltraSound the `ANIM\*.SPD` modules. The change is made at once,
+  wherever the menu was opened (`menu_changed` in `src/main.c`). In the
+  game, title screen included, it stops the music and starts the last track
+  again on the new hardware (`Music_SwitchDevice`); the start menu keeps
+  CHOISE.SPD's hero voice held back on any hardware (`Music_HoldHeroVoice`,
+  [port-bugs.md](port-bugs.md) #1). The AdLib tune buffer is not on the
+  emulated heap (see Memory model), so any switch works the same whatever
+  the game started with. The cut-scenes only have modules, which the
+  original played on both cards (on a Sound Blaster through its own software
+  mixer): None silences them (`cutscene_music_changed`), the other two sound
+  alike, as the menu's help line says. Effects on/off and both volumes are
+  the mixer's own gains on top of the game's (`audio_set_user_volumes`):
+  muted effects still play silently, so the game's waits for them are
+  unchanged.
 - **Video.** Window (in 320x240 steps that fit the display, or the size the
   window was dragged to), full screen at a chosen display mode, or desktop
   full screen. Alt+Enter toggles between the window and the last full-screen

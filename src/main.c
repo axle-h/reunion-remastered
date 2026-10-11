@@ -19,6 +19,7 @@
 #include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/mem.h"
+#include "game/music.h"
 #include "game/options.h"
 #include "game/system.h"
 #include "platform/audio.h"
@@ -113,16 +114,22 @@ static bool boot(void)
     return true;
 }
 
-// The port menu's link to the game: requests go to the main loop.
+// The port menu's link to the game: requests go to the main loop. The music
+// changes at once, wherever the menu was opened: in a cut-scene, on the title
+// screen or in the game.
 static void menu_changed(MenuChange change)
 {
     static const OptionsRequest requests[] = {
         [MENU_CHANGED_CHEATS] = OPTIONS_CHEATS,
         [MENU_ADD_MONEY] = OPTIONS_ADD_MONEY_ONCE,
         [MENU_ADD_ORE] = OPTIONS_ADD_ORE_ONCE,
-        [MENU_CHANGED_MUSIC] = OPTIONS_MUSIC,
         [MENU_CHANGED_FIXES] = OPTIONS_FIXES,
     };
+    if (change == MENU_CHANGED_MUSIC) {
+        if (!cutscene_music_changed())
+            Music_SwitchDevice();
+        return;
+    }
     Options_Request(requests[change]);
 }
 
@@ -141,7 +148,6 @@ static void setup_config(void)
     Fixes_Init();
     audio_set_user_volumes(config.music_volume / 100.0f,
                            config.effects ? config.effects_volume / 100.0f : 0.0f);
-    audio_set_amiga_mixer(config.music == CONFIG_MUSIC_AMIGA);
     skip_intro |= config.skip_intro;
 
     static MenuFix fixes[CONFIG_MAX_FIXES];
