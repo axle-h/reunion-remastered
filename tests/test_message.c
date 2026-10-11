@@ -91,13 +91,13 @@ static bool screen_is_pattern(void)
 static void box(void)
 {
     reset();
-    int32_t avail = System_MemAvail();
+    int32_t avail = system_heap_free();
     TextFile_KeyPressed = key_pressed_snapshot;
     Message_ShowMessageNoLog((const uint8_t *)"\x0bHello|World");
     CHECK(seen_fill == 2);      // box background
     CHECK(seen_outline != 2);   // outline or the pattern, not the fill
     CHECK(screen_is_pattern());  // background restored
-    CHECK(System_MemAvail() == avail);
+    CHECK(system_heap_free() == avail);
     CHECK(ds.Message_LogCount == 0);
 }
 

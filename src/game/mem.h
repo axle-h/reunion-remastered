@@ -17,10 +17,9 @@ enum : uint32_t {
 
 enum : uint16_t {
     // Segment of the program's PSP. The load image starts 10h paragraphs
-    // later. -DREUNION_PSP_SEG=... moves everything but video memory and the
-    // EMS frame (game/emm.h has -DREUNION_EMM_FRAME_SEG): the golden state
-    // hashes (tests/test_golden.c) must not change, which finds pointers that
-    // game/state.c still counts as state.
+    // later. -DREUNION_PSP_SEG=... moves everything but video memory: the
+    // golden state hashes (tests/test_golden.c) must not change, which finds
+    // pointers that game/state.c still counts as state.
 #ifdef REUNION_PSP_SEG
     MEM_PSP_SEG = REUNION_PSP_SEG,
 #else
@@ -74,6 +73,5 @@ static inline void *ds_at(uint16_t off)
     return mem + MEM_DS_SEG * 16 + off;
 }
 
-// Clears the address space, points the video layer at A000:0000 and
-// installs an EMS driver (game/emm.h) with its page frame at E000:0000.
+// Clears the address space and points the video layer at A000:0000.
 void mem_init(void);

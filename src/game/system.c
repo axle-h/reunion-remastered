@@ -28,8 +28,9 @@ void system_init(void)
     ds.System_Test8086 = 2;
 
     // The heap starts after the stack (and the overlay buffer, empty here);
-    // HeapEnd is the top of memory from the PSP. ClearBss left the offsets 0
-    // and FreeList = HeapPtr means "no free blocks".
+    // HeapEnd is the top of memory from the PSP (heap_alloc may move it).
+    // ClearBss left the offsets 0 and FreeList = HeapPtr means "no free
+    // blocks".
     ds.System_OvrHeapOrg = MEM_HEAP_SEG;
     ds.System_OvrHeapPtr = MEM_HEAP_SEG;
     uint16_t org = MEM_HEAP_SEG + ds.System_OvrHeapSize;
@@ -481,6 +482,39 @@ static bool heap_alloc(uint16_t size, FarPtr *out)
             return true;
         }
 
+        // Port addition. The game moved its two big blocks into EMS, which
+        // the port doesn't have (game/ems.h), so the heap can run out where
+        // the original's didn't. When the heap reaches video memory it goes
+        // on above it, to F000:0000 (so that segment + block size can't
+        // wrap): what is left below A000:0000 becomes a free block, and
+        // video memory a block that is never freed. Until then the heap is
+        // the original's. (It goes when its blocks move out of mem[];
+        // docs/native-memory-plan.md.)
+        if (seg_of(ds.System_HeapEnd) == MEM_VIDEO_SEG) {
+            FarPtr top = ds.System_HeapPtr, above = far_ptr(MEM_VIDEO_SEG + 0x1000, 0);
+            uint32_t gap = MEM_VIDEO_SEG * 16u - far_linear(top);  // a multiple of 8
+            ds.System_HeapEnd = far_ptr(0xF000, 0);
+            ds.System_HeapPtr = above;
+            // The list's last link (to the old HeapPtr) goes to the gap, or
+            // above video memory if there is none.
+            uint16_t ls = MEM_DS_SEG, lo = FREELIST_OFF;
+            while (rd16(ls, lo + 2) != seg_of(top)) {
+                uint16_t ns = rd16(ls, lo + 2), no = rd16(ls, lo);
+                ls = ns;
+                lo = no;
+            }
+            FarPtr next = gap ? top : above;
+            wr16(ls, lo, off_of(next));
+            wr16(ls, lo + 2, seg_of(next));
+            if (gap) {
+                wr16(seg_of(top), off_of(top), off_of(above));
+                wr16(seg_of(top), off_of(top) + 2, seg_of(above));
+                wr16(seg_of(top), off_of(top) + 4, (uint16_t)(gap & 0xF));
+                wr16(seg_of(top), off_of(top) + 6, (uint16_t)(gap >> 4));
+            }
+            continue;
+        }
+
         // 48c7:040a: 0 = run-time error, 1 = return nil, else retry.
         uint16_t r = heap_error(ds.System_HeapAllocSize) & 0xFF;
         if (r == 0)
@@ -599,14 +633,27 @@ void System_FreeMem(FarPtr p, uint16_t size)
         System_RunError(204);
 }
 
-// 48c7:02e7
+// 48c7:02e7. The game asks before it loads something big (the start-up
+// check, the satellite animation, picture buffers) and skips or stops when
+// there isn't enough. The port always has enough: all of conventional
+// memory free, which no check asks for.
 int32_t System_MemAvail(void)
 {
-    return heap_walk(false);
+    return SYSTEM_MEM_PLENTY;
 }
 
 // 48c7:0303
 int32_t System_MaxAvail(void)
+{
+    return SYSTEM_MEM_PLENTY;
+}
+
+int32_t system_heap_free(void)
+{
+    return heap_walk(false);
+}
+
+int32_t system_heap_max_block(void)
 {
     return heap_walk(true);
 }

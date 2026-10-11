@@ -32,7 +32,7 @@ static uint16_t path(int sx, int sy, int gx, int gy)
 static void find_path(void)
 {
     ds.GrWar_BattleGrids = System_GetMem(0xC6);
-    int32_t free_before = System_MemAvail();
+    int32_t free_before = system_heap_free();
 
     clear_grid();
     CHECK(path(0, 4, 5, 4) == 3);  // east
@@ -64,7 +64,7 @@ static void find_path(void)
     CHECK(path(4, 4, 10, 4) == 0);
 
     // FindPath gives back everything it took from the heap.
-    CHECK(System_MemAvail() == free_before);
+    CHECK(system_heap_free() == free_before);
 }
 
 // Unit lists as the unit assignment screen leaves them.

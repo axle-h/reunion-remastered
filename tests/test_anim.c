@@ -80,7 +80,7 @@ static void setup(void)
 static void main_anim(void)
 {
     setup();
-    int32_t before = System_MemAvail();
+    int32_t before = system_heap_free();
     uint8_t frames = *(uint8_t *)ds_at(0x55D7 + 7 * 8);
     Ani ani;
     CHECK(ani_load("ANIM\\MAIN8.ANI", &ani));
@@ -103,13 +103,13 @@ static void main_anim(void)
     CHECK(r[0] == 1);
     CHECK((size_t)(r[0x231] | r[0x232] << 8) == ani.frames[0].size + 13);
     // A second load while one is loaded does nothing.
-    int32_t loaded = System_MemAvail();
+    int32_t loaded = system_heap_free();
     Anim_LoadGrAnim(1);
-    CHECK(System_MemAvail() == loaded);
+    CHECK(system_heap_free() == loaded);
     Anim_FreeMainAnim(8);
     CHECK(r[0] == 0);
-    CHECK(System_MemAvail() == before);
-    CHECK(ds.Game_MinMemAvail <= loaded);
+    CHECK(system_heap_free() == before);
+    CHECK(ds.Game_MinMemAvail <= SYSTEM_MEM_PLENTY);
     // Nothing loaded: ok stays true and nothing is drawn.
     uint32_t crc = SDL_crc32(0, scr(), 64000);
     bool drawn = false;

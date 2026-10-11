@@ -148,13 +148,9 @@ void ui_on_interrupt_screen(void (*fn)(void));
 
 // --- Game data block ---
 
-// The game keeps its Groups and Buildings in one block that, with EMS,
-// shares the page frame with the toolbar graphics (game/ems.h): the game
-// maps it in before it uses it, and between a toolbar draw and its next
-// use the frame holds the toolbar. Observers that stand for the group and
-// surface screens read the records here, as the game sees them once it
-// maps the block again (the frame if mapped, else the EMM's copy;
-// emm_page_view). A pointer stays valid until the next call of either.
+// The game keeps its Groups and Buildings in one block (game/ems.h).
+// Observers that stand for the group and surface screens read the records
+// here.
 struct TGroup;
 struct TBuilding;
 const struct TGroup *ui_group_record(int list, int k);  // Groups^[list][k]

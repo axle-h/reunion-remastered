@@ -44,14 +44,14 @@ fails (status 1).
 `tests/test_play_game.c` plays one game from "new game" with seed 12345
 through the 76 steps of acts 1-5 and wins: Halt(10) after 3,466,588
 retraces, on 2930-02-26 04:00 (game date), state hash
-`3aa8aae653a6316f`. The recording, 3.2 MB of plain autopilot script, is
+`9efc3606ee39bc65`. The recording, 3.2 MB of plain autopilot script, is
 [tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
 replays it in-process and `reunion --replay` ends the same way, with exit
 status 10:
 
 ```sh
 build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
-# replay: exit 10 after 3466588 frames, hash 3aa8aae653a6316f   (exit status 10)
+# replay: exit 10 after 3466588 frames, hash 9efc3606ee39bc65   (exit status 10)
 ```
 
 The recording was made again on 2026-10-11: the fixes to game logic that
@@ -113,7 +113,7 @@ hash).
    the prefix, so it is again one script from power-on; resumes can chain.
    Replaying a prefix runs at about 200,000 retraces/s, so the whole game
    replays in seconds: no in-memory snapshots (they would also have to carry
-   the EMS store, the audio and AdLib player state, and the statics outside
+   the audio and AdLib player state, and the statics outside
    the emulated memory).
 4. **Runner** ([tests/play/run.h](../tests/play/run.h)). A policy test is a
    list of steps; `play_main` takes a checkpoint before each step, so
@@ -210,13 +210,11 @@ hash).
    runs again later from what the screens then show.
 
    **Game data block.** Groups and Buildings share one 8770h-byte block
-   that, with EMS, shares the page frame with the toolbar graphics
-   (`game/ems.h`); the game maps it in before each use, so between a
-   toolbar draw and its next use the frame holds toolbar bytes. Observers
-   read groups and buildings through `ui_group_record` and
-   `ui_building_record` (the block as the game would see it mapped,
-   `emm_page_view`); read straight from the frame, a group's name came back
-   empty right after a screen switch.
+   (`game/ems.h`). Observers read groups and buildings through
+   `ui_group_record` and `ui_building_record`. (When the port still
+   emulated EMS, the block shared the page frame with the toolbar graphics,
+   and read straight from the frame a group's name came back empty right
+   after a screen switch.)
 
 ## Threads of work
 

@@ -154,12 +154,13 @@ int main(int argc, char *argv[])
     CHECK(palette_lit());
 
     // The same with the GUS music (modules): the start-up memory check asks
-    // for 28,000 bytes more, which needs the EMS (game/emm.h) as in DOS.
+    // for 28,000 bytes more, which in DOS needed EMS; the port always passes
+    // the check (System_MemAvail).
     config.music = CONFIG_MUSIC_GUS;
     CHECK(run("40:click:160,60;120:click:80,100;1000:quit") == -1);
     config_reset();
     CHECK(ds.SoundDrv_GusReady);
-    CHECK(Ems_GameDataBlock()->State == 2 && Ems_ToolbarBlock()->State == 2);
+    CHECK(Ems_GameDataBlock()->State == 1 && Ems_ToolbarBlock()->State == 1);
     CHECK(ds.Game_CurrentScreen == 1);
     p = match_percent("main", 0x97, 0xB0, 0x40, 0xBE, 49);
     printf("command centre (GUS music): %d%% of main.pic\n", p);

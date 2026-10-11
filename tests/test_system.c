@@ -310,7 +310,7 @@ static void test_heap(void)
     const uint16_t h = MEM_HEAP_SEG;
     CHECK(ds.System_HeapOrg == far_ptr(h, 0) && ds.System_HeapEnd == far_ptr(0xA000, 0));
     int32_t all = (0xA000 - h) * 16;
-    CHECK(System_MemAvail() == all && System_MaxAvail() == all);
+    CHECK(system_heap_free() == all && system_heap_max_block() == all);
 
     CHECK(System_GetMem(0) == 0);
     FarPtr p1 = System_GetMem(10); // 16 bytes
@@ -322,19 +322,19 @@ static void test_heap(void)
     CHECK(ds.System_HeapPtr == far_ptr(h + 9, 8) && ds.System_FreeList == ds.System_HeapPtr);
     CHECK(ds.System_HeapAllocSize == 100);
     int32_t top = all - 16 * 9 - 8;
-    CHECK(System_MemAvail() == top);
+    CHECK(system_heap_free() == top);
 
     // A hole: listed with its size, ending at HeapPtr.
     System_FreeMem(p2, 5);
     CHECK(ds.System_FreeList == p2);
     CHECK(*(uint32_t *)far_host(p2) == ds.System_HeapPtr);
     CHECK(*(uint32_t *)far_host(p2 + 4) == far_ptr(0, 8));
-    CHECK(System_MemAvail() == top + 8 && System_MaxAvail() == top);
+    CHECK(system_heap_free() == top + 8 && system_heap_max_block() == top);
 
     // Freeing the block below merges the two.
     System_FreeMem(p1, 10);
     CHECK(ds.System_FreeList == p1 && *(uint32_t *)far_host(p1 + 4) == far_ptr(1, 8));
-    CHECK(System_MemAvail() == top + 24);
+    CHECK(system_heap_free() == top + 24);
 
     // First fit splits the hole and keeps the rest listed.
     FarPtr p5 = System_GetMem(16);
@@ -351,7 +351,7 @@ static void test_heap(void)
     System_FreeMem(p3, 20);
     CHECK(ds.System_HeapPtr == far_ptr(h + 1, 0) && ds.System_FreeList == ds.System_HeapPtr);
     System_FreeMem(p5, 16);
-    CHECK(ds.System_HeapPtr == far_ptr(h, 0) && System_MemAvail() == all);
+    CHECK(ds.System_HeapPtr == far_ptr(h, 0) && system_heap_free() == all);
 
     // Invalid pointers.
     p1 = System_GetMem(64);
@@ -362,11 +362,16 @@ static void test_heap(void)
     EXPECT_ERROR(System_FreeMem(far_ptr(h, 8), 8), 204); // already free
     System_FreeMem(p1, 0); // size 0: ignored
 
-    // Running out.
+    // Running out: up to video memory, then above it (B000:0000 to
+    // F000:0000), with what is left below video memory a free block.
     system_init();
     volatile int n = 0;
     EXPECT_ERROR(for (;; n++) System_GetMem(0xFFF0), 203);
-    CHECK(n == all / 0xFFF0 && System_MaxAvail() == all - n * 0xFFF0);
+    int below = all / 0xFFF0, above = 0x40000 / 0xFFF0;
+    CHECK(n == below + above);
+    CHECK(ds.System_HeapEnd == far_ptr(0xF000, 0));
+    CHECK(system_heap_free() == all - below * 0xFFF0 + 0x40000 - above * 0xFFF0);
+    CHECK(system_heap_max_block() == SDL_max(all - below * 0xFFF0, 0x40000 - above * 0xFFF0));
 }
 
 int main(void)

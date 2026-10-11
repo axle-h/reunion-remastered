@@ -285,7 +285,7 @@ static void load_pic(void)
     CHECK(retraces == 5);
     CHECK(seen40[0] == 32 && seen40[1] == 24 && seen40[3] == 8 && seen40[4] == 0);
     // The file buffer went back to the heap.
-    CHECK(System_MemAvail() == System_MaxAvail());
+    CHECK(system_heap_free() == system_heap_max_block());
 
     // rows is clipped to the picture height (405f:0ccb): nothing past it.
     FarPtr buf = System_GetMem((uint16_t)(320 * (h + 4)));

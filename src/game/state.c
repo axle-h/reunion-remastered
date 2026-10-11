@@ -4,7 +4,6 @@
 
 #include "game/dseg.h"
 #include "game/dsfields.h"
-#include "game/emm.h"
 #include "platform/autopilot.h"
 #include "platform/video.h"
 
@@ -21,9 +20,9 @@ static const char *const layout_fields[] = {
     // The Borland heap's own bookkeeping: the size GetMem is working on, and
     // the lowest MemAvail seen (diagnostic only).
     "System_HeapAllocSize", "Game_MinMemAvail",
-    // Where the EMS blocks live: in EMS (state 2, with a handle, frame and
-    // pages) or on the heap (state 1), and the last EMM status. The blocks'
-    // contents are in the stream.
+    // Where the EMS blocks live (the original's state 2, in EMS with a
+    // handle, frame and pages, or state 1 on the heap), and the last EMM
+    // status. The blocks' contents are in the stream.
     "Ems_Status", "Ems_GameData.State", "Ems_GameData.Handle", "Ems_GameData.FrameSeg",
     "Ems_GameData.PageCount", "GfxPath_ToolbarBlock.State", "GfxPath_ToolbarBlock.Handle",
     "GfxPath_ToolbarBlock.FrameSeg", "GfxPath_ToolbarBlock.PageCount",
@@ -213,29 +212,32 @@ static void put_ds(StateBuf *b)
     b->nparts = plan.nparts;
 }
 
-// The contents of an EMS block (game/ems.h) wherever it lives: on the heap
-// (state 1) or in EMS pages (state 2), mapped or not.
+// The contents of an EMS block (game/ems.h), a heap copy (state 1).
 static void put_ems_block(StateBuf *b, const char *name, const TEmsBlock *blk)
 {
     put_u8(b, name, blk->State != 0);
-    if (blk->State == 1) {
+    if (blk->State != 0)
         put(b, name, far_host(blk->Data), blk->Size, 1, -1);
-    } else if (blk->State == 2) {
-        static uint8_t copy[0x10000];
-        for (uint32_t at = 0; at < blk->Size; at += EMM_PAGE_SIZE) {
-            const uint8_t *p = emm_page_view(blk->Handle, (uint16_t)(at / EMM_PAGE_SIZE));
-            SDL_memcpy(copy + at, p, SDL_min((uint32_t)EMM_PAGE_SIZE, blk->Size - at));
-        }
-        put(b, name, copy, blk->Size, 1, -1);
-    }
 }
 
-// A block behind a DS pointer, when the pointer is set.
-static void put_block(StateBuf *b, const char *name, FarPtr p, uint32_t size)
+// The message log's entries 1..Message_LogCount, {kind: integer; text:
+// string[50]} each, with the bytes past the text's length as zeros. The
+// game reads nothing else: the rest of the block, and of each string, is
+// whatever the heap or an earlier message left there.
+static void put_log(StateBuf *b)
 {
-    put_u8(b, name, p != 0);
-    if (p)
-        put(b, name, far_host(p), size, 1, -1);
+    enum { ENTRY = 0x35 };
+    uint8_t log[15 * ENTRY] = {};
+    int16_t n = SDL_clamp(ds.Message_LogCount, 0, 15);
+    put_u8(b, "Message_Log^", ds.Message_Log != 0);
+    if (!ds.Message_Log)
+        return;
+    const uint8_t *src = far_host(ds.Message_Log);
+    for (int16_t i = 0; i < n; i++) {
+        const uint8_t *e = src + i * ENTRY;
+        SDL_memcpy(log + i * ENTRY, e, 3 + SDL_min(e[2], 50));
+    }
+    put(b, "Message_Log^", log, (uint32_t)n * ENTRY, ENTRY, -1);
 }
 
 void state_serialize(StateBuf *b)
@@ -245,7 +247,7 @@ void state_serialize(StateBuf *b)
     put_ds(b);
     put_ems_block(b, "Ems_GameData^", &ds.Ems_GameData);
     put_ems_block(b, "GfxPath_ToolbarBlock^", &ds.GfxPath_ToolbarBlock);
-    put_block(b, "Message_Log^", ds.Message_Log, 0x31B);
+    put_log(b);
     put_u8(b, "vid_mode", (uint8_t)vid_mode());
     if (vid_mode() == VID_MODE_13H) {
         put(b, "screen", vid_screen, VID_WIDTH * VID_HEIGHT, 1, -1);

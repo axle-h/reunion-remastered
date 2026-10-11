@@ -5,7 +5,6 @@
 
 #include "assets/icons.h"
 #include "game/dseg.h"
-#include "game/emm.h"
 #include "game/ems.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
 
     GfxPath_Init();
     TEmsBlock *blk = Ems_ToolbarBlock();
-    CHECK(blk->State == 2 && blk->Data == far_ptr(EMM_FRAME_SEG, 0));  // in EMS
+    CHECK(blk->State == 1 && blk->Data != 0);  // a heap copy
     CHECK(ds.Game_GfxPathProc == far_ptr(0x3A1B, 0x09A3));
     GfxPath_IconAllIndex();
 

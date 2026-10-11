@@ -58,8 +58,10 @@ one 1 MB (+64 KB) array, `mem[]`, with everything at its original address:
 |---|---|
 | Data segment | `MEM_DS_SEG` = load segment + 3A81h; `ds` is a `DSeg` view of it |
 | Video memory | `A000:0000`; `vid_screen` points there after `mem_init()` |
-| Heap | from `MEM_HEAP_SEG` (after the stack) to `A000:0000`, managed by `System_GetMem`/`System_FreeMem` (`src/game/system.c`) exactly as Borland's System unit does |
-| EMS | page frame `E000:0000` (4 × 16 KB), driver header at `C800:0000` behind INT 67h's vector; `src/game/emm.c` emulates a LIM 4.0 driver with 256 KB, which unit Ems (`src/game/ems.c`) uses for the game data and toolbar blocks as on a DOS machine with EMS |
+| Heap | from `MEM_HEAP_SEG` (after the stack) to `A000:0000`, managed by `System_GetMem`/`System_FreeMem` (`src/game/system.c`) exactly as Borland's System unit does; if it reaches video memory it goes on above it to `F000:0000`. `System_MemAvail`/`MaxAvail` always report 640 KB, so the game's memory checks pass |
+
+There is no EMS: unit Ems (`src/game/ems.c`) keeps the game data and toolbar
+blocks on the heap, as on a DOS machine without an EMM.
 
 One exception: the AdLib tune buffer, which only the port's own player
 reads, is a C array rather than a heap block (docs/audio.md), so the heap

@@ -3,7 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include "game/dseg.h"
-#include "game/emm.h"
 #include "game/ems.h"
 #include "game/main_program.h"
 #include "game/mem.h"
@@ -672,23 +671,9 @@ int ui_handle_interrupts(void)
 
 // --- Game data block ---
 
-enum : uint32_t { GAME_DATA_SIZE = 0x8770 };
-
-// The block's bytes: the memory itself without EMS, else a copy of its
-// pages as mapped or stored.
 static const uint8_t *game_data(void)
 {
-    static uint8_t copy[GAME_DATA_SIZE];
-    const TEmsBlock *blk = Ems_GameDataBlock();
-    if (blk->State != 2)
-        return far_host(blk->Data);
-    for (uint32_t page = 0; page * EMM_PAGE_SIZE < GAME_DATA_SIZE; page++) {
-        const uint8_t *v = emm_page_view(blk->Handle, (uint16_t)page);
-        uint32_t n = SDL_min((uint32_t)EMM_PAGE_SIZE, GAME_DATA_SIZE - page * EMM_PAGE_SIZE);
-        if (v)
-            SDL_memcpy(copy + page * EMM_PAGE_SIZE, v, n);
-    }
-    return copy;
+    return far_host(Ems_GameDataBlock()->Data);
 }
 
 static uint32_t block_offset(FarPtr p)

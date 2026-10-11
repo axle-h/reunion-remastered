@@ -92,7 +92,7 @@ void System_FillChar(void *dst, uint16_t count, uint8_t value);
 
 // ---------------------------------------------------------------------------
 // Heap: BP7's free list in the emulated address space, between HeapOrg and
-// HeapEnd (A000:0000). Blocks are multiples of 8 bytes and pointers are
+// HeapEnd (A000:0000, then F000:0000 around video memory; heap_alloc). Blocks are multiples of 8 bytes and pointers are
 // normalised (offset 0 or 8), so they equal the original's.
 // ---------------------------------------------------------------------------
 
@@ -100,10 +100,14 @@ void System_FillChar(void *dst, uint16_t count, uint8_t value);
 FarPtr System_GetMem(uint16_t size);
 // 48c7:029f: run-time error 204 for a pointer that is not a heap block.
 void System_FreeMem(FarPtr p, uint16_t size);
-// 48c7:02e7: total free bytes.
+// 48c7:02e7 / 0303: total free bytes and the largest free block, as the
+// game sees them: always SYSTEM_MEM_PLENTY, so its memory checks pass.
+enum : int32_t { SYSTEM_MEM_PLENTY = 0xA0000 };
 int32_t System_MemAvail(void);
-// 48c7:0303: largest free block.
 int32_t System_MaxAvail(void);
+// The heap's real free bytes and largest free block (tests: leak checks).
+int32_t system_heap_free(void);
+int32_t system_heap_max_block(void);
 
 // ---------------------------------------------------------------------------
 // Random numbers (Borland's LCG on ds.System_RandSeed).
