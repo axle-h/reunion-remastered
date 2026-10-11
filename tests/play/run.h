@@ -19,7 +19,7 @@
 //   PLAY_STOP=STEP      ends the run (as a quit) when step STEP would start
 //   PLAY_VERIFY=0       skips replaying the recording at the end
 //   REUNION_BIN=PATH    also replays it with `PATH --replay` (set by CMake)
-//   PLAY_DUMP_DIR, PLAY_TRACE, PLAY_MEM_DUMP: see play.c
+//   PLAY_DUMP_DIR, PLAY_TRACE, PLAY_STATE_DUMP: see play.c
 #pragma once
 
 #include "play/play.h"

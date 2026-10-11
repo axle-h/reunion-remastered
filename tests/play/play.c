@@ -12,6 +12,7 @@
 #include "game/main_program.h"
 #include "game/mem.h"
 #include "game/options.h"
+#include "game/state.h"
 #include "platform/config.h"
 #include "game/system.h"
 #include "platform/audio.h"
@@ -56,21 +57,15 @@ static struct {
     bool failed;
     char failure[256];
     // play_resume: the policy first wakes at the checkpoint's frame, where
-    // the memory must hash as it did when the checkpoint was taken.
+    // the game's state must hash as it did when the checkpoint was taken.
     bool check_resume;
     uint64_t resume_hash;
     char checkpoint[64];
 } ctl;
 
-// The write barrier: the memory as the policy got it. Copying 1.1 MB and
-// comparing it afterwards costs about 30 us, a fraction of hashing it twice,
-// and finds the exact byte.
-static uint8_t shadow[MEM_SIZE];
-
-static uint64_t hash_memory(void)
-{
-    return autopilot_hash(mem, MEM_SIZE);
-}
+// The write barrier: the game's state (game/state.h) as the policy got it
+// and as it left it. Comparing the two streams finds the exact field.
+static StateBuf shadow, after;
 
 static void set_failure(const char *fmt, va_list ap)
 {
@@ -97,8 +92,10 @@ static bool cheating(void)
     return config.freeze_money || config.freeze_ore;
 }
 
-// PLAY_TRACE=path: one line per retrace with the memory hash (debugging
-// replays). Files get a .0, .1, ... suffix per boot.
+// PLAY_TRACE=path: one line per retrace with the state hash (debugging
+// replays). Files get a .0, .1, ... suffix per boot. PLAY_TRACE_DUMP=frame
+// also saves the state stream at that frame (path.state0, ...; compare two
+// with `test_golden compare`).
 static FILE *trace;
 
 static void trace_frame(uint64_t frame)
@@ -107,30 +104,27 @@ static void trace_frame(uint64_t frame)
         return;
     InputMouse m = input_mouse();
     fprintf(trace, "%llu %016llx %d,%d,%d%d\n", (unsigned long long)frame,
-            (unsigned long long)hash_memory(), m.x, m.y, m.left, m.right);
-    const char *at = SDL_getenv("PLAY_TRACE_DUMP");  // frame to save memory at
+            (unsigned long long)state_hash(), m.x, m.y, m.left, m.right);
+    const char *at = SDL_getenv("PLAY_TRACE_DUMP");
     if (at && SDL_strtoull(at, nullptr, 10) == frame) {
         static int n;
         char path[1024];
-        SDL_snprintf(path, sizeof path, "%s.mem%d", SDL_getenv("PLAY_TRACE"), n++);
-        SDL_SaveFile(path, mem, MEM_SIZE);
+        SDL_snprintf(path, sizeof path, "%s.state%d", SDL_getenv("PLAY_TRACE"), n++);
+        state_serialize(&after);
+        state_save(&after, path);
     }
 }
 
 static void check_write_barrier(uint64_t frame)
 {
-    if (memcmp(shadow, mem, MEM_SIZE) == 0)
+    state_serialize(&after);
+    size_t at = state_first_difference(&shadow, &after);
+    if (at == SIZE_MAX)
         return;
-    uint32_t at = 0;
-    while (shadow[at] == mem[at])
-        at++;
-    uint32_t ds_base = MEM_DS_SEG * 16;
-    if (at >= ds_base && at < ds_base + 0x10000)
-        fail_from_game("write barrier: the policy changed game memory at frame %llu (DS:%04X)",
-                       (unsigned long long)frame, at - ds_base);
-    else
-        fail_from_game("write barrier: the policy changed game memory at frame %llu (linear %05X)",
-                       (unsigned long long)frame, at);
+    char where[128];
+    state_describe(&after, at, where, sizeof where);
+    fail_from_game("write barrier: the policy changed the game at frame %llu (%s)",
+                   (unsigned long long)frame, where);
 }
 
 // autopilot controller: runs on the game thread at every retrace.
@@ -146,13 +140,13 @@ static void on_retrace(uint64_t frame)
     }
     if (ctl.check_resume) {
         ctl.check_resume = false;
-        if (hash_memory() != ctl.resume_hash) {
+        if (state_hash() != ctl.resume_hash) {
             fail_from_game("resume: the game at checkpoint %s (frame %llu) is not as recorded",
                            ctl.checkpoint, (unsigned long long)frame);
             return;
         }
     }
-    memcpy(shadow, mem, MEM_SIZE);
+    state_serialize(&shadow);
     SDL_SignalSemaphore(ctl.to_policy);
     SDL_WaitSemaphore(ctl.to_game);
     if (ctl.rebaseline)
@@ -230,17 +224,18 @@ static PlayResult boot_and_run(const char *script)
             Game_Main();
         }
     }
-    const char *dump = SDL_getenv("PLAY_MEM_DUMP");
+    const char *dump = SDL_getenv("PLAY_STATE_DUMP");
     if (dump && *dump) {
         static int n;
         char path[1024];
         SDL_snprintf(path, sizeof path, "%s.%d", dump, n++);
-        SDL_SaveFile(path, mem, MEM_SIZE);
+        state_serialize(&after);
+        state_save(&after, path);
     }
     PlayResult r = {
         .exit_code = halt_code,
         .frames = timing_frames() - start,
-        .state_hash = hash_memory(),
+        .state_hash = state_hash(),
     };
     if (trace)
         fclose(trace);
@@ -376,11 +371,27 @@ PlayResult play_resume(const char *from, const char *checkpoint, PlayPolicy poli
     return r;
 }
 
+static void (*replay_watch)(uint64_t frame);
+
+static void replay_frame(uint64_t frame)
+{
+    trace_frame(frame);
+    if (replay_watch)
+        replay_watch(frame);
+}
+
 PlayResult play_replay(const char *script)
 {
-    autopilot_set_controller(trace_frame);
+    return play_replay_watch(script, nullptr);
+}
+
+PlayResult play_replay_watch(const char *script, void (*watch)(uint64_t frame))
+{
+    replay_watch = watch;
+    autopilot_set_controller(replay_frame);
     PlayResult r = boot_and_run(script);
     autopilot_set_controller(nullptr);
+    replay_watch = nullptr;
     return r;
 }
 
@@ -446,7 +457,7 @@ void play_checkpoint(const char *name)
     if (!ok)
         play_fail("play_checkpoint: bad name '%s'", name);
     record_line("# checkpoint %s at frame %llu, hash %016llx\n", name,
-                (unsigned long long)ctl.frame, (unsigned long long)hash_memory());
+                (unsigned long long)ctl.frame, (unsigned long long)state_hash());
     if (ctl.record)
         fflush(ctl.record);
     play_log("checkpoint %s%s", name, ctl.tainted ? " (tainted: can't be resumed)" : "");

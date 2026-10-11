@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
-#include "game/mem.h"
+#include "game/dseg.h"
 #include "platform/fs.h"
 #include "play/play.h"
 #include "play/run.h"
@@ -37,7 +37,7 @@ static void writes_memory(void *unused)
 {
     (void)unused;
     play_wait(10);
-    mem[MEM_DS_SEG * 16 + 0x1234] ^= 1;
+    ds.Game_Credits ^= 1;
     play_wait(10);
     play_quit();
 }
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
     // The write barrier names the byte.
     r = play_run(SEED, writes_memory, nullptr, nullptr);
     show("policy writes memory", &r);
-    CHECK(r.failed && SDL_strstr(r.failure, "write barrier") && SDL_strstr(r.failure, "DS:1234"));
+    CHECK(r.failed && SDL_strstr(r.failure, "write barrier") && SDL_strstr(r.failure, "DS Game_Credits"));
 
     SDL_Quit();
     return ok ? 0 : 1;

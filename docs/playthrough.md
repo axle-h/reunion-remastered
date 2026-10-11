@@ -8,8 +8,8 @@ Earth ground-battle win (`Halt(10)`, VICTORY).
 
 - **Input only.** The fixture acts only through simulated mouse moves, clicks
   and key presses (`input_set_mouse`, `input_push_key`). It never writes game
-  state; a write barrier (hash of the emulated memory around every controller
-  call) enforces this.
+  state; a write barrier (the game's state, `game/state.h`, compared around
+  every controller call) enforces this.
 - **Player-visible information only** for decisions: the screen shown, its
   hotspots and captions, messages, date, credits, planet and group info the
   game displays. Hidden state (story timers, enemy forces not shown, RNG) may
@@ -35,32 +35,36 @@ build/debug/reunion --replay=play_full.txt
 
 `--replay` runs headless (offscreen video, dummy audio, unless `SDL_*_DRIVER`
 says otherwise), skips the cut-scenes, prints the end as the fixture reports
-it (halt code, retraces, hash of the emulated memory) and exits with the
+it (halt code, retraces, hash of the game's state, `state_hash()`) and exits with the
 halt code. A script that has not ended 100,000 retraces after its last event
 fails (status 1).
 
 ### Result: seed 12345
 
 `tests/test_play_game.c` plays one game from "new game" with seed 12345
-through the 76 steps of acts 1-5 and wins: Halt(10) after 3,490,240
-retraces, on 2930-03-05 01:00 (game date), memory hash
-`bc4fca9eb88e20f0`. The recording, 3.2 MB of plain autopilot script, is
+through the 76 steps of acts 1-5 and wins: Halt(10) after 3,466,588
+retraces, on 2930-02-26 04:00 (game date), state hash
+`3aa8aae653a6316f`. The recording, 3.2 MB of plain autopilot script, is
 [tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
 replays it in-process and `reunion --replay` ends the same way, with exit
 status 10:
 
 ```sh
 build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
-# replay: exit 10 after 3490240 frames, hash bc4fca9eb88e20f0   (exit status 10)
+# replay: exit 10 after 3466588 frames, hash 3aa8aae653a6316f   (exit status 10)
 ```
 
-Milestones: Jade 2927-09-08, Jaanosian contact 2928-03-02, the Galleon
-2928-08-05, Mirach 3 taken 2929-04-01, the League's surrender
-2929-10-01, Earth 2930-03-05 (the dates of each step are in
-[playthrough-policy.md](playthrough-policy.md) §1 "As run"). The Earth
-invasion: 60H 60SF 12D 10C against 80H 80SF 7D 5C in space (won, lost
-48H 42SF), 40T 20Air 40ML against 30Tr 90T 50Air 30ML on the ground (won,
-lost 10T 20Air 30ML). `test_play_game` takes 3-4 minutes in a release build
+The recording was made again on 2026-10-11: the fixes to game logic that
+followed the player's selection changed the run, and the first recording
+(Halt(10) after 3,490,240 retraces, Earth taken 2930-03-05) no longer
+replayed. Milestones of this one: Jade found 2927-08-25, Jaanosian contact
+2928-03-02, the Galleon invented 2928-07-23, Mirach 3 taken (the Morgruls
+eliminated) 2929-03-28, the League's surrender 2929-09-23, Earth
+2930-02-26 (the dates of each step in
+[playthrough-policy.md](playthrough-policy.md) §1 "As run" are the first
+recording's). The Earth invasion: in space lost 45H 22SF, destroyed 64H
+64SF 7D 5C; on the ground lost 10T 21Air 35ML, destroyed 30Tr 90T 50Air
+30ML. `test_play_game` takes 3-4 minutes in a release build
 (ctest `TIMEOUT` 900 s) and about 26 in a debug one, so ctest runs it only
 in non-Debug builds (`ctest --test-dir build/release -R test_play_game`);
 the debug binary still builds for running by hand.
@@ -91,10 +95,12 @@ hash).
    hand-off (exactly one of game and controller runs at a time), so a policy
    reads top to bottom: `hire(...)`, `wait_until(pred, timeout)`, ...
    ([tests/play/play.h](../tests/play/play.h))
-   - Write barrier: the emulated memory is copied before every policy slice
-     and compared after it; a change fails the run and names the byte
-     (`DS:xxxx`). Retraces the policy sleeps through (`play_wait(n)`) cost
-     nothing.
+   - Write barrier: the game's state (`game/state.h`: the data segment
+     field by field without pointers, the blocks behind them, the screen
+     and the palette) is serialized before every policy slice and compared
+     after it; a change fails the run and names the field
+     (`DS Game_Credits+0`). Retraces the policy sleeps through
+     (`play_wait(n)`) cost nothing.
    - The fixture boots like `src/main.c` does for a scripted run (fixes on,
      no intro), so its runs and `reunion --replay` end the same.
    - A policy that returns ends the run as `play_quit()` does. The recording
@@ -102,7 +108,7 @@ hash).
 3. **Checkpoints.** `play_checkpoint("name")` writes `# checkpoint name at
    frame F, hash H` into the recording. `play_resume(recording, "name",
    policy, ...)` replays the recording up to that line with no policy, checks
-   the memory hash at frame F, and wakes the policy there
+   the state hash at frame F, and wakes the policy there
    (`play_resumed_at()` names the checkpoint). The new recording starts with
    the prefix, so it is again one script from power-on; resumes can chain.
    Replaying a prefix runs at about 200,000 retraces/s, so the whole game
@@ -116,12 +122,13 @@ hash).
    and with `reunion --replay` (`REUNION_BIN`, set by CMake for
    `test_play_*`) and checks all three ends match. Other variables:
    `PLAY_SEED`, `PLAY_RECORD`, `PLAY_RESUME_FROM`, `PLAY_VERIFY=0`,
-   `PLAY_DUMP_DIR`, `PLAY_TRACE`. `tests/test_play_bench.c` is the smallest
+   `PLAY_DUMP_DIR`, `PLAY_TRACE`, `PLAY_TRACE_DUMP`, `PLAY_STATE_DUMP`.
+   `tests/test_play_bench.c` is the smallest
    example.
 5. **Speed** (debug build, one core). The clock runs about 98 retraces per
    game hour on the command centre, so two game years are about 1.7 million
    retraces. A policy that checks a condition every retrace runs about 22,000
-   retraces/s (the write barrier's 1.1 MB copy and compare is most of it),
+   retraces/s (the write barrier is most of it),
    a sleeping policy or a replay about 200,000: a whole game is about 1.5
    minutes to play and 10 s to replay. Unpaced autopilot runs (the fixture,
    `--replay`, soak runs) advance the audio without synthesising it

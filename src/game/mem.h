@@ -17,8 +17,15 @@ enum : uint32_t {
 
 enum : uint16_t {
     // Segment of the program's PSP. The load image starts 10h paragraphs
-    // later. TODO: match DOSBox-X's value when comparing memory dumps.
+    // later. -DREUNION_PSP_SEG=... moves everything but video memory and the
+    // EMS frame (game/emm.h has -DREUNION_EMM_FRAME_SEG): the golden state
+    // hashes (tests/test_golden.c) must not change, which finds pointers that
+    // game/state.c still counts as state.
+#ifdef REUNION_PSP_SEG
+    MEM_PSP_SEG = REUNION_PSP_SEG,
+#else
     MEM_PSP_SEG = 0x0192,
+#endif
     MEM_LOAD_SEG = MEM_PSP_SEG + 0x10,
 
     // Data segment (Ghidra 4A81h = file 3A81h).

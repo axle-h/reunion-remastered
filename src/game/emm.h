@@ -18,7 +18,11 @@
 #include "game/dseg.h"
 
 enum : uint16_t {
+#ifdef REUNION_EMM_FRAME_SEG
+    EMM_FRAME_SEG = REUNION_EMM_FRAME_SEG,
+#else
     EMM_FRAME_SEG = 0xE000,
+#endif
     EMM_DRIVER_SEG = 0xC800,  // DOSBox's private segment, where its EMM lives
     EMM_PAGE_SIZE = 0x4000,
     EMM_PHYS_PAGES = 4,

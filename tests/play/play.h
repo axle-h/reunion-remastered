@@ -10,8 +10,8 @@
 //
 // Rules the fixture enforces:
 // - Input only: every input goes through play_mouse()/play_key(), which also
-//   record it. The emulated memory is compared before and after each policy
-//   slice and any change fails the run (write barrier).
+//   record it. The game's state (game/state.h) is compared before and after
+//   each policy slice and any change fails the run (write barrier).
 // - No cheats: the run fails if a port menu cheat is on.
 // Policies decide only on what a player can see (docs/playthrough.md); that
 // part is a review rule, not checked here.
@@ -34,7 +34,7 @@ typedef void (*PlayPolicy)(void *arg);
 typedef struct {
     int exit_code;        // Halt code, or -1 if the game quit (window close)
     uint64_t frames;      // retraces played (script frame numbering)
-    uint64_t state_hash;  // hash of the emulated memory at the end
+    uint64_t state_hash;  // state_hash() at the end
     bool failed;          // the policy called play_fail or broke a rule
     bool tainted;         // play_test_setup was used: not a proof, won't replay
     char failure[256];
@@ -55,6 +55,9 @@ PlayResult play_resume(const char *from, const char *checkpoint, PlayPolicy poli
                        const char *record_path);
 // Boots and plays an autopilot script (e.g. "@path") with no policy.
 PlayResult play_replay(const char *script);
+// The same, calling watch(frame) at every retrace after the script's events
+// (it may end the run with input_request_quit()).
+PlayResult play_replay_watch(const char *script, void (*watch)(uint64_t frame));
 
 // --- Policy side: call only from the policy thread. ---
 

@@ -146,15 +146,11 @@ static bool block(FILE *f, void *buf, uint16_t size, bool save)
     return (save ? fwrite(buf, 1, size, f) : fread(buf, 1, size, f)) == size;
 }
 
-bool SaveLoad_Transfer(bool save)
+// The header, the slot name as string[19] (the first 20 bytes of the
+// string[20] at `name`), then the blocks.
+static bool transfer(FILE *f, uint8_t *name, bool save)
 {
-    if (!save && !*slot_entry(SLOT_SEL))
-        return false;
-    FILE *f = open_slot(SLOT_SEL, save);
-    if (!f)
-        return false;
-    // Header: the slot name, string[19] (the first 20 bytes of the string[20]).
-    bool ok = block(f, slot_entry(SLOT_SEL) + 1, 0x14, save);
+    bool ok = block(f, name, 0x14, save);
     for (size_t i = 0; ok && i < sizeof blocks / sizeof blocks[0]; i++) {
         void *p = blocks[i].ptr ? far_host(*(FarPtr *)ds_at(blocks[i].off)) : ds_at(blocks[i].off);
         ok = block(f, p, blocks[i].size, save);
@@ -164,6 +160,27 @@ bool SaveLoad_Transfer(bool save)
     // never read.
     if (ok && !save)
         Options_Rebase();
+    return ok;
+}
+
+bool SaveLoad_Transfer(bool save)
+{
+    if (!save && !*slot_entry(SLOT_SEL))
+        return false;
+    FILE *f = open_slot(SLOT_SEL, save);
+    if (!f)
+        return false;
+    bool ok = transfer(f, slot_entry(SLOT_SEL) + 1, save);
+    fclose(f);
+    return ok;
+}
+
+bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save)
+{
+    FILE *f = fopen(path, save ? "wb" : "rb");
+    if (!f)
+        return false;
+    bool ok = transfer(f, name, save);
     fclose(f);
     return ok;
 }

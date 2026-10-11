@@ -461,7 +461,7 @@
 4a81:00c2 Advisor::Menus: array[1..3] of TMenu      // folded 00bc; 1991:08de
 4a81:00d4 Advisor::CurMenu: TMenu
 4a81:0c2e Alien::MenuData                           // lists of 4-byte menus (count + 3), 2e4b
-4a81:0ce2 Alien::MenuLists: array[1..9] of pointer  // folded 0cde; 2e4b:0780
+4a81:0ce2 Alien::MenuLists: array[1..10] of pointer  // by race (0cde + race * 4); 2e4b:0780. Races 2..10 point into Alien_MenuData; race 1's entry is not a pointer
 4a81:0d0a Alien::CurMenu: array[0..3] of byte
 4a81:1a3a Surface::Tileset: array[1..11] of integer   // SurfaceType -> FELSZ/FANIM sheet and map template (1,8,2,7,10,3,9,5,4,6,11)
 4a81:1a50 Galaxy::SurfaceColonisable: array[1..11] of boolean  // folded 1a4f; 1390:0047, 357b

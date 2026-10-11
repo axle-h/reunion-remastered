@@ -21,6 +21,7 @@
 #include "game/mem.h"
 #include "game/music.h"
 #include "game/options.h"
+#include "game/state.h"
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
@@ -269,7 +270,7 @@ int main(int argc, char *argv[])
             } else {
                 printf("replay: exit %d after %llu frames, hash %016llx\n", exit_code,
                        (unsigned long long)frames,
-                       (unsigned long long)autopilot_hash(mem, MEM_SIZE));
+                       (unsigned long long)state_hash());
                 result = exit_code == EXIT_QUIT ? 0 : exit_code;
             }
             fflush(stdout);

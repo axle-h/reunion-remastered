@@ -1,0 +1,368 @@
+#include "game/state.h"
+
+#include <SDL3/SDL.h>
+
+#include "game/dseg.h"
+#include "game/dsfields.h"
+#include "game/emm.h"
+#include "platform/autopilot.h"
+#include "platform/video.h"
+
+// DS fields left out besides the pointers (DSF_POINTER), because they only
+// describe the memory layout or the port's emulation of it. "Field.Sub"
+// names a field of every element of a record field.
+static const char *const layout_fields[] = {
+    // Segments: the PSP, video memory and the blitters' destination (screen
+    // or an off-screen block).
+    "System_PrefixSeg", "System_Seg0040", "System_SegA000", "System_SegB000", "System_SegB800",
+    "Gfx_ScreenSeg",
+    // The overlay heap's segments (empty, at the start of the heap).
+    "System_OvrHeapOrg", "System_OvrHeapPtr", "System_OvrHeapEnd",
+    // The Borland heap's own bookkeeping: the size GetMem is working on, and
+    // the lowest MemAvail seen (diagnostic only).
+    "System_HeapAllocSize", "Game_MinMemAvail",
+    // Where the EMS blocks live: in EMS (state 2, with a handle, frame and
+    // pages) or on the heap (state 1), and the last EMM status. The blocks'
+    // contents are in the stream.
+    "Ems_Status", "Ems_GameData.State", "Ems_GameData.Handle", "Ems_GameData.FrameSeg",
+    "Ems_GameData.PageCount", "GfxPath_ToolbarBlock.State", "GfxPath_ToolbarBlock.Handle",
+    "GfxPath_ToolbarBlock.FrameSeg", "GfxPath_ToolbarBlock.PageCount",
+};
+
+// Unnamed DS bytes left out for the same reason: far pointers with no name
+// in dseg.h yet, sorted. Found by running the goldens with the PSP and the
+// EMS page frame moved (heap, DS and EMS pointers change; nothing else
+// did), and every constant DS offset the code reads as a far pointer.
+static const struct {
+    uint16_t ofs, size;
+} layout_ranges[] = {
+    {0x7646, 8},         // ground battle: attacker and defender lists
+    {0x7722, 4},         // advisor's menu lines
+    {0x7726, 12},        // disk screen buffers: back, buttons, frame
+    {0x773A, 4},         // pub: pirates picture
+    {0x776C, 4},         // pub: lines
+    {0x7784, 4},         // pub: animation
+    {0x779E, 12},        // space battle: attacker, defender and side lists
+    {0x77AE, 4},         // space battle: the side's count
+    {0x77D6, 4},         // space battle: losses
+    {0x77DC, 16},        // space battle: view, background, sprites, face
+    {0x7812, 4},         // droids: digits
+    {0x7832, 13 * 4},    // cargo: item stores [1..13]
+    {0x7866, 4},         // cargo: planet ore stocks
+    {0x7ADA, 4},         // shop: panel picture
+    {0x7B0E, 6 * 4},     // system view: backdrop, icons, sprites, frame, ...
+    {0x7C4C, 8},         // InputLine: backup copy, edited string
+    {0x7D62, 12},        // GfxPath: initial block, backgrounds, icon scratch
+    {0x7E08, 12},        // command centre: main face, heroes, off-screen buffer
+    {0x7E18, 4},         // command centre: main animation 5
+    {0x7E24, 4},         // command centre: main animation 4
+    {0x7E40, 8},         // Anim's record and definitions
+    {0x7E56, 4 + 18 * 4 + 17 * 4},  // vector models: projected, normals[0..17], vertices[1..17]
+    {0x7F08, 17 * 4},    // vector models: edges[1..17]
+    {0x7F6E, 17 * 4},    // vector models: faces[1..17]
+    {0x8584, 4},         // vector view's off-screen buffer
+};
+
+static bool layout_field(const char *name, const char *sub)
+{
+    for (size_t i = 0; i < SDL_arraysize(layout_fields); i++) {
+        const char *f = layout_fields[i];
+        size_t n = SDL_strlen(name);
+        if (sub ? SDL_strncmp(f, name, n) == 0 && f[n] == '.' && SDL_strcmp(f + n + 1, sub) == 0
+                : SDL_strcmp(f, name) == 0)
+            return true;
+    }
+    return false;
+}
+
+static void reserve(StateBuf *b, size_t more)
+{
+    if (b->len + more <= b->cap)
+        return;
+    size_t cap = b->cap ? b->cap : 1 << 18;
+    while (cap < b->len + more)
+        cap *= 2;
+    b->data = SDL_realloc(b->data, cap);
+    b->cap = cap;
+}
+
+static void add_part(StateBuf *b, StatePart p)
+{
+    if (b->nparts == b->partcap) {
+        b->partcap = b->partcap ? b->partcap * 2 : 1024;
+        b->parts = SDL_realloc(b->parts, b->partcap * sizeof *b->parts);
+    }
+    b->parts[b->nparts++] = p;
+}
+
+static void put(StateBuf *b, const char *name, const void *p, uint32_t size, uint16_t elem,
+                int16_t rec)
+{
+    add_part(b, (StatePart){b->len, size, name, elem, rec});
+    reserve(b, size);
+    SDL_memcpy(b->data + b->len, p, size);
+    b->len += size;
+}
+
+static void put_u8(StateBuf *b, const char *name, uint8_t v)
+{
+    put(b, name, &v, 1, 1, -1);
+}
+
+// The DS part of the stream is the same list of byte ranges every time, so
+// it is worked out once: the parts (with their stream offsets) and the DS
+// runs to copy, adjacent ranges merged.
+static struct {
+    StatePart *parts;
+    size_t nparts, partcap, len;
+    struct {
+        uint16_t ofs;
+        uint32_t size;
+    } *runs;
+    size_t nruns, runcap;
+} plan;
+
+static void plan_range(const char *name, uint16_t ofs, uint32_t size, uint16_t elem, int16_t rec)
+{
+    if (plan.nparts == plan.partcap) {
+        plan.partcap = plan.partcap ? plan.partcap * 2 : 1024;
+        plan.parts = SDL_realloc(plan.parts, plan.partcap * sizeof *plan.parts);
+    }
+    plan.parts[plan.nparts++] = (StatePart){plan.len, size, name, elem, rec};
+    plan.len += size;
+    if (plan.nruns && plan.runs[plan.nruns - 1].ofs + plan.runs[plan.nruns - 1].size == ofs) {
+        plan.runs[plan.nruns - 1].size += size;
+        return;
+    }
+    if (plan.nruns == plan.runcap) {
+        plan.runcap = plan.runcap ? plan.runcap * 2 : 256;
+        plan.runs = SDL_realloc(plan.runs, plan.runcap * sizeof *plan.runs);
+    }
+    plan.runs[plan.nruns].ofs = ofs;
+    plan.runs[plan.nruns++].size = size;
+}
+
+// Leaves out the unnamed layout ranges from the bytes ofs..ofs+size-1 of DS.
+static void plan_ds_bytes(const char *name, uint16_t ofs, uint32_t size, uint16_t elem, int16_t rec)
+{
+    for (size_t i = 0; i < SDL_arraysize(layout_ranges); i++) {
+        uint32_t lo = layout_ranges[i].ofs, hi = lo + layout_ranges[i].size;
+        if (hi <= ofs || lo >= ofs + size)
+            continue;
+        if (lo > ofs)
+            plan_range(name, ofs, lo - ofs, 1, -1);
+        if (hi < ofs + size)
+            plan_ds_bytes(name, (uint16_t)hi, ofs + size - hi, 1, -1);
+        return;
+    }
+    plan_range(name, ofs, size, elem, rec);
+}
+
+// A record field whose record holds pointers goes element by element, field
+// by field.
+static bool record_has_layout(int16_t rec, const char *name)
+{
+    if (rec < 0)
+        return false;
+    const DsRecord *r = &ds_records[rec];
+    for (int i = 0; i < r->nfields; i++)
+        if ((r->fields[i].flags & DSF_POINTER) || layout_field(name, r->fields[i].name))
+            return true;
+    return false;
+}
+
+static void make_plan(void)
+{
+    for (int i = 0; i < ds_field_count; i++) {
+        const DsField *f = &ds_fields[i];
+        if ((f->flags & DSF_POINTER) || layout_field(f->name, nullptr))
+            continue;
+        if (!record_has_layout(f->rec, f->name)) {
+            plan_ds_bytes(f->name, f->ofs, f->elem * f->count, f->elem, f->rec);
+            continue;
+        }
+        const DsRecord *r = &ds_records[f->rec];
+        for (uint32_t e = 0; e < f->count; e++)
+            for (int k = 0; k < r->nfields; k++) {
+                const DsField *sf = &r->fields[k];
+                if ((sf->flags & DSF_POINTER) || layout_field(f->name, sf->name))
+                    continue;
+                plan_ds_bytes(f->name, (uint16_t)(f->ofs + e * r->size + sf->ofs), sf->elem * sf->count,
+                              1, -1);
+            }
+    }
+}
+
+static void put_ds(StateBuf *b)
+{
+    if (!plan.len)
+        make_plan();
+    reserve(b, plan.len);
+    const uint8_t *base = (const uint8_t *)&ds;
+    uint8_t *out = b->data + b->len;
+    for (size_t i = 0; i < plan.nruns; i++) {
+        SDL_memcpy(out, base + plan.runs[i].ofs, plan.runs[i].size);
+        out += plan.runs[i].size;
+    }
+    b->len += plan.len;
+    if (b->partcap < plan.nparts) {
+        b->partcap = plan.nparts * 2;
+        b->parts = SDL_realloc(b->parts, b->partcap * sizeof *b->parts);
+    }
+    SDL_memcpy(b->parts, plan.parts, plan.nparts * sizeof *plan.parts);
+    b->nparts = plan.nparts;
+}
+
+// The contents of an EMS block (game/ems.h) wherever it lives: on the heap
+// (state 1) or in EMS pages (state 2), mapped or not.
+static void put_ems_block(StateBuf *b, const char *name, const TEmsBlock *blk)
+{
+    put_u8(b, name, blk->State != 0);
+    if (blk->State == 1) {
+        put(b, name, far_host(blk->Data), blk->Size, 1, -1);
+    } else if (blk->State == 2) {
+        static uint8_t copy[0x10000];
+        for (uint32_t at = 0; at < blk->Size; at += EMM_PAGE_SIZE) {
+            const uint8_t *p = emm_page_view(blk->Handle, (uint16_t)(at / EMM_PAGE_SIZE));
+            SDL_memcpy(copy + at, p, SDL_min((uint32_t)EMM_PAGE_SIZE, blk->Size - at));
+        }
+        put(b, name, copy, blk->Size, 1, -1);
+    }
+}
+
+// A block behind a DS pointer, when the pointer is set.
+static void put_block(StateBuf *b, const char *name, FarPtr p, uint32_t size)
+{
+    put_u8(b, name, p != 0);
+    if (p)
+        put(b, name, far_host(p), size, 1, -1);
+}
+
+void state_serialize(StateBuf *b)
+{
+    b->len = 0;
+    b->nparts = 0;
+    put_ds(b);
+    put_ems_block(b, "Ems_GameData^", &ds.Ems_GameData);
+    put_ems_block(b, "GfxPath_ToolbarBlock^", &ds.GfxPath_ToolbarBlock);
+    put_block(b, "Message_Log^", ds.Message_Log, 0x31B);
+    put_u8(b, "vid_mode", (uint8_t)vid_mode());
+    if (vid_mode() == VID_MODE_13H) {
+        put(b, "screen", vid_screen, VID_WIDTH * VID_HEIGHT, 1, -1);
+    } else {
+        put(b, "screen12", vid12_screen, sizeof vid12_screen, 1, -1);
+        put(b, "vid_attr", vid_attr, sizeof vid_attr, 1, -1);
+    }
+    put(b, "vid_palette", vid_palette, sizeof vid_palette, 3, -1);
+}
+
+void state_buf_free(StateBuf *b)
+{
+    SDL_free(b->data);
+    SDL_free(b->parts);
+    *b = (StateBuf){};
+}
+
+uint64_t state_buf_hash(const StateBuf *b)
+{
+    return autopilot_hash(b->data, b->len);
+}
+
+uint64_t state_hash(void)
+{
+    static StateBuf b;
+    state_serialize(&b);
+    return state_buf_hash(&b);
+}
+
+size_t state_first_difference(const StateBuf *a, const StateBuf *b)
+{
+    size_t n = SDL_min(a->len, b->len);
+    if (n == a->len && n == b->len && SDL_memcmp(a->data, b->data, n) == 0)
+        return SIZE_MAX;
+    size_t at = 0;
+    while (at < n && a->data[at] == b->data[at])
+        at++;
+    return at;
+}
+
+void state_describe(const StateBuf *b, size_t at, char *out, size_t size)
+{
+    const StatePart *p = nullptr;
+    for (size_t i = 0; i < b->nparts; i++)
+        if (at >= b->parts[i].start && at < b->parts[i].start + b->parts[i].size)
+            p = &b->parts[i];
+    if (!p) {
+        SDL_snprintf(out, size, "end of the stream (+%zu)", at - b->len);
+        return;
+    }
+    size_t k = at - p->start;
+    if (SDL_strcmp(p->name, "screen") == 0) {
+        SDL_snprintf(out, size, "screen x=%zu y=%zu", k % VID_WIDTH, k / VID_WIDTH);
+        return;
+    }
+    if (SDL_strcmp(p->name, "screen12") == 0) {
+        SDL_snprintf(out, size, "mode 12h screen x=%zu y=%zu", k % VID12_WIDTH, k / VID12_WIDTH);
+        return;
+    }
+    bool in_ds = p->name[SDL_strlen(p->name) - 1] != '^' && SDL_strncmp(p->name, "vid", 3) != 0;
+    const char *where = in_ds ? "DS " : "";
+    if (p->rec >= 0) {
+        const DsRecord *r = &ds_records[p->rec];
+        size_t e = k / p->elem, ofs = k % p->elem;
+        for (int i = 0; i < r->nfields; i++) {
+            const DsField *f = &r->fields[i];
+            if (ofs >= f->ofs && ofs < f->ofs + (size_t)f->elem * f->count) {
+                SDL_snprintf(out, size, "%s%s[%zu].%s+%zu", where, p->name, e, f->name, ofs - f->ofs);
+                return;
+            }
+        }
+    }
+    if (p->elem > 1 && p->size > p->elem)
+        SDL_snprintf(out, size, "%s%s[%zu]+%zu", where, p->name, k / p->elem, k % p->elem);
+    else
+        SDL_snprintf(out, size, "%s%s+%zu", where, p->name, k);
+}
+
+// The file: the stream's length (8 bytes, little-endian) and bytes, then one
+// line per part: "start size elem rec name".
+bool state_save(const StateBuf *b, const char *path)
+{
+    SDL_IOStream *f = SDL_IOFromFile(path, "wb");
+    if (!f)
+        return false;
+    bool ok = SDL_WriteU64LE(f, b->len) && SDL_WriteIO(f, b->data, b->len) == b->len;
+    for (size_t i = 0; ok && i < b->nparts; i++)
+        ok = SDL_IOprintf(f, "%zu %u %u %d %s\n", b->parts[i].start, b->parts[i].size, b->parts[i].elem,
+                          b->parts[i].rec, b->parts[i].name) > 0;
+    return SDL_CloseIO(f) && ok;
+}
+
+bool state_load(StateBuf *b, const char *path)
+{
+    size_t size;
+    char *file = SDL_LoadFile(path, &size);
+    uint64_t len = 0;
+    if (file && size >= 8)
+        SDL_memcpy(&len, file, 8);
+    if (!file || len > size - 8) {
+        SDL_free(file);
+        return false;
+    }
+    state_buf_free(b);
+    reserve(b, len);
+    SDL_memcpy(b->data, file + 8, len);
+    b->len = len;
+    // Part names are kept for good: loaded dumps are few.
+    // SDL_LoadFile ends the data with a zero byte.
+    char *text = file + 8 + len, *save = nullptr;
+    for (char *line = SDL_strtok_r(text, "\n", &save); line; line = SDL_strtok_r(nullptr, "\n", &save)) {
+        size_t start;
+        unsigned psize, elem;
+        int rec, at = 0;
+        if (SDL_sscanf(line, "%zu %u %u %d %n", &start, &psize, &elem, &rec, &at) >= 4 && at > 0)
+            add_part(b, (StatePart){start, psize, SDL_strdup(line + at), (uint16_t)elem, (int16_t)rec});
+    }
+    SDL_free(file);
+    return true;
+}

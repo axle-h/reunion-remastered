@@ -607,9 +607,7 @@ typedef struct DSeg {
     uint8_t _pad_0BE6[0x48];
     uint8_t Alien_MenuData; // lists of 4-byte menus (count + 3), 2e4b
     uint8_t _pad_0C2F[0xB3];
-    // [1..10] by race (0cde + race * 4); 2e4b:0780. Races 2..10 point into
-    // Alien_MenuData; race 1's entry is not a pointer.
-    uint32_t Alien_MenuLists[10];
+    uint32_t Alien_MenuLists[10]; // [1..10] by race (0cde + race * 4); 2e4b:0780. Races 2..10 point into Alien_MenuData; race 1's entry is not a pointer
     uint8_t Alien_CurMenu[4];
     uint8_t AlienTalk_PortraitByRace; // Alien portrait number per race
     uint8_t _pad_0D0F[0x87];

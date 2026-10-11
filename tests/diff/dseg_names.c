@@ -329,7 +329,7 @@ const DiffName diff_ds_names[] = {
     {"Groups_SlotA", 0x0BBE, 1, 20, -1, {5, 4, 1}},
     {"Groups_SlotB", 0x0BD2, 1, 20, -1, {5, 4, 1}},
     {"Alien_MenuData", 0x0C2E, 1, 1, -1, {1, 1, 1}},
-    {"Alien_MenuLists", 0x0CE2, 4, 9, -1, {9, 1, 1}},
+    {"Alien_MenuLists", 0x0CE2, 4, 10, -1, {10, 1, 1}},
     {"Alien_CurMenu", 0x0D0A, 1, 4, -1, {4, 1, 1}},
     {"AlienTalk_PortraitByRace", 0x0D0E, 1, 1, -1, {1, 1, 1}},
     {"Surface_MapTemplates", 0x0D96, 1, 2640, -1, {11, 12, 20}},

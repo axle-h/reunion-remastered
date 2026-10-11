@@ -22,6 +22,9 @@ void SaveLoad_SetSaveDir(const char *dir);
 // false if the file could not be opened or a block failed (the original stops
 // with I/O error 100 and leaves the state half-loaded).
 bool SaveLoad_Transfer(bool save);
+// Port addition (test hook): the same with the file at `path`; `name` holds
+// the header (the slot name as string[19]).
+bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save);
 
 // 1a3e:0008
 void SaveLoad_DiskScreen(void);
