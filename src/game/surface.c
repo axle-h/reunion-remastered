@@ -7,6 +7,7 @@
 #include "assets/map.h"
 #include "game/blit.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
@@ -933,6 +934,10 @@ void Surface_AutoPlaceBuilding(int16_t kind, int16_t system, int16_t planet, int
             Surface_RegisterBuildingAnims(ds.Game_CurSystem, cur_planet(), cur_moon());
             Surface_DrawMapView();
             Surface_RebuildRadar();
+        } else if (fixes.autoplace_when_full) {
+            // The original drops the building. Port fix (game/fixes.h): it
+            // waits unplaced, as on a body that is not shown.
+            Surface_AddBuilding((uint8_t)kind, (uint8_t)system, (uint8_t)planet, (uint8_t)moon, 0xFF, 0xFF);
         }
     } else {
         Surface_AddBuilding((uint8_t)kind, (uint8_t)system, (uint8_t)planet, (uint8_t)moon, 0xFF, 0xFF);

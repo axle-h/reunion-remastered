@@ -28,7 +28,8 @@ counts and colony choices are the guide author's and were tested in play
 
 Standing orders for the whole game:
 
-- Keep the map on **Amnesty** when waiting, or off-system mines stop.
+- Keep the map on **Amnesty** when waiting, or off-system mines stop (the
+  original only; the port mines every system).
 - Answer colony demands for power, hospitals and food as they come.
 - Keep New Earth's space defence able to beat the next wave. A lost space
   battle there deletes the trade and carrier groups at New Earth; a lost
@@ -107,7 +108,8 @@ Standing orders for the whole game:
 5. Beat wave 2 **in space**. This gives Tractor beam and story stage 3,
    which lets Dempsey's skills rise further.
 6. After the Phoenix S.O.S., wait until the Kall fleet is visible at Phoenix
-   5. Then send a group to **Phoenix 1** (with Phoenix 1 selected) and
+   5. Then send a group to **Phoenix 1** (with Phoenix 1 selected in the
+   original; not needed in the port) and
    answer **"Tell me, what are your plans?"**.
 7. Beat wave 3, which is sent 1,100–1,149 h after wave 2.
    - In Space Local, ask the bartender about the suspicious character, then
@@ -279,8 +281,10 @@ not on loan to the Jaanosians).
     if Radio is researched.
 14. **Drifting Morgrul ship.**
     - After the S.O.S., have a group arrive at Phoenix 1 while Phoenix 1 is
-      the selected planet (`sim.c:1027-1033`). Phoenix 1 is hidden until
-      found. This makes **Pirate ship** researchable. It happens once.
+      the selected planet (`Sim_ProcessTravellingGroups`). In the original
+      any group arriving anywhere triggers it while Phoenix 1 is selected;
+      the port needs a group arriving at Phoenix 1, whatever is selected
+      (`fixes.drifting_ship`). Phoenix 1 is hidden until found. This makes **Pirate ship** researchable. It happens once.
     - **Answer "Tell me, what are your plans?"** This cancels the alliance
       clock and sends Kall force 2 (15 Hunters, 10 Starfighters, 10 Troopers,
       35 Tanks) to Mirach 3 to fight alongside you.
@@ -658,10 +662,12 @@ Habitable surfaces are Earth-like, Icy, Desert, Rocky and Tropical.
 
 ### Exploits and bugs to know
 
-- **Mines only work in the currently selected star system** (`sim.c:924`).
-  The mining pass reads bodies from the system on screen, so every other
-  system's mines (New Earth's included) stop while you view another system.
-  **Leave the map on Amnesty while waiting.**
+- **Mines only work in the currently selected star system** (`sim.c`,
+  `Sim_MineBody`). The mining pass reads bodies from the system on screen, so
+  every other system's mines (New Earth's included) stop while you view
+  another system. **Leave the map on Amnesty while waiting.** The port mines
+  every system whatever the map shows (`fixes.mine_all_systems`,
+  [bugs.md](bugs.md)).
 - **Droids stay when mines go.** Demolishing a mine (2,000 credits) never
   lowers the droid count, so 9 droids keep mining with 1 mine left. You lose
   that mine's storage.

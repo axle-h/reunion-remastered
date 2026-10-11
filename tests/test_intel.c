@@ -7,6 +7,7 @@
 #include "game/alientalk.h"
 #include "game/dseg.h"
 #include "game/ems.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/intel.h"
@@ -256,6 +257,25 @@ int main(int argc, char *argv[])
     CHECK(ds.Game_GroupCount == 2 && Groups_At(0, 2)->System == 1 && Groups_At(0, 2)->Status == 6);
     Intel_SpaceBattleLost(1, 5);   // group 1 (stationary at Earth) goes; group 2 is travelling
     CHECK(ds.Game_GroupCount == 1);
+
+    // Fix (game/fixes.h): with the planet forces shown (2 of them), disbanding
+    // fleet 1 of 3 shifts all three fleets. The original shifts up to the
+    // shown count: fleet 2 is duplicated and fleet 3 lost.
+    for (int fix = 0; fix <= 1; fix++) {
+        ds.Game_GroupCount = 3;
+        ds.Game_PlanetForceCount = 2;
+        ds.Game_GroupList = 1;
+        ds.Game_ShownGroupCount = 2;
+        for (int i = 1; i <= 3; i++) {
+            TGroup *gr = Groups_At(0, i);
+            gr->Kind = 2; gr->System = 3; gr->Planet = (uint8_t)i; gr->Status = 1;
+        }
+        fixes.disband_list_count = fix;
+        Intel_DisbandGroup(0, 1);
+        CHECK(ds.Game_GroupCount == 2 && ds.Game_ShownGroupCount == 2);
+        CHECK(Groups_At(0, 1)->Planet == 2);
+        CHECK(Groups_At(0, 2)->Planet == (fix ? 3 : 2));
+    }
 
     // Ideas: scheduling needs state 0 and no timer; grant / offer change the state.
     TProduct *p = &ds.Research_Products[9];

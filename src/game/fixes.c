@@ -2,7 +2,19 @@
 
 #include <SDL3/SDL.h>
 
-Fixes fixes = {.find_jade = true};
+static constexpr Fixes ALL = {
+    .find_jade = true,
+    .mine_all_systems = true,
+    .meteorite_droids = true,
+    .build_on_moons = true,
+    .derricks_on_moons = true,
+    .drifting_ship = true,
+    .disband_list_count = true,
+    .annihilate_leaves_screen = true,
+    .autoplace_when_full = true,
+};
+
+Fixes fixes = ALL;
 
 void Fixes_Init(void)
 {
@@ -10,7 +22,7 @@ void Fixes_Init(void)
     if (env && *env && *env != '0')
         Fixes_Original();
     else
-        fixes = (Fixes){.find_jade = true};
+        fixes = ALL;
 }
 
 void Fixes_Original(void)

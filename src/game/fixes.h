@@ -8,6 +8,36 @@ typedef struct Fixes {
     // day), so some games never find it before the Jaanosian deadline and
     // can't be won. If it is still hidden on JADE_FOUND_BY, it is found then.
     bool find_jade;
+    // Mining reads every body from the selected system's table (the one the
+    // map shows), so only that system's colonies and droids mine, some of
+    // them more than once a turn. The fix reads each system's own table.
+    bool mine_all_systems;
+    // A meteorite that destroys a building lowers the droids of the selected
+    // body, not of the colony it hit. The fix lowers the hit colony's.
+    bool meteorite_droids;
+    // Construction speed reads the body's kind-16h output from the planet
+    // instead of the moon a building is on whenever that system's selected
+    // body is a planet. The fix always reads the building's own body.
+    bool build_on_moons;
+    // A Derrick on a moon puts its ore into the planet's store whenever the
+    // selected system's selected body is a planet. The fix uses the moon's.
+    bool derricks_on_moons;
+    // The drifting Morgrul ship is found when any group arrives anywhere
+    // while the map shows Phoenix 1. The fix needs a group arriving there.
+    bool drifting_ship;
+    // Disbanding a group shifts the list up to the count of the list the
+    // ship info screen last showed, so a disband from the simulation (revolt,
+    // lost battle, story) can wipe or duplicate the other groups of its list.
+    // The fix shifts up to the disbanded list's own count.
+    bool disband_list_count;
+    // System 4's annihilation (a story timer) deletes buildings and groups
+    // while a screen may still hold their indices or the selected group.
+    // The fix leaves those screens first, as a destroyed colony does.
+    bool annihilate_leaves_screen;
+    // A building the simulation places (a new colony's command centre and
+    // starter buildings) is dropped if the player is watching that colony's
+    // surface and no spot is free. The fix adds it unplaced, as elsewhere.
+    bool autoplace_when_full;
 } Fixes;
 
 extern Fixes fixes;

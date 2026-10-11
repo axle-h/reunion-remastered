@@ -7,6 +7,7 @@
 #include "assets/map.h"
 #include "game/blit.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/mem.h"
 #include "game/mouse.h"
 #include "game/surface.h"
@@ -248,6 +249,25 @@ static void hotspots_and_blits(void)
     CHECK(scr[(0x36 + 32) * 320 + 0x5E + 16] == 0x77);
 }
 
+// Fix (game/fixes.h): a building placed by the simulation on the colony
+// being watched, with no free spot, is added unplaced; the original drops it.
+static void autoplace_when_full(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        setup(1, 0);
+        Surface_LoadMap();
+        memset(far_host(ds.Surface_OccupyLayer), 0xFF, 0x1518);
+        ds.Game_CurrentScreen = 0x14;
+        fixes.autoplace_when_full = fix;
+        Surface_AutoPlaceBuilding(2, 1, 1, 0);
+        CHECK(ds.Game_BuildingCount == fix);
+        if (fix)
+            CHECK(bld(1)->Kind == 2 && bld(1)->X == 0xFF && bld(1)->Y == 0xFF);
+    }
+    ds.Game_CurrentScreen = 0;
+    fixes.autoplace_when_full = true;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -263,6 +283,7 @@ int main(int argc, char *argv[])
     load_map();
     placement();
     counting();
+    autoplace_when_full();
     hotspots_and_blits();
     printf(ok ? "surface: ok\n" : "surface: FAILED\n");
     return ok ? 0 : 1;

@@ -701,7 +701,8 @@ S.O.S.) seen **and** "Kall Fleet 2" listed in the Phoenix 5 star-map zoom
 (§4 S-K), checked every 7 days; or, if the zoom is not readable, date ≥
 T(Kall) + 2,100 h (fallback proxy, §4). Do: `launch(Galleon 1, Phoenix 1)`
 (from a body in Phoenix; this leaves Phoenix 1 selected, launch.c:56-59) and
-keep the map on Phoenix 1 until arrival. Done: MSG 18 "You have found a ship
+keep the map on Phoenix 1 until arrival (the original tests the selected
+body; the port the group's, `fixes.drifting_ship`). Done: MSG 18 "You have found a ship
 drifting in space..." then talk 6 (I-T6): **"Tell me, what are your
 plans?"** → "You will send a message to your leaders..." → **"All right."**
 (adds 250 h to wave 3 if not yet sent; main_program.c:1552-1560). Then MSG
@@ -1138,8 +1139,10 @@ Step counts: act 1: 23, act 2: 13, act 3: 18, act 4: 13, act 5: 9.
 Run between steps, in this order, at least once per game day and after
 every interrupt.
 
-**S1. Map on Amnesty.** Mining reads the selected system's bodies only
-(sim.c:939-958). After any action that selected another system (screens 7,
+**S1. Map on Amnesty.** The original's mining reads the selected system's
+bodies only (`Sim_MineBody`). The port mines every system
+(`fixes.mine_all_systems`, docs/bugs.md), so this order only matters with
+`REUNION_ORIGINAL=1`; the policy keeps it. After any action that selected another system (screens 7,
 13, 16, 17, 18, 22, battles), call `select_amnesty()` before idling. Allowed
 exceptions: M11 (Phoenix 1 held until arrival), screen-17 watches of a group
 in transit.

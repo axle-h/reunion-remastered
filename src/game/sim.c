@@ -531,8 +531,9 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 Surface_DeleteBuilding(hit);
                 int16_t n = (int16_t)(Surface_CountBuildings(0x19, system, planet, moon, false)
                                       + Surface_CountBuildings(4, system, planet, moon, false));
-                // BUG? decrements the droids of CurBody, not of this body.
-                TBody *cur = far_host(ds.Game_CurBody);
+                // The original decrements the droids of CurBody, not of this
+                // body. Port fix (game/fixes.h): this body's.
+                TBody *cur = fixes.meteorite_droids ? b : far_host(ds.Game_CurBody);
                 if (cur->_0A > n)
                     cur->_0A--;
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 20));
@@ -856,8 +857,11 @@ void Sim_UpdateBuildings(void)
         }
         // Health > 0: still being built; the builder's work brings it down.
         if (bl->Health > 0) {
-            TBody *bd = cur_moon_of(bl->System) == 0 ? body(bl->System, bl->Planet)
-                                                     : body_at(bl->System, bl->Planet, bl->Moon);
+            // The original picks planet or moon by the system's CurMoon. Port
+            // fix (game/fixes.h): the building's own body.
+            TBody *bd = fixes.build_on_moons || cur_moon_of(bl->System) != 0
+                            ? body_at(bl->System, bl->Planet, bl->Moon)
+                            : body(bl->System, bl->Planet);
             int16_t w4 = (int16_t)(bd->_04[0] | bd->_04[1] << 8);
             int32_t work = (int32_t)(int16_t)(w4 + 4000) + (uint16_t)(ds.Game_StaffExp[1] * 100);
             work = ldiv32(work, 1500);
@@ -889,9 +893,11 @@ void Sim_UpdateBuildings(void)
             Protect2_AskDateQuestion();
         // Kind 5 with Flag set mines ore 1 into the body's store.
         if (bl->Health == 0 && bl->Flag != 0 && bl->Kind == 5) {
-            // BUG? picks planet or moon by the current system's CurMoon.
-            TBody *bd = *cur_moon() == 0 ? body(bl->System, bl->Planet)
-                                         : body_at(bl->System, bl->Planet, bl->Moon);
+            // The original picks planet or moon by the current system's
+            // CurMoon. Port fix (game/fixes.h): the building's own body.
+            TBody *bd = fixes.derricks_on_moons || *cur_moon() != 0
+                            ? body_at(bl->System, bl->Planet, bl->Moon)
+                            : body(bl->System, bl->Planet);
             int16_t force = Groups_FindPlanetForce(bl->System, bl->Planet, bl->Moon);
             int32_t cap = lmul((uint16_t)Groups_At(1, force)->Storage, 1000);
             if (bl->System == 1 && bl->Planet == 5 && bl->Moon == 0) {
@@ -938,8 +944,9 @@ void Sim_UpdateColonySetups(void)
 // 1b8a:26cf: nested in MineAllBodies (uses none of its locals).
 static void Sim_MineBody(int16_t system, int16_t planet, int16_t moon, int16_t bodyIdx)
 {
-    // BUG? the body comes from the current system's table, not `system`'s.
-    TBody *b = body(ds.Game_CurSystem, bodyIdx);
+    // The original reads the body from the current system's table, not
+    // `system`'s. Port fix (game/fixes.h): `system`'s own table.
+    TBody *b = body(fixes.mine_all_systems ? system : ds.Game_CurSystem, bodyIdx);
     if (!(b->Owner == 1 && (b->Colony != 0 || b->_0A != 0)))
         return;
     int16_t force = Groups_FindPlanetForce(system, planet, moon);
@@ -1043,8 +1050,12 @@ void Sim_ProcessTravellingGroups(void)
             g->Status = 5;
 
         // DS:5D71: story flag armed by ProcessStoryTimers (invention 12 done).
-        if (*b8(0x5D71) != 0 && g->Status == 2 && ds.Game_CurSystem == 2
-            && *cur_planet() == 1 && *cur_moon() == 0) {
+        // The original tests the selected body, not where the group arrived.
+        // Port fix (game/fixes.h): the group's.
+        bool at_phoenix1 = fixes.drifting_ship
+                               ? g->System == 2 && g->Planet == 1 && g->Moon == 0
+                               : ds.Game_CurSystem == 2 && *cur_planet() == 1 && *cur_moon() == 0;
+        if (*b8(0x5D71) != 0 && g->Status == 2 && at_phoenix1) {
             Message_ShowMessageLine(0x12);
             AlienTalk_StartAlienTalk(6);
             Intel_OfferInventionForAnalysis(0x13);

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "game/alientalk.h"
+#include "game/fixes.h"
 #include "game/groups.h"
 #include "game/message.h"
 #include "game/planetinfo.h"
@@ -356,7 +357,12 @@ void Intel_DisbandGroup(int16_t list, int16_t group)
             }
         }
     }
-    for (int16_t i = group; i <= ds.Game_ShownGroupCount - 1; i++)
+    // The original shifts up to the shown list's count, whichever list that
+    // is. Port fix (game/fixes.h): this list's own count.
+    int16_t count = !fixes.disband_list_count ? ds.Game_ShownGroupCount
+                    : list == 0               ? ds.Game_GroupCount
+                                              : ds.Game_PlanetForceCount;
+    for (int16_t i = group; i <= count - 1; i++)
         System_MoveFwd(Groups_At(list, i + 1), Groups_At(list, i), sizeof(TGroup));
     if (list == 0)
         ds.Game_GroupCount--;
@@ -475,6 +481,14 @@ void Intel_EliminateRace(int16_t race)
 // 29b9:1179: wipes system 4: buildings, bodies, race forces and the player's groups there.
 void Intel_AnnihilateSystem4(void)
 {
+    // Port fix (game/fixes.h): leaves the screens that hold building or
+    // group indices, as Intel_DestroyBody does.
+    int16_t s = ds.Game_CurrentScreen;
+    if (fixes.annihilate_leaves_screen
+        && (s == 4 || s == 8 || s == 0xD || s == 0x10 || s == 0x11 || s == 0x14 || s == 0x16)) {
+        ds.Game_CurrentScreen = 1;
+        ds.Game_ScreenSwitch = true;
+    }
     int16_t i = 1;
     while (i <= ds.Game_BuildingCount) {
         const TBuilding *b = (const TBuilding *)far_host(ds.Game_Buildings) + (i - 1);

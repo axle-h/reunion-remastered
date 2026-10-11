@@ -8,6 +8,7 @@
 #include "game/ems.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/groups.h"
 #include "game/message.h"
 #include "game/sim.h"
 #include "game/system.h"
@@ -246,6 +247,142 @@ static void test_jade_found(void)
     CHECK(*jade_status() == 0);
 }
 
+// Fix (game/fixes.h): a colony mines whichever system the map shows; with
+// the fix off it mines only while its own system is selected.
+static void test_mine_all_systems(void)
+{
+    reset();
+    const int16_t sys = 3;  // Mirach, body 1
+    ds.Galaxy_SystemStatus[sys - 1] = 1;
+    TBody *b = (TBody *)far_host(ds.Galaxy_Bodies[sys - 1]);
+    b->Owner = 1;
+    b->Colony = 1;
+    b->_0A = 2;
+    b->Deposits[1] = 50;  // ore 2
+    ds.Game_PlanetForceCount = 1;
+    TGroup *g = Groups_At(1, 1);
+    g->System = sys;
+    g->Planet = 1;
+    g->Moon = 0;
+    g->Storage = 10;
+
+    ds.Game_CurSystem = 1;
+    fixes.mine_all_systems = false;
+    Sim_MineAllBodies();
+    CHECK(b->Stores[1] == 0);
+
+    fixes.mine_all_systems = true;
+    Sim_MineAllBodies();
+    CHECK(b->Stores[1] == 50 * 2 / 10);
+
+    fixes.mine_all_systems = false;
+    ds.Game_CurSystem = sys;
+    Sim_MineAllBodies();
+    CHECK(b->Stores[1] == 2 * (50 * 2 / 10));
+    fixes.mine_all_systems = true;
+}
+
+// The first Amnesty planet with a moon.
+static int16_t planet_with_moon(void)
+{
+    for (int16_t p = 1; p <= 7; p++) {
+        if (ds.Galaxy_AmnestyMoons[p - 1].Count > 0)
+            return p;
+    }
+    return 0;
+}
+
+static TBuilding *add_building(uint8_t kind, int16_t planet, int16_t moon, uint8_t health)
+{
+    TBuilding *bl = (TBuilding *)far_host(ds.Game_Buildings) + ds.Game_BuildingCount++;
+    *bl = (TBuilding){.Kind = kind, .System = 1, .Planet = (uint8_t)planet,
+                      .Moon = (uint8_t)moon, .Health = health, .Flag = 1};
+    return bl;
+}
+
+// Fix (game/fixes.h): a Derrick on a moon fills the moon's store; with the
+// fix off it fills the planet's while a planet is selected.
+static void test_derricks_on_moons(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        int16_t p = planet_with_moon();
+        CHECK(p != 0);
+        TBody *planet = &ds.Galaxy_AmnestyBodies[p - 1];
+        TBody *moon = &ds.Galaxy_AmnestyBodies[ds.Galaxy_AmnestyMoons[p - 1].Moons[0] - 1];
+        planet->Deposits[0] = moon->Deposits[0] = 70;
+        planet->Stores[0] = moon->Stores[0] = 0;
+        add_building(5, p, 1, 0);
+        ds.Game_PlanetForceCount = 1;
+        TGroup *g = Groups_At(1, 1);
+        g->System = 1;
+        g->Planet = p;
+        g->Moon = 1;
+        g->Storage = 10;
+        ds.Game_CurSystem = 1;
+        ds.Game_CurMoon[0] = 0;
+        fixes.derricks_on_moons = fix;
+        for (int i = 0; i < 50; i++)
+            Sim_UpdateBuildings();
+        CHECK((fix ? moon : planet)->Stores[0] > 0);
+        CHECK((fix ? planet : moon)->Stores[0] == 0);
+    }
+    fixes.derricks_on_moons = true;
+}
+
+// Fix (game/fixes.h): building on a moon goes at the moon's speed (body
+// bytes 4..5); with the fix off, at the planet's while a planet is selected.
+static void test_build_on_moons(void)
+{
+    uint8_t left[2];
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        int16_t p = planet_with_moon();
+        TBody *planet = &ds.Galaxy_AmnestyBodies[p - 1];
+        TBody *moon = &ds.Galaxy_AmnestyBodies[ds.Galaxy_AmnestyMoons[p - 1].Moons[0] - 1];
+        planet->_04[0] = planet->_04[1] = 0;
+        moon->_04[0] = 0x30;  // 30,000
+        moon->_04[1] = 0x75;
+        TBuilding *bl = add_building(5, p, 1, 250);
+        ds.Game_CurSystem = 1;
+        ds.Game_CurMoon[0] = 0;
+        fixes.build_on_moons = fix;
+        for (int i = 0; i < 1000 && bl->Health == 250; i++)
+            Sim_UpdateBuildings();
+        left[fix] = bl->Health;
+    }
+    CHECK(left[0] < 250);
+    CHECK(left[1] < left[0]);
+    fixes.build_on_moons = true;
+}
+
+// Fix (game/fixes.h): a meteorite that destroys a building takes a droid
+// from the hit colony; with the fix off, from the selected body.
+static void test_meteorite_droids(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        set_date(2928, 1, 1, 0);
+        TBody *hit = &ds.Galaxy_AmnestyBodies[4];  // New Earth
+        TBody *shown = &ds.Galaxy_AmnestyBodies[0];
+        CHECK(hit->Owner == 1 && hit->Colony != 0);
+        hit->_0A = shown->_0A = 5;
+        ds.Game_CurBody = far_ptr(MEM_DS_SEG, (uint16_t)offsetof(DSeg, Galaxy_AmnestyBodies));
+        for (int k = 0; k < 20; k++)
+            add_building(2, 5, 0, 0);
+        fixes.meteorite_droids = fix;
+        int16_t before = ds.Game_BuildingCount;
+        for (int i = 0; i < 5000 && ds.Game_BuildingCount == before; i++) {
+            hit->_14 = 100;  // meteorites hit only at 100
+            Sim_ProcessAllBodyEvents();
+        }
+        CHECK(ds.Game_BuildingCount == before - 1);
+        CHECK((fix ? hit : shown)->_0A == 4);
+        CHECK((fix ? shown : hit)->_0A == 5);
+    }
+    fixes.meteorite_droids = true;
+}
+
 static void test_golden(void)
 {
     reset();
@@ -288,6 +425,10 @@ int main(int argc, char *argv[])
     test_research();
     test_production();
     test_jade_found();
+    test_mine_all_systems();
+    test_derricks_on_moons();
+    test_build_on_moons();
+    test_meteorite_droids();
     test_golden();
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");
