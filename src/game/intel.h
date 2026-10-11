@@ -2,8 +2,8 @@
 // contact, race forces (missions, travel timers, landings), ownership changes
 // of bodies, group disbanding and the intel reports of the Pub / satellite menus.
 //
-// A race record (TRace) is at DS:6A06 + race * E4h (races 2..12; the record
-// of "race 1" overlaps other data, so it is addressed by offset only). Its
+// A race record (TRace) is Races::Races[race] (races 2..12; the record of
+// "race 1" would be the bytes just before it, which hold other data). Its
 // forces are Forces[1..7], ForceCount of them in use. TRaceForce fields:
 //   Mission        0 none, 1 stationed (garrison), >1 on a mission
 //   Active         0 idle, 1 present at System/Body/Moon, 2 travelling there
@@ -18,10 +18,11 @@
 
 #include "game/dseg.h"
 
-// The race's record by offset (valid for races 1..12).
+// Races::Races[race], counted from the array's start so that "race 1" (and 0)
+// reach the bytes before it, as in the original.
 static inline TRace *Intel_Race(int16_t race)
 {
-    return (TRace *)ds_at((uint16_t)(0x6A06 + race * 0xE4));
+    return (TRace *)((uint8_t *)ds.Races_Races + (race - 2) * (int)sizeof(TRace));
 }
 // Forces[force] (1-based) of a race.
 static inline TRaceForce *Intel_Force(int16_t race, int16_t force)

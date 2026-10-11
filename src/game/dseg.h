@@ -21,6 +21,7 @@
 typedef struct Real48 { uint8_t b[6]; } Real48;
 typedef struct Extended80 { uint8_t b[10]; } Extended80;
 typedef struct PString { uint8_t len; char s[255]; } PString;
+typedef struct PStr2 { uint8_t len; char s[2]; } PStr2;
 typedef struct PStr6 { uint8_t len; char s[6]; } PStr6;
 typedef struct PStr7 { uint8_t len; char s[7]; } PStr7;
 typedef struct PStr8 { uint8_t len; char s[8]; } PStr8;
@@ -28,9 +29,11 @@ typedef struct PStr9 { uint8_t len; char s[9]; } PStr9;
 typedef struct PStr11 { uint8_t len; char s[11]; } PStr11;
 typedef struct PStr13 { uint8_t len; char s[13]; } PStr13;
 typedef struct PStr14 { uint8_t len; char s[14]; } PStr14;
+typedef struct PStr15 { uint8_t len; char s[15]; } PStr15;
 typedef struct PStr16 { uint8_t len; char s[16]; } PStr16;
 typedef struct PStr17 { uint8_t len; char s[17]; } PStr17;
 typedef struct PStr18 { uint8_t len; char s[18]; } PStr18;
+typedef struct PStr20 { uint8_t len; char s[20]; } PStr20;
 typedef struct PStr30 { uint8_t len; char s[30]; } PStr30;
 
 // Records from ghidra/types.pas. Array comments give the Pascal bounds;
@@ -525,6 +528,110 @@ static_assert(sizeof(TCatRange) == 2);
 static_assert(offsetof(TCatRange, Lo) == 0x00);
 static_assert(offsetof(TCatRange, Hi) == 0x01);
 
+typedef struct TVecPoint {
+    int16_t X;
+    int16_t Y;
+    int16_t Z;
+} TVecPoint;
+static_assert(sizeof(TVecPoint) == 6);
+static_assert(offsetof(TVecPoint, X) == 0x00);
+static_assert(offsetof(TVecPoint, Y) == 0x02);
+static_assert(offsetof(TVecPoint, Z) == 0x04);
+
+typedef struct TOrbit {
+    int16_t RX;
+    int16_t RY;
+    int16_t Angle;
+    uint16_t Speed;
+    int16_t X;
+    uint16_t Y;
+    int16_t Size;
+    int16_t Half;
+    uint8_t Icon;
+    uint8_t Flag;
+} TOrbit;
+static_assert(sizeof(TOrbit) == 18);
+static_assert(offsetof(TOrbit, RX) == 0x00);
+static_assert(offsetof(TOrbit, RY) == 0x02);
+static_assert(offsetof(TOrbit, Angle) == 0x04);
+static_assert(offsetof(TOrbit, Speed) == 0x06);
+static_assert(offsetof(TOrbit, X) == 0x08);
+static_assert(offsetof(TOrbit, Y) == 0x0A);
+static_assert(offsetof(TOrbit, Size) == 0x0C);
+static_assert(offsetof(TOrbit, Half) == 0x0E);
+static_assert(offsetof(TOrbit, Icon) == 0x10);
+static_assert(offsetof(TOrbit, Flag) == 0x11);
+
+typedef struct TViewGroup {
+    int16_t Kind;
+    int16_t Index;
+    int16_t Moon;
+} TViewGroup;
+static_assert(sizeof(TViewGroup) == 6);
+static_assert(offsetof(TViewGroup, Kind) == 0x00);
+static_assert(offsetof(TViewGroup, Index) == 0x02);
+static_assert(offsetof(TViewGroup, Moon) == 0x04);
+
+typedef struct TRoomAnim {
+    uint8_t Frames;
+    int16_t W;
+    uint8_t H;
+    int16_t X;
+    uint8_t Y;
+} TRoomAnim;
+static_assert(sizeof(TRoomAnim) == 7);
+static_assert(offsetof(TRoomAnim, Frames) == 0x00);
+static_assert(offsetof(TRoomAnim, W) == 0x01);
+static_assert(offsetof(TRoomAnim, H) == 0x03);
+static_assert(offsetof(TRoomAnim, X) == 0x04);
+static_assert(offsetof(TRoomAnim, Y) == 0x06);
+
+typedef struct TWarAnim {
+    uint8_t Frames;
+    uint8_t Speed;
+    uint8_t Repeat_;
+    uint8_t UnitA;
+    uint8_t UnitB;
+} TWarAnim;
+static_assert(sizeof(TWarAnim) == 5);
+static_assert(offsetof(TWarAnim, Frames) == 0x00);
+static_assert(offsetof(TWarAnim, Speed) == 0x01);
+static_assert(offsetof(TWarAnim, Repeat_) == 0x02);
+static_assert(offsetof(TWarAnim, UnitA) == 0x03);
+static_assert(offsetof(TWarAnim, UnitB) == 0x04);
+
+typedef struct TLight {
+    uint16_t Ofs;
+    uint8_t Count;
+} TLight;
+static_assert(sizeof(TLight) == 3);
+static_assert(offsetof(TLight, Ofs) == 0x00);
+static_assert(offsetof(TLight, Count) == 0x02);
+
+typedef struct TGrEffect {
+    int16_t First;
+    int16_t Sheet;
+    int16_t Frames;
+} TGrEffect;
+static_assert(sizeof(TGrEffect) == 6);
+static_assert(offsetof(TGrEffect, First) == 0x00);
+static_assert(offsetof(TGrEffect, Sheet) == 0x02);
+static_assert(offsetof(TGrEffect, Frames) == 0x04);
+
+typedef struct TSaAnim {
+    uint8_t Frames;
+    uint8_t Width;
+    uint8_t Height;
+    uint8_t X;
+    uint8_t Y;
+} TSaAnim;
+static_assert(sizeof(TSaAnim) == 5);
+static_assert(offsetof(TSaAnim, Frames) == 0x00);
+static_assert(offsetof(TSaAnim, Width) == 0x01);
+static_assert(offsetof(TSaAnim, Height) == 0x02);
+static_assert(offsetof(TSaAnim, X) == 0x03);
+static_assert(offsetof(TSaAnim, Y) == 0x04);
+
 typedef struct Registers {
     uint16_t AX;
     uint16_t BX;
@@ -566,10 +673,34 @@ static_assert(offsetof(TEmsBlock, FrameSeg) == 0x09);
 static_assert(offsetof(TEmsBlock, PageCount) == 0x0B);
 
 typedef struct DSeg {
-    uint8_t _pad_0000[0xC2];
+    uint8_t _pad_0000[0x2];
+    int32_t GrWarUnits_WeaponWeight[3]; // [1..3] 2, 7, 9: ground weapons 1 and 2 add to the attack sum, 3 to the defence sum (1430:0479)
+    uint8_t _pad_000E[0x4];
+    uint16_t GrWarUnits_TypeAttack[4]; // [1..4] 2, 13, 28, 0: attack of a race-force or store unit by type (1430:0479)
+    uint16_t GrWarUnits_TypeDefence[4]; // [1..4] 0, 0, 9, 45: defence likewise
+    int16_t GrWar_Cooldown[4]; // [1..4] 30, 20, 10, 60: turns between attacks by unit type (1537:1c05)
+    int16_t GrWar_Vulnerability[4]; // [1..4] 40, 20, 5, 10: damage factor of the target's type (1537:1c05); a base (type 5) reads GrWarUnits::SlotCap[1]
+    int16_t GrWarUnits_SlotCap[4]; // [1..4] 30, 30, 10, 5: most units in one slot (1430:000f)
+    uint8_t _pad_003A[0xC];
+    int16_t GrWar_DirX[4]; // [1..4] -1, 0, 1, 0: tile step of direction 1..4 (left, up, right, down)
+    uint8_t _pad_004E[0x2];
+    int16_t GrWar_DirY[4]; // [1..4] 0, -1, 0, 1
+    uint8_t _pad_0058[0x28];
+    int16_t GrWar_MoveDelay[4]; // [1..4] 7, 6, 4, 10: ticks between steps by unit type (low byte read, 1537:1c05)
+    TGrEffect GrWar_Effects[8]; // [1..8] unit effects: 1..4 attack by type, 5 artillery shot, 7 dies, 8 hit (1537:0da8)
+    uint8_t GrWar_BaseOffset[2][2]; // [0..1,1..2] [Sim::PlayerAttacks][side]: 8 centres the 32x32 base sprite (1537:0a0c)
+    uint8_t _pad_00BC[0x6];
     TMenu Advisor_Menus[3]; // [1..3] folded 00bc; 1991:08de
     TMenu Advisor_CurMenu;
-    uint8_t _pad_00DA[0x60];
+    int16_t SaveLoad_OptionX[6]; // [1..6] disk screen option buttons (Music 1/2, Stop, Effects, ...): x (1a3e:11ea)
+    int16_t SaveLoad_OptionY[6]; // [1..6] y below the toolbar
+    int16_t SaveLoad_OptionW[6]; // [1..6]
+    int16_t SaveLoad_OptionH[6]; // [1..6]
+    int16_t SaveLoad_ButtonX[4]; // [1..4] disk screen push buttons, pressed look from diskbr (1a3e:1366)
+    int16_t SaveLoad_ButtonY[4]; // [1..4]
+    int16_t SaveLoad_ButtonW[4]; // [1..4]
+    int16_t SaveLoad_ButtonH[4]; // [1..4]
+    uint8_t Advisor_CourseSkills[4][4]; // [1..4,1..4] folded 0125; DevSkill gains of each university course (1b8a:3b83)
     TPubPerson Pub_People[10]; // [1..10] folded 011f; 1b8a:006e, 1fd2:01ef, Main 1000:1271
     uint8_t Pub_MenuData; // 10 consts: array[1..n] of TMenu, n = 5,11,3,5,6,11,7,6,7,6
     uint8_t _pad_0249[0x191];
@@ -579,12 +710,33 @@ typedef struct DSeg {
     int32_t Pub_ItemPrice[4]; // [10..13] folded 03ec; 10000, 14000, 20000, 7000
     TPubDeal Pub_Deals[10]; // [1..10] folded 040c; Sim 1b8a:006e
     TPubAnim Pub_Anims[9]; // [1..9] folded 0500; 1fd2:0ec1
-    uint8_t _pad_05C8[0x10];
+    int32_t SpWar_WeaponPower[4]; // [1..4] 2, 7, 40, 200: damage of a fleet's weapons 1..4 (20d4:01d3)
     int32_t SpWar_ClassA[4]; // [1..4] folded 05d4; 800, 2000, 5000, 12000
     int32_t SpWar_ClassB[4]; // [1..4] folded 05e4; 11, 68, 374, 840
-    uint8_t _pad_05F8[0x1C0];
-    uint8_t SpWar_ClassBytes; // 07b8..07cb read as 07b7/07bb/07bf/07c3 + class, 20d4
-    uint8_t _pad_07B9[0x4F];
+    uint8_t SpWar_Routes[2][6][20]; // [1..2,2..7,1..20] [RouteSet][ship's len][pos]: route codes 1..9, 0 = end (20d4:0efd); pos 0 reads the byte before the row
+    uint8_t SpWar_RouteSet[8]; // [1..8] route table (1, 2) of each path
+    uint8_t SpWar_PathDirs[8][9]; // [1..8,1..9] direction 1..9 of each route code on path 1..8
+    uint8_t SpWar_ZonePaths[9][9]; // [1..9,0..8] new path by the ship's zone (3x3, 1 = top left), Random(8) picks; zone 4 starts every ship
+    uint8_t _pad_0789[0x1];
+    int8_t SpWar_DxAttacker[9]; // [1..9] x step of direction 1..9 (9 = stay)
+    uint8_t _pad_0793[0x1];
+    int8_t SpWar_DxDefender[9]; // [1..9] mirrored
+    uint8_t _pad_079D[0x1];
+    int8_t SpWar_Dy[9]; // [1..9]
+    uint8_t _pad_07A7[0x1];
+    uint16_t SpWar_CoolBase[4]; // [1..4] 0, 0, 2, 300: turns between moves by class, plus Random(CoolRange)
+    uint16_t SpWar_CoolRange[4]; // [1..4] 2, 2, 3, 1000
+    uint8_t SpWar_StartX[4]; // [1..4] replaces SpWar::ClassBytes; start x by class, plus Random(StartXRange); mirrored for aliens (20d4)
+    uint8_t SpWar_StartXRange[4]; // [1..4]
+    uint8_t SpWar_StartY[4]; // [1..4]
+    uint8_t SpWar_StartYRange[4]; // [1..4]
+    uint8_t _pad_07C8[0x4];
+    uint8_t SpWar_ExplosionFrames[4]; // [1..4] explosion length by class (20d4:0efd)
+    int16_t SpWar_KillChance[2][2]; // [1..2,1..2] [shooter class][target class]: percent chance a hit destroys a small ship outright
+    int16_t ShipMove_LightX[6]; // [1..6] typed constants: position and size of the 6 blinking lights in the ship view (22ca:1e78)
+    int16_t ShipMove_LightY[6]; // [1..6]
+    int16_t ShipMove_LightW[6]; // [1..6]
+    int16_t ShipMove_LightH[6]; // [1..6]
     int8_t Cargo_Items[13]; // [1..13] folded 0807; product ids, -1 unused (2583:0494)
     uint8_t _pad_0815[0x1];
     int32_t Cargo_ItemSpace[13]; // [1..13] folded 0812; storage units per item
@@ -592,25 +744,36 @@ typedef struct DSeg {
     int16_t Protect_WordCodes[14]; // [1..14] folded 0858; 2693:0342
     int32_t Protect2_QuestionIndex; // init 8615h = not armed; 1..14 once armed by 2693:0000 (disguised store); index into valami.txt/WordCodes
     int32_t Protect2_AnswerHash; // scratch hash of the typed date (2693:0085); also cleared by 2693:04aa
-    uint8_t _pad_087E[0x4];
+    int32_t Protect2_HashEcho; // AnswerHash + AA9Bh, stored by 2693:0085, never read
     int32_t Protect2_AnswerKey; // init 3421h = unanswered; hash+3421h after answering; compared with WordCodes[QuestionIndex]
-    uint8_t _pad_0886[0x4];
+    int32_t Protect2_KeyEcho; // AnswerKey * 5 + 8613h, likewise
     int32_t Protect2_Lives; // init 10Ah; -1 per answered prompt; Halt at 107h; correct answer -> ~479h / D7Dh+rand
     uint8_t Protect2_ScribbleDone; // set after the one-shot random-memory-scribble in 2693:0342
-    uint8_t _pad_088F[0x49];
+    uint8_t _pad_088F[0x1];
+    uint8_t Intel_Race3Stores[8]; // [1..8] folded 088f; stores of a body race 3 takes: Stores[k] = base[k] + Random(range[k]) (29b9:06d4)
+    uint8_t Intel_Race3StoresEarly[8]; // [1..8] used instead while Intel::MorgrulAttack2Done is clear
+    uint8_t Intel_Race3StoresRange[8]; // [1..8]
+    uint8_t Intel_Race7Stores[8]; // [1..8]
+    uint8_t Intel_Race7StoresRange[8]; // [1..8]
+    uint8_t Intel_Race8Stores[8]; // [1..8] only Stores[1] is written, with each k in turn
+    uint8_t Intel_Race8StoresRange[8]; // [1..8]
+    uint8_t Intel_Race12Stores[8]; // [1..8] as for race 8
+    uint8_t Intel_Race12StoresRange[8]; // [1..8]
     uint8_t Groups_SlotLayouts; // 4 variable-length blobs (at 08d8, 0976, 0a14, 0ab2): count bytes + {string, x:word, y:byte, x2:word, y2:byte, 2 bytes} entries: Laser/Twin/Miss/Plasm/Hunter.., Sloop/Trade ship.., Trooper/Tank.., Sat/SypSt..
     uint8_t _pad_08D9[0x277];
     TTypeSlots Groups_TypeSlots[5]; // [1..5] folded 0b3b/0b3c (20 bytes); 2b8d, 26fe
     TCatRange Groups_CatRange[5]; // [1..5] folded 0bb2
     uint8_t Groups_SlotA[5][4]; // [1..5,1..4] folded 0bb9
     uint8_t Groups_SlotB[5][4]; // [1..5,1..4] folded 0bcd
-    uint8_t _pad_0BE6[0x48];
+    uint8_t Groups_EmptyTests[6][4]; // [1..6,1..4] [table, kind]: Units rows 1, 2 and the slot count for IsGroupEmpty (2b8d:1abb), the same for IsGroupEmptyOfCargo (1bad); read at 0be5 + 4*(table-1) + kind, so kind 5 reads the next table
+    int16_t Research_TransitionFrames[20]; // icon frame per transition step (step mod 20), + (kind - 1) * 10 (2d66:0caa, 0d7b)
+    int16_t Research_SkillX[4]; // [1..4] x of the developer's four skill values, + 100 (2d66:074c)
     uint8_t Alien_MenuData; // lists of 4-byte menus (count + 3), 2e4b
     uint8_t _pad_0C2F[0xB3];
     uint32_t Alien_MenuLists[10]; // [1..10] by race (0cde + race * 4); 2e4b:0780. Races 2..10 point into Alien_MenuData; race 1's entry is not a pointer
     uint8_t Alien_CurMenu[4];
-    uint8_t AlienTalk_PortraitByRace; // Alien portrait number per race
-    uint8_t _pad_0D0F[0x87];
+    uint8_t AlienTalk_PortraitByRace[10]; // [1..10] Alien portrait number per race (2e4b:0400: szek<n>, alien<n>)
+    uint8_t Surface_EdgeScroll[9][14]; // [1..9,1..14] folded 0d09; edge-scroll direction 1..8 (0 none) of each cell of the 14x9 map view, for right-button clicks (Main)
     uint8_t Surface_MapTemplates[11][12][20]; // [1..11,1..12,0..19] folded 0c92 (2ef2:03e7: t*0F0h + row*14h + col)
     int16_t Surface_FelszHeight[11]; // [1..11] FELSZ<t>.PIC sheet height in pixels (Main allocates height*320)
     int16_t Surface_FanimHeight[11]; // [1..11] FANIM<t>.PIC sheet height, 0 = none
@@ -669,24 +832,39 @@ typedef struct DSeg {
     uint8_t Galaxy_BodyIcon[8][8]; // [1..8,1..8] folded 478d; copied into the planet-list hotspot (357b:23db). Meaning?
     int8_t Galaxy_PlanetStatus[8][8]; // [1..8,1..8] folded 47cd; -1 unknown, 0 known, 1, -2/-3/-4 events (1b8a:0cba)
     int8_t Galaxy_SystemStatus[8]; // [1..8] folded 4815; 1 open, 0 known, -1 unknown (cheat sets -1 -> 0)
-    uint8_t _pad_481E[0x12];
+    int16_t Sim_Observatories[8]; // [1..8] folded 481c; completed observatories (building kind 6) per system (1b8a:2178)
+    int16_t Sim_UniversityCount; // completed universities (building kind 13) anywhere (1b8a:2178)
     uint32_t Scale_RowProcs[17]; // [16..32] ScaleRow16..ScaleRow32
-    uint8_t _pad_4874[0x1];
-    uint8_t Ui_RowOffset[20]; // [1..20] folded 4874; 3a1b:0586 (*140h)
-    uint8_t _pad_4889[0x13];
-    PStr17 Ui_ButtonLabels[77]; // [1..77] folded 488a; 'DISK OPERATIONS' .. 'ALIEN PLANETS'; index from hotspot records at 7c64
-    uint8_t GfxPath_CommandIcon; // Icon number per menu command id
-    uint8_t _pad_4E07[0x58];
+    uint8_t Ui_RowOffset[21]; // rows scrolled per step of the toolbar scroll, 21 steps of 33 rows in all (3a1b:0586 reads 4874 + i, i = 0..20)
+    uint8_t _pad_4889[0x1];
+    PStr17 Ui_ButtonLabels[78]; // was 489c [1..77]; [0] is 17 spaces, the label of an empty slot (3a1b:00bf copies 488a + 18 * id with id 0); 'DISK OPERATIONS' .. 'ALIEN PLANETS'
+    int8_t GfxPath_CommandIcon[78]; // icon number (ICON.ALL) per menu command id, 0 = none (3a1b:00bf)
+    uint8_t _pad_4E54[0xB];
     PStr8 Ui_ButtonSounds[77]; // [1..77] folded 4e56; Main passes 95ea*9+4e56 to 431a:031a; 'disk','maincpu' = SOUND\DISK.SMP, MAINCPU.SMP
     TScreenInfo Ui_Screens[38]; // [1..38] folded 50fb; Name string[8] ('main','faces','research'.. 'colinfo' = GRAFIKA\*.PIC) + 16 bytes; +9/+A/+B read with 95e6 (Main 1000:0733)
     uint16_t GfxPath_IconAllSize; // Size of ICON\ICON.ALL
-    uint8_t _pad_54CC[0x94];
-    uint8_t SpWar_SpriteRects; // folded 555b; 20d4:0a85
-    uint8_t _pad_5561[0x7D];
-    uint8_t Cc_Doors; // folded 55d7; 3abd:0c70 (frames, w:word, h, x:word, y)
-    uint8_t _pad_55DF[0x77];
-    uint8_t Cc_Rooms; // folded 5651; 3abd:0c05
-    uint8_t _pad_5657[0x129];
+    uint16_t GfxPath_CellsSize; // 1E00h: the 240x32 cell backgrounds after the two bar pages in the toolbar block (3a1b:09b2)
+    uint16_t Command_StaffX[4]; // [1..4] command centre: staff figure of kind 1..4, window x (3abd:16bc, hotspots 3abd:08e0)
+    uint16_t Command_StaffY[4]; // [1..4] window y
+    uint16_t Command_StaffSrcX[4][3]; // [1..4,1..3] [kind, candidate]: figure in grafika\mainface, x
+    uint16_t Command_StaffSrcY[4][3]; // [1..4,1..3] y
+    uint16_t Command_StaffW[4]; // [1..4]
+    uint16_t Command_StaffH[4]; // [1..4]
+    uint16_t Command_StaffOfSlot[4]; // [1..4] staff kind drawn for slot 1..4 (3abd:16bc): 3, 2, 4, 1
+    TLight Command_Lights[19]; // [1..19] blinking pixels of the command centre (3abd:14c5): 1..11 random colours, 12..19 on/off timers
+    uint8_t _pad_555F[0x1];
+    TSaAnim SpWar_SpriteRects[25]; // [1..25] folded 555b; war\war\sa<n>.ani: frames and screen rect (3c64:0010, 20d4:0a85)
+    uint8_t _pad_55DD[0x1];
+    TRoomAnim Cc_Doors[17]; // [1..17] folded 55d7; anim\main<n>.ani (3c64:019c, 3abd:0c70)
+    uint8_t _pad_5655[0x1];
+    TWarAnim Cc_Rooms[14]; // [1..14] folded 5651; war\grwar\granim<n>.ani 1..14 (3c64:031d, 3abd:0c05, 1537:11f2); ids 15, 16 read on into SpWar::ScriptPlays
+    int16_t SpWar_ScriptPlays[25]; // [1..25] extra plays of anim.def script n before another is picked (20d4:0985)
+    uint8_t VecLoad_ModelZoom[35]; // [1..35] folded 56cd; final scale per model, the solid view zooms up to it (3d38:084a)
+    uint8_t _pad_56F1[0x1];
+    uint8_t VecLoad_ModelMode[35]; // [1..35] folded 56f1; projection mode per model, 2 = swap the first two matrix rows (3d38:0000, 01aa)
+    uint8_t _pad_5715[0x1];
+    uint8_t VecLoad_ModelSpin[35][3]; // [1..35,1..3] folded 5713; spin per model and axis, in 1/3 degrees per frame (3d38:084a)
+    uint8_t _pad_577F[0x1];
     PStr6 Staff_FacePics[4]; // [1..4] folded 5779; 'faces1'..'faces4' (1991:0355)
     int32_t Staff_Price[4][3]; // [1..4,1..3] folded 578c; 4500, 25000, 120000 for the pilots
     int16_t Staff_Level[4][3]; // [1..4,1..3] folded 57c4; 10/20/40 "scholarly level", saved by 1a3e
@@ -710,35 +888,85 @@ typedef struct DSeg {
     PString Gfx_CharsetChars;
     int16_t Gfx_LineStride; // row step used by DrawLine (320)
     int16_t Gfx_LineStrideCopy; // row step used by DrawLineCopy (320)
-    uint8_t _pad_5CF2[0xC];
-    uint16_t Gus_RateTable[32]; // [1..32] folded 5cfc; 592, 296, 197, ... (sound driver)
-    uint8_t _pad_5D3E[0x2];
+    uint8_t _pad_5CF2[0xA];
+    uint16_t Gus_RateTable[32]; // [1..32] 592 div n for n active voices (46ca: mov ax,[si+5CFC] with si = 2*(n-1)); was at 5cfe, which ran into 5D3C
+    uint8_t Intel_MorgrulAttack3Won; // a battle was won while MorgrulAttack3Open: pub person 2 becomes available (Main 1000:2cd5, 329d); only set
+    uint8_t _pad_5D3D[0x1];
+    uint8_t Intel_KallForceSent; // set while the Kall's force 2 is sent to 2:5:0 (Race4Timer fired, KallTurnTimer not yet; 1b8a:3d07)
+    uint8_t Intel_KallTurnCancelled; // set by the Eran talk (race 6, answer 2) with KallTurnTimer := 0 (Main)
     int16_t Intel_LaunchTimer; // hours until the scheduled race force launch (2693-independent story script, Sim)
     int16_t Intel_LaunchRace; // race of the scheduled launch (29b9:03b3)
     int16_t Intel_LaunchForce; // force index of the scheduled launch
     int16_t Intel_LaunchMission; // mission value passed along (always 2)
-    uint8_t _pad_5D48[0x6];
-    uint16_t Intel_Race2Timer1; // Race 2 story timers, done flags at 5D50/5D56/5D5A/5D5E
+    uint8_t Intel_FirstJumpSeen; // the first hyperspace jump was shown: message 22h, scene 2 (1b8a:2a0e)
+    uint8_t _pad_5D49[0x1];
+    int16_t Intel_SatTheftTimer; // Random(10) + 5 after a stock satellite is deployed away from home (28cd:0000); Sim 1b8a:3d07 plays scene 9
+    uint8_t Intel_SatTheftDone; // satellite theft happened: stock satellites only at 1:5 (28cd:062b)
+    uint8_t _pad_5D4D[0x1];
+    int16_t Intel_Race2Timer1; // Race 2 story timers, done flags at 5D50/5D56/5D5A/5D5E (Sim counts them as signed)
     uint8_t Intel_Race2Done1;
-    uint8_t _pad_5D51[0x3];
-    uint16_t Intel_Race2Timer2;
+    uint8_t _pad_5D51[0x1];
+    int16_t Intel_DevAwayTimer; // hours the developer is away after the Jaanosian talk (Main); research stops, Sim 1b8a:3d07 grants invention 9 at 0; his figure is hidden (3abd:16bc)
+    int16_t Intel_Race2Timer2;
     uint8_t Intel_Race2Done2;
     uint8_t _pad_5D57[0x1];
-    uint16_t Intel_Race2Timer3;
+    int16_t Intel_Race2Timer3;
     uint8_t Intel_Race2Done3;
     uint8_t _pad_5D5B[0x1];
-    uint16_t Intel_Race2Timer4;
+    int16_t Intel_Race2Timer4;
     uint8_t Intel_Race2Done4;
-    uint8_t _pad_5D5F[0x17];
-    uint16_t Intel_Race4Timer;
+    uint8_t _pad_5D5F[0x1];
+    int16_t Intel_Invention14Timer; // runs once invention 14 is known: message 1Eh (1b8a:3d07)
+    uint8_t Intel_Invention14Revealed; // set when the story timer at 5D60 ends; until then invention 14 is "Unknown" (2d66:0029, 1b8a:3d07)
+    uint8_t _pad_5D63[0x1];
+    int16_t Intel_MorgrulAttack1Timer; // the Morgrul's force 1 attacks New Earth (1b8a:3d07)
+    uint8_t Intel_MorgrulAttack1Done;
+    uint8_t Intel_FirstBattleWon; // the first battle (space or ground) was won: ideas 0Dh and 11h scheduled (Main 1000:2c62)
+    uint8_t Intel_FirstGroundLost; // the first ground battle was lost: message 0Eh, idea 11h (Main 1000:3239)
+    uint8_t _pad_5D69[0x1];
+    int16_t Intel_MorgrulAttack2Timer; // the Morgrul's force 2 attacks New Earth
+    uint8_t Intel_MorgrulAttack2Done;
+    uint8_t Intel_MorgrulAttack2Open; // set with MorgrulAttack2Done; cleared by the next space battle won (Main)
+    int16_t Intel_Phoenix1Timer; // runs once invention 12 is done: message 11h, sets Phoenix1Armed
+    uint8_t Intel_Phoenix1Done;
+    uint8_t Intel_Phoenix1Armed; // a group in orbit of 2:1:0 starts alien talk 6 (1b8a:2a0e)
+    int16_t Intel_MorgrulAttack3Timer; // the Morgrul's force 3 attacks New Earth
+    uint8_t Intel_MorgrulAttack3Done;
+    uint8_t Intel_MorgrulAttack3Open; // set with MorgrulAttack3Done; cleared by the next space battle won (Main)
+    int16_t Intel_Race4Timer;
     uint8_t Intel_Race4Done;
-    uint8_t _pad_5D79[0x9];
-    uint16_t Intel_Race5Timer;
+    uint8_t _pad_5D79[0x1];
+    int16_t Intel_KallTurnTimer; // hours until the Kall turn and the Phelonians fall (Sim 1b8a:3d07)
+    uint8_t Intel_KallTurnDone;
+    uint8_t _pad_5D7D[0x1];
+    int16_t Intel_JointAttackTimer; // the Morgrul's force 4 and the Kall's force 2 attack New Earth
+    uint8_t Intel_JointAttackDone;
+    uint8_t _pad_5D81[0x1];
+    int16_t Intel_Race5Timer;
     uint8_t Intel_Race5Done;
-    uint8_t _pad_5D85[0x11];
-    uint16_t Intel_Race7to10Timer;
+    uint8_t _pad_5D85[0x1];
+    int16_t Intel_Msg14Timer; // message 14h, after the Morgrul's third attack
+    uint8_t Intel_Msg14Done;
+    uint8_t _pad_5D89[0x1];
+    int16_t Intel_System3Timer; // system 3 becomes known (message 25h); 200 from the pub (Main)
+    uint8_t Intel_MorgrulBeaten; // the Morgrul were eliminated in a ground battle (Main 1000:30eb); only set
+    uint8_t _pad_5D8D[0x1];
+    int16_t Intel_System4DestroyTimer; // system 4 is annihilated (message 1Bh, scene 7)
+    uint8_t Intel_System4Destroyed; // system 4 annihilated (Sim 1b8a:3d07; 1fd2:0b30, 357b)
+    uint8_t Intel_Pub4HintOff; // ? never set; while clear, pub person 4 gives hint 4 once system 3 is known (Main 1000:2720)
+    int16_t Intel_System4WarnTimer; // armed when a fleet first reaches system 4; runs while it has an observatory: message 19h
+    uint8_t Intel_System4Warned;
+    uint8_t Intel_System4TalkArmed; // set with System4Warned: a fleet at a colony in system 4 starts alien talk 9 (1b8a:2a0e)
+    int16_t Intel_Race7to10Timer;
     uint8_t Intel_Race7to10Done;
-    uint8_t _pad_5D99[0x11];
+    uint8_t Intel_Pub10Done; // set by pub person 10's answers 9 and 10, with Pub::StoryFlags[7] (Main 1000:2a3e); only set
+    uint8_t Intel_Pub7Done; // pub person 7's errand is done (1b8a:006e)
+    uint8_t _pad_5D9B[0x1];
+    int16_t Advisor_TrainingTimer; // hours left at the university (1991:0000; Sim 1b8a:3b83)
+    int16_t Advisor_TrainingKind; // staff kind away at the university, 0 = none; 4 = the developer, who can't research meanwhile (1991, 1b8a, 2d66:0bae)
+    int16_t Advisor_TrainingCourse; // developer course 1..4 (1991:0000); Sim 1b8a:3b83 adds its skill gains
+    int32_t Advisor_TrainingPrice; // price quoted for the university (1991:0580)
+    int32_t Game_FrameCount; // frames since start; past 30000 the protection page may be re-randomised (Main 1000:05da)
     int16_t Game_StartChoice; // Start menu choice set by Title::StartMenu: 1 new game, 2 load, 3 quit (Halt); SaveLoad::DiskScreen treats 2 as its first showing
     TProduct Research_Products[35]; // [1..35] folded 5d77; fields seen as DAT_5d88(+11) / 5d8c(+15) / 5d92(+1B) + i*35h
     uint8_t _pad_64EB[0x5];
@@ -791,86 +1019,187 @@ typedef struct DSeg {
     uint8_t _pad_75EB[0x1];
     char System_CrLf[2];
     int32_t Main_I; // FOR loop variable of the main program body (all `i` loops in Main)
-    uint8_t _pad_75F2[0x1C];
+    int32_t Main_PrevKind; // Surface::SelKind before the kind arrows' search (Main 1000:1b8c)
+    PStr20 Main_SceneTrack; // number of the atv<n> music track of the story scene (Main, screen 33)
+    uint8_t Main_HasBuilderPlant; // the body has a builder plant (surface Build button); also AddBodyActionItems' unused flag (Main 1000:1539)
+    uint8_t Main_HasVehiclePlant; // the body has a vehicle plant (surface Build button, Main 1000:1f94)
+    uint8_t _pad_760D[0x1];
     uint32_t PlanetList_Entries; // array of 8-byte entries
     int16_t PlanetList_Count; // number of list entries
     int16_t PlanetList_Top; // first visible entry (1-based)
     int16_t PlanetList_Mode; // 1 colonies/miner, 2 accomodable/mineable, 3 aliens
-    uint8_t _pad_7618[0x10];
-    uint32_t GrWar_Buffer1; // Ground-battle picture buffers
-    uint32_t GrWar_Buffer2;
-    uint32_t GrWar_Buffer3;
-    uint32_t GrWar_Buffer4;
-    uint32_t GrWar_Buffer5;
-    uint8_t _pad_763C[0x6];
+    int32_t GrWarUnits_Scratch[4]; // [1..4] CollectAvailableForces: units of each type still to put in slots (1430:0479)
+    uint32_t GrWar_RenderBuf; // renames GrWar::Buffer1; off-screen field, 0BCD0h bytes (1537:0da8)
+    uint32_t GrWar_Background; // renames GrWar::Buffer2; war\grf<surface> with the side panel, 64000 bytes
+    uint32_t GrWar_UnitIcons; // renames GrWar::Buffer3; war\gricon unit sprites, 3C00h bytes (also GrWarUnits)
+    uint32_t GrWar_EffectIcons; // renames GrWar::Buffer4; war\gricon2 effect sprites, 2800h bytes
+    uint32_t GrWar_LostFrames; // renames GrWar::Buffer5; war\granim frames of the lost screen, 2860h bytes
+    uint8_t GrWar_LostShown; // the lost screen animates (1537:3369)
+    uint8_t _pad_763D[0x1];
+    int16_t GrWar_LostFrame; // 1..3
+    int16_t GrWar_LostTick; // 1..13
     uint32_t GrWar_BattleGrids; // 2 x 0xc6 battle state blocks (0xb-wide grid at +0xc, units at +0x30c)
-    uint8_t _pad_7646[0x8];
+    uint32_t GrWarUnits_UnitLists[2]; // [1..2] attackers' and defenders' 21 slots of 27h bytes, the 21st the base (1430:0479)
     int16_t GrWarUnits_AttackerSlotCount; // count of 0x27-byte unit records at 4a81:7646 (max 20)
     int16_t GrWarUnits_DefenderSlotCount; // count for list at 4a81:764a
     uint32_t GrWar_Projectiles; // 0x708 bytes, 2 sides x 50 x 0x12-byte projectile records
-    uint8_t _pad_7656[0xB4];
+    int16_t GrWar_ProjectileCount[2]; // [1..2] projectiles in flight by side
+    int32_t GrWarUnits_Totals[2][4]; // [1..2,1..4] [side][type] units in the battle; 1 attackers, 2 defenders (1430:0479)
+    int32_t GrWarUnits_Pool[4]; // [1..4] attackers' units not in a slot
+    int32_t GrWarUnits_Attack[2][4]; // [1..2,1..4] [side][type] attack sums
+    int32_t GrWarUnits_Defence[2][4]; // [1..2,1..4] [side][type] defence sums (GrWar: artillery shots)
+    int32_t GrWar_Survivors[2][4]; // [1..2,1..4] [side][type] (1537:2a19)
+    int32_t GrWar_Losses[2][4]; // [1..2,1..4] [side][type], shown on the result screen (1537:312c)
     uint8_t GrWar_PlayerWon; // selects grvict vs grlost in EndGroundBattle
-    uint8_t _pad_770B[0x27];
+    uint8_t GrWar_BattleOver; // a side has no units left and the effects are done
+    int16_t GrWar_Order; // main program: 1 select, 2 paused, 3 move target, 4 attack target
+    int16_t GrWar_PathDir; // FindPath's first step, 0 = none (1537:2349)
+    int16_t GrWar_Spare; // only cleared, by InitBattleUnits (1537:0262)
+    int16_t GrWar_TargetX; // field column of a move order (Main 1000:2e51)
+    int16_t GrWar_TargetY; // field row of a move order, at most 8
+    int16_t GrWar_Selected; // selected slot, 0 = none
+    int16_t GrWar_PrevSelected; // Selected before a click; a change plays the select sound (Main 1000:2dd1)
+    uint8_t GrWar_SelectedOwn; // the selected slot is the attackers'
+    uint8_t GrWar_PrevSelectedOwn; // SelectedOwn before the click
+    int16_t Advisor_MenuNumber; // menu shown (Advisor::Menus index), 0 = leave (1991:0580)
+    int16_t Advisor_Question; // KERDES1.SP line of the chosen question (1991:0000)
+    int16_t Advisor_Answer; // VALASZ1.SP line drawn as the answer (1991:0580)
+    uint32_t Advisor_MenuLines; // GetMem(131h): array[1..5] of string[60], the menu's lines (1991:08de)
+    uint32_t SaveLoad_BufBack; // grafika\disk, 320x151 (1a3e:0ee5)
+    uint32_t SaveLoad_BufButtons; // grafika\diskbr, 320x65: the buttons' "on" look and the knob
+    uint32_t SaveLoad_BufFrame; // anim\main frame of disk.ani, 100x49
     int16_t SaveLoad_SelectedSlot;
     uint32_t SaveLoad_SlotTable;
-    uint8_t _pad_7738[0x51];
+    int16_t Pub_Person; // person talked to, 1..10 (Main 1000:1271, 1fd2:02f4)
+    uint32_t Pub_PiratesSheet; // grafika\pirates, AF00h bytes (1fd2:00d9)
+    uint8_t Pub_StoryFlags[12]; // [1..12] set by Main's pub dialogue (1000:1271); [1] the Spy-Hunter was asked
+    uint8_t Pub_AnyTopic; // one of TopicAvail[1..6] is set (1fd2:0b30)
+    uint8_t Pub_TopicAvail[10]; // [1..10] topics the trader can be asked about (1fd2:0b30, 0788)
+    uint8_t _pad_7755[0x3];
+    int16_t Pub_HoverItem; // question under the mouse, 1.. (1fd2:0a8b)
+    uint8_t Pub_Replied; // the reply is shown: hover frozen, next click continues (Main)
+    uint8_t _pad_775B[0x1];
+    uint16_t Pub_HoverCol; // 1 inside the question column (1fd2:0a8b)
+    int16_t Pub_HoverRow; // text row under the mouse (1fd2:0a8b)
+    PStr2 Pub_PersonStr; // Person as text, for KERDES<n>.LOC / VALASZ<n>.LOC (1fd2:02f4)
+    uint8_t _pad_7763[0x1];
+    int16_t Pub_MenuIdx; // menu of the person (MenuLists[Person][MenuIdx]); set from the reply code, 0 = leave (1fd2:05fe)
+    int16_t Pub_QuestionLine; // KERDES<n>.LOC line of the chosen question (1fd2:0544)
+    int16_t Pub_ReplyLine; // VALASZ<n>.LOC line drawn as the reply (1fd2:05fe)
+    int16_t Pub_QuestionCode; // code read by ReadQuestionCode / DrawQuestionMenu (1fd2:0544)
+    uint32_t Pub_Lines; // GetMem(500h): array[1..5] of string[255], the question lines (1fd2:02f4)
+    int32_t Pub_OfferItem; // item of the trader's offer, 1..12 (Main; 1fd2:05fe)
+    int32_t Pub_OfferPrice; // price named by the trader (1fd2:05fe)
+    int16_t Pub_LineCount; // text lines of the question menu (1fd2:0788)
+    uint8_t Pub_LineItem[8]; // [1..8] question number of each text line (1fd2:0788)
+    int16_t Pub_LastSound; // last local<n> sound played (1fd2:0e5f)
+    uint32_t Pub_AnimSheet; // grafika\kocsmaan, 64000 bytes (1fd2:00d9)
+    uint8_t SpWar_GroundBattle; // a ground battle follows the space battle (the player invades / a colony is attacked; 18e0, 1b8a:3546)
     uint8_t SpWar_PlayerWon; // selects spvict vs splost
-    uint8_t _pad_778A[0x20];
+    uint8_t SpWar_RaceMissionHigh; // the attacking race force's NextMission was 3 or 4 (1b8a:3546)
+    uint8_t Sim_PlayerAttacks; // set by Launch (18e0:0647) when the player starts a battle, cleared by Sim (1b8a:3b15) when a race attacks; GrWar: the defender's base is the 32x32 sprite
+    int16_t SpWar_EnemyRace; // the attacking race (1b8a:3546); a won ground battle gives it the body
+    uint8_t SpWar_Exploding; // an explosion was drawn this step; the battle waits for it (20d4:0efd)
+    uint8_t _pad_778F[0x1];
+    int16_t SpWar_RepeatsLeft; // plays of the current script still to come before a new pick (20d4:0a85)
+    int16_t SpWar_Script; // current anim.def script 1..25, 0 = none
+    int16_t SpWar_ScriptStep; // entry in it, 1..140
+    int16_t SpWar_ScriptDelay; // ticks until the next entry
+    int16_t SpWar_BattleSystem; // where the battle is, set by Launch (18e0:062d) and Sim (1b8a:3921); also GrWar, GrWarUnits
+    int16_t SpWar_BattlePlanet;
+    int16_t SpWar_BattleMoon;
+    uint32_t SpWar_AttackerList; // 500 ships of 0Ch bytes (20d4:01d3)
+    uint32_t SpWar_DefenderList;
+    uint32_t SpWar_SideList; // InitSpaceFleets/ApplySpaceLosses: the list of the race being added
     int16_t SpWar_AttackerShipCount; // used by 20d4:01d3, max 500, list at 779e
     int16_t SpWar_DefenderShipCount; // list at 77a2
-    uint8_t _pad_77AE[0x4C];
+    uint32_t SpWar_SideCount; // and its count, AttackerShipCount or DefenderShipCount
+    int16_t SpWar_AttackerStart; // ship counts when the battle began
+    int16_t SpWar_DefenderStart;
+    int32_t SpWar_AttackerLosses[4]; // [1..4] ships lost by class (20d4:17f0)
+    int32_t SpWar_DefenderLosses[4]; // [1..4]
+    uint32_t SpWar_LossPtr; // ApplySpaceLosses: the loss array of the last race force handled
+    uint8_t SpWar_BattleOver; // a side has no ships left and the explosions are done
+    uint8_t SpWar_Retreated; // set by the main program when the player leaves a battle: a loss (SpWar, GrWar)
+    uint32_t SpWar_View; // 160x150 battle view, 5E60h bytes
+    uint32_t SpWar_Background; // war\sphatter, copied into View every step
+    uint32_t SpWar_Sprites; // war\spants: ship dots and explosions, 80 wide
+    uint32_t SpWar_Face; // war\spface<n>: 80x56 pilot portrait
+    int16_t SpWar_StepNo; // 1..4; the battle moves on 1
+    int16_t SpWar_CurtainLeft; // wipe that reveals a new script's area; Left >= 1000 = done (20d4:0a85)
+    int16_t SpWar_CurtainRight;
+    int16_t SpWar_CurtainTop;
+    int16_t SpWar_CurtainBottom;
+    uint8_t SpWar_ScriptsLeft[4]; // set of 2..25: anim.def scripts not played yet
     uint32_t ShipMove_AnimSheet; // sprite sheet from planets\muszianm (0x9100 bytes)
     uint32_t ShipMove_Backdrop; // 0xbcc0 byte off-screen copy of the view; star field is drawn into it
     uint16_t ShipMove_BlinkCounter;
     uint16_t ShipMove_SpinnerCounter;
-    uint8_t _pad_7806[0x6];
+    uint8_t ShipMove_LightOn[6]; // [1..6] light lit, toggled at random (22ca:1e78)
     uint8_t ShipMove_InRestrictedArea;
     uint8_t _pad_780D[0x1];
     uint32_t ShipMove_Stars; // 1101 star records of 7 bytes (x,y,depth,speed)
-    uint8_t _pad_7812[0x6A];
+    uint32_t Droids_DigitsPic; // grafika\szamok, 8980h bytes: droid figures, face digits at +5780h, small digits at +5963h (2527:001f)
+    uint16_t Cargo_ItemCount; // entries in ItemList (2583:0494)
+    uint16_t Cargo_ItemList[13]; // [1..13] Cargo::Items indices of the storable items (product done)
+    uint32_t Cargo_ItemStore[13]; // [1..13] far ^integer the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494)
+    uint32_t Cargo_Stores; // far ^longint the planet's ore stocks (Game::HomeStock or CurBody^.Stores)
+    int32_t Cargo_ShipUsed; // cargo space used on the ship
+    int32_t Cargo_ShipCap; // ship cargo capacity
+    int32_t Cargo_PlanetCap; // storage space on the planet (planet force Storage * 1000)
+    uint8_t _pad_7876[0x4];
+    int16_t Cargo_Row; // clicked row (hotspot - 14h / 27h, then - 6 for items)
     uint8_t Launch_DestinationActive;
     uint8_t _pad_787D[0x1];
     uint32_t ShipInfo_Backdrop; // 0xbcc0 byte screen image of grafika\ship<n>
     uint32_t ShipInfo_Sprites; // grafika\ship3 sprite sheet (0x5000 bytes)
     uint32_t ShipInfo_Buffer; // 0xfb40 byte off-screen copy used by SwitchGroupList
     int32_t Colonize_ColonyCost;
-    uint8_t _pad_788E[0x2];
+    uint8_t Satellite_ActionDone; // a body action was executed (28cd:0948; Main redraws the map)
+    uint8_t _pad_788F[0x1];
     int16_t Groups_SlotCategory; // currently shown slot category 1..4, cycled by 2b8d:1996/19f7/1a62
-    uint8_t _pad_7892[0x8];
+    int16_t Groups_SavedCategory; // SlotCategory before page up / down (2b8d:0002)
+    int16_t Groups_SlotShip; // ship slot of the clicked button (2b8d:0002)
+    int16_t Groups_SlotWeapon; // weapon column of the clicked button
+    int16_t Groups_SlotAvail; // stock the unit would come from
     uint8_t Groups_CanChangeSlots; // ? body is a colony and group Status is 1 or 7 (set in 2b8d:11bf)
     uint8_t Groups_AtHomePlanet; // group is at system 1 planet 5 moon 0 (set in 2b8d:11bf)
-    uint32_t Groups_PlanetForceList; // Far pointer to the planet-force group list
-    uint8_t _pad_78A0[0x4];
+    uint32_t Groups_PlanetForceList; // ^TGroup: the planet force at the shown group's location (2b8d:11bf)
+    uint8_t _pad_78A0[0x2];
+    int16_t Groups_SlotReturned; // weapons sent back to stock when ships are removed
     uint8_t Groups_PlanetForceMode; // := PrevScreen=0x14; screen 0x16 edits a planet force (no prev/next group)
     uint8_t _pad_78A5[0x1];
     uint32_t Groups_IconBuffer;
-    uint16_t Research_FrameCounter; // Selection-frame animation counter
+    int16_t Research_FrameCounter; // selection frame blink counter 28h..0 (2d66:0891)
     uint32_t Research_IconBuffer; // Icon picture buffer
-    uint16_t Research_ProgressFrame;
+    int16_t Research_ProgressFrame; // frame of the work-in-progress animation 0..2Ch (2d66:0bae)
     uint8_t _pad_78B2[0x2];
     uint16_t AlienTalk_SelectedLine;
     uint8_t AlienTalk_Locked;
-    uint8_t _pad_78B7[0x5];
-    uint16_t AlienTalk_MenuNumber;
-    uint16_t AlienTalk_QuestionLine;
-    uint16_t AlienTalk_ReplyLine;
-    uint16_t AlienTalk_AnswerId;
+    uint8_t _pad_78B7[0x1];
+    PStr2 AlienTalk_RaceStr; // AlienTalk::Race as text, for KERDES<n>.AT / VALASZ<n>.AT (2e4b:03a5)
+    uint8_t _pad_78BB[0x1];
+    int16_t AlienTalk_MenuNumber; // next menu (reply code, 2e4b:0700), 0 = done
+    int16_t AlienTalk_QuestionLine; // KERDES<race>.AT line of the chosen question
+    int16_t AlienTalk_ReplyLine; // VALASZ<race>.AT line drawn as the reply
+    int16_t AlienTalk_AnswerId; // reply line named by the question's code (2e4b:0675)
     uint32_t AlienTalk_QuestionBuf; // GetMem(300h): 3 pascal strings of 256 bytes with the current menu's questions
     int16_t AlienTalk_Scene; // scene id set by 2e4b:0000
     int16_t AlienTalk_Race; // race number set by 2e4b:03a5, used for file names KERDES<n>.AT / VALASZ<n>.AT
-    uint8_t _pad_78CC[0x4];
+    uint16_t AlienTalk_HoverCol; // 1 inside the question column (2e4b:092e)
+    int16_t AlienTalk_HoverRow; // text row under the mouse (2e4b:092e)
     int16_t AlienTalk_MenuLineCount; // total text lines in the menu; line->question index bytes follow at 78D2
-    uint8_t _pad_78D2[0x8];
+    uint8_t AlienTalk_LineQuestion[8]; // [1..8] question number of each text line (2e4b:0780)
     int16_t Surface_Mode; // 1 browse, 2 placing a building, 3 type info, 4 existing building selected, 6 destroy (2ef2:15de, 22df, 0791 captions)
     int16_t Surface_SelKind; // Building type 1..25 selected (index into BuildingTypes)
-    uint8_t _pad_78DE[0x2];
+    int16_t Surface_PrevKind; // SelKind before a map click; destroy mode restores it (Main 1000:16e9)
     int16_t Surface_SelBuilding; // Index in Game::Buildings of the selected/created building
     int16_t Surface_TileSet; // Surface::Tileset[SurfaceType]: number of the FELSZ/FANIM/radar/epulet sheet
     int16_t Surface_MapVariant; // N in MAP\MAP<type>_<N>.MAP (LoadMap)
     int16_t Surface_AnimTileFrame;
     uint16_t Surface_AnimTileOffset; // Offset of the animated-tile frame in BufD
     uint8_t Surface_CanBuild; // ? 0 = hotspot captions 'No effect'; set = Invention up/down/Info and Build live
-    uint8_t _pad_78EB[0x1];
+    uint8_t Surface_Scrolled; // the view scrolled this pass: redraw the map and the radar (Main 1000:1e03)
     uint32_t Surface_TileLayer; // 60x60 bytes, [x*3Ch+y-3Dh]: terrain tile number (LoadMap)
     uint32_t Surface_OccupyLayer; // bytes: 0 free, tile+1 = building cell, FFh blocked terrain
     uint32_t Surface_BuildingLayer; // words [x*78h+y*2-7Ah]: index of the building covering the cell
@@ -878,9 +1207,11 @@ typedef struct DSeg {
     uint16_t Surface_MapHeight; // second byte of the .MAP file
     int16_t Surface_ScrollX; // Left column of the 14x9 visible window
     int16_t Surface_ScrollY; // Top row of the visible window
-    uint8_t _pad_7900[0x4];
+    int16_t Surface_PrevScrollX; // ScrollX before a radar click (Main 1000:1a34)
+    int16_t Surface_PrevScrollY;
     uint16_t Surface_RadarStale; // FFFFh forces a radar redraw
-    uint8_t _pad_7906[0x4];
+    uint8_t _pad_7906[0x2];
+    int16_t Surface_EdgeScrollDir; // EdgeScroll entry under a right-button click, 0 = none (Main 1000:19a4)
     uint32_t Surface_RadarBuf; // Saved background bitmap of the radar area
     uint32_t Surface_RadarColors; // 2080 bytes loaded from planets\radar<t>: 2x2 colours for each tile
     uint16_t Surface_RadarOfs; // RadarY*320+RadarX
@@ -889,21 +1220,30 @@ typedef struct DSeg {
     uint8_t Surface_RadarDouble; // map smaller than 46x31: radar drawn at 2x scale
     uint8_t _pad_7919[0x1];
     uint16_t Surface_FelszTiles; // Tiles in the current FELSZ sheet; higher numbers come from BufD
-    uint8_t _pad_791C[0x2];
+    uint16_t Surface_BlinkCounter; // 0..19, the Build/Destroy button blinks at 1 and 11 (2ef2:15de)
     uint8_t Surface_BlinkOn;
-    uint8_t _pad_791F[0xC9];
+    uint8_t _pad_791F[0x1];
+    int32_t Surface_KindCounts[2][25]; // [0..1,1..25] [Building.Flag][Kind]: finished buildings on a body (2ef2:2b9e)
     int16_t Shop_Sel; // Selected position in the product list
     int16_t Shop_Top; // First visible list position
     int32_t Shop_Qty; // Quantity being ordered (+/-1, +/-10 buttons)
-    uint8_t _pad_79F0[0xA];
+    int16_t Shop_PrevSel; // Sel at the last redraw; a change reloads the model and the panels (32b4:0057, 0aac)
+    int16_t Shop_PrevTop; // Top at the last list redraw (32b4:0aac)
+    int32_t Shop_PrevQty; // Qty before this pass's +/- buttons (32b4:0057)
+    int16_t Shop_PrevSel2; // Sel when the list scroll buttons were last handled (32b4:0057)
     uint8_t Shop_ListMode; // Set after MenuCommand 1Fh / hotspot 16h: product list shown (with picture of the thing). 79FB = quantity edit active, 79FC = info (vs picture) toggle
-    uint8_t _pad_79FB[0x17];
-    int32_t Shop_OreStock[6]; // [1..6] Snapshot of Game ore stocks while ordering (at DS:7A16..)
-    uint8_t _pad_7A2A[0xA];
+    uint8_t Shop_QtyEdit; // quantity edit active on the shop screen
+    uint8_t Shop_ShowPicture; // the right panel shows the picture, else the info text (32b4:0057)
+    uint8_t _pad_79FD[0x1];
+    int32_t Shop_OreNeeded[6]; // [1..6] ore the order uses (32b4:0d21)
+    int32_t Shop_OreStock[6]; // [1..6] Game::HomeStock plus the queued order's ore while editing the quantity (32b4:0057)
+    uint8_t Shop_OreShort[6]; // [1..6] one more piece would run out of this ore (32b4:0d21)
     PStr30 Shop_OreHeader; // 'Ore needed ...' line; DS:7A54.. six string[15] ore lines
-    uint8_t _pad_7A53[0x61];
+    uint8_t _pad_7A53[0x1];
+    PStr15 Shop_OreLines[6]; // [1..6] the ore lines under OreHeader, in the order 1, 3, 2, 6, 5, 4 (32b4:0d21)
     int16_t Shop_Count; // Number of listed products; DS:7AB6.. = byte list of product indices (1-based, count+1 bytes)
-    uint8_t _pad_7AB6[0x28];
+    uint8_t Shop_List[36]; // [1..36] product numbers of the listed lines (Shop::Count + 1 used); Research reads List[Sel] (2d66:0029)
+    uint32_t Shop_PanelBuf; // grafika\select while it loads, freed straight after (32b4:074d)
     uint32_t Message_Log; // array of 53-byte entries {kind: integer; text: string[50]}
     int16_t Message_LogCount; // entries used in Message::Log (max 15)
     int16_t Game_CurSystem; // Selected star system 1..8. Copied from TGroup.System (+13h); indexes the body tables at DS:4752/4732
@@ -912,33 +1252,112 @@ typedef struct DSeg {
     uint16_t PlanetInfo_AlienMode; // 0 normal, 1, 3 (word everywhere, e.g. 1413:0133); selects 1 hotspot layout / skips planet pics (357b:0031, 134b)
     uint32_t Game_CurBody; // far ^TBody Set by 357b:3253 from CurSystem/CurPlanet/CurMoon: DS:4752[sys]^[body], 65-byte records
     uint16_t Game_CurBodyIsColony; // 1 if CurBody^.Owner = 1 and CurBody^.Colony <> 0 (357b:3253) ? boolean stored as word
-    uint8_t _pad_7B0E[0xB6];
-    uint8_t Launch_SystemViewTable; // 18 entries of 6 bytes {type, index}
-    uint8_t _pad_7BC5[0x71];
+    uint32_t PlanetInfo_Backdrop; // system view background, planets\hatter1/2, 320x151 (357b:235a)
+    uint32_t PlanetInfo_Icons; // system view icon sheet, planets\hatter3/4, 320x75 (357b:235a)
+    uint32_t PlanetInfo_Sprites; // planet and moon sprite sheet planets\napr<system> (357b:235a, 10d9)
+    uint32_t PlanetInfo_Frame; // system view frame being composed (357b:29cd)
+    uint32_t PlanetInfo_MoonSprite; // scaled moon sprite (357b:27e9)
+    uint32_t PlanetInfo_PlanetSprite; // scaled planet sprite (357b:270b)
+    uint8_t PlanetInfo_BodiesHidden; // system 4 after its annihilation: bodies not drawn, body hotspots off (357b:18cc)
+    uint8_t _pad_7B27[0x1];
+    TOrbit PlanetInfo_Orbits[9]; // [0] the planet of the planet view, [k] planet k or moon k (357b:23db, 3010)
+    TViewGroup Launch_SystemViewTable[18]; // [1..18] folded 7bc4; fleets/forces of the planet view's hotspots 1..18, kind 0 = none (357b:18cc)
     uint16_t Launch_SelectedEntry;
-    uint8_t _pad_7C38[0x8];
+    uint16_t Launch_SavedBody; // with SavedSystem/SavedPlanet: the marked body, 1 = the planet, k + 1 = moon k (357b:27e9)
+    uint8_t Launch_AttackIconShown; // toolbar state last shown: attack icon 37h (18e0:00e8)
+    uint8_t Launch_AttackIcon; // the selected race force can be attacked
+    uint8_t Launch_MoveIconShown; // move icon 38h last shown
+    uint8_t Launch_MoveIcon; // a group is selected
+    uint8_t Launch_InvadeIconShown; // ground battle icon 47h last shown
+    uint8_t Launch_InvadeIcon; // the selected army can invade the race's planet
     uint16_t Launch_SavedScreen;
     uint16_t Launch_SavedSystem;
     uint16_t Launch_SavedPlanet;
-    uint8_t _pad_7C46[0x1C];
+    int16_t PlanetInfo_BlinkTimer; // countdown 20..0 of the blinking frame in the unknown-system view (357b:29cd)
+    uint8_t PlanetInfo_HasGroups; // the planet has fleets the player can see (357b:18cc)
+    uint8_t PlanetInfo_HasBase; // the planet has a base/colony the player can see (357b:18cc)
+    uint8_t TextFile_InputActive; // an input line is being edited (398f:0059)
+    uint8_t TextFile_InputEscaped; // set by InputLine (Esc restores the backup); afterwards 1 if Esc ended it (398f:0179), checked by 1a3e:0008
+    uint32_t TextFile_InputBackup; // GetMem(3Ch) copy of the string, restored by Esc
+    uint32_t TextFile_InputStr; // the edited string
+    uint16_t TextFile_InputBlink; // cursor blink counter 1..20 (398f:0179)
+    uint8_t TextFile_InputCanCancel; // Esc allowed
+    uint8_t _pad_7C57[0x1];
+    int16_t TextFile_InputX;
+    int16_t TextFile_InputY;
+    int16_t TextFile_InputWidth; // characters
+    int16_t TextFile_CursorX; // cursor underline position
+    int16_t TextFile_CursorY;
     uint8_t GfxPath_PageFlagA; // Toolbar page flags
     uint8_t GfxPath_PageFlagB;
-    uint8_t _pad_7C64[0x10E];
-    uint8_t GfxPath_IconIndex; // Index of the icons in ICON\ICON.ALL
-    uint8_t _pad_7D73[0x87];
+    uint8_t GfxPath_SavedPage; // toolbar page of the command centre: toggled with PageFlagB by each scroll (3a1b:0586), restored by SetToolbar(1) (3a1b:0030), 1 at start (Main); where MenuBar[0].Command would be
+    uint8_t _pad_7C65[0x1];
+    TMenuButton GfxPath_MenuBar[12]; // [1..12] the toolbar's slots: label and command id (3a1b:0030, Main 1000:089d)
+    uint32_t GfxPath_InitBlock; // GetMem block of the toolbar, handed to Ems::EmsMoveToEms (3a1b:09b2)
+    uint32_t GfxPath_CellBackgrounds; // the cell backgrounds in the toolbar block (icon\iconmain, 240 wide); the cursor sheet at start (321d:026f)
+    uint32_t GfxPath_IconScratch; // GetMem(3C0h): an icon decoded by 3a1b:0864
+    uint8_t _pad_7D6E[0x4];
+    uint16_t GfxPath_IconIndex[68]; // offset of each icon in the toolbar block (ICON.ALL read position, 3a1b:0810)
     TEmsBlock GfxPath_ToolbarBlock;
-    uint8_t _pad_7E07[0x22];
-    uint8_t Command_ShowHologramOnEntry;
-    uint8_t _pad_7E2A[0xC];
+    uint8_t _pad_7E07[0x1];
+    uint32_t Command_MainFace; // grafika\mainface, E600h bytes: staff figures (3abd:0352)
+    uint32_t Command_Heroes; // grafika\heroes, 4C40h bytes
+    uint32_t Command_Offscreen; // 64000-byte screen copy while the hologram shows (3abd:04b4)
+    int16_t Command_LightFrame; // frame 0..37 of the first maina5 light loop (3abd:14c5)
+    int16_t Command_LightTimer; // retraces to its next frame
+    uint32_t Command_MainA5; // grafika\maina5, 5280h bytes: the light loops
+    int16_t Command_Light2Frame; // frame 0..9 of the second light loop
+    int16_t Command_Light2Timer;
+    int16_t Command_DoorTimer; // steps until the builders' door turns (3abd:1395); 70..319
+    int16_t Command_DoorCountdown; // retraces to the next door step (4)
+    uint32_t Command_MainA4; // grafika\maina4, 5B00h bytes: the door strips
+    uint8_t Command_DoorDir; // door direction, flipped when DoorTimer runs out
+    uint8_t Command_ShowHologramOnEntry; // set by Sim when the developer comes back on the command screen (1b8a:3d07)
+    int16_t Command_AnimId; // room animation playing (Cc::Doors index; 3abd, 2e4b:0044)
+    int16_t Command_AnimFrame; // frame of the room animation; GrWar resets it (1537:01eb)
+    int16_t Command_AnimDelay; // frames before the next step; 100..299 at the start (3abd:0c05)
+    int16_t Command_AnimTick; // war animation: retraces to the next frame (3abd:0f19)
+    int16_t Command_AnimRepeat; // war animation: loops left (Cc::Rooms.Repeat)
+    int16_t Command_AnimSpeed; // war animation: AnimTick reload (Cc::Rooms.Speed)
     uint32_t Command_WarAnimBuffer;
     uint8_t Command_BackdropShown;
-    uint8_t _pad_7E3B[0x199];
-    uint8_t Vec3D_SineTable; // Built at start-up; shared with the system view's orbits
-    uint8_t _pad_7FD5[0x9C7];
-    uint16_t Hire_Candidate;
-    uint16_t Hire_StaffKind;
+    uint8_t _pad_7E3B[0x1];
+    int16_t Command_StaffPicked; // staff kind picked in the command centre: the advisor's kind 1..4 (1991)
+    int16_t Command_AdvisorLine; // advisor menu line under the mouse, 0 = none (1991:09e8)
+    uint32_t Anim_Record; // 349h bytes: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
+    uint32_t Anim_Script; // 230h bytes: 140 entries {anim, frame, sound, delay} of an anim.def script (SpWar, Command)
+    uint16_t VecLoad_Angles[3]; // [1..3] model rotation, 1/3 degrees (0..1079) (3d38:01aa)
+    uint8_t VecLoad_Spinning; // the model view turns: Main calls DrawFrame every frame (Shop 32b4:0057)
+    uint8_t _pad_7E4F[0x1];
+    int16_t VecLoad_ObjectCount; // objects in the loaded model (3d38:084a)
+    int16_t VecLoad_Zoom; // ModelZoom of the loaded model (3d38:084a)
+    int16_t VecLoad_WireScale; // scale of the wireframe view (3d38:0cd6)
+    uint32_t VecLoad_Projected; // projected points of the object being drawn (3d38:0000)
+    uint32_t VecLoad_Normals[18]; // [0] projected normals, [1..17] each object's face normals (3d38:051c)
+    uint32_t VecLoad_Verts[17]; // [1..17] vertices of each object (3d38:051c)
+    int16_t VecLoad_VertCount[17]; // [1..17] (3d38:0696)
+    uint32_t VecLoad_Edges[17]; // [1..17] edge index pairs of each object (3d38:051c)
+    int16_t VecLoad_EdgeCount[17]; // [1..17] (3d38:0696)
+    uint32_t VecLoad_Faces[17]; // [1..17] faces of each object, 20 bytes each (3d38:051c)
+    int16_t VecLoad_FaceCount[17]; // [1..17] (3d38:0696)
+    int32_t Vec3D_CosTable[361]; // Round(Cos(i deg) * 500), built at start-up (3e17:18db); the system view's orbits use it too (357b:3010)
+    uint16_t VecLoad_Spin[3]; // [1..3] added to Angles every frame (3d38:01aa)
+    uint8_t _pad_857E[0x6];
+    uint32_t VecLoad_Buffer; // 320-wide off-screen buffer of the model views, allocated by Shop and Command (3d38:01aa)
+    TVecPoint Vec3D_Centroids[17]; // [1..17] folded 8582; rounded centroid of each object, with hand fixes (3e17:04d2)
+    TVecPoint VecLoad_ProjCentroids[17]; // [1..17] projected centroids; Z is the depth to sort by (3d38:01aa)
+    int16_t VecLoad_Order[17]; // [1..17] drawing order of the objects (3d38:00e5)
+    int16_t Vec3D_EdgesA[200]; // x per scanline of one side of the polygon being filled (3e17:11f9)
+    int16_t Vec3D_EdgesB[200]; // x per scanline of the other side (3e17:11f9)
+    int16_t Vec3D_Model; // model being loaded or drawn (3d38:0696)
+    int16_t Vec3D_Slot; // object being drawn (3d38:0000)
+    int16_t VecLoad_Scale; // current scale of the solid view, grows to Zoom (3d38:01aa)
+    int16_t Hire_Candidate; // selected candidate 1..3, 0 = none (3fab:0032)
+    int16_t Hire_StaffKind; // staff kind shown, 1..4 (3fab:0032)
     uint8_t Hire_InfoShown;
-    uint8_t _pad_89A1[0xB];
+    uint8_t _pad_89A1[0x1];
+    int16_t Command_StaffHotspotKind[4]; // [1..4] staff kind of command-centre hotspot 1..4 (3abd:08e0)
+    int16_t Command_StaffHotspotCount; // staff hotspots in use
     uint32_t RawText_SzFace; // text\sz_face.raw (1968 bytes)
     uint32_t RawText_SzTalal; // text\sz_talal.raw (7595 bytes)
     uint32_t RawText_SzFaj; // text\sz_faj.raw (5184 bytes)
@@ -994,12 +1413,16 @@ typedef struct DSeg {
     uint8_t Mouse_HeldRight; // BtnRight while a button is down
     int16_t Mouse_ClickX;
     int16_t Mouse_ClickY;
-    uint8_t _pad_8A80[0x1];
+    uint8_t Mouse_QuitFlag; // Main fades and halts when set; cleared by Mouse::Poll (4758:042d), setter unknown
     uint8_t Mouse_ButtonsChanged;
-    uint8_t _pad_8A82[0x3];
+    uint8_t Mouse_HotPushable; // Main: the hotspot under the mouse repeats while held or has a command (1000:0899)
+    uint8_t Mouse_HeldPhase; // Main: wait for the button's release on this pass (1000:023d)
+    uint8_t Mouse_LastPushable; // Main: the pushable state of the last press; cleared by the callback when no button is down (4758:0000)
     uint8_t Mouse_Released; // A button was released this poll
     uint8_t Mouse_Pressed; // A button was pressed this poll
-    uint8_t _pad_8A87[0x3];
+    uint8_t Mouse_CursorHidden; // ? cleared by InitMouse (4758:0314), only read by Main
+    uint8_t Mouse_HiddenClick; // Main: CursorHidden and no right button, forces hotspot 999 (1000:05aa)
+    uint8_t _pad_8A89[0x1];
     int16_t Mouse_HotspotCount;
     THotspot Mouse_Hotspots[66]; // [1..66] Pascal base is DS:8A71 (element 0). 66 records end at 9181, just before CursorState. Hit test 4758:05bc returns 20+index
     uint16_t Mouse_CursorState; // 0 hidden, 1 shown, 2 being redrawn
@@ -1016,7 +1439,7 @@ typedef struct DSeg {
     uint8_t _pad_9194[0x4];
     uint16_t Mouse_CursorShape; // Index into the 256-byte cursor images at DS:9602
     uint16_t Mouse_SavedCursorShape; // 357b:29cd saves CursorShape here before changing it
-    uint8_t _pad_919C[0x2];
+    int16_t Mouse_ViewHotspot; // Mouse_HitTestCursor result in the system view (357b:29cd)
     uint8_t Mouse_CursorFrozen; // Cursor isn't redrawn while set
     uint8_t _pad_919F[0x1];
     int16_t Game_IdeaTimer[35]; // [1..35] Hours until invention k becomes available (status 0 -> 1). -1 = not scheduled. Decremented by 1b8a:3d07; set by 29b9:136e
@@ -1109,8 +1532,28 @@ typedef struct DSeg {
 #pragma pack(pop)
 
 static_assert(sizeof(DSeg) == DSEG_SIZE);
+static_assert(offsetof(DSeg, GrWarUnits_WeaponWeight) == 0x0002);
+static_assert(offsetof(DSeg, GrWarUnits_TypeAttack) == 0x0012);
+static_assert(offsetof(DSeg, GrWarUnits_TypeDefence) == 0x001A);
+static_assert(offsetof(DSeg, GrWar_Cooldown) == 0x0022);
+static_assert(offsetof(DSeg, GrWar_Vulnerability) == 0x002A);
+static_assert(offsetof(DSeg, GrWarUnits_SlotCap) == 0x0032);
+static_assert(offsetof(DSeg, GrWar_DirX) == 0x0046);
+static_assert(offsetof(DSeg, GrWar_DirY) == 0x0050);
+static_assert(offsetof(DSeg, GrWar_MoveDelay) == 0x0080);
+static_assert(offsetof(DSeg, GrWar_Effects) == 0x0088);
+static_assert(offsetof(DSeg, GrWar_BaseOffset) == 0x00B8);
 static_assert(offsetof(DSeg, Advisor_Menus) == 0x00C2);
 static_assert(offsetof(DSeg, Advisor_CurMenu) == 0x00D4);
+static_assert(offsetof(DSeg, SaveLoad_OptionX) == 0x00DA);
+static_assert(offsetof(DSeg, SaveLoad_OptionY) == 0x00E6);
+static_assert(offsetof(DSeg, SaveLoad_OptionW) == 0x00F2);
+static_assert(offsetof(DSeg, SaveLoad_OptionH) == 0x00FE);
+static_assert(offsetof(DSeg, SaveLoad_ButtonX) == 0x010A);
+static_assert(offsetof(DSeg, SaveLoad_ButtonY) == 0x0112);
+static_assert(offsetof(DSeg, SaveLoad_ButtonW) == 0x011A);
+static_assert(offsetof(DSeg, SaveLoad_ButtonH) == 0x0122);
+static_assert(offsetof(DSeg, Advisor_CourseSkills) == 0x012A);
 static_assert(offsetof(DSeg, Pub_People) == 0x013A);
 static_assert(offsetof(DSeg, Pub_MenuData) == 0x0248);
 static_assert(offsetof(DSeg, Pub_MenuLists) == 0x03DA);
@@ -1119,27 +1562,61 @@ static_assert(offsetof(DSeg, Pub_ItemQty) == 0x0408);
 static_assert(offsetof(DSeg, Pub_ItemPrice) == 0x0414);
 static_assert(offsetof(DSeg, Pub_Deals) == 0x0424);
 static_assert(offsetof(DSeg, Pub_Anims) == 0x0514);
+static_assert(offsetof(DSeg, SpWar_WeaponPower) == 0x05C8);
 static_assert(offsetof(DSeg, SpWar_ClassA) == 0x05D8);
 static_assert(offsetof(DSeg, SpWar_ClassB) == 0x05E8);
-static_assert(offsetof(DSeg, SpWar_ClassBytes) == 0x07B8);
+static_assert(offsetof(DSeg, SpWar_Routes) == 0x05F8);
+static_assert(offsetof(DSeg, SpWar_RouteSet) == 0x06E8);
+static_assert(offsetof(DSeg, SpWar_PathDirs) == 0x06F0);
+static_assert(offsetof(DSeg, SpWar_ZonePaths) == 0x0738);
+static_assert(offsetof(DSeg, SpWar_DxAttacker) == 0x078A);
+static_assert(offsetof(DSeg, SpWar_DxDefender) == 0x0794);
+static_assert(offsetof(DSeg, SpWar_Dy) == 0x079E);
+static_assert(offsetof(DSeg, SpWar_CoolBase) == 0x07A8);
+static_assert(offsetof(DSeg, SpWar_CoolRange) == 0x07B0);
+static_assert(offsetof(DSeg, SpWar_StartX) == 0x07B8);
+static_assert(offsetof(DSeg, SpWar_StartXRange) == 0x07BC);
+static_assert(offsetof(DSeg, SpWar_StartY) == 0x07C0);
+static_assert(offsetof(DSeg, SpWar_StartYRange) == 0x07C4);
+static_assert(offsetof(DSeg, SpWar_ExplosionFrames) == 0x07CC);
+static_assert(offsetof(DSeg, SpWar_KillChance) == 0x07D0);
+static_assert(offsetof(DSeg, ShipMove_LightX) == 0x07D8);
+static_assert(offsetof(DSeg, ShipMove_LightY) == 0x07E4);
+static_assert(offsetof(DSeg, ShipMove_LightW) == 0x07F0);
+static_assert(offsetof(DSeg, ShipMove_LightH) == 0x07FC);
 static_assert(offsetof(DSeg, Cargo_Items) == 0x0808);
 static_assert(offsetof(DSeg, Cargo_ItemSpace) == 0x0816);
 static_assert(offsetof(DSeg, Cargo_UnitSpace) == 0x084A);
 static_assert(offsetof(DSeg, Protect_WordCodes) == 0x085A);
 static_assert(offsetof(DSeg, Protect2_QuestionIndex) == 0x0876);
 static_assert(offsetof(DSeg, Protect2_AnswerHash) == 0x087A);
+static_assert(offsetof(DSeg, Protect2_HashEcho) == 0x087E);
 static_assert(offsetof(DSeg, Protect2_AnswerKey) == 0x0882);
+static_assert(offsetof(DSeg, Protect2_KeyEcho) == 0x0886);
 static_assert(offsetof(DSeg, Protect2_Lives) == 0x088A);
 static_assert(offsetof(DSeg, Protect2_ScribbleDone) == 0x088E);
+static_assert(offsetof(DSeg, Intel_Race3Stores) == 0x0890);
+static_assert(offsetof(DSeg, Intel_Race3StoresEarly) == 0x0898);
+static_assert(offsetof(DSeg, Intel_Race3StoresRange) == 0x08A0);
+static_assert(offsetof(DSeg, Intel_Race7Stores) == 0x08A8);
+static_assert(offsetof(DSeg, Intel_Race7StoresRange) == 0x08B0);
+static_assert(offsetof(DSeg, Intel_Race8Stores) == 0x08B8);
+static_assert(offsetof(DSeg, Intel_Race8StoresRange) == 0x08C0);
+static_assert(offsetof(DSeg, Intel_Race12Stores) == 0x08C8);
+static_assert(offsetof(DSeg, Intel_Race12StoresRange) == 0x08D0);
 static_assert(offsetof(DSeg, Groups_SlotLayouts) == 0x08D8);
 static_assert(offsetof(DSeg, Groups_TypeSlots) == 0x0B50);
 static_assert(offsetof(DSeg, Groups_CatRange) == 0x0BB4);
 static_assert(offsetof(DSeg, Groups_SlotA) == 0x0BBE);
 static_assert(offsetof(DSeg, Groups_SlotB) == 0x0BD2);
+static_assert(offsetof(DSeg, Groups_EmptyTests) == 0x0BE6);
+static_assert(offsetof(DSeg, Research_TransitionFrames) == 0x0BFE);
+static_assert(offsetof(DSeg, Research_SkillX) == 0x0C26);
 static_assert(offsetof(DSeg, Alien_MenuData) == 0x0C2E);
 static_assert(offsetof(DSeg, Alien_MenuLists) == 0x0CE2);
 static_assert(offsetof(DSeg, Alien_CurMenu) == 0x0D0A);
 static_assert(offsetof(DSeg, AlienTalk_PortraitByRace) == 0x0D0E);
+static_assert(offsetof(DSeg, Surface_EdgeScroll) == 0x0D18);
 static_assert(offsetof(DSeg, Surface_MapTemplates) == 0x0D96);
 static_assert(offsetof(DSeg, Surface_FelszHeight) == 0x17E6);
 static_assert(offsetof(DSeg, Surface_FanimHeight) == 0x17FC);
@@ -1182,16 +1659,31 @@ static_assert(offsetof(DSeg, Galaxy_MoonCount) == 0x4786);
 static_assert(offsetof(DSeg, Galaxy_BodyIcon) == 0x4796);
 static_assert(offsetof(DSeg, Galaxy_PlanetStatus) == 0x47D6);
 static_assert(offsetof(DSeg, Galaxy_SystemStatus) == 0x4816);
+static_assert(offsetof(DSeg, Sim_Observatories) == 0x481E);
+static_assert(offsetof(DSeg, Sim_UniversityCount) == 0x482E);
 static_assert(offsetof(DSeg, Scale_RowProcs) == 0x4830);
-static_assert(offsetof(DSeg, Ui_RowOffset) == 0x4875);
-static_assert(offsetof(DSeg, Ui_ButtonLabels) == 0x489C);
+static_assert(offsetof(DSeg, Ui_RowOffset) == 0x4874);
+static_assert(offsetof(DSeg, Ui_ButtonLabels) == 0x488A);
 static_assert(offsetof(DSeg, GfxPath_CommandIcon) == 0x4E06);
 static_assert(offsetof(DSeg, Ui_ButtonSounds) == 0x4E5F);
 static_assert(offsetof(DSeg, Ui_Screens) == 0x5114);
 static_assert(offsetof(DSeg, GfxPath_IconAllSize) == 0x54CA);
+static_assert(offsetof(DSeg, GfxPath_CellsSize) == 0x54CC);
+static_assert(offsetof(DSeg, Command_StaffX) == 0x54CE);
+static_assert(offsetof(DSeg, Command_StaffY) == 0x54D6);
+static_assert(offsetof(DSeg, Command_StaffSrcX) == 0x54DE);
+static_assert(offsetof(DSeg, Command_StaffSrcY) == 0x54F6);
+static_assert(offsetof(DSeg, Command_StaffW) == 0x550E);
+static_assert(offsetof(DSeg, Command_StaffH) == 0x5516);
+static_assert(offsetof(DSeg, Command_StaffOfSlot) == 0x551E);
+static_assert(offsetof(DSeg, Command_Lights) == 0x5526);
 static_assert(offsetof(DSeg, SpWar_SpriteRects) == 0x5560);
 static_assert(offsetof(DSeg, Cc_Doors) == 0x55DE);
 static_assert(offsetof(DSeg, Cc_Rooms) == 0x5656);
+static_assert(offsetof(DSeg, SpWar_ScriptPlays) == 0x569C);
+static_assert(offsetof(DSeg, VecLoad_ModelZoom) == 0x56CE);
+static_assert(offsetof(DSeg, VecLoad_ModelMode) == 0x56F2);
+static_assert(offsetof(DSeg, VecLoad_ModelSpin) == 0x5716);
 static_assert(offsetof(DSeg, Staff_FacePics) == 0x5780);
 static_assert(offsetof(DSeg, Staff_Price) == 0x579C);
 static_assert(offsetof(DSeg, Staff_Level) == 0x57CC);
@@ -1213,25 +1705,68 @@ static_assert(offsetof(DSeg, Names_SystemsShort) == 0x5BB6);
 static_assert(offsetof(DSeg, Gfx_CharsetChars) == 0x5BEE);
 static_assert(offsetof(DSeg, Gfx_LineStride) == 0x5CEE);
 static_assert(offsetof(DSeg, Gfx_LineStrideCopy) == 0x5CF0);
-static_assert(offsetof(DSeg, Gus_RateTable) == 0x5CFE);
+static_assert(offsetof(DSeg, Gus_RateTable) == 0x5CFC);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack3Won) == 0x5D3C);
+static_assert(offsetof(DSeg, Intel_KallForceSent) == 0x5D3E);
+static_assert(offsetof(DSeg, Intel_KallTurnCancelled) == 0x5D3F);
 static_assert(offsetof(DSeg, Intel_LaunchTimer) == 0x5D40);
 static_assert(offsetof(DSeg, Intel_LaunchRace) == 0x5D42);
 static_assert(offsetof(DSeg, Intel_LaunchForce) == 0x5D44);
 static_assert(offsetof(DSeg, Intel_LaunchMission) == 0x5D46);
+static_assert(offsetof(DSeg, Intel_FirstJumpSeen) == 0x5D48);
+static_assert(offsetof(DSeg, Intel_SatTheftTimer) == 0x5D4A);
+static_assert(offsetof(DSeg, Intel_SatTheftDone) == 0x5D4C);
 static_assert(offsetof(DSeg, Intel_Race2Timer1) == 0x5D4E);
 static_assert(offsetof(DSeg, Intel_Race2Done1) == 0x5D50);
+static_assert(offsetof(DSeg, Intel_DevAwayTimer) == 0x5D52);
 static_assert(offsetof(DSeg, Intel_Race2Timer2) == 0x5D54);
 static_assert(offsetof(DSeg, Intel_Race2Done2) == 0x5D56);
 static_assert(offsetof(DSeg, Intel_Race2Timer3) == 0x5D58);
 static_assert(offsetof(DSeg, Intel_Race2Done3) == 0x5D5A);
 static_assert(offsetof(DSeg, Intel_Race2Timer4) == 0x5D5C);
 static_assert(offsetof(DSeg, Intel_Race2Done4) == 0x5D5E);
+static_assert(offsetof(DSeg, Intel_Invention14Timer) == 0x5D60);
+static_assert(offsetof(DSeg, Intel_Invention14Revealed) == 0x5D62);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack1Timer) == 0x5D64);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack1Done) == 0x5D66);
+static_assert(offsetof(DSeg, Intel_FirstBattleWon) == 0x5D67);
+static_assert(offsetof(DSeg, Intel_FirstGroundLost) == 0x5D68);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack2Timer) == 0x5D6A);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack2Done) == 0x5D6C);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack2Open) == 0x5D6D);
+static_assert(offsetof(DSeg, Intel_Phoenix1Timer) == 0x5D6E);
+static_assert(offsetof(DSeg, Intel_Phoenix1Done) == 0x5D70);
+static_assert(offsetof(DSeg, Intel_Phoenix1Armed) == 0x5D71);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack3Timer) == 0x5D72);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack3Done) == 0x5D74);
+static_assert(offsetof(DSeg, Intel_MorgrulAttack3Open) == 0x5D75);
 static_assert(offsetof(DSeg, Intel_Race4Timer) == 0x5D76);
 static_assert(offsetof(DSeg, Intel_Race4Done) == 0x5D78);
+static_assert(offsetof(DSeg, Intel_KallTurnTimer) == 0x5D7A);
+static_assert(offsetof(DSeg, Intel_KallTurnDone) == 0x5D7C);
+static_assert(offsetof(DSeg, Intel_JointAttackTimer) == 0x5D7E);
+static_assert(offsetof(DSeg, Intel_JointAttackDone) == 0x5D80);
 static_assert(offsetof(DSeg, Intel_Race5Timer) == 0x5D82);
 static_assert(offsetof(DSeg, Intel_Race5Done) == 0x5D84);
+static_assert(offsetof(DSeg, Intel_Msg14Timer) == 0x5D86);
+static_assert(offsetof(DSeg, Intel_Msg14Done) == 0x5D88);
+static_assert(offsetof(DSeg, Intel_System3Timer) == 0x5D8A);
+static_assert(offsetof(DSeg, Intel_MorgrulBeaten) == 0x5D8C);
+static_assert(offsetof(DSeg, Intel_System4DestroyTimer) == 0x5D8E);
+static_assert(offsetof(DSeg, Intel_System4Destroyed) == 0x5D90);
+static_assert(offsetof(DSeg, Intel_Pub4HintOff) == 0x5D91);
+static_assert(offsetof(DSeg, Intel_System4WarnTimer) == 0x5D92);
+static_assert(offsetof(DSeg, Intel_System4Warned) == 0x5D94);
+static_assert(offsetof(DSeg, Intel_System4TalkArmed) == 0x5D95);
 static_assert(offsetof(DSeg, Intel_Race7to10Timer) == 0x5D96);
 static_assert(offsetof(DSeg, Intel_Race7to10Done) == 0x5D98);
+static_assert(offsetof(DSeg, Intel_Pub10Done) == 0x5D99);
+static_assert(offsetof(DSeg, Intel_Pub7Done) == 0x5D9A);
+static_assert(offsetof(DSeg, Advisor_TrainingTimer) == 0x5D9C);
+static_assert(offsetof(DSeg, Advisor_TrainingKind) == 0x5D9E);
+static_assert(offsetof(DSeg, Advisor_TrainingCourse) == 0x5DA0);
+static_assert(offsetof(DSeg, Advisor_TrainingPrice) == 0x5DA2);
+static_assert(offsetof(DSeg, Game_FrameCount) == 0x5DA6);
 static_assert(offsetof(DSeg, Game_StartChoice) == 0x5DAA);
 static_assert(offsetof(DSeg, Research_Products) == 0x5DAC);
 static_assert(offsetof(DSeg, Advisor_Hints) == 0x64F0);
@@ -1277,40 +1812,143 @@ static_assert(offsetof(DSeg, System_Test8087) == 0x75E9);
 static_assert(offsetof(DSeg, System_FileMode) == 0x75EA);
 static_assert(offsetof(DSeg, System_CrLf) == 0x75EC);
 static_assert(offsetof(DSeg, Main_I) == 0x75EE);
+static_assert(offsetof(DSeg, Main_PrevKind) == 0x75F2);
+static_assert(offsetof(DSeg, Main_SceneTrack) == 0x75F6);
+static_assert(offsetof(DSeg, Main_HasBuilderPlant) == 0x760B);
+static_assert(offsetof(DSeg, Main_HasVehiclePlant) == 0x760C);
 static_assert(offsetof(DSeg, PlanetList_Entries) == 0x760E);
 static_assert(offsetof(DSeg, PlanetList_Count) == 0x7612);
 static_assert(offsetof(DSeg, PlanetList_Top) == 0x7614);
 static_assert(offsetof(DSeg, PlanetList_Mode) == 0x7616);
-static_assert(offsetof(DSeg, GrWar_Buffer1) == 0x7628);
-static_assert(offsetof(DSeg, GrWar_Buffer2) == 0x762C);
-static_assert(offsetof(DSeg, GrWar_Buffer3) == 0x7630);
-static_assert(offsetof(DSeg, GrWar_Buffer4) == 0x7634);
-static_assert(offsetof(DSeg, GrWar_Buffer5) == 0x7638);
+static_assert(offsetof(DSeg, GrWarUnits_Scratch) == 0x7618);
+static_assert(offsetof(DSeg, GrWar_RenderBuf) == 0x7628);
+static_assert(offsetof(DSeg, GrWar_Background) == 0x762C);
+static_assert(offsetof(DSeg, GrWar_UnitIcons) == 0x7630);
+static_assert(offsetof(DSeg, GrWar_EffectIcons) == 0x7634);
+static_assert(offsetof(DSeg, GrWar_LostFrames) == 0x7638);
+static_assert(offsetof(DSeg, GrWar_LostShown) == 0x763C);
+static_assert(offsetof(DSeg, GrWar_LostFrame) == 0x763E);
+static_assert(offsetof(DSeg, GrWar_LostTick) == 0x7640);
 static_assert(offsetof(DSeg, GrWar_BattleGrids) == 0x7642);
+static_assert(offsetof(DSeg, GrWarUnits_UnitLists) == 0x7646);
 static_assert(offsetof(DSeg, GrWarUnits_AttackerSlotCount) == 0x764E);
 static_assert(offsetof(DSeg, GrWarUnits_DefenderSlotCount) == 0x7650);
 static_assert(offsetof(DSeg, GrWar_Projectiles) == 0x7652);
+static_assert(offsetof(DSeg, GrWar_ProjectileCount) == 0x7656);
+static_assert(offsetof(DSeg, GrWarUnits_Totals) == 0x765A);
+static_assert(offsetof(DSeg, GrWarUnits_Pool) == 0x767A);
+static_assert(offsetof(DSeg, GrWarUnits_Attack) == 0x768A);
+static_assert(offsetof(DSeg, GrWarUnits_Defence) == 0x76AA);
+static_assert(offsetof(DSeg, GrWar_Survivors) == 0x76CA);
+static_assert(offsetof(DSeg, GrWar_Losses) == 0x76EA);
 static_assert(offsetof(DSeg, GrWar_PlayerWon) == 0x770A);
+static_assert(offsetof(DSeg, GrWar_BattleOver) == 0x770B);
+static_assert(offsetof(DSeg, GrWar_Order) == 0x770C);
+static_assert(offsetof(DSeg, GrWar_PathDir) == 0x770E);
+static_assert(offsetof(DSeg, GrWar_Spare) == 0x7710);
+static_assert(offsetof(DSeg, GrWar_TargetX) == 0x7712);
+static_assert(offsetof(DSeg, GrWar_TargetY) == 0x7714);
+static_assert(offsetof(DSeg, GrWar_Selected) == 0x7716);
+static_assert(offsetof(DSeg, GrWar_PrevSelected) == 0x7718);
+static_assert(offsetof(DSeg, GrWar_SelectedOwn) == 0x771A);
+static_assert(offsetof(DSeg, GrWar_PrevSelectedOwn) == 0x771B);
+static_assert(offsetof(DSeg, Advisor_MenuNumber) == 0x771C);
+static_assert(offsetof(DSeg, Advisor_Question) == 0x771E);
+static_assert(offsetof(DSeg, Advisor_Answer) == 0x7720);
+static_assert(offsetof(DSeg, Advisor_MenuLines) == 0x7722);
+static_assert(offsetof(DSeg, SaveLoad_BufBack) == 0x7726);
+static_assert(offsetof(DSeg, SaveLoad_BufButtons) == 0x772A);
+static_assert(offsetof(DSeg, SaveLoad_BufFrame) == 0x772E);
 static_assert(offsetof(DSeg, SaveLoad_SelectedSlot) == 0x7732);
 static_assert(offsetof(DSeg, SaveLoad_SlotTable) == 0x7734);
+static_assert(offsetof(DSeg, Pub_Person) == 0x7738);
+static_assert(offsetof(DSeg, Pub_PiratesSheet) == 0x773A);
+static_assert(offsetof(DSeg, Pub_StoryFlags) == 0x773E);
+static_assert(offsetof(DSeg, Pub_AnyTopic) == 0x774A);
+static_assert(offsetof(DSeg, Pub_TopicAvail) == 0x774B);
+static_assert(offsetof(DSeg, Pub_HoverItem) == 0x7758);
+static_assert(offsetof(DSeg, Pub_Replied) == 0x775A);
+static_assert(offsetof(DSeg, Pub_HoverCol) == 0x775C);
+static_assert(offsetof(DSeg, Pub_HoverRow) == 0x775E);
+static_assert(offsetof(DSeg, Pub_PersonStr) == 0x7760);
+static_assert(offsetof(DSeg, Pub_MenuIdx) == 0x7764);
+static_assert(offsetof(DSeg, Pub_QuestionLine) == 0x7766);
+static_assert(offsetof(DSeg, Pub_ReplyLine) == 0x7768);
+static_assert(offsetof(DSeg, Pub_QuestionCode) == 0x776A);
+static_assert(offsetof(DSeg, Pub_Lines) == 0x776C);
+static_assert(offsetof(DSeg, Pub_OfferItem) == 0x7770);
+static_assert(offsetof(DSeg, Pub_OfferPrice) == 0x7774);
+static_assert(offsetof(DSeg, Pub_LineCount) == 0x7778);
+static_assert(offsetof(DSeg, Pub_LineItem) == 0x777A);
+static_assert(offsetof(DSeg, Pub_LastSound) == 0x7782);
+static_assert(offsetof(DSeg, Pub_AnimSheet) == 0x7784);
+static_assert(offsetof(DSeg, SpWar_GroundBattle) == 0x7788);
 static_assert(offsetof(DSeg, SpWar_PlayerWon) == 0x7789);
+static_assert(offsetof(DSeg, SpWar_RaceMissionHigh) == 0x778A);
+static_assert(offsetof(DSeg, Sim_PlayerAttacks) == 0x778B);
+static_assert(offsetof(DSeg, SpWar_EnemyRace) == 0x778C);
+static_assert(offsetof(DSeg, SpWar_Exploding) == 0x778E);
+static_assert(offsetof(DSeg, SpWar_RepeatsLeft) == 0x7790);
+static_assert(offsetof(DSeg, SpWar_Script) == 0x7792);
+static_assert(offsetof(DSeg, SpWar_ScriptStep) == 0x7794);
+static_assert(offsetof(DSeg, SpWar_ScriptDelay) == 0x7796);
+static_assert(offsetof(DSeg, SpWar_BattleSystem) == 0x7798);
+static_assert(offsetof(DSeg, SpWar_BattlePlanet) == 0x779A);
+static_assert(offsetof(DSeg, SpWar_BattleMoon) == 0x779C);
+static_assert(offsetof(DSeg, SpWar_AttackerList) == 0x779E);
+static_assert(offsetof(DSeg, SpWar_DefenderList) == 0x77A2);
+static_assert(offsetof(DSeg, SpWar_SideList) == 0x77A6);
 static_assert(offsetof(DSeg, SpWar_AttackerShipCount) == 0x77AA);
 static_assert(offsetof(DSeg, SpWar_DefenderShipCount) == 0x77AC);
+static_assert(offsetof(DSeg, SpWar_SideCount) == 0x77AE);
+static_assert(offsetof(DSeg, SpWar_AttackerStart) == 0x77B2);
+static_assert(offsetof(DSeg, SpWar_DefenderStart) == 0x77B4);
+static_assert(offsetof(DSeg, SpWar_AttackerLosses) == 0x77B6);
+static_assert(offsetof(DSeg, SpWar_DefenderLosses) == 0x77C6);
+static_assert(offsetof(DSeg, SpWar_LossPtr) == 0x77D6);
+static_assert(offsetof(DSeg, SpWar_BattleOver) == 0x77DA);
+static_assert(offsetof(DSeg, SpWar_Retreated) == 0x77DB);
+static_assert(offsetof(DSeg, SpWar_View) == 0x77DC);
+static_assert(offsetof(DSeg, SpWar_Background) == 0x77E0);
+static_assert(offsetof(DSeg, SpWar_Sprites) == 0x77E4);
+static_assert(offsetof(DSeg, SpWar_Face) == 0x77E8);
+static_assert(offsetof(DSeg, SpWar_StepNo) == 0x77EC);
+static_assert(offsetof(DSeg, SpWar_CurtainLeft) == 0x77EE);
+static_assert(offsetof(DSeg, SpWar_CurtainRight) == 0x77F0);
+static_assert(offsetof(DSeg, SpWar_CurtainTop) == 0x77F2);
+static_assert(offsetof(DSeg, SpWar_CurtainBottom) == 0x77F4);
+static_assert(offsetof(DSeg, SpWar_ScriptsLeft) == 0x77F6);
 static_assert(offsetof(DSeg, ShipMove_AnimSheet) == 0x77FA);
 static_assert(offsetof(DSeg, ShipMove_Backdrop) == 0x77FE);
 static_assert(offsetof(DSeg, ShipMove_BlinkCounter) == 0x7802);
 static_assert(offsetof(DSeg, ShipMove_SpinnerCounter) == 0x7804);
+static_assert(offsetof(DSeg, ShipMove_LightOn) == 0x7806);
 static_assert(offsetof(DSeg, ShipMove_InRestrictedArea) == 0x780C);
 static_assert(offsetof(DSeg, ShipMove_Stars) == 0x780E);
+static_assert(offsetof(DSeg, Droids_DigitsPic) == 0x7812);
+static_assert(offsetof(DSeg, Cargo_ItemCount) == 0x7816);
+static_assert(offsetof(DSeg, Cargo_ItemList) == 0x7818);
+static_assert(offsetof(DSeg, Cargo_ItemStore) == 0x7832);
+static_assert(offsetof(DSeg, Cargo_Stores) == 0x7866);
+static_assert(offsetof(DSeg, Cargo_ShipUsed) == 0x786A);
+static_assert(offsetof(DSeg, Cargo_ShipCap) == 0x786E);
+static_assert(offsetof(DSeg, Cargo_PlanetCap) == 0x7872);
+static_assert(offsetof(DSeg, Cargo_Row) == 0x787A);
 static_assert(offsetof(DSeg, Launch_DestinationActive) == 0x787C);
 static_assert(offsetof(DSeg, ShipInfo_Backdrop) == 0x787E);
 static_assert(offsetof(DSeg, ShipInfo_Sprites) == 0x7882);
 static_assert(offsetof(DSeg, ShipInfo_Buffer) == 0x7886);
 static_assert(offsetof(DSeg, Colonize_ColonyCost) == 0x788A);
+static_assert(offsetof(DSeg, Satellite_ActionDone) == 0x788E);
 static_assert(offsetof(DSeg, Groups_SlotCategory) == 0x7890);
+static_assert(offsetof(DSeg, Groups_SavedCategory) == 0x7892);
+static_assert(offsetof(DSeg, Groups_SlotShip) == 0x7894);
+static_assert(offsetof(DSeg, Groups_SlotWeapon) == 0x7896);
+static_assert(offsetof(DSeg, Groups_SlotAvail) == 0x7898);
 static_assert(offsetof(DSeg, Groups_CanChangeSlots) == 0x789A);
 static_assert(offsetof(DSeg, Groups_AtHomePlanet) == 0x789B);
 static_assert(offsetof(DSeg, Groups_PlanetForceList) == 0x789C);
+static_assert(offsetof(DSeg, Groups_SlotReturned) == 0x78A2);
 static_assert(offsetof(DSeg, Groups_PlanetForceMode) == 0x78A4);
 static_assert(offsetof(DSeg, Groups_IconBuffer) == 0x78A6);
 static_assert(offsetof(DSeg, Research_FrameCounter) == 0x78AA);
@@ -1318,6 +1956,7 @@ static_assert(offsetof(DSeg, Research_IconBuffer) == 0x78AC);
 static_assert(offsetof(DSeg, Research_ProgressFrame) == 0x78B0);
 static_assert(offsetof(DSeg, AlienTalk_SelectedLine) == 0x78B4);
 static_assert(offsetof(DSeg, AlienTalk_Locked) == 0x78B6);
+static_assert(offsetof(DSeg, AlienTalk_RaceStr) == 0x78B8);
 static_assert(offsetof(DSeg, AlienTalk_MenuNumber) == 0x78BC);
 static_assert(offsetof(DSeg, AlienTalk_QuestionLine) == 0x78BE);
 static_assert(offsetof(DSeg, AlienTalk_ReplyLine) == 0x78C0);
@@ -1325,15 +1964,20 @@ static_assert(offsetof(DSeg, AlienTalk_AnswerId) == 0x78C2);
 static_assert(offsetof(DSeg, AlienTalk_QuestionBuf) == 0x78C4);
 static_assert(offsetof(DSeg, AlienTalk_Scene) == 0x78C8);
 static_assert(offsetof(DSeg, AlienTalk_Race) == 0x78CA);
+static_assert(offsetof(DSeg, AlienTalk_HoverCol) == 0x78CC);
+static_assert(offsetof(DSeg, AlienTalk_HoverRow) == 0x78CE);
 static_assert(offsetof(DSeg, AlienTalk_MenuLineCount) == 0x78D0);
+static_assert(offsetof(DSeg, AlienTalk_LineQuestion) == 0x78D2);
 static_assert(offsetof(DSeg, Surface_Mode) == 0x78DA);
 static_assert(offsetof(DSeg, Surface_SelKind) == 0x78DC);
+static_assert(offsetof(DSeg, Surface_PrevKind) == 0x78DE);
 static_assert(offsetof(DSeg, Surface_SelBuilding) == 0x78E0);
 static_assert(offsetof(DSeg, Surface_TileSet) == 0x78E2);
 static_assert(offsetof(DSeg, Surface_MapVariant) == 0x78E4);
 static_assert(offsetof(DSeg, Surface_AnimTileFrame) == 0x78E6);
 static_assert(offsetof(DSeg, Surface_AnimTileOffset) == 0x78E8);
 static_assert(offsetof(DSeg, Surface_CanBuild) == 0x78EA);
+static_assert(offsetof(DSeg, Surface_Scrolled) == 0x78EB);
 static_assert(offsetof(DSeg, Surface_TileLayer) == 0x78EC);
 static_assert(offsetof(DSeg, Surface_OccupyLayer) == 0x78F0);
 static_assert(offsetof(DSeg, Surface_BuildingLayer) == 0x78F4);
@@ -1341,7 +1985,10 @@ static_assert(offsetof(DSeg, Surface_MapWidth) == 0x78F8);
 static_assert(offsetof(DSeg, Surface_MapHeight) == 0x78FA);
 static_assert(offsetof(DSeg, Surface_ScrollX) == 0x78FC);
 static_assert(offsetof(DSeg, Surface_ScrollY) == 0x78FE);
+static_assert(offsetof(DSeg, Surface_PrevScrollX) == 0x7900);
+static_assert(offsetof(DSeg, Surface_PrevScrollY) == 0x7902);
 static_assert(offsetof(DSeg, Surface_RadarStale) == 0x7904);
+static_assert(offsetof(DSeg, Surface_EdgeScrollDir) == 0x7908);
 static_assert(offsetof(DSeg, Surface_RadarBuf) == 0x790A);
 static_assert(offsetof(DSeg, Surface_RadarColors) == 0x790E);
 static_assert(offsetof(DSeg, Surface_RadarOfs) == 0x7912);
@@ -1349,14 +1996,27 @@ static_assert(offsetof(DSeg, Surface_RadarX) == 0x7914);
 static_assert(offsetof(DSeg, Surface_RadarY) == 0x7916);
 static_assert(offsetof(DSeg, Surface_RadarDouble) == 0x7918);
 static_assert(offsetof(DSeg, Surface_FelszTiles) == 0x791A);
+static_assert(offsetof(DSeg, Surface_BlinkCounter) == 0x791C);
 static_assert(offsetof(DSeg, Surface_BlinkOn) == 0x791E);
+static_assert(offsetof(DSeg, Surface_KindCounts) == 0x7920);
 static_assert(offsetof(DSeg, Shop_Sel) == 0x79E8);
 static_assert(offsetof(DSeg, Shop_Top) == 0x79EA);
 static_assert(offsetof(DSeg, Shop_Qty) == 0x79EC);
+static_assert(offsetof(DSeg, Shop_PrevSel) == 0x79F0);
+static_assert(offsetof(DSeg, Shop_PrevTop) == 0x79F2);
+static_assert(offsetof(DSeg, Shop_PrevQty) == 0x79F4);
+static_assert(offsetof(DSeg, Shop_PrevSel2) == 0x79F8);
 static_assert(offsetof(DSeg, Shop_ListMode) == 0x79FA);
-static_assert(offsetof(DSeg, Shop_OreStock) == 0x7A12);
+static_assert(offsetof(DSeg, Shop_QtyEdit) == 0x79FB);
+static_assert(offsetof(DSeg, Shop_ShowPicture) == 0x79FC);
+static_assert(offsetof(DSeg, Shop_OreNeeded) == 0x79FE);
+static_assert(offsetof(DSeg, Shop_OreStock) == 0x7A16);
+static_assert(offsetof(DSeg, Shop_OreShort) == 0x7A2E);
 static_assert(offsetof(DSeg, Shop_OreHeader) == 0x7A34);
+static_assert(offsetof(DSeg, Shop_OreLines) == 0x7A54);
 static_assert(offsetof(DSeg, Shop_Count) == 0x7AB4);
+static_assert(offsetof(DSeg, Shop_List) == 0x7AB6);
+static_assert(offsetof(DSeg, Shop_PanelBuf) == 0x7ADA);
 static_assert(offsetof(DSeg, Message_Log) == 0x7ADE);
 static_assert(offsetof(DSeg, Message_LogCount) == 0x7AE2);
 static_assert(offsetof(DSeg, Game_CurSystem) == 0x7AE4);
@@ -1365,22 +2025,103 @@ static_assert(offsetof(DSeg, Game_CurMoon) == 0x7AF6);
 static_assert(offsetof(DSeg, PlanetInfo_AlienMode) == 0x7B06);
 static_assert(offsetof(DSeg, Game_CurBody) == 0x7B08);
 static_assert(offsetof(DSeg, Game_CurBodyIsColony) == 0x7B0C);
-static_assert(offsetof(DSeg, Launch_SystemViewTable) == 0x7BC4);
+static_assert(offsetof(DSeg, PlanetInfo_Backdrop) == 0x7B0E);
+static_assert(offsetof(DSeg, PlanetInfo_Icons) == 0x7B12);
+static_assert(offsetof(DSeg, PlanetInfo_Sprites) == 0x7B16);
+static_assert(offsetof(DSeg, PlanetInfo_Frame) == 0x7B1A);
+static_assert(offsetof(DSeg, PlanetInfo_MoonSprite) == 0x7B1E);
+static_assert(offsetof(DSeg, PlanetInfo_PlanetSprite) == 0x7B22);
+static_assert(offsetof(DSeg, PlanetInfo_BodiesHidden) == 0x7B26);
+static_assert(offsetof(DSeg, PlanetInfo_Orbits) == 0x7B28);
+static_assert(offsetof(DSeg, Launch_SystemViewTable) == 0x7BCA);
 static_assert(offsetof(DSeg, Launch_SelectedEntry) == 0x7C36);
+static_assert(offsetof(DSeg, Launch_SavedBody) == 0x7C38);
+static_assert(offsetof(DSeg, Launch_AttackIconShown) == 0x7C3A);
+static_assert(offsetof(DSeg, Launch_AttackIcon) == 0x7C3B);
+static_assert(offsetof(DSeg, Launch_MoveIconShown) == 0x7C3C);
+static_assert(offsetof(DSeg, Launch_MoveIcon) == 0x7C3D);
+static_assert(offsetof(DSeg, Launch_InvadeIconShown) == 0x7C3E);
+static_assert(offsetof(DSeg, Launch_InvadeIcon) == 0x7C3F);
 static_assert(offsetof(DSeg, Launch_SavedScreen) == 0x7C40);
 static_assert(offsetof(DSeg, Launch_SavedSystem) == 0x7C42);
 static_assert(offsetof(DSeg, Launch_SavedPlanet) == 0x7C44);
+static_assert(offsetof(DSeg, PlanetInfo_BlinkTimer) == 0x7C46);
+static_assert(offsetof(DSeg, PlanetInfo_HasGroups) == 0x7C48);
+static_assert(offsetof(DSeg, PlanetInfo_HasBase) == 0x7C49);
+static_assert(offsetof(DSeg, TextFile_InputActive) == 0x7C4A);
+static_assert(offsetof(DSeg, TextFile_InputEscaped) == 0x7C4B);
+static_assert(offsetof(DSeg, TextFile_InputBackup) == 0x7C4C);
+static_assert(offsetof(DSeg, TextFile_InputStr) == 0x7C50);
+static_assert(offsetof(DSeg, TextFile_InputBlink) == 0x7C54);
+static_assert(offsetof(DSeg, TextFile_InputCanCancel) == 0x7C56);
+static_assert(offsetof(DSeg, TextFile_InputX) == 0x7C58);
+static_assert(offsetof(DSeg, TextFile_InputY) == 0x7C5A);
+static_assert(offsetof(DSeg, TextFile_InputWidth) == 0x7C5C);
+static_assert(offsetof(DSeg, TextFile_CursorX) == 0x7C5E);
+static_assert(offsetof(DSeg, TextFile_CursorY) == 0x7C60);
 static_assert(offsetof(DSeg, GfxPath_PageFlagA) == 0x7C62);
 static_assert(offsetof(DSeg, GfxPath_PageFlagB) == 0x7C63);
+static_assert(offsetof(DSeg, GfxPath_SavedPage) == 0x7C64);
+static_assert(offsetof(DSeg, GfxPath_MenuBar) == 0x7C66);
+static_assert(offsetof(DSeg, GfxPath_InitBlock) == 0x7D62);
+static_assert(offsetof(DSeg, GfxPath_CellBackgrounds) == 0x7D66);
+static_assert(offsetof(DSeg, GfxPath_IconScratch) == 0x7D6A);
 static_assert(offsetof(DSeg, GfxPath_IconIndex) == 0x7D72);
 static_assert(offsetof(DSeg, GfxPath_ToolbarBlock) == 0x7DFA);
+static_assert(offsetof(DSeg, Command_MainFace) == 0x7E08);
+static_assert(offsetof(DSeg, Command_Heroes) == 0x7E0C);
+static_assert(offsetof(DSeg, Command_Offscreen) == 0x7E10);
+static_assert(offsetof(DSeg, Command_LightFrame) == 0x7E14);
+static_assert(offsetof(DSeg, Command_LightTimer) == 0x7E16);
+static_assert(offsetof(DSeg, Command_MainA5) == 0x7E18);
+static_assert(offsetof(DSeg, Command_Light2Frame) == 0x7E1C);
+static_assert(offsetof(DSeg, Command_Light2Timer) == 0x7E1E);
+static_assert(offsetof(DSeg, Command_DoorTimer) == 0x7E20);
+static_assert(offsetof(DSeg, Command_DoorCountdown) == 0x7E22);
+static_assert(offsetof(DSeg, Command_MainA4) == 0x7E24);
+static_assert(offsetof(DSeg, Command_DoorDir) == 0x7E28);
 static_assert(offsetof(DSeg, Command_ShowHologramOnEntry) == 0x7E29);
+static_assert(offsetof(DSeg, Command_AnimId) == 0x7E2A);
+static_assert(offsetof(DSeg, Command_AnimFrame) == 0x7E2C);
+static_assert(offsetof(DSeg, Command_AnimDelay) == 0x7E2E);
+static_assert(offsetof(DSeg, Command_AnimTick) == 0x7E30);
+static_assert(offsetof(DSeg, Command_AnimRepeat) == 0x7E32);
+static_assert(offsetof(DSeg, Command_AnimSpeed) == 0x7E34);
 static_assert(offsetof(DSeg, Command_WarAnimBuffer) == 0x7E36);
 static_assert(offsetof(DSeg, Command_BackdropShown) == 0x7E3A);
-static_assert(offsetof(DSeg, Vec3D_SineTable) == 0x7FD4);
+static_assert(offsetof(DSeg, Command_StaffPicked) == 0x7E3C);
+static_assert(offsetof(DSeg, Command_AdvisorLine) == 0x7E3E);
+static_assert(offsetof(DSeg, Anim_Record) == 0x7E40);
+static_assert(offsetof(DSeg, Anim_Script) == 0x7E44);
+static_assert(offsetof(DSeg, VecLoad_Angles) == 0x7E48);
+static_assert(offsetof(DSeg, VecLoad_Spinning) == 0x7E4E);
+static_assert(offsetof(DSeg, VecLoad_ObjectCount) == 0x7E50);
+static_assert(offsetof(DSeg, VecLoad_Zoom) == 0x7E52);
+static_assert(offsetof(DSeg, VecLoad_WireScale) == 0x7E54);
+static_assert(offsetof(DSeg, VecLoad_Projected) == 0x7E56);
+static_assert(offsetof(DSeg, VecLoad_Normals) == 0x7E5A);
+static_assert(offsetof(DSeg, VecLoad_Verts) == 0x7EA2);
+static_assert(offsetof(DSeg, VecLoad_VertCount) == 0x7EE6);
+static_assert(offsetof(DSeg, VecLoad_Edges) == 0x7F08);
+static_assert(offsetof(DSeg, VecLoad_EdgeCount) == 0x7F4C);
+static_assert(offsetof(DSeg, VecLoad_Faces) == 0x7F6E);
+static_assert(offsetof(DSeg, VecLoad_FaceCount) == 0x7FB2);
+static_assert(offsetof(DSeg, Vec3D_CosTable) == 0x7FD4);
+static_assert(offsetof(DSeg, VecLoad_Spin) == 0x8578);
+static_assert(offsetof(DSeg, VecLoad_Buffer) == 0x8584);
+static_assert(offsetof(DSeg, Vec3D_Centroids) == 0x8588);
+static_assert(offsetof(DSeg, VecLoad_ProjCentroids) == 0x85EE);
+static_assert(offsetof(DSeg, VecLoad_Order) == 0x8654);
+static_assert(offsetof(DSeg, Vec3D_EdgesA) == 0x8676);
+static_assert(offsetof(DSeg, Vec3D_EdgesB) == 0x8806);
+static_assert(offsetof(DSeg, Vec3D_Model) == 0x8996);
+static_assert(offsetof(DSeg, Vec3D_Slot) == 0x8998);
+static_assert(offsetof(DSeg, VecLoad_Scale) == 0x899A);
 static_assert(offsetof(DSeg, Hire_Candidate) == 0x899C);
 static_assert(offsetof(DSeg, Hire_StaffKind) == 0x899E);
 static_assert(offsetof(DSeg, Hire_InfoShown) == 0x89A0);
+static_assert(offsetof(DSeg, Command_StaffHotspotKind) == 0x89A2);
+static_assert(offsetof(DSeg, Command_StaffHotspotCount) == 0x89AA);
 static_assert(offsetof(DSeg, RawText_SzFace) == 0x89AC);
 static_assert(offsetof(DSeg, RawText_SzTalal) == 0x89B0);
 static_assert(offsetof(DSeg, RawText_SzFaj) == 0x89B4);
@@ -1424,9 +2165,15 @@ static_assert(offsetof(DSeg, Mouse_HeldLeft) == 0x8A7A);
 static_assert(offsetof(DSeg, Mouse_HeldRight) == 0x8A7B);
 static_assert(offsetof(DSeg, Mouse_ClickX) == 0x8A7C);
 static_assert(offsetof(DSeg, Mouse_ClickY) == 0x8A7E);
+static_assert(offsetof(DSeg, Mouse_QuitFlag) == 0x8A80);
 static_assert(offsetof(DSeg, Mouse_ButtonsChanged) == 0x8A81);
+static_assert(offsetof(DSeg, Mouse_HotPushable) == 0x8A82);
+static_assert(offsetof(DSeg, Mouse_HeldPhase) == 0x8A83);
+static_assert(offsetof(DSeg, Mouse_LastPushable) == 0x8A84);
 static_assert(offsetof(DSeg, Mouse_Released) == 0x8A85);
 static_assert(offsetof(DSeg, Mouse_Pressed) == 0x8A86);
+static_assert(offsetof(DSeg, Mouse_CursorHidden) == 0x8A87);
+static_assert(offsetof(DSeg, Mouse_HiddenClick) == 0x8A88);
 static_assert(offsetof(DSeg, Mouse_HotspotCount) == 0x8A8A);
 static_assert(offsetof(DSeg, Mouse_Hotspots) == 0x8A8C);
 static_assert(offsetof(DSeg, Mouse_CursorState) == 0x9182);
@@ -1441,6 +2188,7 @@ static_assert(offsetof(DSeg, Mouse_BtnRight) == 0x9190);
 static_assert(offsetof(DSeg, Mouse_HotspotUnder) == 0x9192);
 static_assert(offsetof(DSeg, Mouse_CursorShape) == 0x9198);
 static_assert(offsetof(DSeg, Mouse_SavedCursorShape) == 0x919A);
+static_assert(offsetof(DSeg, Mouse_ViewHotspot) == 0x919C);
 static_assert(offsetof(DSeg, Mouse_CursorFrozen) == 0x919E);
 static_assert(offsetof(DSeg, Game_IdeaTimer) == 0x91A0);
 static_assert(offsetof(DSeg, Cheat_Used) == 0x91E6);

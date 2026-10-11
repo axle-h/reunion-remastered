@@ -64,10 +64,10 @@ static void setup(void)
     mem_init();
     CHECK(dseg_init());
     system_init();
-    // The record DS:7E40 points to (InitRoomAnim allocates it).
+    // The record Anim::Record points to (InitRoomAnim allocates it).
     FarPtr rec = System_GetMem(0x349);
     SDL_memset(far_host(rec), 0, 0x349);
-    *(FarPtr *)ds_at(0x7E40) = rec;
+    ds.Anim_Record = rec;
 }
 
 // MAIN8 (320x200, delta frames) straight onto the screen, as the cut-scene
@@ -76,7 +76,7 @@ static void main_anim(void)
 {
     setup();
     int32_t before = system_heap_free();
-    uint8_t frames = *(uint8_t *)ds_at(0x55D7 + 7 * 8);
+    uint8_t frames = ds.Cc_Doors[8 - 1].Frames;
     Ani ani;
     CHECK(ani_load("ANIM\\MAIN8.ANI", &ani));
     CHECK(ani.width == 320 && ani.height == 200 && frames >= 2 && frames <= ani.count);
@@ -93,7 +93,7 @@ static void main_anim(void)
     }
     CHECK(same);
     // The record holds the sizes (stream + 13) and the loaded flag.
-    FarPtr rec = *(FarPtr *)ds_at(0x7E40);
+    FarPtr rec = ds.Anim_Record;
     uint8_t *r = far_host(rec);
     CHECK(r[0] == 1);
     CHECK((size_t)(r[0x231] | r[0x232] << 8) == ani.frames[0].size + 13);
@@ -117,16 +117,17 @@ static void main_anim(void)
 static void war_anim(void)
 {
     setup();
-    const uint8_t *t = ds_at(0x555B + 5 * 1);
+    const TSaAnim *t = &ds.SpWar_SpriteRects[1 - 1];
     Ani ani;
     CHECK(ani_load("WAR\\WAR\\SA1.ANI", &ani));
-    CHECK(t[0] >= 2 && t[0] <= ani.count && t[1] == ani.width && t[2] == ani.height);
+    CHECK(t->Frames >= 2 && t->Frames <= ani.count);
+    CHECK(t->Width == ani.width && t->Height == ani.height);
     Anim_LoadWarAnim(1);
     uint8_t *buf = far_host(far_ptr(0x9000, 0));
     size_t n = (size_t)ani.width * (size_t)ani.height;
     uint8_t *ref = SDL_malloc(n);
     bool same = true;
-    for (int f = 1; f <= t[0]; f++) {
+    for (int f = 1; f <= t->Frames; f++) {
         Anim_DrawAnimKeyed((uint16_t)f, buf);
         ani_draw_frame(&ani, 0, ref, (size_t)ani.width, 0x40);
         ani_draw_frame(&ani, f - 1, ref, (size_t)ani.width, 0x40);

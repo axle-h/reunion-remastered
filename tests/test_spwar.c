@@ -13,9 +13,6 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-#define W(off) (*(int16_t *)ds_at(off))
-#define FP(off) (*(FarPtr *)ds_at(off))
-
 static bool wait_retrace(void) { return true; }
 
 static void reset(void)
@@ -32,14 +29,14 @@ static void reset(void)
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;
-    FP(0x77DC) = System_GetMem(0x5E60); // view
-    FP(0x77E0) = System_GetMem(0x5E60); // background
-    FP(0x77E4) = System_GetMem(0xF00);  // sprites
-    FP(0x77E8) = System_GetMem(0x1180); // face
-    FP(0x779E) = System_GetMem(0x177C); // attackers
-    FP(0x77A2) = System_GetMem(0x177C); // defenders
-    W(0x77EC) = 0;
-    *(uint8_t *)ds_at(0x77DA) = 0;
+    ds.SpWar_View = System_GetMem(0x5E60);
+    ds.SpWar_Background = System_GetMem(0x5E60);
+    ds.SpWar_Sprites = System_GetMem(0xF00);
+    ds.SpWar_Face = System_GetMem(0x1180);
+    ds.SpWar_AttackerList = System_GetMem(0x177C);
+    ds.SpWar_DefenderList = System_GetMem(0x177C);
+    ds.SpWar_StepNo = 0;
+    ds.SpWar_BattleOver = 0;
     ds.SpWar_AttackerShipCount = ds.SpWar_DefenderShipCount = 0;
 }
 
@@ -79,30 +76,30 @@ static void test_step(void)
     reset();
     ds.SpWar_AttackerShipCount = 1;
     ds.SpWar_DefenderShipCount = 1;
-    W(0x77B2) = 1;
-    W(0x77B4) = 1;
-    set_ship(ship(FP(0x779E), 1), 1, 4, 30, 100);
-    set_ship(ship(FP(0x77A2), 1), 2, 3, 20, 25);
+    ds.SpWar_AttackerStart = 1;
+    ds.SpWar_DefenderStart = 1;
+    set_ship(ship(ds.SpWar_AttackerList, 1), 1, 4, 30, 100);
+    set_ship(ship(ds.SpWar_DefenderList, 1), 2, 3, 20, 25);
     ds.System_RandSeed = seed;
     SpWar_StepSpaceBattle();
-    CHECK(W(0x77EC) == 1);
+    CHECK(ds.SpWar_StepNo == 1);
     // Attacker (4) shoots first: 25 - 30 < 1, the defender dies. It stays in
     // the list tail with the explosion at frame 1 + the one drawn this step.
     CHECK(ds.SpWar_DefenderShipCount == 0);
-    CHECK(ship(FP(0x77A2), 1)->hp == -5);
-    CHECK(ship(FP(0x77A2), 1)->pos == 2);
+    CHECK(ship(ds.SpWar_DefenderList, 1)->hp == -5);
+    CHECK(ship(ds.SpWar_DefenderList, 1)->pos == 2);
     // The dead defender doesn't shoot back and nobody else is hit.
-    CHECK(ship(FP(0x779E), 1)->hp == 100);
-    CHECK(ship(FP(0x779E), 1)->cool == 4);
+    CHECK(ship(ds.SpWar_AttackerList, 1)->hp == 100);
+    CHECK(ship(ds.SpWar_AttackerList, 1)->cool == 4);
     // The explosion is still playing, so the battle isn't over yet.
-    CHECK(*(uint8_t *)ds_at(0x778E) == 1);
-    CHECK(*(uint8_t *)ds_at(0x77DA) == 0);
+    CHECK(ds.SpWar_Exploding == 1);
+    CHECK(ds.SpWar_BattleOver == 0);
 
     // Steps 2..4 of the 4-step cycle do nothing.
     int32_t s2 = ds.System_RandSeed;
     for (int i = 2; i <= 4; i++) {
         SpWar_StepSpaceBattle();
-        CHECK(W(0x77EC) == i);
+        CHECK(ds.SpWar_StepNo == i);
     }
     CHECK(ds.System_RandSeed == s2);
 
@@ -119,14 +116,14 @@ static void test_step(void)
     reset();
     ds.SpWar_AttackerShipCount = 1;
     ds.SpWar_DefenderShipCount = 1;
-    W(0x77B2) = 1;
-    W(0x77B4) = 1;
-    set_ship(ship(FP(0x779E), 1), 1, 4, 30, 100);
-    set_ship(ship(FP(0x77A2), 1), 2, 1, 7 * 3 + 2, 25);
+    ds.SpWar_AttackerStart = 1;
+    ds.SpWar_DefenderStart = 1;
+    set_ship(ship(ds.SpWar_AttackerList, 1), 1, 4, 30, 100);
+    set_ship(ship(ds.SpWar_DefenderList, 1), 2, 1, 7 * 3 + 2, 25);
     ds.System_RandSeed = seed;
     SpWar_StepSpaceBattle();
-    CHECK(ship(FP(0x779E), 1)->hp == 100 - 23 / 3);
-    CHECK(ship(FP(0x77A2), 1)->hp == 25);
+    CHECK(ship(ds.SpWar_AttackerList, 1)->hp == 100 - 23 / 3);
+    CHECK(ship(ds.SpWar_DefenderList, 1)->hp == 25);
     CHECK(ds.SpWar_AttackerShipCount == 1 && ds.SpWar_DefenderShipCount == 1);
 }
 
@@ -140,9 +137,9 @@ static void test_losses(void)
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.Game_CurSystem = 1;
-    W(0x7798) = 1;
-    W(0x779A) = 1;
-    W(0x779C) = 0;
+    ds.SpWar_BattleSystem = 1;
+    ds.SpWar_BattlePlanet = 1;
+    ds.SpWar_BattleMoon = 0;
     TGroup *g = Groups_At(0, 1);
     g->Kind = 1;
     g->System = 1;
@@ -153,13 +150,13 @@ static void test_losses(void)
     g->Units[0][0].Weapons[1] = 7;
     ds.SpWar_AttackerShipCount = 4;
     for (int i = 1; i <= 4; i++)
-        set_ship(ship(FP(0x779E), i), 1, 1, 1, 10);
+        set_ship(ship(ds.SpWar_AttackerList, i), 1, 1, 1, 10);
     SpWar_ApplySpaceLosses();
     CHECK(g->Units[0][0].ShipType == 5);
     CHECK(g->Units[0][0].Weapons[0] == 2);  // 5 * 5 / 10
     CHECK(g->Units[0][0].Weapons[1] == 3);  // 7 * 5 / 10
-    CHECK(*(int32_t *)ds_at(0x77B6) == 5);
-    CHECK(*(int32_t *)ds_at(0x77BA) == 0);
+    CHECK(ds.SpWar_AttackerLosses[0] == 5);
+    CHECK(ds.SpWar_AttackerLosses[1] == 0);
     CHECK(ds.Game_CurMoon[0] == 0);
 }
 

@@ -12,65 +12,6 @@
 // Not ported yet: see stubs.c.
 int16_t GrWar_PickBattleAnim(void); // 1537:11f2 (what Game::GrWarProc points to)
 
-// Unnamed globals (see command.h).
-#define W16(off) (*(uint16_t *)ds_at(off))
-#define I16(off) (*(int16_t *)ds_at(off))
-#define B8(off) (*(uint8_t *)ds_at(off))
-#define FP(off) (*(FarPtr *)ds_at(off))
-#define MAINFACE FP(0x7E08)
-#define HEROES FP(0x7E0C)
-#define OFFSCREEN FP(0x7E10)
-#define LIGHT_FRAME I16(0x7E14)
-#define LIGHT_TIMER I16(0x7E16)
-#define MAINA5 FP(0x7E18)
-#define LIGHT2_FRAME I16(0x7E1C)
-#define LIGHT2_TIMER I16(0x7E1E)
-#define DOOR_TIMER I16(0x7E20)
-#define DOOR_COUNTDOWN I16(0x7E22)
-#define MAINA4 FP(0x7E24)
-#define DOOR_DIR B8(0x7E28)
-#define HOLOGRAM_ON_ENTRY B8(0x7E29)
-#define ANIM_ID I16(0x7E2A)
-#define ANIM_FRAME I16(0x7E2C)
-#define ANIM_DELAY I16(0x7E2E)
-#define ANIM_TICK I16(0x7E30)
-#define ANIM_REPEAT I16(0x7E32)
-#define ANIM_SPEED I16(0x7E34)
-#define GR_BUF FP(0x7E36)
-#define BACKDROP_SHOWN B8(0x7E3A)
-#define STAFF_PICKED I16(0x7E3C)
-#define ANIM_REC FP(0x7E40)
-#define ANIM_BUF2 FP(0x7E44)
-#define HOTSPOT_STAFF(i) I16((uint16_t)(0x89A0 + 2 * (i)))
-#define HOTSPOT_STAFF_COUNT I16(0x89AA)
-#define WIRE_BUF FP(0x8584)
-
-// Constant tables in the typed-constant area of the data segment.
-#define STAFF_X(s) W16((uint16_t)(0x54CC + 2 * (s)))
-#define STAFF_Y(s) W16((uint16_t)(0x54D4 + 2 * (s)))
-#define STAFF_W(s) W16((uint16_t)(0x550C + 2 * (s)))
-#define STAFF_H(s) W16((uint16_t)(0x5514 + 2 * (s)))
-#define STAFF_OF_SLOT(n) W16((uint16_t)(0x551C + 2 * (n)))
-#define STAFF_SRC_X(s, h) W16((uint16_t)(0x54D6 + 6 * (s) + 2 * (h)))
-#define STAFF_SRC_Y(s, h) W16((uint16_t)(0x54EE + 6 * (s) + 2 * (h)))
-#define STAFF_HIRED(s) W16((uint16_t)(0x95B4 + 2 * (s)))   // Game::StaffHired[1..4]
-#define LIGHT_OFS(i) W16((uint16_t)(0x5523 + 3 * (i)))
-#define LIGHT_CNT(i) B8((uint16_t)(0x5525 + 3 * (i)))
-// Room animation table (Cc::Doors, 7-byte records): frames, width, height,
-// x, y.
-#define ROOM_FRAMES(a) B8((uint16_t)(0x55D7 + 7 * (a)))
-#define ROOM_W(a) W16((uint16_t)(0x55D8 + 7 * (a)))
-#define ROOM_H(a) B8((uint16_t)(0x55DA + 7 * (a)))
-#define ROOM_X(a) W16((uint16_t)(0x55DB + 7 * (a)))
-#define ROOM_Y(a) B8((uint16_t)(0x55DD + 7 * (a)))
-// War animation table (Cc::Rooms, 5-byte records).
-#define GR_FRAMES(a) B8((uint16_t)(0x5651 + 5 * (a)))
-#define GR_SPEED(a) B8((uint16_t)(0x5652 + 5 * (a)))
-#define GR_REPEAT(a) B8((uint16_t)(0x5653 + 5 * (a)))
-
-#define FLAG_5D52 W16(0x5D52)  // ? nonzero: developer cannot work
-#define KIND_5D9E I16(0x5D9E)  // staff kind away at the university
-
 enum : uint16_t {
     SCREEN_AT = 0x3D40, // grafika\main window: screen row 49
 };
@@ -100,6 +41,14 @@ static inline const uint8_t *ps(const PString *p)
 
 #define LIT(s) ps(PSTR(s))
 
+// Cc::Rooms holds the 14 war animations; StartMainAnim also looks up room
+// animations there, and the endings' ids 15 and 16 read on into the table
+// after it (SpWar::ScriptPlays), as in the original.
+static const TWarAnim *war_anim(int16_t id)
+{
+    return ds.Cc_Rooms + (id - 1);
+}
+
 // Gfx_LoadPic with the arguments shared by every command-centre sheet.
 static void load_sheet(const uint8_t *name, FarPtr dest, uint16_t rows, uint16_t stride)
 {
@@ -127,8 +76,8 @@ static void play_sfx(const char *name)
 static void play_room_anim(int16_t anim)
 {
     Command_StartMainAnim(anim);
-    ANIM_DELAY = 0;
-    uint16_t frames = ROOM_FRAMES(ANIM_ID);
+    ds.Command_AnimDelay = 0;
+    uint16_t frames = ds.Cc_Doors[ds.Command_AnimId - 1].Frames;
     if (frames != 0) {
         for (uint16_t i = 1;; i++) {
             Command_TickRoomAnim();
@@ -145,18 +94,18 @@ void Command_HandleCommandCentre(void)
     if (ds.Game_ScreenEntered) {
         Command_DrawCommandBackdrop();
         Command_SetupCommandHotspots();
-        LIGHT_FRAME = 1;
-        if (HOLOGRAM_ON_ENTRY != 0) {
-            HOLOGRAM_ON_ENTRY = 0;
+        ds.Command_LightFrame = 1;
+        if (ds.Command_ShowHologramOnEntry != 0) {
+            ds.Command_ShowHologramOnEntry = 0;
             Command_ShowHologram(9);
         }
     }
     if (ds.Game_HotspotHit != 0x14 && (uint16_t)(ds.Game_HotspotHit - 0x14) < 5) {
-        STAFF_PICKED = HOTSPOT_STAFF(ds.Game_HotspotHit - 0x14);
+        ds.Command_StaffPicked = ds.Command_StaffHotspotKind[ds.Game_HotspotHit - 0x15];
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x18;
-        if (STAFF_PICKED >= 1 && STAFF_PICKED <= 4)
-            play_sfx(staff_sfx[STAFF_PICKED]);
+        if (ds.Command_StaffPicked >= 1 && ds.Command_StaffPicked <= 4)
+            play_sfx(staff_sfx[ds.Command_StaffPicked]);
     }
     if (ds.Game_HotspotHit == 0x19) {
         ds.Game_ScreenSwitch = true;
@@ -209,16 +158,16 @@ void Command_HandleCommandCentre(void)
 void Command_DrawCommandBackdrop(void)
 {
     FarPtr dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\main"), far_host(dest), 1, 0x97, 0, 0, 200, BACKDROP_SHOWN != 0,
-                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(LIT("grafika\\main"), far_host(dest), 1, 0x97, 0, 0, 200,
+                ds.Command_BackdropShown != 0, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(far_host(dest), screen_at(SCREEN_AT), 0x140, 0x97);
     System_FreeMem(dest, 0xBCC0);
     Command_LoadCommandGfx();
-    if (BACKDROP_SHOWN == 0)
+    if (ds.Command_BackdropShown == 0)
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
     else
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    BACKDROP_SHOWN = 1;
+    ds.Command_BackdropShown = 1;
 }
 
 // 3abd:0352
@@ -226,23 +175,23 @@ void Command_LoadCommandGfx(void)
 {
     Command_InitRoomAnim();
     Command_StartMainAnim((int16_t)(System_Random(6) + 1));
-    MAINA5 = System_GetMem(0x5280);
-    HEROES = System_GetMem(0x4C40);
-    MAINA4 = System_GetMem(0x5B00);
-    MAINFACE = System_GetMem(0xE600);
-    load_sheet(LIT("grafika\\mainface"), MAINFACE, 0xB8, 0x140);
-    load_sheet(LIT("grafika\\heroes"), HEROES, 0x3D, 0x140);
+    ds.Command_MainA5 = System_GetMem(0x5280);
+    ds.Command_Heroes = System_GetMem(0x4C40);
+    ds.Command_MainA4 = System_GetMem(0x5B00);
+    ds.Command_MainFace = System_GetMem(0xE600);
+    load_sheet(LIT("grafika\\mainface"), ds.Command_MainFace, 0xB8, 0x140);
+    load_sheet(LIT("grafika\\heroes"), ds.Command_Heroes, 0x3D, 0x140);
     Command_DrawHeroPortrait();
     Command_DrawAllStaffIcons();
-    load_sheet(LIT("grafika\\maina4"), MAINA4, 0x5B, 0x100);
-    load_sheet(LIT("grafika\\maina5"), MAINA5, 0x42, 0x140);
+    load_sheet(LIT("grafika\\maina4"), ds.Command_MainA4, 0x5B, 0x100);
+    load_sheet(LIT("grafika\\maina5"), ds.Command_MainA5, 0x42, 0x140);
 }
 
 // The edge lines of the hologram panel opening or closing: one pass of the
 // "iris" (n from 0 to 0x39 when opening, back down when closing).
 static void iris_lines(int16_t n)
 {
-    uint8_t *seg = fp_at(OFFSCREEN, 0);
+    uint8_t *seg = fp_at(ds.Command_Offscreen, 0);
     Gfx_DrawLineCopy(gfx_screen(), (int16_t)(n + 0xA6), 0x31, 0xA6, 0xBA, seg);
     Gfx_DrawLineCopy(gfx_screen(), (int16_t)(0xA6 - n), 0x31, 0xA6, 0xBA, seg);
     if (n % 2 == 0) {
@@ -257,18 +206,18 @@ void Command_ShowHologram(int16_t vec)
     uint8_t *pal = Gfx_PalettePtr();
 
     Command_FreeRoomAnim();
-    System_FreeMem(MAINA4, 0x5B00);
-    System_FreeMem(MAINFACE, 0xE600);
-    OFFSCREEN = System_GetMem(64000);
+    System_FreeMem(ds.Command_MainA4, 0x5B00);
+    System_FreeMem(ds.Command_MainFace, 0xE600);
+    ds.Command_Offscreen = System_GetMem(64000);
     Sound_PlayButtonSfx(LIT("holo"));
     PString num, name;
     System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
     System_StrLoad(&name, PSTR("grafika\\holo"));
     System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), fp_at(OFFSCREEN, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false, pal, 0, 0xB0,
-                0x40, 0, 0xBE);
+    Gfx_LoadPic(ps(&name), fp_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false, pal,
+                0, 0xB0, 0x40, 0, 0xBE);
 
-    uint8_t *seg = fp_at(OFFSCREEN, 0);
+    uint8_t *seg = fp_at(ds.Command_Offscreen, 0);
     for (int16_t n = 1;; n++) {
         for (int16_t x = 0xA4; x <= 0xA8; x++)
             Gfx_DrawLineCopy(gfx_screen(), x, 0xBA, x, (int16_t)(0xBA - n), seg);
@@ -285,29 +234,31 @@ void Command_ShowHologram(int16_t vec)
             break;
     }
 
-    WIRE_BUF = System_GetMem(0x8980);
+    ds.VecLoad_Buffer = System_GetMem(0x8980);
     VecLoad_AllocWireBuffers();
     VecLoad_LoadWireVec(vec);
     VecLoad_SetWirePalette();
-    Blit_CopyRect(fp_at(OFFSCREEN, 0x3DBD), fp_at(WIRE_BUF, 0x0DE0), 0x4E, 0x41);
+    Blit_CopyRect(fp_at(ds.Command_Offscreen, 0x3DBD), fp_at(ds.VecLoad_Buffer, 0x0DE0), 0x4E,
+                  0x41);
     VecLoad_DrawWireScene();
     for (;;) {
         Mouse_Update();
         if (Crt_KeyPressed() || ds.Mouse_BtnDown != 0)
             break;
         Command_TickAmbientLights();
-        Blit_CopyRect(fp_at(WIRE_BUF, 0x0DE0), screen_at(0x3DBD), 0x4E, 0x41);
-        Blit_CopyRect(fp_at(OFFSCREEN, 0x3DBD), fp_at(WIRE_BUF, 0x0DE0), 0x4E, 0x41);
+        Blit_CopyRect(fp_at(ds.VecLoad_Buffer, 0x0DE0), screen_at(0x3DBD), 0x4E, 0x41);
+        Blit_CopyRect(fp_at(ds.Command_Offscreen, 0x3DBD), fp_at(ds.VecLoad_Buffer, 0x0DE0),
+                      0x4E, 0x41);
         VecLoad_DrawWireScene();
         Gfx_WaitVRetrace();
     }
     if (Crt_KeyPressed())
         (void)Crt_ReadKey();
     VecLoad_FreeWireBuffers();
-    System_FreeMem(WIRE_BUF, 0x8980);
+    System_FreeMem(ds.VecLoad_Buffer, 0x8980);
 
-    Gfx_LoadPic(LIT("grafika\\main"), fp_at(OFFSCREEN, SCREEN_AT), 1, 0x97, 0, 0, 0x140, false, pal,
-                0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(LIT("grafika\\main"), fp_at(ds.Command_Offscreen, SCREEN_AT), 1, 0x97, 0, 0, 0x140,
+                false, pal, 0, 0xB0, 0x40, 0, 0xBE);
     Command_DrawHeroPortraitToBuffer();
     for (int16_t n = 0x39;; n--) {
         iris_lines(n);
@@ -315,16 +266,16 @@ void Command_ShowHologram(int16_t vec)
             break;
     }
     Sound_FreeSampleIfIdle();
-    MAINFACE = System_GetMem(0xE600);
-    load_sheet(LIT("grafika\\mainface"), MAINFACE, 0xB8, 0x140);
+    ds.Command_MainFace = System_GetMem(0xE600);
+    load_sheet(LIT("grafika\\mainface"), ds.Command_MainFace, 0xB8, 0x140);
     Command_TickAmbientLights();
-    Blit_CopyRect(fp_at(OFFSCREEN, SCREEN_AT), screen_at(SCREEN_AT), 0x140, 0x97);
+    Blit_CopyRect(fp_at(ds.Command_Offscreen, SCREEN_AT), screen_at(SCREEN_AT), 0x140, 0x97);
     Command_TickAmbientLights();
     Command_DrawHeroPortrait();
     Command_DrawAllStaffIcons();
-    System_FreeMem(OFFSCREEN, 64000);
-    MAINA4 = System_GetMem(0x5B00);
-    load_sheet(LIT("grafika\\maina4"), MAINA4, 0x5B, 0x100);
+    System_FreeMem(ds.Command_Offscreen, 64000);
+    ds.Command_MainA4 = System_GetMem(0x5B00);
+    load_sheet(LIT("grafika\\maina4"), ds.Command_MainA4, 0x5B, 0x100);
     Command_InitRoomAnim();
 }
 
@@ -332,25 +283,25 @@ void Command_ShowHologram(int16_t vec)
 void Command_SetupCommandHotspots(void)
 {
     ds.Mouse_HotspotCount = 12;
-    HOTSPOT_STAFF_COUNT = 0;
+    ds.Command_StaffHotspotCount = 0;
     for (int16_t s = 1; s <= 4; s++) {
-        uint16_t hired = STAFF_HIRED(s);
-        if ((int16_t)hired > 0 && KIND_5D9E != s && (s != 4 || FLAG_5D52 == 0)) {
-            THotspot *h = Mouse_Hotspot((int16_t)(HOTSPOT_STAFF_COUNT + 1));
-            h->X = (int16_t)(STAFF_X(s) + 1);
-            h->Y = (uint8_t)(STAFF_Y(s) + 0x32);
-            h->W = (int16_t)(STAFF_W(s) - 2);
-            h->H = (uint8_t)(STAFF_H(s) - 2);
-            // Staff name: DS:57F8 + 57 * kind + 19 * candidate.
-            System_StrStore((const PString *)ds_at((uint16_t)(0x57F8 + s * 0x39 + hired * 0x13)),
+        uint16_t hired = ds.Game_StaffHired[s - 1];
+        if ((int16_t)hired > 0 && ds.Advisor_TrainingKind != s
+            && (s != 4 || ds.Intel_DevAwayTimer == 0)) {
+            THotspot *h = Mouse_Hotspot((int16_t)(ds.Command_StaffHotspotCount + 1));
+            h->X = (int16_t)(ds.Command_StaffX[s - 1] + 1);
+            h->Y = (uint8_t)(ds.Command_StaffY[s - 1] + 0x32);
+            h->W = (int16_t)(ds.Command_StaffW[s - 1] - 2);
+            h->H = (uint8_t)(ds.Command_StaffH[s - 1] - 2);
+            System_StrStore((const PString *)&ds.Staff_Names[s - 1][hired - 1],
                             (PString *)&h->Caption, 0x12);
             h->Repeat_ = 1;
-            HOTSPOT_STAFF_COUNT++;
-            HOTSPOT_STAFF(HOTSPOT_STAFF_COUNT) = s;
+            ds.Command_StaffHotspotCount++;
+            ds.Command_StaffHotspotKind[ds.Command_StaffHotspotCount - 1] = s;
             h->_1A = 0;
         }
     }
-    for (int16_t j = (int16_t)(HOTSPOT_STAFF_COUNT + 1); j < 5; j++) {
+    for (int16_t j = (int16_t)(ds.Command_StaffHotspotCount + 1); j < 5; j++) {
         THotspot *h = Mouse_Hotspot(j);
         h->X = 0;
         h->Y = 0;
@@ -373,40 +324,40 @@ void Command_SetupCommandHotspots(void)
 // 3abd:0ba1
 void Command_InitRoomAnim(void)
 {
-    ANIM_REC = System_GetMem(0x349);
-    ANIM_BUF2 = System_GetMem(0x230);
-    ANIM_ID = 0;
-    ANIM_FRAME = 0;
-    ANIM_TICK = 1;
-    *(uint8_t *)far_host(ANIM_REC) = 0; // Anim record: not loaded
+    ds.Anim_Record = System_GetMem(0x349);
+    ds.Anim_Script = System_GetMem(0x230);
+    ds.Command_AnimId = 0;
+    ds.Command_AnimFrame = 0;
+    ds.Command_AnimTick = 1;
+    *(uint8_t *)far_host(ds.Anim_Record) = 0; // Anim record: not loaded
 }
 
 // 3abd:0bdc
 void Command_FreeRoomAnim(void)
 {
     Command_StopMainAnim();
-    System_FreeMem(ANIM_REC, 0x349);
-    System_FreeMem(ANIM_BUF2, 0x230);
+    System_FreeMem(ds.Anim_Record, 0x349);
+    System_FreeMem(ds.Anim_Script, 0x230);
 }
 
 // 3abd:0c05: random delay 100..299 frames before the first frame.
 void Command_StartMainAnim(int16_t anim)
 {
     Command_StopMainAnim();
-    ANIM_ID = anim;
-    ANIM_FRAME = 1;
-    ANIM_DELAY = (int16_t)(System_Random(200) + 100);
+    ds.Command_AnimId = anim;
+    ds.Command_AnimFrame = 1;
+    ds.Command_AnimDelay = (int16_t)(System_Random(200) + 100);
     // Read from the 5-byte war table, not the 7-byte room table.
-    ANIM_REPEAT = GR_REPEAT(ANIM_ID);
-    ANIM_SPEED = GR_SPEED(ANIM_ID);
+    ds.Command_AnimRepeat = war_anim(ds.Command_AnimId)->Repeat_;
+    ds.Command_AnimSpeed = war_anim(ds.Command_AnimId)->Speed;
 }
 
 // 3abd:0c55
 void Command_StopMainAnim(void)
 {
-    if (ANIM_ID > 0) {
-        Anim_FreeMainAnim((uint16_t)ANIM_ID);
-        ANIM_ID = 0;
+    if (ds.Command_AnimId > 0) {
+        Anim_FreeMainAnim((uint16_t)ds.Command_AnimId);
+        ds.Command_AnimId = 0;
     }
 }
 
@@ -414,74 +365,76 @@ void Command_StopMainAnim(void)
 // drawn over it.
 void Command_TickRoomAnim(void)
 {
-    if (ANIM_ID == 0)
+    if (ds.Command_AnimId == 0)
         return;
-    if (ANIM_DELAY != 0) {
-        ANIM_DELAY--;
+    if (ds.Command_AnimDelay != 0) {
+        ds.Command_AnimDelay--;
         return;
     }
-    ANIM_FRAME++;
-    if ((int16_t)ROOM_FRAMES(ANIM_ID) < ANIM_FRAME) {
+    ds.Command_AnimFrame++;
+    if ((int16_t)ds.Cc_Doors[ds.Command_AnimId - 1].Frames < ds.Command_AnimFrame) {
         Command_StopMainAnim();
         Command_StartMainAnim((int16_t)(System_Random(6) + 1));
         return;
     }
-    int16_t id = ANIM_ID;
-    uint16_t w = ROOM_W(id);
+    int16_t id = ds.Command_AnimId;
+    uint16_t w = (uint16_t)ds.Cc_Doors[id - 1].W;
     Anim_LoadMainAnim((uint16_t)id);
-    uint16_t size = (uint16_t)(ROOM_H(ANIM_ID) * ROOM_W(ANIM_ID));
+    const TRoomAnim *room = &ds.Cc_Doors[ds.Command_AnimId - 1];
+    uint16_t size = (uint16_t)(room->H * room->W);
     FarPtr buf = System_GetMem(size);
-    uint16_t scr = (uint16_t)(ROOM_Y(ANIM_ID) * 0x140 + ROOM_X(ANIM_ID));
+    uint16_t scr = (uint16_t)(room->Y * 0x140 + room->X);
     Mouse_HideCursor();
     Blit_CopyRectStrided(screen_at(scr), fp_add(buf, (uint16_t)(w + 1)), (int16_t)(w - 2),
-                         (int16_t)(ROOM_H(id) - 2), 0x140, (int16_t)w);
+                         (int16_t)(ds.Cc_Doors[id - 1].H - 2), 0x140, (int16_t)w);
     Mouse_ShowCursor();
     bool ok;
-    Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, far_host(buf), &ok);
+    Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, far_host(buf), &ok);
     uint16_t fighter = ds.Game_StaffHired[2];
     Mouse_HideCursor();
-    if ((int16_t)fighter > 0 && ANIM_ID < 7) {
+    if ((int16_t)fighter > 0 && ds.Command_AnimId < 7) {
         Blit_BlitTransparentStrided(
-            fp_add(MAINFACE, (uint16_t)(W16((uint16_t)(fighter * 2 + 0x5500)) * 0x140
-                                        + W16((uint16_t)(fighter * 2 + 0x54E8)) + 0x147)),
+            fp_add(ds.Command_MainFace, (uint16_t)(ds.Command_StaffSrcY[2][fighter - 1] * 0x140
+                                                   + ds.Command_StaffSrcX[2][fighter - 1] + 0x147)),
             fp_add(buf, (uint16_t)(w * 0x27 + 1)), 0x2A, 0x1A, 0x140, (int16_t)w, 0x40);
     }
     Blit_CopyRectStrided(fp_add(buf, (uint16_t)(w + 1)), screen_at(scr), (int16_t)(w - 2),
-                         (int16_t)(ROOM_H(id) - 2), (int16_t)w, 0x140);
+                         (int16_t)(ds.Cc_Doors[id - 1].H - 2), (int16_t)w, 0x140);
     Mouse_ShowCursor();
-    ANIM_DELAY = 0;
+    ds.Command_AnimDelay = 0;
     System_FreeMem(buf, size);
 }
 
 // 3abd:0e5d: next frame (wrapping) straight to the screen, for the endings.
 void Command_StepMainAnim(void)
 {
-    if (ANIM_ID == 0)
+    if (ds.Command_AnimId == 0)
         return;
-    ANIM_FRAME++;
-    if ((int16_t)ROOM_FRAMES(ANIM_ID) < ANIM_FRAME)
-        ANIM_FRAME = 1;
-    int16_t id = ANIM_ID;
+    ds.Command_AnimFrame++;
+    if ((int16_t)ds.Cc_Doors[ds.Command_AnimId - 1].Frames < ds.Command_AnimFrame)
+        ds.Command_AnimFrame = 1;
+    int16_t id = ds.Command_AnimId;
     Anim_LoadMainAnim((uint16_t)id);
     bool ok;
-    Anim_DrawAnimFrame((uint16_t)ANIM_FRAME,
-                       screen_at((uint16_t)(ROOM_Y(id) * 0x140 + ROOM_X(id))), &ok);
+    Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame,
+                       screen_at((uint16_t)(ds.Cc_Doors[id - 1].Y * 0x140 + ds.Cc_Doors[id - 1].X)),
+                       &ok);
 }
 
 // 3abd:0ed5
 void Command_FreeGrRoomAnim(void)
 {
     Command_StopGrAnim();
-    System_FreeMem(ANIM_REC, 0x349);
-    System_FreeMem(ANIM_BUF2, 0x230);
+    System_FreeMem(ds.Anim_Record, 0x349);
+    System_FreeMem(ds.Anim_Script, 0x230);
 }
 
 // 3abd:0efe
 void Command_StopGrAnim(void)
 {
-    if (ANIM_ID > 0) {
-        Anim_FreeGrAnim((uint16_t)ANIM_ID);
-        ANIM_ID = 0;
+    if (ds.Command_AnimId > 0) {
+        Anim_FreeGrAnim((uint16_t)ds.Command_AnimId);
+        ds.Command_AnimId = 0;
     }
 }
 
@@ -489,32 +442,33 @@ void Command_StopGrAnim(void)
 // Game::GrWarProc (GrWar's PickBattleAnim).
 void Command_TickGrAnim(void)
 {
-    if (ANIM_ID == 0)
+    if (ds.Command_AnimId == 0)
         return;
-    ANIM_TICK--;
-    if (ANIM_TICK >= 1)
+    ds.Command_AnimTick--;
+    if (ds.Command_AnimTick >= 1)
         return;
-    ANIM_TICK = ANIM_SPEED;
-    ANIM_FRAME++;
-    if ((int16_t)GR_FRAMES(ANIM_ID) < ANIM_FRAME) {
-        ANIM_REPEAT--;
-        if (ANIM_REPEAT < 1) {
+    ds.Command_AnimTick = ds.Command_AnimSpeed;
+    ds.Command_AnimFrame++;
+    if ((int16_t)war_anim(ds.Command_AnimId)->Frames < ds.Command_AnimFrame) {
+        ds.Command_AnimRepeat--;
+        if (ds.Command_AnimRepeat < 1) {
             Command_StopGrAnim();
             int16_t anim = GrWar_PickBattleAnim();
             Command_StartMainAnim(anim); // BUG? not a StartGrAnim; the original calls 0c05
         }
-        ANIM_TICK = 1;
-        ANIM_FRAME = 0;
+        ds.Command_AnimTick = 1;
+        ds.Command_AnimFrame = 0;
     } else {
-        Anim_LoadGrAnim((uint16_t)ANIM_ID);
+        Anim_LoadGrAnim((uint16_t)ds.Command_AnimId);
         bool ok;
-        Anim_DrawAnimFrame((uint16_t)ANIM_FRAME, far_host(GR_BUF), &ok);
+        Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, far_host(ds.Command_WarAnimBuffer), &ok);
         if (!ok) {
-            ANIM_FRAME = GR_FRAMES(ANIM_ID);
-            ANIM_REPEAT = 1;
+            ds.Command_AnimFrame = war_anim(ds.Command_AnimId)->Frames;
+            ds.Command_AnimRepeat = 1;
         }
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(GR_BUF, 0x3A), screen_at(0x4103), 0x3A, 0x4F, 0x3A, 0x140);
+        Blit_CopyRectStrided(fp_add(ds.Command_WarAnimBuffer, 0x3A), screen_at(0x4103), 0x3A, 0x4F,
+                             0x3A, 0x140);
         Mouse_ShowCursor();
     }
 }
@@ -574,7 +528,7 @@ void Command_OpenPanelMaina3And4(void)
     load_sheet(LIT("grafika\\maina4"), buf, 0x5B, 0x100);
     Gfx_WaitVRetrace();
     for (int16_t n = 1;; n++) {
-        int16_t strip = DOOR_DIR == 0 ? n : (int16_t)(0x10 - n);
+        int16_t strip = ds.Command_DoorDir == 0 ? n : (int16_t)(0x10 - n);
         Mouse_HideCursor();
         Blit_CopyRectStrided(fp_add(buf, (uint16_t)((strip - 1) * 0x10)), screen_at(0x584D), 0x10,
                              0x5B, 0x100, 0x140);
@@ -606,31 +560,34 @@ void Command_OpenPanelMaina3And4(void)
 // intervals (period 70..319 steps of 4 frames).
 void Command_TickPanelDoorAnim(void)
 {
-    DOOR_COUNTDOWN--;
-    if (DOOR_COUNTDOWN >= 1)
+    ds.Command_DoorCountdown--;
+    if (ds.Command_DoorCountdown >= 1)
         return;
-    DOOR_COUNTDOWN = 4;
-    DOOR_TIMER--;
-    if (DOOR_TIMER == 0) {
-        DOOR_TIMER = (int16_t)(System_Random(0xFA) + 0x46);
-        DOOR_DIR = DOOR_DIR == 0;
+    ds.Command_DoorCountdown = 4;
+    ds.Command_DoorTimer--;
+    if (ds.Command_DoorTimer == 0) {
+        ds.Command_DoorTimer = (int16_t)(System_Random(0xFA) + 0x46);
+        ds.Command_DoorDir = ds.Command_DoorDir == 0;
     }
-    int16_t strip = DOOR_DIR == 0 ? (int16_t)(0x10 - DOOR_TIMER) : (int16_t)(DOOR_TIMER - 1);
+    int16_t strip = ds.Command_DoorDir == 0 ? (int16_t)(0x10 - ds.Command_DoorTimer)
+                                             : (int16_t)(ds.Command_DoorTimer - 1);
     if (strip >= 0 && strip < 0x10) {
         Mouse_HideCursor();
-        Blit_CopyRectStrided(fp_add(MAINA4, (uint16_t)(strip * 0x10)), screen_at(0x584D), 0x10, 0x5B,
-                             0x100, 0x140);
+        Blit_CopyRectStrided(fp_add(ds.Command_MainA4, (uint16_t)(strip * 0x10)), screen_at(0x584D),
+                             0x10, 0x5B, 0x100, 0x140);
         uint16_t hired = ds.Game_StaffHired[1];
         if ((int16_t)hired > 0) {
             Blit_BlitTransparent(
-                fp_add(MAINFACE, (uint16_t)(W16((uint16_t)(hired * 2 + 0x54FA)) * 0x140
-                                            + W16((uint16_t)(hired * 2 + 0x54E2)) + 0x141)),
-                screen_at((uint16_t)((W16(0x54D8) + 0x31) * 0x140 + W16(0x54D0) + 0x141)),
-                (int16_t)(W16(0x5510) - 2), (int16_t)(W16(0x5518) - 2), 0x40);
+                fp_add(ds.Command_MainFace,
+                       (uint16_t)(ds.Command_StaffSrcY[1][hired - 1] * 0x140
+                                  + ds.Command_StaffSrcX[1][hired - 1] + 0x141)),
+                screen_at((uint16_t)((ds.Command_StaffY[1] + 0x31) * 0x140 + ds.Command_StaffX[1]
+                                     + 0x141)),
+                (int16_t)(ds.Command_StaffW[1] - 2), (int16_t)(ds.Command_StaffH[1] - 2), 0x40);
         }
         Mouse_ShowCursor();
     }
-    int16_t delay = ANIM_DELAY;
+    int16_t delay = ds.Command_AnimDelay;
     Command_TickRoomAnim();
     if (delay == 0)
         Command_DrawStaffIcon(4);
@@ -639,35 +596,37 @@ void Command_TickPanelDoorAnim(void)
 // 3abd:14c5: two small sprite loops from maina5, plus the blinking pixels.
 void Command_TickAmbientLights(void)
 {
-    LIGHT_TIMER--;
-    if (LIGHT_TIMER < 1) {
-        LIGHT_TIMER = 5;
-        LIGHT_FRAME = (int16_t)((LIGHT_FRAME + 1) % 0x26);
-        uint16_t f = (uint16_t)LIGHT_FRAME;
-        Blit_CopyRect(fp_add(MAINA5, (uint16_t)((f >> 4) * 0x1B80 + (f % 0x10) * 0x13 + 0x140)),
-                      screen_at(0x3D65), 0x13, 0x15);
+    ds.Command_LightTimer--;
+    if (ds.Command_LightTimer < 1) {
+        ds.Command_LightTimer = 5;
+        ds.Command_LightFrame = (int16_t)((ds.Command_LightFrame + 1) % 0x26);
+        uint16_t f = (uint16_t)ds.Command_LightFrame;
+        Blit_CopyRect(
+            fp_add(ds.Command_MainA5, (uint16_t)((f >> 4) * 0x1B80 + (f % 0x10) * 0x13 + 0x140)),
+            screen_at(0x3D65), 0x13, 0x15);
     }
-    LIGHT2_TIMER--;
-    if (LIGHT2_TIMER < 1) {
-        LIGHT2_TIMER = 7;
-        LIGHT2_FRAME = (int16_t)((LIGHT2_FRAME + 1) % 10);
-        Blit_CopyRect(fp_add(MAINA5, (uint16_t)(LIGHT2_FRAME * 0xD + 0x38B3)), screen_at(0x6622), 0xC,
-                      0xE);
+    ds.Command_Light2Timer--;
+    if (ds.Command_Light2Timer < 1) {
+        ds.Command_Light2Timer = 7;
+        ds.Command_Light2Frame = (int16_t)((ds.Command_Light2Frame + 1) % 10);
+        Blit_CopyRect(fp_add(ds.Command_MainA5, (uint16_t)(ds.Command_Light2Frame * 0xD + 0x38B3)),
+                      screen_at(0x6622), 0xC, 0xE);
     }
     for (uint16_t i = 1;; i++) {
-        uint8_t *px = screen_at((uint16_t)(LIGHT_OFS(i) + SCREEN_AT));
+        TLight *light = &ds.Command_Lights[i - 1];
+        uint8_t *px = screen_at((uint16_t)(light->Ofs + SCREEN_AT));
         if (i < 0xC) {
             *px = (uint8_t)(System_Random(0xB0) + 0x40);
         } else {
-            LIGHT_CNT(i)--;
-            if (LIGHT_CNT(i) == 0)
+            light->Count--;
+            if (light->Count == 0)
                 *px = 0x70;
-            if (LIGHT_CNT(i) == 0x64)
+            if (light->Count == 0x64)
                 *px = 0x82;
-            if (LIGHT_CNT(i) == 0)
-                LIGHT_CNT(i) = (uint8_t)(System_Random(5) + 0x66);
-            if (LIGHT_CNT(i) == 0x64)
-                LIGHT_CNT(i) = (uint8_t)(System_Random(8) + 5);
+            if (light->Count == 0)
+                light->Count = (uint8_t)(System_Random(5) + 0x66);
+            if (light->Count == 0x64)
+                light->Count = (uint8_t)(System_Random(8) + 5);
         }
         if (i == 0x13)
             break;
@@ -678,8 +637,8 @@ void Command_TickAmbientLights(void)
 void Command_DrawHeroPortrait(void)
 {
     Mouse_HideCursor();
-    Blit_BlitTransparent(fp_add(HEROES, (uint16_t)(0x140 + ds.Game_HeroSpriteX)), screen_at(0x7C43),
-                         0x43, 0x3B, 0x40);
+    Blit_BlitTransparent(fp_add(ds.Command_Heroes, (uint16_t)(0x140 + ds.Game_HeroSpriteX)),
+                         screen_at(0x7C43), 0x43, 0x3B, 0x40);
     Mouse_ShowCursor();
 }
 
@@ -687,8 +646,8 @@ void Command_DrawHeroPortrait(void)
 void Command_DrawHeroPortraitToBuffer(void)
 {
     Mouse_HideCursor();
-    Blit_BlitTransparent(fp_add(HEROES, (uint16_t)(0x140 + ds.Game_HeroSpriteX)),
-                         fp_at(OFFSCREEN, 0x7C43), 0x43, 0x3B, 0x40);
+    Blit_BlitTransparent(fp_add(ds.Command_Heroes, (uint16_t)(0x140 + ds.Game_HeroSpriteX)),
+                         fp_at(ds.Command_Offscreen, 0x7C43), 0x43, 0x3B, 0x40);
     Mouse_ShowCursor();
 }
 
@@ -696,13 +655,17 @@ void Command_DrawHeroPortraitToBuffer(void)
 // is blocked.
 void Command_DrawStaffIcon(int16_t slot)
 {
-    int16_t s = (int16_t)STAFF_OF_SLOT(slot);
-    uint16_t hired = STAFF_HIRED(s);
-    if ((s != 4 || FLAG_5D52 == 0) && KIND_5D9E != s && (int16_t)hired > 0) {
+    int16_t s = (int16_t)ds.Command_StaffOfSlot[slot - 1];
+    uint16_t hired = ds.Game_StaffHired[s - 1];
+    if ((s != 4 || ds.Intel_DevAwayTimer == 0) && ds.Advisor_TrainingKind != s
+        && (int16_t)hired > 0) {
         Blit_BlitTransparent(
-            fp_add(MAINFACE, (uint16_t)(STAFF_SRC_Y(s, hired) * 0x140 + STAFF_SRC_X(s, hired) + 0x141)),
-            screen_at((uint16_t)((STAFF_Y(s) + 0x31) * 0x140 + STAFF_X(s) + 0x141)),
-            (int16_t)(STAFF_W(s) - 2), (int16_t)(STAFF_H(s) - 2), 0x40);
+            fp_add(ds.Command_MainFace,
+                   (uint16_t)(ds.Command_StaffSrcY[s - 1][hired - 1] * 0x140
+                              + ds.Command_StaffSrcX[s - 1][hired - 1] + 0x141)),
+            screen_at((uint16_t)((ds.Command_StaffY[s - 1] + 0x31) * 0x140
+                                 + ds.Command_StaffX[s - 1] + 0x141)),
+            (int16_t)(ds.Command_StaffW[s - 1] - 2), (int16_t)(ds.Command_StaffH[s - 1] - 2), 0x40);
     }
 }
 

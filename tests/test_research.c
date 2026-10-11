@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
         ds.Research_Products[i].State = 0;
     ds.Research_Products[0].State = 1;
     ds.Research_Products[13].State = 3;   // invention 14: "Unknown" until revealed
-    SDL_memset(ds_at(0x5D62), 0, 1);
+    ds.Intel_Invention14Revealed = 0;
     Research_SetupResearchHotspots();
     CHECK(ds.Mouse_HotspotCount == 35);
     THotspot *h1 = Mouse_Hotspot(1), *h6 = Mouse_Hotspot(6), *h14 = Mouse_Hotspot(14);

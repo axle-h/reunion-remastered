@@ -19,8 +19,8 @@ int main(int argc, char *argv[])
     mem_init();
     CHECK(dseg_init());
 
-    // DS:7E3C = advisor kind. Hints are (who, product) pairs.
-    uint16_t *kind = ds_at(0x7E3C);
+    // Command::StaffPicked = advisor kind. Hints are (who, product) pairs.
+    int16_t *kind = &ds.Command_StaffPicked;
     for (int i = 0; i < 9; i++)
         ds.Advisor_Hints[i].Who = 0;
     ds.Advisor_Hints[1] = (TAdvisorHint){2, 7};

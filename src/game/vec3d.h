@@ -8,36 +8,25 @@
 // faces are 20-byte records of 1-based vertex-index bytes ended by FFh;
 // edges are two index bytes.
 //
-// Data segment state (no names in dseg.h yet):
-//   DS:7FD4  cos500[0..360]: longint, Round(cos(i deg) * 500)
-//   DS:8582  centroids: 3 words per object slot (slot 1 at 8588h)
-//   DS:8676 / DS:8806  the two x-per-scanline edge tables (200 words each)
-//   DS:8996  current model number, DS:8998 current object slot
+// Data segment state: Vec3D_CosTable, Vec3D_Centroids (per object slot),
+// the two x-per-scanline edge tables Vec3D_EdgesA/B, and the current model
+// and object slot (Vec3D_Model, Vec3D_Slot).
 #pragma once
 
 #include <stdint.h>
 
 #include "game/mem.h"
 
-enum : uint16_t {
-    VEC3D_COS_TABLE = 0x7FD4,
-    VEC3D_CENTROIDS = 0x8582,
-    VEC3D_EDGES_A = 0x8676,
-    VEC3D_EDGES_B = 0x8806,
-    VEC3D_MODEL = 0x8996,
-    VEC3D_SLOT = 0x8998,
-};
-
 // 3e17:0000: one line per edge, from (x + 46h, y + 32h) of the projected
 // points, in the segment starting at bufSeg (stride Gfx_LineStride).
 void Vec3D_DrawEdges(uint8_t *bufSeg, uint8_t *verts, uint8_t *edges, int16_t count,
                      uint8_t colour);
 // 3e17:00cc: fills every face whose projected normal has z >= 0, at
-// (x + 86h, y + 43h), shaded from the normal; six objects (by DS:8996/8998)
+// (x + 86h, y + 43h), shaded from the normal; six objects (by Vec3D_Model/Slot)
 // are two-sided and a few of their faces are skipped.
 void Vec3D_DrawFaces(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint8_t *normals,
                      uint8_t count);
-// 3e17:04d2: stores the rounded centroid at DS:8582 + 6 * slot (with the
+// 3e17:04d2: stores the rounded centroid in Vec3D_Centroids[slot] (with the
 // hard-coded per-model fixes) and one normal per face (length 50, pointing
 // toward the Real centroid) in normals.
 void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *faces,

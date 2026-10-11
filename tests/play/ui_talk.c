@@ -27,10 +27,6 @@ enum : int {
     TIMEOUT = 3000,
 };
 
-#define U8(off) (*(const uint8_t *)ds_at(off))
-#define I16(off) (*(const int16_t *)ds_at(off))
-#define I32(off) (*(const int32_t *)ds_at(off))
-
 // --- Text helpers ---
 
 // A Pascal-string row text as drawn by TextFile_DrawReply: without the
@@ -99,11 +95,6 @@ static void text_file_line(const char *name, const PString *num, const char *ext
 
 // --- Alien talk (screen 34): alientalk.c, main_program.c screen_alien_talk ---
 
-#define TALK_LOCKED U8(0x78B6)    // the reply is drawn in place of the questions
-#define TALK_SEL I16(0x78B4)      // highlighted question (1..), drawn in colour FC
-#define TALK_REPLY I16(0x78C0)    // VALASZ<race>.AT line drawn as the reply
-#define TALK_RACE_STR ((const PString *)ds_at(0x78B8))
-
 static bool on_screen(int screen)
 {
     return ds.Game_CurrentScreen == screen && !ds.Game_ScreenSwitch;
@@ -122,7 +113,7 @@ int ui_talk_alien(void)
 bool ui_talk_menu(TalkMenu *m)
 {
     m->count = 0;
-    if (!ui_talk_shown() || TALK_LOCKED)
+    if (!ui_talk_shown() || ds.AlienTalk_Locked)
         return false;
     int row = 1;
     for (int k = 0; k < ds.Alien_CurMenu[0] && k < TALK_QUESTIONS_MAX; k++) {
@@ -138,42 +129,37 @@ bool ui_talk_menu(TalkMenu *m)
 void ui_talk_reply(char *out, size_t size)
 {
     out[0] = 0;
-    if (!ui_talk_shown() || !TALK_LOCKED)
+    if (!ui_talk_shown() || !ds.AlienTalk_Locked)
         return;
     uint8_t line[256];
-    text_file_line("valasz", TALK_RACE_STR, ".at", TALK_REPLY, line);
+    text_file_line("valasz", (const PString *)&ds.AlienTalk_RaceStr, ".at", ds.AlienTalk_ReplyLine,
+                   line);
     drawn_text(line, 3, out, size);
 }
 
+// The highlighted question (1..), drawn in colour FC.
 static int talk_hovered(void)
 {
-    return TALK_SEL;
+    return (int16_t)ds.AlienTalk_SelectedLine;
 }
 
 static bool talk_replied(void)
 {
-    return TALK_LOCKED != 0;
+    return ds.AlienTalk_Locked != 0;
 }
 
 // --- Pub questions (screen 25): pub.c, main_program.c screen_pub_dialog ---
 
-#define PUB_PERSON I16(0x7738)
-#define PUB_HOVER I16(0x7758)     // highlighted question (1..)
-#define PUB_REPLIED U8(0x775A)    // the reply is drawn in place of the questions
-#define PUB_NUM_STR ((const PString *)ds_at(0x7760))
-#define PUB_REPLY I16(0x7768)     // VALASZ<person>.LOC line drawn as the reply
-#define PUB_LINES (*(const FarPtr *)ds_at(0x776C))
-
 static const uint8_t *pub_line(int i)
 {
-    FarPtr b = PUB_LINES;
+    FarPtr b = ds.Pub_Lines;
     return far_host(far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + (i - 1) * 256)));
 }
 
 bool ui_pub_menu(TalkMenu *m)
 {
     m->count = 0;
-    if (!on_screen(SCREEN_PUB_TALK) || ds.Mouse_HotspotCount != 1 || PUB_REPLIED)
+    if (!on_screen(SCREEN_PUB_TALK) || ds.Mouse_HotspotCount != 1 || ds.Pub_Replied)
         return false;
     int row = 1;
     for (int k = 0; k < ds.Pub_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
@@ -188,27 +174,28 @@ bool ui_pub_menu(TalkMenu *m)
 void ui_pub_reply(char *out, size_t size)
 {
     out[0] = 0;
-    if (!on_screen(SCREEN_PUB_TALK) || !PUB_REPLIED)
+    if (!on_screen(SCREEN_PUB_TALK) || !ds.Pub_Replied)
         return;
     // The trader's prices are made up in the first question line (pub.c
     // Pub_ShowReply); every other reply is the file line.
-    if (PUB_PERSON == 2 && PUB_REPLY > 9 && PUB_REPLY < 14) {
+    if (ds.Pub_Person == 2 && ds.Pub_ReplyLine > 9 && ds.Pub_ReplyLine < 14) {
         drawn_text(pub_line(1), 3, out, size);
         return;
     }
     uint8_t line[256];
-    text_file_line("valasz", PUB_NUM_STR, ".loc", PUB_REPLY, line);
+    text_file_line("valasz", (const PString *)&ds.Pub_PersonStr, ".loc", ds.Pub_ReplyLine, line);
     drawn_text(line, 3, out, size);
 }
 
+// The highlighted question (1..).
 static int pub_hovered(void)
 {
-    return PUB_HOVER;
+    return ds.Pub_HoverItem;
 }
 
 static bool pub_replied(void)
 {
-    return PUB_REPLIED != 0;
+    return ds.Pub_Replied != 0;
 }
 
 bool ui_pub_present(const char *name)
@@ -410,16 +397,12 @@ int ui_pub_ask_path(const char *person, const char *const path[])
 
 // --- Advisor (screen 24): advisor.c ---
 
-#define ADV_ANSWER I16(0x7720)    // VALASZ1.SP line drawn as the answer
-#define ADV_LINES (*(const FarPtr *)ds_at(0x7722))
-#define ADV_PRICE I32(0x5DA2)     // "It will be <price> credits"
-
 bool ui_advisor_menu(TalkMenu *m)
 {
     m->count = 0;
     if (!on_screen(SCREEN_ADVISOR) || ds.Mouse_HotspotCount != 1)
         return false;
-    FarPtr b = ADV_LINES;
+    FarPtr b = ds.Advisor_MenuLines;
     for (int k = 0; k < ds.Advisor_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
         const uint8_t *p = far_host(far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + k * 0x3D)));
         drawn_text(p, 0, m->text[k], TALK_TEXT_MAX);
@@ -433,13 +416,13 @@ void ui_advisor_reply(char *out, size_t size)
 {
     // Answer 10 names the price (advisor.c Advisor_ShowAdvisorAnswer); 7
     // and 8 name an invention, logged here as the file's placeholder.
-    if (ADV_ANSWER == 10) {
-        SDL_snprintf(out, size, "It will be %d credits", (int)ADV_PRICE);
+    if (ds.Advisor_Answer == 10) {
+        SDL_snprintf(out, size, "It will be %d credits", (int)ds.Advisor_TrainingPrice);
         return;
     }
     uint8_t line[256];
     PString none = {0};
-    text_file_line("valasz1.sp", &none, "", ADV_ANSWER, line);
+    text_file_line("valasz1.sp", &none, "", ds.Advisor_Answer, line);
     drawn_text(line, 3, out, size);
 }
 

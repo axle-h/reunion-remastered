@@ -2,10 +2,8 @@
 //
 // Ported from the disassembly (the decompile drops code in places: e.g. it
 // misses ProcessAllBodyEvents adding the day's taxes to Game_Credits).
-// Globals without a name in DSeg are reached with ds_at() and named in a
-// comment; most of them sit in the story-timer block DS:5D48..5DAB, which
-// overlaps the folded base of Research_Products (Products[0] would start at
-// 5D77), so products are addressed as DS:5D77 + 35h*p for p = 0 as well.
+// Most of the story state is in the timer block DS:5D3E..5DA1 (Intel:: and
+// Advisor:: fields): word timers, each with a "done" byte behind it.
 #include "game/sim.h"
 
 #include "game/blit.h"
@@ -17,6 +15,7 @@
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
+#include "game/intel.h"
 #include "game/mem.h"
 #include "game/message.h"
 #include "game/minmax.h"
@@ -72,55 +71,50 @@ void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon);
 void Surface_RebuildRadar(void);                                       // 2ef2:2c52
 
 // ---------------------------------------------------------------------------
-// Data access, with the original's address arithmetic (out-of-range indices
-// land where they did in DOS).
+// Data access (the original's 1-based arrays).
 // ---------------------------------------------------------------------------
-
-static inline uint8_t *b8(uint16_t off) { return (uint8_t *)ds_at(off); }
-static inline int8_t *i8(uint16_t off) { return (int8_t *)ds_at(off); }
-static inline int16_t *w16(uint16_t off) { return (int16_t *)ds_at(off); }
-static inline int32_t *l32(uint16_t off) { return (int32_t *)ds_at(off); }
 
 static inline const uint8_t *ps(const PString *s) { return &s->len; }
 
-// Research::Products[p] (DS:5D77 + 35h*p).
-static inline TProduct *product(int16_t p) { return (TProduct *)ds_at((uint16_t)(0x5D77 + p * 0x35)); }
-// Races::Races[r] (DS:6A06 + E4h*r); Status = +1Bh.
-static inline TRace *race(int16_t r) { return (TRace *)ds_at((uint16_t)(0x6A06 + r * 0xE4)); }
-// Galaxy::SystemStatus[s] (DS:4815 + s).
-static inline int8_t *system_status(int16_t s) { return i8((uint16_t)(0x4815 + s)); }
-// Galaxy::PlanetStatus[s, p] (DS:47CD + 8s + p).
-static inline int8_t *planet_status(int16_t s, int16_t p) { return i8((uint16_t)(0x47CD + s * 8 + p)); }
-// DS:481C + 2s: completed observatories (building kind 6) in system s,
-// counted by UpdateBuildings. Unnamed.
-static inline int16_t *observatories(int16_t s) { return w16((uint16_t)(0x481C + s * 2)); }
-// Names::Systems[s] (DS:5B65 + 9s).
-static inline const PString *system_name(int16_t s) { return (const PString *)ds_at((uint16_t)(0x5B65 + s * 9)); }
+static inline TProduct *product(int16_t p) { return &ds.Research_Products[p - 1]; }
+static inline TRace *race(int16_t r) { return Intel_Race(r); }
+static inline int8_t *system_status(int16_t s) { return &ds.Galaxy_SystemStatus[s - 1]; }
+static inline int8_t *planet_status(int16_t s, int16_t p)
+{
+    return &ds.Galaxy_PlanetStatus[s - 1][p - 1];
+}
+// Completed observatories in system s, counted by UpdateBuildings.
+static inline int16_t *observatories(int16_t s) { return &ds.Sim_Observatories[s - 1]; }
+static inline const PString *system_name(int16_t s)
+{
+    return (const PString *)&ds.Names_Systems[s - 1];
+}
 // Game::CurPlanet[CurSystem] / CurMoon[CurSystem].
-static inline int16_t *cur_planet(void) { return w16((uint16_t)(0x7AE4 + ds.Game_CurSystem * 2)); }
-static inline int16_t *cur_moon(void) { return w16((uint16_t)(0x7AF4 + ds.Game_CurSystem * 2)); }
+static inline int16_t *cur_planet(void) { return &ds.Game_CurPlanet[ds.Game_CurSystem - 1]; }
+static inline int16_t *cur_moon(void) { return &ds.Game_CurMoon[ds.Game_CurSystem - 1]; }
 // Game::CurMoon[s] for any system.
-static inline int16_t cur_moon_of(int16_t s) { return *w16((uint16_t)(0x7AF4 + s * 2)); }
-// Game::ColonySetups[k] (DS:A20C + 10h*k).
-static inline TColonySetup *colony_setup(int16_t k) { return (TColonySetup *)ds_at((uint16_t)(0xA20C + k * 16)); }
-// Game::HomeStock[i] (DS:95C2 + 4i).
-static inline int32_t *home_stock(int16_t i) { return l32((uint16_t)(0x95C2 + i * 4)); }
+static inline int16_t cur_moon_of(int16_t s) { return ds.Game_CurMoon[s - 1]; }
+static inline TColonySetup *colony_setup(int16_t k) { return &ds.Game_ColonySetups[k - 1]; }
+static inline int32_t *home_stock(int16_t i) { return &ds.Game_HomeStock[i - 1]; }
 // Game::Buildings^[i].
-static inline TBuilding *building(int16_t i) { return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1); }
-// The longint table filled by Surface::CountBuildingsByKind (DS:791C).
-static inline int32_t kind_count(uint16_t off) { return *l32(off); }
+static inline TBuilding *building(int16_t i)
+{
+    return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
+}
+// Surface::KindCounts[1, kind], filled by Surface::CountBuildingsByKind.
+static inline int32_t kind_count(int16_t kind) { return ds.Surface_KindCounts[1][kind - 1]; }
 
 // Galaxy::Bodies[s]^[idx]: 65-byte records; the offset wraps at 64 KB.
 static TBody *body(int16_t s, int16_t idx)
 {
-    FarPtr p = *(FarPtr *)ds_at((uint16_t)(0x4752 + s * 4));
+    FarPtr p = ds.Galaxy_Bodies[s - 1];
     return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + idx * 0x41 - 0x41)));
 }
 
 // Galaxy::MoonLists[s]^[planet] (count + 8 body indices).
 static uint8_t *moon_list(int16_t s, int16_t planet)
 {
-    FarPtr p = *(FarPtr *)ds_at((uint16_t)(0x4732 + s * 4));
+    FarPtr p = ds.Galaxy_MoonLists[s - 1];
     return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + planet * 9 - 9)));
 }
 
@@ -208,11 +202,10 @@ void Sim_ProcessPubTimers(void)
             int16_t kind = person->Deal / 20;
             Message_ShowMessageLine(0x27);
             Intel_ShowRaceIntel(r, kind);
-            // Races::Hostile[r] (DS:6517 + r)
-            if (kind == 1 && *b8((uint16_t)(0x6517 + r)) != 2)
-                *b8((uint16_t)(0x6517 + r)) = 1;
+            if (kind == 1 && ds.Races_Hostile[r - 1] != 2)
+                ds.Races_Hostile[r - 1] = 1;
             if (kind == 3)
-                *b8((uint16_t)(0x6517 + r)) = 2;
+                ds.Races_Hostile[r - 1] = 2;
         }
         if (k == 5) {
             if (person->Deal == 1)
@@ -230,7 +223,7 @@ void Sim_ProcessPubTimers(void)
             }
         }
         if (k == 7) {
-            *b8(0x5D9A) = 1;  // story flag
+            ds.Intel_Pub7Done = 1;
             ds.Pub_People[6].State = 1;
             TBody *earth = &ds.Galaxy_SunBodies[2];
             earth->Stores[0] -= 20;
@@ -254,7 +247,10 @@ void Sim_ProcessPubTimers(void)
         if (d > 10)
             d -= 10;
         if (k == 9) {
-            TPubDeal *deal = (TPubDeal *)ds_at((uint16_t)(0x40C + d * 0x18));
+            // Pub::Deals[d]; d = 0 (no active deal) reaches the bytes before the
+            // array, as in the original.
+            TPubDeal *deal =
+                (TPubDeal *)((uint8_t *)ds.Pub_Deals + (d - 1) * (int)sizeof(TPubDeal));
             if (System_Random(100) < deal->Chance) {
                 Message_ShowMessageLine(0x2F);
                 for (int16_t j = 1; j <= 4; j++) {
@@ -269,7 +265,7 @@ void Sim_ProcessPubTimers(void)
                         System_StrLoad(&t, PSTR("You got "));
                         System_StrConcat(&t, &num);
                         System_StrConcat(&t, PSTR(" t of "));
-                        System_StrConcat(&t, (const PString *)ds_at((uint16_t)(0x5A73 + item * 9)));
+                        System_StrConcat(&t, (const PString *)&ds.Names_Ores[item - 1]);
                     } else {
                         product((int16_t)(item - 10))->Stock += (int16_t)amount;
                         System_StrLoad(&t, PSTR("You got "));
@@ -313,9 +309,9 @@ void Sim_ProgressResearch(void)
 {
     for (int16_t k = 1; k <= 35; k++) {
         TProduct *p = product(k);
-        // DS:5D52: story timer that blocks research while it runs (Main);
-        // DS:5D9E: staff member away at the university (4 = developer).
-        if (*w16(0x5D52) != 0 || *w16(0x5D9E) == 4 || !(p->State == 2 || p->State == 4))
+        // Research stops while the developer is with race 2 or at the university.
+        if (ds.Intel_DevAwayTimer != 0 || ds.Advisor_TrainingKind == 4
+            || !(p->State == 2 || p->State == 4))
             continue;
 
         int16_t shortfall = 0;
@@ -385,11 +381,10 @@ void Sim_ProgressProduction(void)
     bool completed = false;
     for (int16_t k = 1; k <= 35; k++) {
         TProduct *p = product(k);
-        // Shop_ListMode+1 (DS:79FB): quantity edit active on the shop screen.
-        if ((ds.Game_CurrentScreen == 5 && *b8(0x79FB) != 0) || p->_1D == 0)
+        if ((ds.Game_CurrentScreen == 5 && ds.Shop_QtyEdit != 0) || p->_1D == 0)
             continue;
         p->_21 -= ds.Game_ProductionRate;
-        // DS:7AB5 + Shop_Sel: the product selected in the shop's list.
+        // Shop::List[Shop::Sel]: the product selected in the shop's list.
         if ((int16_t)p->_21 <= 0) {
             completed = true;
             p->_21 = 0;
@@ -397,11 +392,11 @@ void Sim_ProgressProduction(void)
             p->_1D--;
             if ((int16_t)p->_1D > 0)
                 p->_21 = p->_1F;
-            if (ds.Game_CurrentScreen == 5 && *b8((uint16_t)(0x7AB5 + ds.Shop_Sel)) == k
+            if (ds.Game_CurrentScreen == 5 && ds.Shop_List[ds.Shop_Sel - 1] == k
                 && (int16_t)p->_1D > 0)
                 Shop_DrawQueueNumbers();
         }
-        if (ds.Game_CurrentScreen == 5 && *b8((uint16_t)(0x7AB5 + ds.Shop_Sel)) == k) {
+        if (ds.Game_CurrentScreen == 5 && ds.Shop_List[ds.Shop_Sel - 1] == k) {
             if (p->_1D == 0)
                 Shop_DrawNotProducible();
             else
@@ -455,10 +450,10 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         Surface_CountBuildingsByKind(system, planet, moon);
         // Target attitude; the people's attitude moves towards it.
         int16_t target = (int16_t)((7 - (int8_t)b->TechLevel) * 10);
-        int32_t living = lmul(kind_count(0x799C), 7000) + 10000;
-        int32_t food = lmul(kind_count(0x79D4), 20000) + lmul(kind_count(0x79C0), 8000) + 20000;
-        int32_t medicine = kind_count(0x79E0);
-        int32_t hospital = lmul(kind_count(0x79BC), 20000) + 20000;
+        int32_t living = lmul(kind_count(7), 7000) + 10000;
+        int32_t food = lmul(kind_count(21), 20000) + lmul(kind_count(16), 8000) + 20000;
+        int32_t medicine = kind_count(24);
+        int32_t hospital = lmul(kind_count(15), 20000) + 20000;
         if (b->_14 > 0 && b->_14 < 100)
             b->_14--;
         int16_t sick = b->_14 == 0 ? 2 : 1;
@@ -485,8 +480,10 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             target -= 20;
         if (b->Population > 150000)
             target -= 20;
-        int16_t k8 = *w16(0x79A0), stadium = *w16(0x79A4), k10 = *w16(0x79A8);
-        int16_t k14 = *w16(0x79B8), university = *w16(0x79B4);
+        // The low words of the counts, as the original reads them.
+        int16_t k8 = (int16_t)kind_count(8), stadium = (int16_t)kind_count(9);
+        int16_t k10 = (int16_t)kind_count(10), k14 = (int16_t)kind_count(14);
+        int16_t university = (int16_t)kind_count(13);
         if (k8 > 0)
             target += 10;
         if (stadium > 0)
@@ -505,7 +502,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 show3(PSTR("  Your people demand a University | on "), &name, end);
             target -= 20;
         }
-        if (planet < 3 && kind_count(0x79CC) == 0) {
+        if (planet < 3 && kind_count(19) == 0) {
             if (System_Random(5) == 0) {
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 4));
                 b->Population -= (uint16_t)(r + 500);
@@ -671,8 +668,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
     if (b->InfoLevel - gain < 30 && b->InfoLevel >= 30) {
         if ((int8_t)b->Owner <= 1) {
             // Galaxy::SurfaceColonisable[Surface::Tileset[SurfaceType]]
-            uint16_t tileset = (uint16_t)*w16((uint16_t)(0x1A38 + (int8_t)b->SurfaceType * 2));
-            if (b->Surveyed != 0 && *b8((uint16_t)(0x1A4F + tileset)) != 0)
+            uint16_t tileset = (uint16_t)ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
+            if (b->Surveyed != 0 && ds.Galaxy_SurfaceColonisable[tileset - 1] != 0)
                 show3(end, &name, PSTR(" |    is a suitable place for living"));
             else
                 show3(end, &name, PSTR(" |    is not suitable for living"));
@@ -823,7 +820,7 @@ void Sim_ProcessAllBodyEvents(void)
     for (int16_t s = 1; s <= 8; s++) {
         if (*system_status(s) != 1)
             continue;
-        int16_t planets = *w16((uint16_t)(0x4774 + s * 2));  // Galaxy::PlanetCount[s]
+        int16_t planets = ds.Galaxy_PlanetCount[s - 1];
         for (int16_t p = 1; p <= planets; p++) {
             const uint8_t *moons = moon_list(s, p);
             Sim_ProcessBodyEvents(&frame, s, p, 0, p);
@@ -834,9 +831,9 @@ void Sim_ProcessAllBodyEvents(void)
     }
     ds.Game_Credits += frame.income;
     // PlanetInfo::AlienMode, read as a word.
-    if (ds.Game_CurrentScreen == 8 && *w16(0x7B06) == 0)
+    if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == 0)
         PlanetInfo_DrawPlanetInfoText();
-    if (ds.Game_CurrentScreen == 8 && *w16(0x7B06) == 1)
+    if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == 1)
         PlanetInfo_DrawStoresList();
 }
 
@@ -845,13 +842,13 @@ void Sim_UpdateBuildings(void)
 {
     for (int16_t s = 1; s <= 8; s++)
         *observatories(s) = 0;
-    *w16(0x482E) = 0;  // completed buildings of kind 13
+    ds.Sim_UniversityCount = 0;
     int16_t count = ds.Game_BuildingCount;
     for (int16_t i = 1; i <= count; i++) {
         TBuilding *bl = building(i);
         if (bl->Health == 0) {
             if (bl->Kind == 0xD)
-                (*w16(0x482E))++;
+                ds.Sim_UniversityCount++;
             if (bl->Kind == 6)
                 (*observatories(bl->System))++;
         }
@@ -870,8 +867,7 @@ void Sim_UpdateBuildings(void)
             if (ds.Game_StaffHired[1] == 3)
                 work = lmul(work, 2);
             uint8_t old = bl->Health;
-            // Surface::BuildingTypes[Kind]._2C
-            if (System_Random(*b8((uint16_t)(0x657F + bl->Kind * 0x3F))) < 10) {
+            if (System_Random(ds.Surface_BuildingTypes[bl->Kind - 1]._2C) < 10) {
                 if ((int32_t)bl->Health > work)
                     bl->Health -= (uint8_t)work;
                 else
@@ -926,9 +922,8 @@ void Sim_UpdateColonySetups(void)
             if (s->Timers[j - 1] == 0)
                 continue;
             if (--s->Timers[j - 1] == 0) {
-                // Colony::StarterBuildings[j].Building
-                Surface_AutoPlaceBuilding(*w16((uint16_t)(0x651E + j * 10)), s->System, s->Planet,
-                                          s->Moon);
+                Surface_AutoPlaceBuilding(ds.Colony_StarterBuildings[j - 1].Building, s->System,
+                                          s->Planet, s->Moon);
             }
             done = done && s->Timers[j - 1] == 0;
         }
@@ -971,7 +966,7 @@ void Sim_MineAllBodies(void)
     for (int16_t s = 1; s <= 8; s++) {
         if (*system_status(s) != 1)
             continue;
-        int16_t planets = *w16((uint16_t)(0x4774 + s * 2));
+        int16_t planets = ds.Galaxy_PlanetCount[s - 1];
         for (int16_t p = 1; p <= planets; p++) {
             const uint8_t *moons = moon_list(s, p);
             Sim_MineBody(s, p, 0, p);
@@ -1016,10 +1011,10 @@ void Sim_ProcessTravellingGroups(void)
         // Status 4..6: Leg1 hours to the jump point, Jump hours in hyperspace,
         // Leg2 hours to the target; the pilot's experience speeds up the legs.
         if (g->Jump == 1 && g->Leg1 == 0) {
-            if (*b8(0x5D48) == 0) {  // story flag: first hyperspace jump seen
+            if (ds.Intel_FirstJumpSeen == 0) {
                 Message_ShowMessageLine(0x22);
                 AlienTalk_StartAlienScene(2);
-                *b8(0x5D48) = 1;
+                ds.Intel_FirstJumpSeen = 1;
             } else if (ds.Game_CurrentScreen == 0x11 && i >= 0 && ds.Game_SelGroup == i) {
                 Gfx_FadeToWhite(0x70, 0x84, Gfx_PalettePtr(), 0x14);
                 Blit_FillBytes(far_host(ds.ShipMove_Backdrop), 0x8980, 0x7F);
@@ -1049,17 +1044,17 @@ void Sim_ProcessTravellingGroups(void)
         else if (g->Leg1 == 0)
             g->Status = 5;
 
-        // DS:5D71: story flag armed by ProcessStoryTimers (invention 12 done).
+        // Intel::Phoenix1Armed: set by ProcessStoryTimers (invention 12 done).
         // The original tests the selected body, not where the group arrived.
         // Port fix (game/fixes.h): the group's.
         bool at_phoenix1 = fixes.drifting_ship
                                ? g->System == 2 && g->Planet == 1 && g->Moon == 0
                                : ds.Game_CurSystem == 2 && *cur_planet() == 1 && *cur_moon() == 0;
-        if (*b8(0x5D71) != 0 && g->Status == 2 && at_phoenix1) {
+        if (ds.Intel_Phoenix1Armed != 0 && g->Status == 2 && at_phoenix1) {
             Message_ShowMessageLine(0x12);
             AlienTalk_StartAlienTalk(6);
             Intel_OfferInventionForAnalysis(0x13);
-            *b8(0x5D71) = 0;
+            ds.Intel_Phoenix1Armed = 0;
         }
 
         PString t, who, s2;
@@ -1095,8 +1090,8 @@ void Sim_ProcessTravellingGroups(void)
                         }
                     }
                     if (g->System == 4) {
-                        if (*b8(0x5D94) == 0)     // story flag
-                            *w16(0x5D92) = 0x32;  // story timer
+                        if (ds.Intel_System4Warned == 0)
+                            ds.Intel_System4WarnTimer = 0x32;
                         Intel_ScheduleIdea(0x1B, 0x96, 0x46);
                     }
                 } else {
@@ -1145,14 +1140,14 @@ void Sim_ProcessTravellingGroups(void)
                     }
                 }
             }
-            // DS:5D95: story flag set with 5D94 (system 4 found).
-            if (*b8(0x5D95) != 0 && g->System == 4 && bd->Colony != 0
+            // Intel::System4TalkArmed: set with System4Done (system 4 found).
+            if (ds.Intel_System4TalkArmed != 0 && g->System == 4 && bd->Colony != 0
                 && (bd->Owner == 1 || bd->Owner == 6)) {
-                *b8(0x5D95) = 0;
+                ds.Intel_System4TalkArmed = 0;
                 AlienTalk_StartAlienTalk(9);
                 Message_ShowMessageLine(0x2D);
-                if (*b8(0x5D90) == 0)
-                    *w16(0x5D8E) = (int16_t)(System_Random(10) + 0x230);
+                if (ds.Intel_System4Destroyed == 0)
+                    ds.Intel_System4DestroyTimer = (int16_t)(System_Random(10) + 0x230);
             }
             if (is_selected_fleet(i)) {
                 if (ds.Game_CurrentScreen == 0x10) {
@@ -1185,19 +1180,19 @@ void Sim_ProcessTravellingGroups(void)
             if (ds.Game_CurrentScreen == 0x12 || ds.Game_CurrentScreen == 7)
                 PlanetInfo_SetupSystemViewHotspots();
             if (ds.Game_CurrentScreen == 7 && *cur_planet() != 0) {
-                // System-view state (PlanetInfo): DS:7C3A, 7C3B flags, DS:7C36
-                // selected entry, DS:7BC4 + 6k entry kinds (>3: race kind-3).
-                if (*b8(0x7C3A) == 0 && *w16(0x7C36) > 0) {
-                    int16_t kind = *w16((uint16_t)(0x7BC4 + *w16(0x7C36) * 6));
+                // The map screen's toolbar state (Launch): the selected system-view
+                // entry, whose Kind > 3 is the force of race Kind - 3.
+                if (ds.Launch_AttackIconShown == 0 && (int16_t)ds.Launch_SelectedEntry > 0) {
+                    int16_t kind = ds.Launch_SystemViewTable[ds.Launch_SelectedEntry - 1].Kind;
                     if (kind > 3 && race((int16_t)(kind - 3))->Status != 6) {
-                        *b8(0x7C3B) = 0;
+                        ds.Launch_AttackIcon = 0;
                         for (int16_t e = 1; e <= 0x12; e++) {
-                            if (*w16((uint16_t)(0x7BC4 + e * 6)) == 1)
-                                *b8(0x7C3B) = 1;
+                            if (ds.Launch_SystemViewTable[e - 1].Kind == 1)
+                                ds.Launch_AttackIcon = 1;
                         }
                     }
                 }
-                if (*b8(0x7C3A) == 0 && *b8(0x7C3B) != 0) {
+                if (ds.Launch_AttackIconShown == 0 && ds.Launch_AttackIcon != 0) {
                     GfxPath_SetToolbar(7);
                     GfxPath_AddToolbarIcon(0x21);
                     GfxPath_AddToolbarIcon(0x37);
@@ -1278,22 +1273,21 @@ void Sim_CheckEnemyAttacks(void)
             PlanetInfo_GetBodyLongName(&t, fc->System, fc->Body, fc->Moon);
             System_StrStore(&t, &where, 0x32);
             TBody *bd = body_at(fc->System, fc->Body, fc->Moon);
-            // Battle setup (SpWar/GrWar): DS:7798/779A/779C target, DS:778A
-            // ground battle, DS:7788 colony attacked, DS:778B, DS:778C race.
-            *w16(0x7798) = fc->System;
-            *w16(0x779A) = fc->Body;
-            *w16(0x779C) = fc->Moon;
-            *b8(0x778A) = fc->NextMission >= 3;
+            // Battle setup (SpWar/GrWar).
+            ds.SpWar_BattleSystem = fc->System;
+            ds.SpWar_BattlePlanet = fc->Body;
+            ds.SpWar_BattleMoon = fc->Moon;
+            ds.SpWar_RaceMissionHigh = fc->NextMission >= 3;
             if (fc->NextMission == 1)
-                *b8(0x7788) = 0;
+                ds.SpWar_GroundBattle = 0;
             if (fc->NextMission == 2)
-                *b8(0x7788) = 1;
+                ds.SpWar_GroundBattle = 1;
             if (fc->NextMission == 3)
-                *b8(0x7788) = 0;
+                ds.SpWar_GroundBattle = 0;
             if (fc->NextMission == 4)
-                *b8(0x7788) = 1;
-            if (*b8(0x7788) != 0 && bd->Owner != 1)
-                *b8(0x7788) = 0;
+                ds.SpWar_GroundBattle = 1;
+            if (ds.SpWar_GroundBattle != 0 && bd->Owner != 1)
+                ds.SpWar_GroundBattle = 0;
             bool defended = false;
             int16_t n = ds.Game_GroupCount;
             for (int16_t k = 1; k <= n; k++) {
@@ -1302,7 +1296,7 @@ void Sim_CheckEnemyAttacks(void)
                     defended = true;
             }
             if (!defended) {
-                if (*b8(0x7788) != 0) {
+                if (ds.SpWar_GroundBattle != 0) {
                     System_StrLoad(&t, PSTR("| Your colony is under attack by "));
                     System_StrConcat(&t, (const PString *)&rc->Name);
                     System_StrConcat(&t, PSTR(" |  at "));
@@ -1313,7 +1307,7 @@ void Sim_CheckEnemyAttacks(void)
                     ds.Game_ScreenSwitch = 1;
                 }
             } else {
-                if (*b8(0x7788) == 0) {
+                if (ds.SpWar_GroundBattle == 0) {
                     System_StrLoad(&t, PSTR(" Your ships around "));
                     PlanetInfo_GetBodyLongName(&s2, fc->System, fc->Body, 0);
                     System_StrConcat(&t, &s2);
@@ -1333,19 +1327,20 @@ void Sim_CheckEnemyAttacks(void)
                 ds.Game_CurrentScreen = 0x1D;
                 ds.Game_ScreenSwitch = 1;
             }
-            *b8(0x778B) = 0;
+            ds.Sim_PlayerAttacks = 0;
             fc->NextMission = 0;
-            *w16(0x778C) = r;
+            ds.SpWar_EnemyRace = r;
         }
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();
     }
 }
 
-// Staff::Ability[type, hired] (DS:57E0 + 3*type + hired): experience cap.
+// Staff::Ability[type, hired]: experience cap. Indexed flat like the original,
+// so hired = 0 reads the previous entry.
 static uint8_t ability_cap(int16_t type)
 {
-    return *b8((uint16_t)(0x57E0 + type * 3 + ds.Game_StaffHired[type - 1]));
+    return (&ds.Staff_Ability[0][0])[(type - 1) * 3 + ds.Game_StaffHired[type - 1] - 1];
 }
 
 // 1b8a:3b83
@@ -1356,31 +1351,33 @@ void Sim_GrowStaffExperience(void)
             && ability_cap(k) > ds.Game_StaffExp[k - 1])
             ds.Game_StaffExp[k - 1]++;
     }
-    // DS:5D9E: staff type at the university, DS:5D9C: hours left, DS:5DA0:
-    // the course (skill gains at DS:125 + 4*course + field).
-    int16_t t = *w16(0x5D9E);
+    // A staff member at the university: back when the hours are up, with
+    // experience (and for the developer, the course's skills).
+    int16_t t = ds.Advisor_TrainingKind;
     if (t <= 0)
         return;
-    if (*w16(0x5D9C) > 0)
-        (*w16(0x5D9C))--;
-    if (*w16(0x5D9C) != 0)
+    if (ds.Advisor_TrainingTimer > 0)
+        ds.Advisor_TrainingTimer--;
+    if (ds.Advisor_TrainingTimer != 0)
         return;
-    uint16_t *exp = (uint16_t *)ds_at((uint16_t)(0x95A2 + t * 2));  // Game::StaffExp[t]
+    uint16_t *exp = &ds.Game_StaffExp[t - 1];
     *exp += (uint16_t)(System_Random(4) + 0x69);
-    uint8_t cap = *b8((uint16_t)(0x57E0 + t * 3 + *w16((uint16_t)(0x95B4 + t * 2))));
+    uint8_t cap = ability_cap(t);
     if (cap < *exp)
         *exp = cap;
     if (t == 4) {
         for (int16_t j = 1; j <= 4; j++) {
-            ds.Game_DevSkill[j - 1] += *b8((uint16_t)(0x125 + *w16(0x5DA0) * 4 + j));
-            // Staff::DevSkills[StoryStage, StaffHired[4], j]
-            uint8_t skillCap = *b8((uint16_t)(0x57EB + ds.Game_StoryStage * 12
-                                              + ds.Game_StaffHired[3] * 4 + j));
+            int16_t course = ds.Advisor_TrainingCourse;
+            ds.Game_DevSkill[j - 1] += ds.Advisor_CourseSkills[course - 1][j - 1];
+            // Staff::DevSkills[StoryStage, StaffHired[4], j], indexed flat
+            const uint8_t *caps = &ds.Staff_DevSkills[0][0][0];
+            uint8_t skillCap =
+                caps[ds.Game_StoryStage * 12 + (ds.Game_StaffHired[3] - 1) * 4 + j - 1];
             if (skillCap < ds.Game_DevSkill[j - 1])
                 ds.Game_DevSkill[j - 1] = skillCap;
         }
     }
-    *w16(0x5D9E) = 0;
+    ds.Advisor_TrainingKind = 0;
     if (ds.Game_CurrentScreen == 1) {
         ds.Game_CurrentScreen = -1;
         ds.Game_ScreenSwitch = 1;
@@ -1392,20 +1389,20 @@ void Sim_GrowStaffExperience(void)
     }
 }
 
-// A story timer: word `timer` counts down while `done` (a byte) is clear;
-// true when it reaches 0 this hour (the caller sets `done`).
-static bool tick(uint16_t timer)
+// A story timer counts down while its `done` byte is clear; true when it
+// reaches 0 this hour (the caller sets `done`).
+static bool tick(int16_t *timer)
 {
-    if (*w16(timer) > 0 && --*w16(timer) == 0)
+    if (*timer > 0 && --*timer == 0)
         return true;
     return false;
 }
 
-// 1b8a:3d07. The story block DS:5D4A..5D98 holds pairs of a word timer and a
-// byte "fired" flag (5D4A/5D4C, 5D4E/5D50, 5D54/5D56, ...).
+// 1b8a:3d07: the idea timers and the story timers (each with its "done" flag).
 void Sim_ProcessStoryTimers(void)
 {
-    if (ds.Game_StaffExp[3] != 0 && *w16(0x5D52) == 0 && (*w16(0x5D9C) == 0 || *w16(0x5D9E) != 4)) {
+    if (ds.Game_StaffExp[3] != 0 && ds.Intel_DevAwayTimer == 0
+        && (ds.Advisor_TrainingTimer == 0 || ds.Advisor_TrainingKind != 4)) {
         for (int16_t k = 1; k <= 35; k++) {
             int16_t *timer = &ds.Game_IdeaTimer[k - 1];
             if (*timer <= 0)
@@ -1428,32 +1425,32 @@ void Sim_ProcessStoryTimers(void)
             }
         }
     }
-    if (*b8(0x5D4C) == 0 && tick(0x5D4A)) {
-        *b8(0x5D4C) = 1;
+    if (ds.Intel_SatTheftDone == 0 && tick(&ds.Intel_SatTheftTimer)) {
+        ds.Intel_SatTheftDone = 1;
         Intel_ScheduleIdea(4, 10, 10);
         AlienTalk_StartAlienScene(9);
     }
-    if (ds.Game_StaffHired[3] != 0 && *b8(0x5D50) == 0 && *w16(0x5D4E) > 0
-        && (*w16(0x5D9C) == 0 || *w16(0x5D9E) != 4) && ds.Races_Races[0].Status > 2
-        && --*w16(0x5D4E) == 0) {
+    if (ds.Game_StaffHired[3] != 0 && ds.Intel_Race2Done1 == 0 && ds.Intel_Race2Timer1 > 0
+        && (ds.Advisor_TrainingTimer == 0 || ds.Advisor_TrainingKind != 4)
+        && ds.Races_Races[0].Status > 2 && --ds.Intel_Race2Timer1 == 0) {
         if (product(8)->State == 5)
             AlienTalk_StartAlienTalk(2);
         else
             Message_ShowMessageLine(6);
     }
-    if (tick(0x5D52)) {
+    if (tick(&ds.Intel_DevAwayTimer)) {
         Message_ShowMessageLine(8);
         if (ds.Game_CurrentScreen == 1) {
-            *b8(0x7E29) = 1;  // Command
+            ds.Command_ShowHologramOnEntry = 1;
             ds.Game_PrevScreen = 1;
             ds.Game_CurrentScreen = -1;
             ds.Game_ScreenSwitch = 1;
         }
         Intel_GrantInvention(9);
     }
-    if (*b8(0x5D56) == 0 && *w16(0x5D54) > 0 && ds.Races_Races[0].Status > 2) {
-        (*w16(0x5D54))--;
-        if (*w16(0x5D54) == 0) {
+    if (ds.Intel_Race2Done2 == 0 && ds.Intel_Race2Timer2 > 0 && ds.Races_Races[0].Status > 2) {
+        ds.Intel_Race2Timer2--;
+        if (ds.Intel_Race2Timer2 == 0) {
             if (product(8)->State == 5) {
                 Message_ShowMessageLine(9);
                 AlienTalk_StartAlienTalk(3);
@@ -1461,123 +1458,128 @@ void Sim_ProcessStoryTimers(void)
                 Message_ShowMessageLine(6);
             }
         }
-        if (*w16(0x5D54) == 0)
-            *b8(0x5D56) = 1;
+        if (ds.Intel_Race2Timer2 == 0)
+            ds.Intel_Race2Done2 = 1;
     }
-    if (*b8(0x5D5A) == 0 && *w16(0x5D58) > 0
-        && (ds.Races_Races[0].Status == 0 || ds.Races_Races[0].Status > 2) && --*w16(0x5D58) == 0) {
+    if (ds.Intel_Race2Done3 == 0 && ds.Intel_Race2Timer3 > 0
+        && (ds.Races_Races[0].Status == 0 || ds.Races_Races[0].Status > 2)
+        && --ds.Intel_Race2Timer3 == 0) {
         if (product(8)->State == 5) {
             Message_ShowMessageLine(10);
             AlienTalk_StartAlienTalk(4);
         } else {
             Message_ShowMessageLine(6);
         }
-        *b8(0x5D5A) = 1;
-        if (*b8(0x5D5E) == 0)
-            *w16(0x5D5C) = (int16_t)(System_Random(0x32) + 200);
+        ds.Intel_Race2Done3 = 1;
+        if (ds.Intel_Race2Done4 == 0)
+            ds.Intel_Race2Timer4 = (int16_t)(System_Random(0x32) + 200);
         Intel_SetForceTarget(3, 1, 1, 7, 0);
     }
-    if (*b8(0x5D5E) == 0 && tick(0x5D5C)) {
+    if (ds.Intel_Race2Done4 == 0 && tick(&ds.Intel_Race2Timer4)) {
         if (ds.Races_Races[0].Status > 0)
             Message_ShowMessageLine(0xB);
         if (ds.Races_Races[0].Status > 0)
             AlienTalk_StartAlienScene(1);
         Intel_EliminateRace(2);
         Intel_ClaimBodyForRace(3, 1, 7, 0);
-        if (*b8(0x5D66) == 0)
-            *w16(0x5D64) = (int16_t)(System_Random(0x32) + 600);
-        if (*b8(0x5D62) == 0)
-            *w16(0x5D60) = (int16_t)(System_Random(0x32) + 300);
-        if (*b8(0x5D6C) == 0)
-            *w16(0x5D6A) = (int16_t)(System_Random(200) + 0x708);
-        *b8(0x5D5E) = 1;
+        if (ds.Intel_MorgrulAttack1Done == 0)
+            ds.Intel_MorgrulAttack1Timer = (int16_t)(System_Random(0x32) + 600);
+        if (ds.Intel_Invention14Revealed == 0)
+            ds.Intel_Invention14Timer = (int16_t)(System_Random(0x32) + 300);
+        if (ds.Intel_MorgrulAttack2Done == 0)
+            ds.Intel_MorgrulAttack2Timer = (int16_t)(System_Random(200) + 0x708);
+        ds.Intel_Race2Done4 = 1;
         ds.Game_StoryStage = 2;
     }
-    if (*b8(0x5D66) == 0 && tick(0x5D64)) {
+    if (ds.Intel_MorgrulAttack1Done == 0 && tick(&ds.Intel_MorgrulAttack1Timer)) {
         Intel_DispatchForce(3, 1, 1, 5, 0, 2);
-        *b8(0x5D66) = 1;
+        ds.Intel_MorgrulAttack1Done = 1;
     }
-    if (*b8(0x5D62) == 0 && *w16(0x5D60) > 0 && product(14)->State > 0 && ds.Game_StaffExp[3] != 0
-        && *w16(0x5D52) == 0 && *w16(0x5D9E) != 4 && --*w16(0x5D60) == 0) {
+    if (ds.Intel_Invention14Revealed == 0 && ds.Intel_Invention14Timer > 0 && product(14)->State > 0
+        && ds.Game_StaffExp[3] != 0 && ds.Intel_DevAwayTimer == 0 && ds.Advisor_TrainingKind != 4
+        && --ds.Intel_Invention14Timer == 0) {
         Message_ShowMessageLine(0x1E);
-        *b8(0x5D62) = 1;
+        ds.Intel_Invention14Revealed = 1;
     }
-    if (*b8(0x5D6C) == 0 && tick(0x5D6A)) {
+    if (ds.Intel_MorgrulAttack2Done == 0 && tick(&ds.Intel_MorgrulAttack2Timer)) {
         Intel_DispatchForce(3, 2, 1, 5, 0, 2);
-        *b8(0x5D6C) = 1;
-        *b8(0x5D6D) = 1;
-        if (*b8(0x5D74) == 0)
-            *w16(0x5D72) = (int16_t)(System_Random(0x32) + 0x44C);
-        if (*b8(0x5D70) == 0)
-            *w16(0x5D6E) = (int16_t)(System_Random(0x14) + 100);
+        ds.Intel_MorgrulAttack2Done = 1;
+        ds.Intel_MorgrulAttack2Open = 1;
+        if (ds.Intel_MorgrulAttack3Done == 0)
+            ds.Intel_MorgrulAttack3Timer = (int16_t)(System_Random(0x32) + 0x44C);
+        if (ds.Intel_Phoenix1Done == 0)
+            ds.Intel_Phoenix1Timer = (int16_t)(System_Random(0x14) + 100);
     }
-    if (*b8(0x5D70) == 0 && *w16(0x5D6E) > 0 && product(12)->State == 5 && --*w16(0x5D6E) == 0) {
+    if (ds.Intel_Phoenix1Done == 0 && ds.Intel_Phoenix1Timer > 0 && product(12)->State == 5
+        && --ds.Intel_Phoenix1Timer == 0) {
         Message_ShowMessageLine(0x11);
-        *b8(0x5D70) = 1;
-        *b8(0x5D71) = 1;
+        ds.Intel_Phoenix1Done = 1;
+        ds.Intel_Phoenix1Armed = 1;
     }
-    if (*b8(0x5D74) == 0 && tick(0x5D72)) {
+    if (ds.Intel_MorgrulAttack3Done == 0 && tick(&ds.Intel_MorgrulAttack3Timer)) {
         Intel_DispatchForce(3, 3, 1, 5, 0, 2);
-        *b8(0x5D74) = 1;
-        *b8(0x5D75) = 1;
-        if (*b8(0x5D88) == 0)
-            *w16(0x5D86) = (int16_t)(System_Random(0x32) + 0x32);
+        ds.Intel_MorgrulAttack3Done = 1;
+        ds.Intel_MorgrulAttack3Open = 1;
+        if (ds.Intel_Msg14Done == 0)
+            ds.Intel_Msg14Timer = (int16_t)(System_Random(0x32) + 0x32);
         Intel_ScheduleForceLaunch(3, 6, (int16_t)(System_Random(500) + 8000), 2);
     }
-    if (*b8(0x5D78) == 0 && tick(0x5D76)) {
-        *b8(0x5D78) = 1;
-        *b8(0x5D3E) = 1;
-        if (*b8(0x5D7C) == 0)
-            *w16(0x5D7A) = (int16_t)(System_Random(0x32) + 4000);
+    if (ds.Intel_Race4Done == 0 && tick(&ds.Intel_Race4Timer)) {
+        ds.Intel_Race4Done = 1;
+        ds.Intel_KallForceSent = 1;
+        if (ds.Intel_KallTurnDone == 0)
+            ds.Intel_KallTurnTimer = (int16_t)(System_Random(0x32) + 4000);
         Intel_SetForceTarget(4, 2, 2, 5, 0);
     }
-    if (*b8(0x5D7C) == 0 && tick(0x5D7A)) {
-        *b8(0x5D7C) = 1;
-        *b8(0x5D3E) = 0;
-        if (*b8(0x5D80) == 0)
-            *w16(0x5D7E) = (int16_t)(System_Random(0x32) + 300);
+    if (ds.Intel_KallTurnDone == 0 && tick(&ds.Intel_KallTurnTimer)) {
+        ds.Intel_KallTurnDone = 1;
+        ds.Intel_KallForceSent = 0;
+        if (ds.Intel_JointAttackDone == 0)
+            ds.Intel_JointAttackTimer = (int16_t)(System_Random(0x32) + 300);
         ds.Races_Races[2].Status = 2;
         Intel_SetForceTarget(3, 4, 2, 5, 0);
         Message_ShowMessageLine(0x18);
         Intel_EliminateRace(5);
     }
-    if (*b8(0x5D80) == 0 && tick(0x5D7E)) {
-        *b8(0x5D80) = 1;
+    if (ds.Intel_JointAttackDone == 0 && tick(&ds.Intel_JointAttackTimer)) {
+        ds.Intel_JointAttackDone = 1;
         Intel_DispatchForce(3, 4, 1, 5, 0, 2);
         Intel_DispatchForce(4, 2, 1, 5, 0, 2);
     }
-    if (*b8(0x5D84) == 0 && *w16(0x5D82) > 0 && ds.Races_Races[3].Status > 2 && --*w16(0x5D82) == 0) {
-        *b8(0x5D84) = 1;
+    if (ds.Intel_Race5Done == 0 && ds.Intel_Race5Timer > 0 && ds.Races_Races[3].Status > 2
+        && --ds.Intel_Race5Timer == 0) {
+        ds.Intel_Race5Done = 1;
         AlienTalk_StartAlienTalk(7);
     }
-    if (*b8(0x5D88) == 0 && tick(0x5D86)) {
-        *b8(0x5D88) = 1;
+    if (ds.Intel_Msg14Done == 0 && tick(&ds.Intel_Msg14Timer)) {
+        ds.Intel_Msg14Done = 1;
         Message_ShowMessageLine(0x14);
     }
-    if (ds.Galaxy_SystemStatus[2] < 0 && tick(0x5D8A)) {
+    if (ds.Galaxy_SystemStatus[2] < 0 && tick(&ds.Intel_System3Timer)) {
         ds.Galaxy_SystemStatus[2] = 0;
         Message_ShowMessageLine(0x25);
     }
-    if (*b8(0x5D94) == 0 && *w16(0x5D92) > 0 && *observatories(4) > 0 && --*w16(0x5D92) == 0) {
-        *b8(0x5D94) = 1;
-        *b8(0x5D95) = 1;
+    if (ds.Intel_System4Warned == 0 && ds.Intel_System4WarnTimer > 0 && *observatories(4) > 0
+        && --ds.Intel_System4WarnTimer == 0) {
+        ds.Intel_System4Warned = 1;
+        ds.Intel_System4TalkArmed = 1;
         Message_ShowMessageLine(0x19);
-        if (*b8(0x5D90) == 0)
-            *w16(0x5D8E) = (int16_t)(System_Random(100) + 1000);
+        if (ds.Intel_System4Destroyed == 0)
+            ds.Intel_System4DestroyTimer = (int16_t)(System_Random(100) + 1000);
     }
-    if (*b8(0x5D90) == 0 && tick(0x5D8E)) {
-        *b8(0x5D90) = 1;
-        *w16(0x5D92) = 0;
+    if (ds.Intel_System4Destroyed == 0 && tick(&ds.Intel_System4DestroyTimer)) {
+        ds.Intel_System4Destroyed = 1;
+        ds.Intel_System4WarnTimer = 0;
         Message_ShowMessageLine(0x1B);
         AlienTalk_StartAlienScene(7);
         Intel_AnnihilateSystem4();
     }
-    if (*b8(0x5D98) == 0 && tick(0x5D96)) {
+    if (ds.Intel_Race7to10Done == 0 && tick(&ds.Intel_Race7to10Timer)) {
         Intel_DispatchForce(7, 1, 1, 5, 0, 2);
-        *b8(0x5D98) = 1;
+        ds.Intel_Race7to10Done = 1;
         Intel_ScheduleForceLaunch(8, 1, (int16_t)(System_Random(500) + 1000), 2);
     }
-    if (tick(0x5D40)) {  // Intel_LaunchTimer
+    if (tick(&ds.Intel_LaunchTimer)) {
         if (race(ds.Intel_LaunchRace)->Status == 2)
             Intel_DispatchForceNow(ds.Intel_LaunchRace, ds.Intel_LaunchForce, 1, 5, 0, 2,
                                    ds.Intel_LaunchMission);

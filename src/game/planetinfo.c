@@ -18,77 +18,36 @@ int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int
 #define PS(p) ((const uint8_t *)(p))
 
 // ---------------------------------------------------------------------------
-// Unnamed globals of the unit.
+// System view state
 // ---------------------------------------------------------------------------
-// System view buffers (far pointers): the background picture (hatter1/2,
-// 320x151), the icon sheet (hatter3/4, 320x75), the planet and moon sprite
-// sheet (planets\napr<system>), the frame being composed and the two scaled
-// sprite buffers.
-#define SV_BACKDROP (*(FarPtr *)ds_at(0x7B0E))
-#define SV_ICONS (*(FarPtr *)ds_at(0x7B12))
-#define SV_SPRITES (*(FarPtr *)ds_at(0x7B16))
-#define SV_FRAME (*(FarPtr *)ds_at(0x7B1A))
-#define SV_MOON (*(FarPtr *)ds_at(0x7B1E))
-#define SV_PLANET (*(FarPtr *)ds_at(0x7B22))
-// Set by SetupSystemViewHotspots when CurSystem is 4 and the byte at DS:5D90
-// (just before Research_Products) is set: the bodies are not drawn and the
-// body hotspots are not active.
-#define SV_HIDDEN (*(uint8_t *)ds_at(0x7B26))
-// Selected body marker: 7C38 = body number (1 = the planet, k + 1 = moon k),
-// 7C42/7C44 = its system and planet.
-#define SV_MARK_BODY (*(int16_t *)ds_at(0x7C38))
-#define SV_MARK_SYS (*(int16_t *)ds_at(0x7C42))
-#define SV_MARK_PLANET (*(int16_t *)ds_at(0x7C44))
-// Selected entry (1..18) of the fleet/group hotspot table, 0 = none.
-#define SV_SELECTED (*(int16_t *)ds_at(0x7C36))
-// Countdown (20..0) of the blinking frame in the unknown-system view.
-#define SV_BLINK (*(int16_t *)ds_at(0x7C46))
-// The body has fleets / a base the player can see, to draw the group table.
-#define SV_HAS_GROUPS (*(uint8_t *)ds_at(0x7C48))
-#define SV_HAS_BASE (*(uint8_t *)ds_at(0x7C49))
-// Hotspot found by Mouse_HitTestCursor in RenderSystemView.
-#define SV_HIT (*(int16_t *)ds_at(0x919C))
+// PlanetInfo_Backdrop/Icons/Sprites: the system view's pictures (hatter1/2,
+// hatter3/4, planets\napr<system>); Frame: the frame being composed;
+// MoonSprite/PlanetSprite: the scaled sprites. PlanetInfo_Orbits[k]: where
+// body k is drawn (TOrbit). Launch_SystemViewTable[1..18]: the fleets
+// behind hotspots 1..18; Launch_SelectedEntry: the selected one (0 = none).
+// Launch_SavedSystem/SavedPlanet/SavedBody: the marked body (1 = the planet,
+// k + 1 = moon k).
 
-// Per-body orbit record: DS:7B28 + 18 * k (k = 1 for the planet or moon 1 ...
-// 8). rx/ry: orbit radii from the name table, ang: tenths of a degree, speed:
-// the body's Size, x/y/size/half: where and how big it is drawn, icon: the
-// BodyIcon byte, flag: marker for the status (1 = known, owner + 1 =
-// alien, 2 = player's).
-typedef struct OrbitRec {
-    int16_t rx;
-    int16_t ry;
-    int16_t ang;
-    uint16_t speed;
-    int16_t x;
-    uint16_t y;
-    int16_t size;
-    int16_t half;
-    uint8_t icon;
-    uint8_t flag;
-} OrbitRec;
-static_assert(sizeof(OrbitRec) == 18);
-
-static OrbitRec *orbit(int16_t k)
+static TOrbit *orbit(int16_t k)
 {
-    return (OrbitRec *)ds_at((uint16_t)(0x7B28 + k * 18));
+    return &ds.PlanetInfo_Orbits[k];
 }
 
-// Fleet table entries at DS:7BC4 + 6 * i (i = 1..18): the group kind (0 =
-// none), its number and its moon.
-typedef struct GroupTab {
-    int16_t kind;
-    int16_t idx;
-    int16_t moon;
-} GroupTab;
-static GroupTab *group_tab(int16_t i)
+static TViewGroup *group_tab(int16_t i)
 {
-    return (GroupTab *)ds_at((uint16_t)(0x7BC4 + i * 6));
+    return &ds.Launch_SystemViewTable[i - 1];
 }
 
-// Sine table, 360 longints (DS:7FD4), scaled by 500.
+// Launch_SelectedEntry, signed as the original compares it.
+static int16_t selected_entry(void)
+{
+    return (int16_t)ds.Launch_SelectedEntry;
+}
+
+// Vec3D's cosine table, read as sines with the angle shifted (scaled by 500).
 static int32_t sin_tab(int16_t i)
 {
-    return *(int32_t *)ds_at((uint16_t)(0x7FD4 + i * 4));
+    return ds.Vec3D_CosTable[i];
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +79,27 @@ static uint8_t *buf_at(FarPtr p, int32_t delta)
 static uint8_t *buf_at_wrapped(FarPtr p, int32_t delta)
 {
     return far_host(far_add(p, delta));
+}
+
+// The system view's pictures.
+static uint8_t *icons_at(int32_t delta)
+{
+    return buf_at(ds.PlanetInfo_Icons, delta);
+}
+
+static uint8_t *sprites_at(int32_t delta)
+{
+    return buf_at(ds.PlanetInfo_Sprites, delta);
+}
+
+static uint8_t *frame_at(int32_t delta)
+{
+    return buf_at(ds.PlanetInfo_Frame, delta);
+}
+
+static uint8_t *frame_at_wrapped(int32_t delta)
+{
+    return buf_at_wrapped(ds.PlanetInfo_Frame, delta);
 }
 
 static uint8_t *screen_at(uint16_t off)
@@ -159,14 +139,21 @@ static int16_t moon_body(int16_t sys, int16_t planet, int16_t moon)
 // Surface::Tileset[SurfaceType], then SurfaceColonisable of that.
 static bool colonisable(const TBody *b)
 {
-    int16_t tileset = *(int16_t *)ds_at((uint16_t)(0x1A38 + (int8_t)b->SurfaceType * 2));
+    int16_t tileset = ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
     return ds.Galaxy_SurfaceColonisable[tileset - 1] != 0;
 }
 
-// Races[owner].Status, read raw as owners 0 and 1 index below the array.
+// The bytes of Races[owner] (2..12). Owners 0 and 1 index below the array
+// (into Surface_BuildingTypes) and owners above 12 past it; the original
+// reads them all the same.
+static const uint8_t *race_bytes(int16_t owner)
+{
+    return (const uint8_t *)&ds + offsetof(DSeg, Races_Races) + (owner - 2) * (int)sizeof(TRace);
+}
+
 static int8_t race_status(uint8_t owner)
 {
-    return *(int8_t *)ds_at((uint16_t)(0x6A21 + owner * 0xE4));
+    return (int8_t)race_bytes(owner)[offsetof(TRace, Status)];
 }
 
 // dst := a + b (the original's StrLoad, StrConcat, StrStore sequence).
@@ -274,7 +261,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
             System_StrStore(PSTR("ALIEN "), &text, 0x3C);
         } else {
             // Races[owner].Name; owner can exceed the 12 races only in damaged data.
-            str_cat2(&text, 0x3C, (const PString *)ds_at((uint16_t)(0x6A06 + owner * 0xE4)), PSTR(" "));
+            str_cat2(&text, 0x3C, (const PString *)race_bytes(owner), PSTR(" "));
         }
     }
     if (cur_moon() == 0) {
@@ -500,20 +487,21 @@ void PlanetInfo_DrawPlanetInfoScreen(void)
 
     // The sprite sheet is only needed here; the global pointer is reused as in
     // the original (InitSystemView allocates it again).
-    SV_SPRITES = System_GetMem(0x5500);
+    ds.PlanetInfo_Sprites = System_GetMem(0x5500);
     numbered_name(&tmp, PSTR("planets\\napr"), ds.Game_CurSystem);
-    Gfx_LoadPic(PS(&tmp), far_host(SV_SPRITES), 1, 0x44, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6F, 0x80, 0, 0xBE);
+    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Sprites), 1, 0x44, 0, 0, 0x140, false,
+                Gfx_PalettePtr(), 0, 0x6F, 0x80, 0, 0xBE);
     Mouse_HideCursor();
     if (cur_moon() == 0) {
-        Blit_BlitTransparent(buf_at(SV_SPRITES, (cur_planet() - 1) * 0x20 + 0x180), screen_at(0x834D), 0x20,
+        Blit_BlitTransparent(sprites_at((cur_planet() - 1) * 0x20 + 0x180), screen_at(0x834D), 0x20,
                              0x20, 0x80);
     } else {
         int16_t m = (int16_t)(moon_body(ds.Game_CurSystem, cur_planet(), cur_moon())
                               - ds.Galaxy_PlanetCount[ds.Game_CurSystem - 1]);
-        Blit_BlitTransparent(buf_at(SV_SPRITES, ((m - 1) / 0xE) * 0x1540 + ((m - 1) % 0xE) * 0x11 + 0x2AC2),
+        Blit_BlitTransparent(sprites_at(((m - 1) / 0xE) * 0x1540 + ((m - 1) % 0xE) * 0x11 + 0x2AC2),
                              screen_at(0x8D55), 0x10, 0x10, 0x80);
     }
-    System_FreeMem(SV_SPRITES, 0x5500);
+    System_FreeMem(ds.PlanetInfo_Sprites, 0x5500);
     Mouse_ShowCursor();
     PlanetInfo_DrawPlanetInfoText();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -580,10 +568,11 @@ void PlanetInfo_DrawAlienInfoScreen(void)
 void PlanetInfo_DrawStoresList(void)
 {
     const TBody *b = far_host(ds.Game_CurBody);
-    if (b->_09 != 0 || ((int8_t)b->Owner > 1 && *(uint8_t *)ds_at((uint16_t)(0x6517 + b->Owner)) == 2)) {
+    if (b->_09 != 0 || ((int8_t)b->Owner > 1 && ds.Races_Hostile[b->Owner - 1] == 2)) {
         // BUG? Bytes 13h..1Ah of the race record (typed as KnownSystems) are
-        // read as "has this resource / product" flags.
-        const uint8_t *race = (const uint8_t *)ds_at((uint16_t)(0x6A06 + (int8_t)b->Owner * 0xE4));
+        // read as "has this resource / product" flags, also for owners 0
+        // and 1 when there is a spy ship (_09).
+        const uint8_t *race = race_bytes((int8_t)b->Owner);
         PString s;
         for (int16_t k = 1; k <= 4; k++) {
             int16_t y = (int16_t)((k - 1) * 9 + 0x9C);
@@ -718,10 +707,11 @@ static TBuilding *building_at(int16_t i)
 }
 
 // TBuildingType of a building kind; kind 0 is not a real type but the
-// original indexes it all the same (Kind * 3Fh + 6553h).
+// original indexes it all the same (the 63 bytes before the table).
 static const TBuildingType *kind_type(uint8_t kind)
 {
-    return (const TBuildingType *)ds_at((uint16_t)(0x6592 - 0x3F + kind * 0x3F));
+    return (const TBuildingType *)((const uint8_t *)&ds + offsetof(DSeg, Surface_BuildingTypes)
+                                   + (kind - 1) * (int)sizeof(TBuildingType));
 }
 
 static bool on_body(const PowerCtx *c, const TBuilding *b)
@@ -871,17 +861,17 @@ static uint8_t body_flag(const TBody *b)
     return flag;
 }
 
-// Sets SV_HAS_BASE when the body has something the player can see.
+// Sets PlanetInfo_HasBase when the body has something the player can see.
 static void note_base(const TBody *b)
 {
     if (b->Owner > 1 && b->Colony != 0 && race_status(b->Owner) == 6)
-        SV_HAS_BASE = 1;
+        ds.PlanetInfo_HasBase = 1;
     if (b->Owner == 1 && b->Colony != 0)
-        SV_HAS_BASE = 1;
+        ds.PlanetInfo_HasBase = 1;
     if (b->Owner == 1 && b->_0A != 0)
-        SV_HAS_BASE = 1;
+        ds.PlanetInfo_HasBase = 1;
     if (b->_09 != 0)
-        SV_HAS_BASE = 1;
+        ds.PlanetInfo_HasBase = 1;
 }
 
 static void body_hotspot(int16_t j, const TBodyName *nm, int16_t size, int16_t sys, int16_t planet,
@@ -903,7 +893,7 @@ static void body_hotspot(int16_t j, const TBodyName *nm, int16_t size, int16_t s
 void PlanetInfo_SetupSystemViewHotspots(void)
 {
     int16_t sys = ds.Game_CurSystem;
-    SV_HIDDEN = (sys == 4 && *(uint8_t *)ds_at(0x5D90) != 0) ? 1 : 0;
+    ds.PlanetInfo_BodiesHidden = (sys == 4 && ds.Intel_System4Destroyed != 0) ? 1 : 0;
 
     // Hotspots 1..8: the system list down the right side, once product 14 or
     // 15 is developed and the system is known.
@@ -936,7 +926,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             ds.Mouse_HotspotCount = 0x13;
         else
             ds.Mouse_HotspotCount = (int16_t)(ds.Galaxy_PlanetCount[sys - 1] + 0x13);
-        if (SV_HIDDEN != 0)
+        if (ds.PlanetInfo_BodiesHidden != 0)
             ds.Mouse_HotspotCount = 0x12;
         int16_t planets = ds.Galaxy_PlanetCount[sys - 1];
         for (int16_t k = 1; k <= planets; k++)
@@ -959,20 +949,20 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             // is Bodies[sys][CurPlanet - 1] = Bodies[sys][-1] as CurPlanet is
             // 0 in this branch.
             const TBody *b = body_at(sys, cur_planet());
-            orbit(8)->flag = 0;
+            orbit(8)->Flag = 0;
             if (b->Owner > 1 && b->InfoLevel > 0x1D)
-                orbit(8)->flag = 1;
+                orbit(8)->Flag = 1;
             if (b->Owner > 1 && b->InfoLevel > 0x27)
-                orbit(8)->flag = (uint8_t)(b->Owner + 1);
+                orbit(8)->Flag = (uint8_t)(b->Owner + 1);
             if (b->Owner == 1)
-                orbit(8)->flag = 2;
+                orbit(8)->Flag = 2;
         }
         return;
     }
 
     // One planet and its moons.
     int16_t planet = cur_planet();
-    SV_HAS_BASE = 0;
+    ds.PlanetInfo_HasBase = 0;
     THotspot *h = Mouse_Hotspot(0x13);
     PString name;
     h->X = 0x90;
@@ -985,7 +975,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
     h->_1A = 5;
     const TBody *pb = body_at(sys, planet);
     note_base(pb);
-    orbit(0)->flag = body_flag(pb);
+    orbit(0)->Flag = body_flag(pb);
 
     int16_t moons = moons_of(sys, planet)->Count;
     for (int16_t k = 1; moons != 0 && k <= moons; k++) {
@@ -993,20 +983,20 @@ void PlanetInfo_SetupSystemViewHotspots(void)
         body_hotspot((int16_t)(k + 0x13), name_at(sys, bodyIdx), 0x10, sys, planet, k);
         const TBody *mb = body_at(sys, bodyIdx);
         note_base(mb);
-        orbit(k)->flag = body_flag(mb);
+        orbit(k)->Flag = body_flag(mb);
     }
     if (planet_status(sys, planet) < 1)
         ds.Mouse_HotspotCount = 0x13;
     else
         ds.Mouse_HotspotCount = (int16_t)(moons_of(sys, planet)->Count + 0x13);
     Mouse_ClearHotspots(1, 0x12);
-    if (SV_HIDDEN != 0)
+    if (ds.PlanetInfo_BodiesHidden != 0)
         ds.Mouse_HotspotCount = 0x12;
 
     // Remember which fleet was selected, to find it again after the rebuild.
-    GroupTab saved = {0, 0, 0};
-    if (SV_SELECTED > 0)
-        saved = *group_tab(SV_SELECTED);
+    TViewGroup saved = {0, 0, 0};
+    if (selected_entry() > 0)
+        saved = *group_tab(selected_entry());
 
     // Hotspots 1..18: the player's fleets here, then the aliens' forces.
     int16_t j = 1;
@@ -1016,31 +1006,32 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             && (grp->Status == 1 || grp->Status == 2 || grp->Status == 3) && j < 0x13) {
             Mouse_SetHotspot(j, (int16_t)(((j - 1) % 2) * 0x20 + 0x101), (uint8_t)(((j - 1) / 2) * 0x10 + 0x32),
                              0x20, 0x10, PS(&grp->Name), 0, 0);
-            GroupTab *t = group_tab(j);
-            t->kind = grp->Kind;
-            t->idx = g;
-            t->moon = grp->Moon;
+            TViewGroup *t = group_tab(j);
+            t->Kind = grp->Kind;
+            t->Index = g;
+            t->Moon = grp->Moon;
             j++;
         }
     }
-    SV_HAS_GROUPS = j > 1;
+    ds.PlanetInfo_HasGroups = j > 1;
     for (int16_t r = 2; r <= 12; r++) {
         const TRace *race = &ds.Races_Races[r - 2];
         if (race->Status == 6 && (int8_t)race->ForceCount > 0) {
             for (int16_t f = 1; f <= (int8_t)race->ForceCount; f++) {
                 const TRaceForce *rf = &race->Forces[f - 1];
                 if (rf->System == ds.Game_CurSystem && rf->Body == cur_planet() && rf->Active == 1)
-                    SV_HAS_GROUPS = 1;
+                    ds.PlanetInfo_HasGroups = 1;
             }
         }
     }
-    if (SV_HAS_BASE != 0 || SV_HAS_GROUPS != 0) {
+    if (ds.PlanetInfo_HasBase != 0 || ds.PlanetInfo_HasGroups != 0) {
         for (int16_t r = 2; r <= 12; r++) {
             const TRace *race = &ds.Races_Races[r - 2];
             // Each race starts at a new row (an odd slot).
             if (!(j & 1))
-                group_tab(j++)->kind = 0;
-            // BUG? j can reach 19, and entry 19 of the table is SV_SELECTED.
+                group_tab(j++)->Kind = 0;
+            // j can reach 19 (entry 19 would be Launch_SelectedEntry), but
+            // only even j are cleared here.
             int16_t nf = (int8_t)race->ForceCount;
             for (int16_t f = 1; nf > 0 && f <= nf; f++) {
                 const TRaceForce *rf = &race->Forces[f - 1];
@@ -1051,10 +1042,10 @@ void PlanetInfo_SetupSystemViewHotspots(void)
                     str_cat3(&fleet, 0xFF, (const PString *)&ds.Names_Races[r - 1], PSTR(" Fleet "), &num);
                     Mouse_SetHotspot(j, (int16_t)(((j - 1) % 2) * 0x20 + 0x101),
                                      (uint8_t)(((j - 1) / 2) * 0x10 + 0x32), 0x20, 0x10, PS(&fleet), 0, 0);
-                    GroupTab *t = group_tab(j);
-                    t->kind = r + 3;
-                    t->idx = f;
-                    t->moon = rf->Moon;
+                    TViewGroup *t = group_tab(j);
+                    t->Kind = r + 3;
+                    t->Index = f;
+                    t->Moon = rf->Moon;
                     j++;
                 }
             }
@@ -1062,13 +1053,13 @@ void PlanetInfo_SetupSystemViewHotspots(void)
     }
     if (j < 0x13) {
         for (int16_t i = j; i <= 0x12; i++)
-            group_tab(i)->kind = 0;
+            group_tab(i)->Kind = 0;
     }
-    if (SV_SELECTED > 0) {
-        SV_SELECTED = 0;
+    if (selected_entry() > 0) {
+        ds.Launch_SelectedEntry = 0;
         for (int16_t i = 1; i <= 0x12; i++) {
-            if (saved.kind == group_tab(i)->kind && saved.idx == group_tab(i)->idx)
-                SV_SELECTED = i;
+            if (saved.Kind == group_tab(i)->Kind && saved.Index == group_tab(i)->Index)
+                ds.Launch_SelectedEntry = (uint16_t)i;
         }
     }
 }
@@ -1084,46 +1075,46 @@ void PlanetInfo_LoadSystemViewAssets(void)
 
     System_StrStore(cur_planet() == 0 ? PSTR("hatter1") : PSTR("hatter2"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), far_host(SV_BACKDROP), 1, 0x97, 0, 0, 0x140, true, pal, 0,
+    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Backdrop), 1, 0x97, 0, 0, 0x140, true, pal, 0,
                 0xB0, 0x40, 0, 0xBE);
     System_StrStore(cur_planet() == 0 ? PSTR("hatter3") : PSTR("hatter4"), &s, 0xFF);
     str_cat2(&tmp, 0xFF, PSTR("planets\\"), &s);
-    Gfx_LoadPic(PS(&tmp), far_host(SV_ICONS), 1, 0x4B, 0, 0, 0x140, false, pal, 0,
+    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Icons), 1, 0x4B, 0, 0, 0x140, false, pal, 0,
                 0xB0, 0x40, 0, 0xBE);
     numbered_name(&tmp, PSTR("planets\\napr"), sys);
-    Gfx_LoadPic(PS(&tmp), far_host(SV_SPRITES), 1, 0x44, 0, 0, 0x140, false, pal, 0,
+    Gfx_LoadPic(PS(&tmp), far_host(ds.PlanetInfo_Sprites), 1, 0x44, 0, 0, 0x140, false, pal, 0,
                 0x6F, 0x80, 0, 0xBE);
 
     if (cur_planet() == 0) {
         for (int16_t k = 1; k <= ds.Galaxy_PlanetCount[sys - 1]; k++) {
             const TBodyName *nm = name_at(sys, k);
-            OrbitRec *o = orbit(k);
-            o->rx = nm->X;
-            o->ry = nm->Y;
-            o->ang = (int16_t)System_Random(0xE10);
-            o->speed = nm->Size;
-            o->icon = ds.Galaxy_BodyIcon[sys - 1][k - 1];
+            TOrbit *o = orbit(k);
+            o->RX = nm->X;
+            o->RY = nm->Y;
+            o->Angle = (int16_t)System_Random(0xE10);
+            o->Speed = nm->Size;
+            o->Icon = ds.Galaxy_BodyIcon[sys - 1][k - 1];
         }
     } else {
         int16_t moons = moons_of(sys, cur_planet())->Count;
         for (int16_t k = 1; k <= moons; k++) {
             const TBodyName *nm = name_at(sys, moon_body(sys, cur_planet(), k));
-            OrbitRec *o = orbit(k);
-            o->rx = nm->X;
-            o->ry = nm->Y;
-            o->ang = (int16_t)System_Random(0xE10);
-            o->speed = nm->Size;
+            TOrbit *o = orbit(k);
+            o->RX = nm->X;
+            o->RY = nm->Y;
+            o->Angle = (int16_t)System_Random(0xE10);
+            o->Speed = nm->Size;
         }
     }
-    SV_BLINK = 0;
+    ds.PlanetInfo_BlinkTimer = 0;
 }
 
 // 357b:235a
 void PlanetInfo_InitSystemView(void)
 {
-    SV_BACKDROP = System_GetMem(0xBCC0);
-    SV_ICONS = System_GetMem(24000);
-    SV_SPRITES = System_GetMem(0x6900);
+    ds.PlanetInfo_Backdrop = System_GetMem(0xBCC0);
+    ds.PlanetInfo_Icons = System_GetMem(24000);
+    ds.PlanetInfo_Sprites = System_GetMem(0x6900);
     PlanetInfo_LoadSystemViewAssets();
     PlanetInfo_UpdateOrbitPositions();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -1137,10 +1128,18 @@ void PlanetInfo_ReloadSystemView(void)
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }
 
-// Offset into the 320-wide frame of the top left corner of body record o.
-static int32_t sprite_origin(const OrbitRec *o)
+// Body `body` of the planet view (1 = the planet, k + 1 = moon k) is the
+// marked one.
+static bool is_marked(int16_t body)
 {
-    return (int16_t)((int16_t)(o->y - o->half) * 0x140) + (int16_t)(o->x - o->half);
+    return body == ds.Launch_SavedBody && ds.Game_CurSystem == ds.Launch_SavedSystem
+           && cur_planet() == ds.Launch_SavedPlanet;
+}
+
+// Offset into the 320-wide frame of the top left corner of body record o.
+static int32_t sprite_origin(const TOrbit *o)
+{
+    return (int16_t)((int16_t)(o->Y - o->Half) * 0x140) + (int16_t)(o->X - o->Half);
 }
 
 // 357b:270b
@@ -1150,10 +1149,10 @@ void PlanetInfo_DrawOrbitingPlanet(int16_t k)
     if (ds.Galaxy_SystemStatus[sys - 1] > 0 && planet_status(sys, k) >= 0) {
         // (The original also computes (ang / 71h + 19h) mod 20h into a local
         // here and never uses it.)
-        const OrbitRec *o = orbit(k);
-        Scale_ScaleSprite(buf_at(SV_SPRITES, (k - 1) * 0x20 + 0x180), far_host(SV_PLANET), o->size);
-        Blit_BlitTransparent(far_host(SV_PLANET), buf_at_wrapped(SV_FRAME, sprite_origin(o)), o->size,
-                             o->size, 0x80);
+        const TOrbit *o = orbit(k);
+        uint8_t *sprite = far_host(ds.PlanetInfo_PlanetSprite);
+        Scale_ScaleSprite(sprites_at((k - 1) * 0x20 + 0x180), sprite, o->Size);
+        Blit_BlitTransparent(sprite, frame_at_wrapped(sprite_origin(o)), o->Size, o->Size, 0x80);
     }
 }
 
@@ -1162,69 +1161,69 @@ void PlanetInfo_DrawOrbitingMoon(int16_t k)
 {
     int16_t sys = ds.Game_CurSystem;
     if (planet_status(sys, cur_planet()) > 0) {
-        const OrbitRec *o = orbit(k);
+        const TOrbit *o = orbit(k);
         int16_t m = (int16_t)(moon_body(sys, cur_planet(), k) - ds.Galaxy_PlanetCount[sys - 1]);
-        Scale_ScaleSprite(buf_at(SV_SPRITES, ((m - 1) % 0xE) * 0x11 + 0x2AC2 + ((m - 1) / 0xE) * 0x1540),
-                          far_host(SV_MOON), (int16_t)(o->size << 1));
+        Scale_ScaleSprite(sprites_at(((m - 1) % 0xE) * 0x11 + 0x2AC2 + ((m - 1) / 0xE) * 0x1540),
+                          far_host(ds.PlanetInfo_MoonSprite), (int16_t)(o->Size << 1));
         int32_t origin = sprite_origin(o);
-        Blit_BlitTransparent(far_host(SV_MOON), buf_at_wrapped(SV_FRAME, origin), o->size, o->size,
-                             0x80);
-        if (o->flag != 0) {
-            Blit_BlitTransparent(buf_at(SV_ICONS, 0x2A81 + (o->flag - 1) * 8),
-                                 buf_at_wrapped(SV_FRAME,
-                                                (int16_t)((int16_t)(o->y - o->half - 3) * 0x140)
-                                                    + (int16_t)(o->x - o->half) - 3),
+        Blit_BlitTransparent(far_host(ds.PlanetInfo_MoonSprite), frame_at_wrapped(origin), o->Size,
+                             o->Size, 0x80);
+        if (o->Flag != 0) {
+            Blit_BlitTransparent(icons_at(0x2A81 + (o->Flag - 1) * 8),
+                                 buf_at_wrapped(ds.PlanetInfo_Frame,
+                                                (int16_t)((int16_t)(o->Y - o->Half - 3) * 0x140)
+                                                    + (int16_t)(o->X - o->Half) - 3),
                                  7, 7, 0x40);
         }
-        if (k + 1 == SV_MARK_BODY && sys == SV_MARK_SYS && cur_planet() == SV_MARK_PLANET) {
-            Blit_BlitTransparent(buf_at(SV_ICONS, 0x2AE9),
-                                 buf_at_wrapped(SV_FRAME,
-                                                (int16_t)((int16_t)(o->y - o->half + 9) * 0x140)
-                                                    + (int16_t)(o->x - o->half) - 3),
+        if (is_marked(k + 1)) {
+            Blit_BlitTransparent(icons_at(0x2AE9),
+                                 buf_at_wrapped(ds.PlanetInfo_Frame,
+                                                (int16_t)((int16_t)(o->Y - o->Half + 9) * 0x140)
+                                                    + (int16_t)(o->X - o->Half) - 3),
                                  7, 7, 0x40);
         }
     }
 }
 
-// 357b:29cd: composes one frame in SV_FRAME and copies it to the screen.
+// 357b:29cd: composes one frame in ds.PlanetInfo_Frame and copies it to the screen.
 void PlanetInfo_RenderSystemView(void)
 {
     int16_t sys = ds.Game_CurSystem;
-    SV_FRAME = System_GetMem(0xBCC0);
-    SV_MOON = System_GetMem(0x2A80);
-    SV_PLANET = System_GetMem(0x2A80);
+    ds.PlanetInfo_Frame = System_GetMem(0xBCC0);
+    ds.PlanetInfo_MoonSprite = System_GetMem(0x2A80);
+    ds.PlanetInfo_PlanetSprite = System_GetMem(0x2A80);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = System_MemAvail();
-    Blit_CopyBytes(far_host(SV_BACKDROP), far_host(SV_FRAME), 0xBCC0);
+    Blit_CopyBytes(far_host(ds.PlanetInfo_Backdrop), far_host(ds.PlanetInfo_Frame), 0xBCC0);
 
-    if (SV_HIDDEN == 0) {
+    if (ds.PlanetInfo_BodiesHidden == 0) {
         if (cur_planet() == 0) {
             int16_t n = ds.Galaxy_PlanetCount[sys - 1];
             // Far half of the orbits behind the sun, near half in front.
             for (int16_t k = n; k >= 1; k--) {
-                if (orbit(k)->y < 0x4B)
+                if (orbit(k)->Y < 0x4B)
                     PlanetInfo_DrawOrbitingPlanet(k);
             }
-            Blit_BlitTransparent(buf_at(SV_SPRITES, 0x140), buf_at(SV_FRAME, 0x3640), 0x40, 0x40, 0x80);
+            Blit_BlitTransparent(sprites_at(0x140), frame_at(0x3640), 0x40, 0x40, 0x80);
             for (int16_t k = 1; k <= n; k++) {
-                if (orbit(k)->y > 0x4A)
+                if (orbit(k)->Y > 0x4A)
                     PlanetInfo_DrawOrbitingPlanet(k);
             }
         } else {
             int16_t moons = moons_of(sys, cur_planet())->Count;
             for (int16_t k = moons; k >= 1; k--) {
-                if ((uint16_t)(orbit(k)->y + 8) < 0x4B)
+                if ((uint16_t)(orbit(k)->Y + 8) < 0x4B)
                     PlanetInfo_DrawOrbitingMoon(k);
             }
-            Blit_BlitTransparent(buf_at(SV_SPRITES, 0x180 + (cur_planet() - 1) * 0x20),
-                                 buf_at(SV_FRAME, 0x4A50), 0x20, 0x20, 0x80);
-            if (orbit(0)->flag != 0)
-                Blit_BlitTransparent(buf_at(SV_ICONS, 0x2A81 + (orbit(0)->flag - 1) * 8),
-                                     buf_at(SV_FRAME, 0x4A50), 7, 7, 0x40);
-            if (SV_MARK_BODY == 1 && sys == SV_MARK_SYS && cur_planet() == SV_MARK_PLANET)
-                Blit_BlitTransparent(buf_at(SV_ICONS, 0x2AE9), buf_at(SV_FRAME, 0x6E90), 7, 7, 0x40);
+            Blit_BlitTransparent(sprites_at(0x180 + (cur_planet() - 1) * 0x20),
+                                 frame_at(0x4A50), 0x20, 0x20, 0x80);
+            if (orbit(0)->Flag != 0)
+                Blit_BlitTransparent(icons_at(0x2A81 + (orbit(0)->Flag - 1) * 8),
+                                     frame_at(0x4A50), 7, 7, 0x40);
+            if (is_marked(1))
+                Blit_BlitTransparent(icons_at(0x2AE9), frame_at(0x6E90), 7, 7, 0x40);
             for (int16_t k = 1; k <= moons; k++) {
-                if ((uint16_t)(orbit(k)->y + 8) > 0x4A)
+                if ((uint16_t)(orbit(k)->Y + 8) > 0x4A)
                     PlanetInfo_DrawOrbitingMoon(k);
             }
         }
@@ -1233,59 +1232,63 @@ void PlanetInfo_RenderSystemView(void)
     if (cur_planet() > 0) {
         int8_t status = planet_status(sys, cur_planet());
         if (status == 0)
-            Blit_BlitTransparent(buf_at(SV_ICONS, 0x1742), buf_at(SV_FRAME, 0x74E), 0x21, 9, 0x40);
-        if (status == 1 && SV_HAS_BASE == 0 && SV_HAS_GROUPS == 0)
-            Blit_BlitTransparent(buf_at(SV_ICONS, 0x23C2), buf_at(SV_FRAME, 0x74E), 0x21, 9, 0x40);
+            Blit_BlitTransparent(icons_at(0x1742), frame_at(0x74E), 0x21, 9, 0x40);
+        if (status == 1 && ds.PlanetInfo_HasBase == 0 && ds.PlanetInfo_HasGroups == 0)
+            Blit_BlitTransparent(icons_at(0x23C2), frame_at(0x74E), 0x21, 9, 0x40);
     }
 
     // The list of systems down the right side (screen 7).
     if ((ds.Research_Products[0xD].State == 5 || ds.Research_Products[0xE].State == 5) && cur_planet() == 0) {
         for (int16_t i = 0; i <= 0x12; i++)
-            Blit_FillBytes(buf_at(SV_FRAME, i * 0x140 + (sys - 1) * 0x17C0 + 0x100), 0x40, 0x48);
+            Blit_FillBytes(frame_at(i * 0x140 + (sys - 1) * 0x17C0 + 0x100), 0x40, 0x48);
         for (int16_t k = 1; k <= 8; k++) {
             if (ds.Galaxy_SystemStatus[k - 1] >= 0)
-                Blit_BlitTransparent(buf_at(SV_ICONS, ((k - 1) / 4) * 0x17C0 + ((k - 1) % 4) * 0x40),
-                                     buf_at(SV_FRAME, (k - 1) * 0x17C0 + 0x100), 0x40, 0x13, 0x40);
+                Blit_BlitTransparent(icons_at(((k - 1) / 4) * 0x17C0 + ((k - 1) % 4) * 0x40),
+                                     frame_at((k - 1) * 0x17C0 + 0x100), 0x40, 0x13, 0x40);
         }
     }
 
     // The fleets list of the planet view (screen 18).
-    if (cur_planet() != 0 && (SV_HAS_BASE != 0 || SV_HAS_GROUPS != 0)) {
+    if (cur_planet() != 0 && (ds.PlanetInfo_HasBase != 0 || ds.PlanetInfo_HasGroups != 0)) {
         for (int16_t i = 1; i <= 0x12; i++) {
-            int16_t kind = group_tab(i)->kind;
+            int16_t kind = group_tab(i)->Kind;
             if (kind > 0)
                 Blit_BlitTransparent(
-                    buf_at(SV_ICONS, ((kind - 1) % 10) * 0x20 + 1 + (((kind - 1) / 10) * 0x10 + 1) * 0x140),
-                    buf_at(SV_FRAME, ((i - 1) % 2) * 0x20 + ((i - 1) / 2) * 0x1400 + 0x241), 0x1F, 0xF, 0x40);
+                    icons_at(((kind - 1) % 10) * 0x20 + 1 + (((kind - 1) / 10) * 0x10 + 1) * 0x140),
+                    frame_at(((i - 1) % 2) * 0x20 + ((i - 1) / 2) * 0x1400 + 0x241), 0x1F, 0xF,
+                    0x40);
         }
-        if (SV_SELECTED > 0)
-            Blit_BlitTransparent(buf_at(SV_ICONS, 0x15E1),
-                                 buf_at(SV_FRAME, ((SV_SELECTED - 1) % 2) * 0x1F + ((SV_SELECTED - 1) / 2) * 0x1400
+        int16_t sel = selected_entry();
+        if (sel > 0)
+            Blit_BlitTransparent(icons_at(0x15E1),
+                                 frame_at(((sel - 1) % 2) * 0x1F + ((sel - 1) / 2) * 0x1400
                                                        + 0x241),
                                  0x1F, 0xF, 0x40);
     }
 
-    if (SV_BLINK < 1)
-        SV_BLINK = 0x14;
+    if (ds.PlanetInfo_BlinkTimer < 1)
+        ds.PlanetInfo_BlinkTimer = 0x14;
     else
-        SV_BLINK--;
-    if (ds.Game_CurrentScreen == 0x12 && SV_BLINK > 7) {
-        Blit_BlitTransparent(buf_at(SV_ICONS, 0x2187), buf_at(SV_FRAME, 0xADCA), 0x39, 5, 0x40);
-        Blit_BlitTransparent(buf_at(SV_ICONS, 0x2906), buf_at(SV_FRAME, 0xAE03), 0x39, 5, 0x40);
+        ds.PlanetInfo_BlinkTimer--;
+    if (ds.Game_CurrentScreen == 0x12 && ds.PlanetInfo_BlinkTimer > 7) {
+        Blit_BlitTransparent(icons_at(0x2187), frame_at(0xADCA), 0x39, 5, 0x40);
+        Blit_BlitTransparent(icons_at(0x2906), frame_at(0xAE03), 0x39, 5, 0x40);
     }
 
-    Blit_CopyRect(far_host(SV_FRAME), screen_at(0x3D40), 0x140, 0x97);
-    Mouse_HitTestCursor(&SV_HIT);
+    Blit_CopyRect(far_host(ds.PlanetInfo_Frame), screen_at(0x3D40), 0x140, 0x97);
+    int16_t hit;
+    Mouse_HitTestCursor(&hit);
+    ds.Mouse_ViewHotspot = hit;
     ds.Mouse_SavedCursorShape = ds.Mouse_CursorShape;
-    if (SV_HIT < 0x14)
+    if (hit < 0x14)
         ds.Mouse_CursorShape = 0;
     else
-        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(SV_HIT - 0x14))->_1A;
+        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(hit - 0x14))->_1A;
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = System_MemAvail();
-    System_FreeMem(SV_FRAME, 0xBCC0);
-    System_FreeMem(SV_MOON, 0x2A80);
-    System_FreeMem(SV_PLANET, 0x2A80);
+    System_FreeMem(ds.PlanetInfo_Frame, 0xBCC0);
+    System_FreeMem(ds.PlanetInfo_MoonSprite, 0x2A80);
+    System_FreeMem(ds.PlanetInfo_PlanetSprite, 0x2A80);
 }
 
 // 357b:3010: moves every body along its orbit, then draws the frame.
@@ -1296,30 +1299,30 @@ void PlanetInfo_UpdateOrbitPositions(void)
     for (int16_t k = 1; k <= 8; k++) {
         if (!moonView && planet_status(sys, k) < 0)
             continue;
-        OrbitRec *o = orbit(k);
+        TOrbit *o = orbit(k);
         THotspot *h = Mouse_Hotspot((int16_t)(k + 0x13));
         // The inner planets turn at even angles only.
-        int16_t ang = k < 4 ? (int16_t)((o->ang / 2) << 1) : o->ang;
+        int16_t ang = k < 4 ? (int16_t)((o->Angle / 2) << 1) : o->Angle;
         int16_t a = (int16_t)(ang / 10);
         int16_t b = (int16_t)((a + 0x10E) % 0x168);
-        o->x = (int16_t)(long_div(long_mul(o->rx, sin_tab(a)), 500) + 0xA0);
-        o->y = (uint16_t)(long_div(long_mul((int16_t)o->ry, sin_tab(b)), 500) + 0x4B);
+        o->X = (int16_t)(long_div(long_mul(o->RX, sin_tab(a)), 500) + 0xA0);
+        o->Y = (uint16_t)(long_div(long_mul((int16_t)o->RY, sin_tab(b)), 500) + 0x4B);
         uint16_t sz = (uint16_t)(long_div(long_mul(sin_tab(b), 0x43), 500) + 0x43);
-        o->size = moonView ? (int16_t)((sz >> 4) + 8) : (int16_t)((sz >> 3) + 0x10);
-        o->half = (int16_t)((uint16_t)o->size >> 1);
-        h->X = (int16_t)(o->x - o->half - 3);
-        h->Y = (uint8_t)((uint8_t)o->y - (uint8_t)o->half + 0x2E);
+        o->Size = moonView ? (int16_t)((sz >> 4) + 8) : (int16_t)((sz >> 3) + 0x10);
+        o->Half = (int16_t)((uint16_t)o->Size >> 1);
+        h->X = (int16_t)(o->X - o->Half - 3);
+        h->Y = (uint8_t)((uint8_t)o->Y - (uint8_t)o->Half + 0x2E);
         if (moonView) {
             h->W = 0x10;
             h->H = 0x10;
         } else {
-            h->W = o->size;
-            h->H = (uint8_t)o->size;
+            h->W = o->Size;
+            h->H = (uint8_t)o->Size;
         }
         if (!moonView)
-            o->ang = (int16_t)((int16_t)((o->speed >> 1) + o->ang + 0xE10) % 0xE10);
+            o->Angle = (int16_t)((int16_t)((o->Speed >> 1) + o->Angle + 0xE10) % 0xE10);
         else
-            o->ang = (int16_t)((int16_t)((o->speed >> 2) + o->ang + 0xE10) % 0xE10);
+            o->Angle = (int16_t)((int16_t)((o->Speed >> 2) + o->Angle + 0xE10) % 0xE10);
     }
     PlanetInfo_RenderSystemView();
 }

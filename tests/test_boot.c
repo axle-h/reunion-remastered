@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
     // "New game", then the hero choice (grafika\choise).
     CHECK(run("40:click:160,60;120:quit") == -1);
-    CHECK(*(int16_t *)ds_at(0x5DAA) == 1);  // Game::StartChoice
+    CHECK(ds.Game_StartChoice == 1);
     p = match_percent("choise", 200, 0xFF, 0, 0xFF, 0);
     printf("hero choice: %d%% of choise.pic\n", p);
     CHECK(p >= 95);

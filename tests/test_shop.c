@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     ds.Game_PrevScreen = 3;
     ds.Game_SelInvention = 7;
     Shop_BuildProductList();
-    uint8_t *list = ds_at(0x7AB6);
+    uint8_t *list = ds.Shop_List;
     CHECK(ds.Shop_Count == 3 && list[0] == 3 && list[1] == 7 && list[2] == 21);
     CHECK(ds.Shop_Sel == 2);
     ds.Game_PrevScreen = 4;
@@ -66,19 +66,19 @@ int main(int argc, char *argv[])
     ds.Research_Products[6].Ores[4] = 1;
     ds.Research_Products[6].Ores[5] = 0;
     ds.Shop_Sel = 2;                          // list[1] = product 7
-    int32_t *stock = ds_at(0x7A12 + 4);       // OreStock[1..6]
+    int32_t *stock = ds.Shop_OreStock;
     for (int k = 0; k < 6; k++)
         stock[k] = 1000;
     stock[2] = 22;                            // ore 3: 22 in stock, 5 per piece -> 4 pieces
     ds.Shop_Qty = 9;
     Shop_UpdateOrderOres();
     CHECK(ds.Shop_Qty == 4);
-    int32_t *needed = ds_at(0x79FA + 4);      // OreNeeded[1..6]
+    int32_t *needed = ds.Shop_OreNeeded;
     CHECK(needed[0] == 40 && needed[2] == 20 && needed[4] == 4 && needed[1] == 0);
-    uint8_t *flags = ds_at(0x7A2E);           // would one more piece run out?
+    uint8_t *flags = ds.Shop_OreShort;        // would one more piece run out?
     CHECK(flags[2] == 1 && flags[0] == 0 && flags[4] == 0);   // 25 > 22
     CHECK(pstr_is(&ds.Shop_OreHeader, "Ore needed: (4 pieces )"));
-    PString *line1 = ds_at(0x7A54);
+    PString *line1 = (PString *)&ds.Shop_OreLines[0];
     CHECK(line1->len == ds.Names_Ores[0].len + 6);
     CHECK(SDL_memcmp(line1->s + line1->len - 2, "40", 2) == 0);
     ds.Shop_Qty = 1;

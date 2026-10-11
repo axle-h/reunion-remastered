@@ -10,28 +10,6 @@
 // Not ported yet: see stubs.c.
 bool Intel_IsRaceActive(int16_t race);  // 29b9:1461
 
-// Unnamed globals (see pub.h).
-#define PIRATES_BUF (*(FarPtr *)ds_at(0x773A))
-#define PERSON (*(int16_t *)ds_at(0x7738))
-#define FLAG_TOPICS (*(uint8_t *)ds_at(0x774A))
-#define FLAG(k) (*(uint8_t *)ds_at((uint16_t)(0x774A + (k)))) // 774B..7754
-#define HOVER_ITEM (*(int16_t *)ds_at(0x7758))
-#define HOVER_FROZEN (*(uint8_t *)ds_at(0x775A))
-#define HOVER_COL (*(uint16_t *)ds_at(0x775C))
-#define HOVER_ROW (*(int16_t *)ds_at(0x775E))
-#define NUM_STR ((PString *)ds_at(0x7760)) // string[2]
-#define MENU_IDX (*(int16_t *)ds_at(0x7764))
-#define Q_LINE (*(int16_t *)ds_at(0x7766))
-#define R_LINE (*(int16_t *)ds_at(0x7768))
-#define QCODE (*(int16_t *)ds_at(0x776A))
-#define LINES_BUF (*(FarPtr *)ds_at(0x776C))
-#define OFFER_ITEM (*(int32_t *)ds_at(0x7770))
-#define OFFER_PRICE (*(int32_t *)ds_at(0x7774))
-#define LINE_COUNT (*(int16_t *)ds_at(0x7778))
-#define LINE_MAP(j) (*(uint8_t *)ds_at((uint16_t)(0x7779 + (j))))
-#define LAST_SOUND (*(int16_t *)ds_at(0x7782))
-#define ANIM_BUF (*(FarPtr *)ds_at(0x7784))
-
 static const uint8_t *ps(const PString *p)
 {
     return (const uint8_t *)p;
@@ -45,7 +23,15 @@ static uint8_t *off_ptr(FarPtr base, uint16_t off)
 
 static uint8_t *line_at(int i) // question line i (1..5), string[255]
 {
-    return off_ptr(LINES_BUF, (uint16_t)((i - 1) * 256));
+    return off_ptr(ds.Pub_Lines, (uint16_t)((i - 1) * 256));
+}
+
+// LineItem[j]. The original doesn't check the range: the trader's menu can
+// have more than 8 text lines, and then entries 9.. land in LastSound and
+// AnimSheet. Addressed through DS so the same bytes are read and written.
+static uint8_t *line_item(int16_t j)
+{
+    return (uint8_t *)&ds + offsetof(DSeg, Pub_LineItem) + (j - 1);
 }
 
 // 1fd2:0000
@@ -54,7 +40,7 @@ void Pub_DrawPubSprite(int16_t idx)
     const TPubPerson *p = &ds.Pub_People[idx - 1];
     if ((p->State == 2 || p->State == 3) && p->Timer == 0) {
         Mouse_HideCursor();
-        uint8_t *src = off_ptr(PIRATES_BUF, (uint16_t)(p->SrcY * 0x140 + p->SrcX + 0x141));
+        uint8_t *src = off_ptr(ds.Pub_PiratesSheet, (uint16_t)(p->SrcY * 0x140 + p->SrcX + 0x141));
         uint8_t *dst = gfx_screen() + (uint16_t)((p->Y + 0x31) * 0x140 + p->X + 0x141);
         Blit_BlitTransparent(src, dst, (int16_t)(p->W - 2), (int16_t)(p->H - 2), 0x40);
         Mouse_ShowCursor();
@@ -64,14 +50,14 @@ void Pub_DrawPubSprite(int16_t idx)
 // 1fd2:00d9
 void Pub_LoadPubGraphics(void)
 {
-    PIRATES_BUF = System_GetMem(0xAF00);
-    Gfx_LoadPic(LIT("grafika\\pirates"), far_host(PIRATES_BUF), 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    ds.Pub_PiratesSheet = System_GetMem(0xAF00);
+    Gfx_LoadPic(LIT("grafika\\pirates"), far_host(ds.Pub_PiratesSheet), 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     FarPtr dest = System_GetMem(0xBCC0);
     Gfx_LoadPic(LIT("grafika\\kocsma"), far_host(dest), 1, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(far_host(dest), gfx_screen() + 0x3D40, 0x140, 0x97);
     System_FreeMem(dest, 0xBCC0);
-    ANIM_BUF = System_GetMem(64000);
-    Gfx_LoadPic(LIT("grafika\\kocsmaan"), far_host(ANIM_BUF), 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    ds.Pub_AnimSheet = System_GetMem(64000);
+    Gfx_LoadPic(LIT("grafika\\kocsmaan"), far_host(ds.Pub_AnimSheet), 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     for (int16_t i = 10; i >= 1; i--)
         Pub_DrawPubSprite(i);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -102,27 +88,27 @@ void Pub_SetupPubHotspots(void)
 void Pub_LoadPersonPortrait(void)
 {
     PString suffix, name, num;
-    if (PERSON == 6)
+    if (ds.Pub_Person == 6)
         System_StrStore(PSTR("2"), &suffix, 255);
     else
         suffix.len = 0;
-    LINES_BUF = System_GetMem(0x500);
+    ds.Pub_Lines = System_GetMem(0x500);
     FarPtr buf = System_GetMem(0xBCC0);
     System_StrLoad(&name, PSTR("grafika\\beszed"));
     System_StrConcat(&name, &suffix);
     Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_StrLong(PERSON, 0, NUM_STR, 2);
-    if (PERSON != 6) {
+    System_StrLong(ds.Pub_Person, 0, (PString *)&ds.Pub_PersonStr, 2);
+    if (ds.Pub_Person != 6) {
         System_StrLoad(&name, PSTR("alien\\kocsmb"));
-        System_StrConcat(&name, NUM_STR);
+        System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
         Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x4E, 0, 0, 0x52, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
         Blit_CopyRectStrided(off_ptr(buf, 0x53), off_ptr(buf, 16000), 0x4F, 0x4C, 0x52, 0x140);
         Mouse_HideCursor();
         Blit_BlitTransparent(off_ptr(buf, 16000), gfx_screen() + 0x3D8D, 0x4F, 0x4C, 0x40);
         Mouse_ShowCursor();
     }
-    System_StrLong(ds.Pub_People[PERSON - 1].Portrait, 0, &num, 255);
+    System_StrLong(ds.Pub_People[ds.Pub_Person - 1].Portrait, 0, &num, 255);
     System_StrLoad(&name, PSTR("alien\\alien"));
     System_StrConcat(&name, &num);
     Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0xBE);
@@ -144,8 +130,8 @@ void Pub_SetupTalkHotspot(void)
     System_StrStore(PSTR("Talking"), (PString *)&h->Caption, 0x12);
     h->Repeat_ = 0;
     h->_1A = 0;
-    HOVER_COL = 0xFFFF;
-    HOVER_ROW = (int16_t)0xFFFF;
+    ds.Pub_HoverCol = 0xFFFF;
+    ds.Pub_HoverRow = (int16_t)0xFFFF;
 }
 
 // 1fd2:0544
@@ -153,16 +139,16 @@ void Pub_ReadQuestionCode(void)
 {
     PString name, line, c1;
     System_StrLoad(&name, PSTR("kerdes"));
-    System_StrConcat(&name, NUM_STR);
+    System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
     System_StrConcat(&name, PSTR(".loc"));
-    TextFile_ReadTextLine(ps(&name), Q_LINE, (uint8_t *)&line);
+    TextFile_ReadTextLine(ps(&name), ds.Pub_QuestionLine, (uint8_t *)&line);
     // The code is the first two characters of the line.
     System_CharToStr(&name, line.s[0]);
     System_CharToStr(&c1, line.s[1]);
     System_StrConcat(&name, &c1);
     System_StrStore(&name, &line, 255);
     int16_t code;
-    QCODE = (int16_t)System_ValLong(&line, &code);
+    ds.Pub_QuestionCode = (int16_t)System_ValLong(&line, &code);
 }
 
 // 1fd2:05fe
@@ -171,15 +157,15 @@ void Pub_ShowReply(void)
     PString name, line, t;
     int16_t lines;
     System_StrLoad(&name, PSTR("valasz"));
-    System_StrConcat(&name, NUM_STR);
+    System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
     System_StrConcat(&name, PSTR(".loc"));
-    TextFile_ReadTextLine(ps(&name), R_LINE, (uint8_t *)&line);
-    if (PERSON == 2 && R_LINE > 9 && R_LINE < 0xE) {
+    TextFile_ReadTextLine(ps(&name), ds.Pub_ReplyLine, (uint8_t *)&line);
+    if (ds.Pub_Person == 2 && ds.Pub_ReplyLine > 9 && ds.Pub_ReplyLine < 0xE) {
         // The trader names a price: quantity * unit price of the item.
-        int32_t price = (int32_t)((uint32_t)ds.Pub_ItemQty[OFFER_ITEM - 1]
-                                  * (uint32_t)ds.Pub_ItemPrice[R_LINE - 10]);
-        OFFER_PRICE = price;
-        ds.Pub_People[1].Deal = (uint8_t)((R_LINE - 9) * 0x14 + OFFER_ITEM);
+        int32_t price = (int32_t)((uint32_t)ds.Pub_ItemQty[ds.Pub_OfferItem - 1]
+                                  * (uint32_t)ds.Pub_ItemPrice[ds.Pub_ReplyLine - 10]);
+        ds.Pub_OfferPrice = price;
+        ds.Pub_People[1].Deal = (uint8_t)((ds.Pub_ReplyLine - 9) * 0x14 + ds.Pub_OfferItem);
         System_StrLong(price, 0, &line, 255);
         ds.Pub_CurMenu.Count = 1;
         if (System_Random(2) == 0)
@@ -189,44 +175,44 @@ void Pub_ShowReply(void)
         System_StrConcat(&t, &line);
         System_StrConcat(&t, PSTR(" credits"));
         System_StrStore(&t, &line, 255);
-        System_StrStore(&line, (PString *)far_host(LINES_BUF), 255);
+        System_StrStore(&line, (PString *)far_host(ds.Pub_Lines), 255);
     }
     Mouse_HideCursor();
     Blit_FillRect(6, 0x86, 0xD8, 0x3F, 0x40);
     Mouse_ShowCursor();
-    // The reply's leading code is the next question menu (0 = leave), DS:7764
-    // (1fd2:075f), not the question code at 776A.
-    TextFile_DrawReply(ps(&line), 6, 0x86, 0x24, false, true, &MENU_IDX, &lines);
+    // The reply's leading code is the next question menu (0 = leave), MenuIdx
+    // (1fd2:075f), not QuestionCode.
+    TextFile_DrawReply(ps(&line), 6, 0x86, 0x24, false, true, &ds.Pub_MenuIdx, &lines);
 }
 
 // 1fd2:0788
 void Pub_BuildQuestionMenu(void)
 {
     int16_t lines = 0;
-    LINE_COUNT = 0;
-    FarPtr lists = ds.Pub_MenuLists[PERSON - 1];
-    System_MoveFwd(off_ptr(lists, (uint16_t)(MENU_IDX * 6)), &ds.Pub_CurMenu, 6);
+    ds.Pub_LineCount = 0;
+    FarPtr lists = ds.Pub_MenuLists[ds.Pub_Person - 1];
+    System_MoveFwd(off_ptr(lists, (uint16_t)(ds.Pub_MenuIdx * 6)), &ds.Pub_CurMenu, 6);
     TMenu *m = &ds.Pub_CurMenu;
     // The trader's (2) and the informant's menus list only what is available.
-    if (PERSON == 2 && MENU_IDX == 6) {
-        m->Count = FLAG(1) != 0;
+    if (ds.Pub_Person == 2 && ds.Pub_MenuIdx == 6) {
+        m->Count = ds.Pub_TopicAvail[0] != 0;
         if (m->Count)
             m->Items[0] = 10;
         static const uint8_t topic[5] = {0xB, 0xC, 0xD, 0xE, 0x1A};
         for (int k = 0; k < 5; k++) {
-            if (FLAG(2 + k) != 0) {
+            if (ds.Pub_TopicAvail[1 + k] != 0) {
                 m->Items[m->Count] = (int8_t)topic[k];
                 m->Count++;
             }
         }
     }
-    if (PERSON == 2 && MENU_IDX == 7) {
-        m->Count = FLAG(7) != 0;
+    if (ds.Pub_Person == 2 && ds.Pub_MenuIdx == 7) {
+        m->Count = ds.Pub_TopicAvail[6] != 0;
         if (m->Count)
             m->Items[0] = 0xF;
         static const uint8_t topic[3] = {0x10, 0x11, 0x12};
         for (int k = 0; k < 3; k++) {
-            if (FLAG(8 + k) != 0) {
+            if (ds.Pub_TopicAvail[7 + k] != 0) {
                 m->Items[m->Count] = (int8_t)topic[k];
                 m->Count++;
             }
@@ -236,21 +222,22 @@ void Pub_BuildQuestionMenu(void)
     for (uint16_t i = 1; i <= n && n != 0; i++) {
         PString name;
         System_StrLoad(&name, PSTR("kerdes"));
-        System_StrConcat(&name, NUM_STR);
+        System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
         System_StrConcat(&name, PSTR(".loc"));
         TextFile_ReadTextLine(ps(&name), m->Items[i - 1], line_at(i));
         lines = TextFile_CountLines(line_at(i));
-        for (int16_t j = (int16_t)(LINE_COUNT + 1); j <= LINE_COUNT + lines; j++)
-            LINE_MAP(j) = (uint8_t)i;
-        LINE_COUNT = (int16_t)(LINE_COUNT + lines);
+        for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
+            *line_item(j) = (uint8_t)i;
+        ds.Pub_LineCount = (int16_t)(ds.Pub_LineCount + lines);
     }
-    if (PERSON == 9 && MENU_IDX == 4) {
+    if (ds.Pub_Person == 9 && ds.Pub_MenuIdx == 4) {
         m->Count = 1;
-        TextFile_ReadTextLine(LIT("pirate.txt"), (int16_t)(Pub_FindActiveDeal() + 10), far_host(LINES_BUF));
+        TextFile_ReadTextLine(LIT("pirate.txt"), (int16_t)(Pub_FindActiveDeal() + 10),
+                              far_host(ds.Pub_Lines));
     }
     // BUG? clears as many entries as the last text had lines, not the unused ones.
-    for (int16_t j = (int16_t)(LINE_COUNT + 1); j <= LINE_COUNT + lines; j++)
-        LINE_MAP(j) = 0;
+    for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
+        *line_item(j) = 0;
 }
 
 // 1fd2:09ea
@@ -259,7 +246,8 @@ void Pub_DrawQuestionMenu(void)
     int16_t row = 0, lines = 0;
     uint16_t n = ds.Pub_CurMenu.Count;
     for (uint16_t i = 1; i <= n && n != 0; i++) {
-        TextFile_DrawReply(line_at(i), 6, (int16_t)(row * 9 + 0x86), 0x24, i == (uint16_t)HOVER_ITEM, false, &QCODE, &lines);
+        TextFile_DrawReply(line_at(i), 6, (int16_t)(row * 9 + 0x86), 0x24,
+                           i == (uint16_t)ds.Pub_HoverItem, false, &ds.Pub_QuestionCode, &lines);
         row = (int16_t)(row + lines);
     }
     if (row > 7)
@@ -272,21 +260,21 @@ void Pub_DrawQuestionMenu(void)
 // 1fd2:0a8b
 void Pub_UpdateQuestionHover(void)
 {
-    uint16_t old_col = HOVER_COL;
-    int16_t old_row = HOVER_ROW;
-    if (HOVER_FROZEN == 0) {
-        HOVER_ROW = (int16_t)((ds.Mouse_ClickY - 0x7D) / 9);
-        if (HOVER_ROW < 0)
-            HOVER_ROW = 0;
-        if (LINE_COUNT < HOVER_ROW)
-            HOVER_ROW = 0;
-        HOVER_COL = ds.Mouse_ClickX > 5;
+    uint16_t old_col = ds.Pub_HoverCol;
+    int16_t old_row = ds.Pub_HoverRow;
+    if (ds.Pub_Replied == 0) {
+        ds.Pub_HoverRow = (int16_t)((ds.Mouse_ClickY - 0x7D) / 9);
+        if (ds.Pub_HoverRow < 0)
+            ds.Pub_HoverRow = 0;
+        if (ds.Pub_LineCount < ds.Pub_HoverRow)
+            ds.Pub_HoverRow = 0;
+        ds.Pub_HoverCol = ds.Mouse_ClickX > 5;
         if (ds.Mouse_ClickX > 0xD8)
-            HOVER_COL = 0;
-        HOVER_ITEM = (int16_t)(HOVER_ROW * HOVER_COL);
-        if (HOVER_ITEM > 0)
-            HOVER_ITEM = LINE_MAP(HOVER_ITEM);
-        if (HOVER_COL != old_col || HOVER_ROW != old_row)
+            ds.Pub_HoverCol = 0;
+        ds.Pub_HoverItem = (int16_t)(ds.Pub_HoverRow * ds.Pub_HoverCol);
+        if (ds.Pub_HoverItem > 0)
+            ds.Pub_HoverItem = *line_item(ds.Pub_HoverItem);
+        if (ds.Pub_HoverCol != old_col || ds.Pub_HoverRow != old_row)
             Pub_DrawQuestionMenu();
     }
 }
@@ -294,17 +282,19 @@ void Pub_UpdateQuestionHover(void)
 // 1fd2:0b30
 void Pub_UpdateTopicAvailability(void)
 {
-    FLAG(7) = Intel_IsRaceActive(7);
-    FLAG(8) = Intel_IsRaceActive(8);
-    FLAG(9) = Intel_IsRaceActive(9);
-    FLAG(10) = Intel_IsRaceActive(10);
-    FLAG(5) = FLAG(7) || FLAG(8) || FLAG(9) || FLAG(10);
-    FLAG(1) = Intel_IsRaceActive(3) && ds.Galaxy_SystemStatus[2] > 0;
-    FLAG(2) = Intel_IsRaceActive(4) && ds.Races_Races[1].Status >= 0;
-    FLAG(3) = Intel_IsRaceActive(5) && ds.Races_Races[1].Status >= 0;
-    FLAG(4) = Intel_IsRaceActive(6) && *(uint8_t *)ds_at(0x5D90) == 0;
-    FLAG(6) = Intel_IsRaceActive(0xC);
-    FLAG_TOPICS = FLAG(1) || FLAG(2) || FLAG(3) || FLAG(4) || FLAG(5) || FLAG(6);
+    ds.Pub_TopicAvail[6] = Intel_IsRaceActive(7);
+    ds.Pub_TopicAvail[7] = Intel_IsRaceActive(8);
+    ds.Pub_TopicAvail[8] = Intel_IsRaceActive(9);
+    ds.Pub_TopicAvail[9] = Intel_IsRaceActive(10);
+    ds.Pub_TopicAvail[4] = ds.Pub_TopicAvail[6] || ds.Pub_TopicAvail[7] || ds.Pub_TopicAvail[8]
+                           || ds.Pub_TopicAvail[9];
+    ds.Pub_TopicAvail[0] = Intel_IsRaceActive(3) && ds.Galaxy_SystemStatus[2] > 0;
+    ds.Pub_TopicAvail[1] = Intel_IsRaceActive(4) && ds.Races_Races[1].Status >= 0;
+    ds.Pub_TopicAvail[2] = Intel_IsRaceActive(5) && ds.Races_Races[1].Status >= 0;
+    ds.Pub_TopicAvail[3] = Intel_IsRaceActive(6) && ds.Intel_System4Destroyed == 0;
+    ds.Pub_TopicAvail[5] = Intel_IsRaceActive(0xC);
+    ds.Pub_AnyTopic = ds.Pub_TopicAvail[0] || ds.Pub_TopicAvail[1] || ds.Pub_TopicAvail[2]
+                      || ds.Pub_TopicAvail[3] || ds.Pub_TopicAvail[4] || ds.Pub_TopicAvail[5];
 }
 
 // 1fd2:0c2b
@@ -379,8 +369,8 @@ void Pub_PlayRandomPubSound(void)
         int16_t n;
         do {
             n = (int16_t)(System_Random(8) + 1);
-        } while (LAST_SOUND == n);
-        LAST_SOUND = n;
+        } while (ds.Pub_LastSound == n);
+        ds.Pub_LastSound = n;
         PString num, name;
         System_StrLong(n, 0, &num, 10);
         System_StrLoad(&name, PSTR("local"));
@@ -405,7 +395,7 @@ void Pub_AnimatePubPerson(int16_t idx)
         uint16_t src = (uint16_t)(a->SrcX + a->SrcY * 0x140 + (f % a->FramesPerRow) * a->W
                                   + (f / a->FramesPerRow) * (a->H + 1) * 0x140);
         uint16_t dst = (uint16_t)((a->Y + 0x31) * 0x140 + a->X);
-        Blit_BlitTransparent(off_ptr(ANIM_BUF, src), gfx_screen() + dst, a->W, a->H, 0x40);
+        Blit_BlitTransparent(off_ptr(ds.Pub_AnimSheet, src), gfx_screen() + dst, a->W, a->H, 0x40);
     }
 }
 

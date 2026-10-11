@@ -13,15 +13,6 @@ void Blit_SaveCursorBackground(uint16_t screenOfs, int16_t width, int16_t rows);
 void Blit_RestoreCursorBackground(uint16_t screenOfs, int16_t width, int16_t rows);
 #endif
 
-// Unnamed globals touched by this unit.
-#define G8A7A (*(uint8_t *)ds_at(0x8A7A))  // right-ish button seen while down
-#define G8A7B (*(uint8_t *)ds_at(0x8A7B))  // other button seen while down
-#define G8A80 (*(uint8_t *)ds_at(0x8A80))  // cleared on every poll
-#define G8A84 (*(uint8_t *)ds_at(0x8A84))  // cleared by the callback when no button is down
-#define G8A85 (*(uint8_t *)ds_at(0x8A85))  // button released this poll
-#define G8A86 (*(uint8_t *)ds_at(0x8A86))  // button pressed this poll
-#define G8A87 (*(uint8_t *)ds_at(0x8A87))  // cleared by init
-
 // Does the blit row Blit_HookRow touch the cursor's rows Y..Y+11? The original
 // compares the signed row with Y as an unsigned word, so negative rows never match.
 static bool hook_row_overlaps(void)
@@ -41,13 +32,12 @@ static void callback(void)
         ds.Mouse_X = (int16_t)m.x;
         ds.Mouse_Y = (int16_t)m.y;
     }
-    // Raw bytes at DS:918E..9190. The names follow the original's use, not the
-    // button: BtnRight is bit 0 (left button), BtnOther is bit 1 (right button).
+    // BX bit 0 is the left button, bit 1 the right one.
     ds.Mouse_BtnDown = m.left || m.right;
     ds.Mouse_BtnLeft = m.left;
     ds.Mouse_BtnRight = m.right;
     if (!ds.Mouse_BtnDown)
-        G8A84 = 0;
+        ds.Mouse_LastPushable = 0;
 
     int16_t under;
     Mouse_HitTestCursor(&under);
@@ -182,7 +172,7 @@ void Mouse_InitMouse(void)
     ds.Mouse_Y = 70;
     Mouse_CursorSaveBackground();
     ds.Blit_CursorHook = far_ptr(0x4758, 0x012D);  // Mouse_CursorBlitHook
-    G8A87 = 0;
+    ds.Mouse_CursorHidden = 0;
     timing_set_mouse_hook(retrace_hook);
 }
 
@@ -216,17 +206,17 @@ void Mouse_Poll(void)
     ds.Mouse_Buttons = ds.Mouse_BtnDown;
     ds.Mouse_ClickX = ds.Mouse_X;
     ds.Mouse_ClickY = ds.Mouse_Y;
-    G8A80 = 0;
+    ds.Mouse_QuitFlag = 0;
     if (ds.Mouse_BtnDown) {
-        G8A7A = ds.Mouse_BtnLeft;
-        G8A7B = ds.Mouse_BtnRight;
+        ds.Mouse_HeldLeft = ds.Mouse_BtnLeft;
+        ds.Mouse_HeldRight = ds.Mouse_BtnRight;
     }
     // Swallows one key press (an extended key takes two reads).
     if (Crt_KeyPressed() && Crt_ReadKey() == 0)
         Crt_ReadKey();
     ds.Mouse_ButtonsChanged = old != ds.Mouse_Buttons;
-    G8A85 = ds.Mouse_ButtonsChanged && ds.Mouse_Buttons == 0;
-    G8A86 = ds.Mouse_ButtonsChanged && ds.Mouse_Buttons != 0;
+    ds.Mouse_Released = ds.Mouse_ButtonsChanged && ds.Mouse_Buttons == 0;
+    ds.Mouse_Pressed = ds.Mouse_ButtonsChanged && ds.Mouse_Buttons != 0;
 }
 
 // 4758:04c0

@@ -16,16 +16,6 @@ void PlanetInfo_SelectCurBody(void);                                            
 void PlanetInfo_GetBodyLocationName(PString *result, int16_t sys, int16_t planet, int16_t moon); // 357b:355e
 void Intel_DisbandGroup(int16_t list, int16_t group);                           // 29b9:0b93
 
-// Unnamed globals.
-#define ICONS_PTR (*(FarPtr *)ds_at(0x78A6))   // grafika\benyil slot icons (0x2300 bytes)
-#define PF_PTR (*(FarPtr *)ds_at(0x789C))      // planet force group at the shown group's location
-// GroupsScreen's working variables, globals in the original (2b8d:02bb..0605).
-#define SAVED_CAT (*(int16_t *)ds_at(0x7892))     // SlotCategory before page up / down
-#define SLOT_S (*(int16_t *)ds_at(0x7894))        // ship slot of the clicked button
-#define SLOT_W (*(int16_t *)ds_at(0x7896))        // weapon column
-#define SLOT_AVAIL (*(int16_t *)ds_at(0x7898))    // stock the unit would come from
-#define SLOT_RETURNED (*(int16_t *)ds_at(0x78A2)) // weapons sent back to stock
-
 // Slot layout blobs (Groups::SlotLayouts, found through TypeSlots[kind].Layout[cat]):
 //   byte 0: number of ship slots (rows)     byte 1: number of weapon columns
 //   from byte 2: weapon items of 14 bytes:  product, stock index, string[5], x:word, y:byte, x2:word, y2:byte
@@ -38,11 +28,15 @@ static uint8_t capacity(const uint8_t *layout, int s, int w) { return layout[s *
 
 #define PRODUCT(a) (&ds.Research_Products[(a) - 1])
 
-// Byte tables addressed by Kind at DS:0BE5 .. 0BF9 (rows of Units / slot counts for the
-// empty tests).
-static uint8_t kind_table(uint16_t base, uint8_t kind) { return *(uint8_t *)ds_at(base + kind); }
+// Groups::EmptyTests[table][kind]: rows of Units / slot counts for the empty tests. The
+// original adds Kind to the table's base, so Kind 5 (planet forces) reads the next
+// table's first entry, and for the last table the byte after it (DS:0BFE).
+static uint8_t kind_table(int table, uint8_t kind)
+{
+    return (&ds.Groups_EmptyTests[0][0])[(table - 1) * 4 + kind - 1];
+}
 
-static bool units_empty(const TGroup *g, uint16_t count_tbl, uint16_t row_a, uint16_t row_b)
+static bool units_empty(const TGroup *g, int count_tbl, int row_a, int row_b)
 {
     bool empty = true;
     unsigned count = kind_table(count_tbl, g->Kind);
@@ -76,7 +70,7 @@ static void group_changed(void)
 
 static int16_t *planet_force_item(uint8_t b)
 {
-    return (int16_t *)((uint8_t *)far_host(PF_PTR) + 0x83 + b * 2);
+    return (int16_t *)((uint8_t *)far_host(ds.Groups_PlanetForceList) + 0x83 + b * 2);
 }
 
 // The stock a slot draws from: the home planet's product stock or the planet force's item.
@@ -165,24 +159,24 @@ void Groups_GroupsScreen(void)
     // Page up / down through the slot categories
     if (ds.Game_HotspotHit == 0x19) {
         Sound_PlayButtonSfx((const uint8_t *)PSTR("x"));
-        SAVED_CAT = ds.Groups_SlotCategory;
+        ds.Groups_SavedCategory = ds.Groups_SlotCategory;
         Groups_PrevSlotCategory();
-        if (ds.Groups_SlotCategory < SAVED_CAT) {
+        if (ds.Groups_SlotCategory < ds.Groups_SavedCategory) {
             Groups_SetupGroupsHotspots();
             Groups_DrawGroupPanel(true);
         } else {
-            ds.Groups_SlotCategory = SAVED_CAT;
+            ds.Groups_SlotCategory = ds.Groups_SavedCategory;
         }
     }
     if (ds.Game_HotspotHit == 0x1A) {
         Sound_PlayButtonSfx((const uint8_t *)PSTR("x"));
-        SAVED_CAT = ds.Groups_SlotCategory;
+        ds.Groups_SavedCategory = ds.Groups_SlotCategory;
         Groups_NextSlotCategory();
-        if (SAVED_CAT < ds.Groups_SlotCategory) {
+        if (ds.Groups_SavedCategory < ds.Groups_SlotCategory) {
             Groups_SetupGroupsHotspots();
             Groups_DrawGroupPanel(true);
         } else {
-            ds.Groups_SlotCategory = SAVED_CAT;
+            ds.Groups_SlotCategory = ds.Groups_SavedCategory;
         }
     }
 
@@ -190,35 +184,36 @@ void Groups_GroupsScreen(void)
     if ((uint16_t)ds.Game_HotspotHit > 0x1B && (uint16_t)ds.Game_HotspotHit < 0x21) {
         TGroup *g = Groups_Selected();
         const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
-        SLOT_S = ds.Game_HotspotHit - 0x1B;
+        ds.Groups_SlotShip = ds.Game_HotspotHit - 0x1B;
         // Units[row][j]; row from SlotA
-        uint8_t row = *(uint8_t *)ds_at(0x0BB9 + g->Kind * 4 + ds.Groups_SlotCategory);
-        int16_t *unit = (int16_t *)((uint8_t *)g + row * 0x28 + SLOT_S * 10 - 21);
-        const uint8_t *ship = ship_item(layout, SLOT_S);
+        uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
+        int16_t *unit = (int16_t *)((uint8_t *)g + row * 0x28 + ds.Groups_SlotShip * 10 - 21);
+        const uint8_t *ship = ship_item(layout, ds.Groups_SlotShip);
         if (!ds.Mouse_HeldLeft) {
             if (*unit > 0) {
                 (*unit)--;
                 (*slot_stock(ship))++;
                 int16_t weapons = layout[1];
                 if (weapons >= 1) {
-                    for (SLOT_W = 1;; SLOT_W++) {
-                        int16_t w = SLOT_W;
+                    for (ds.Groups_SlotWeapon = 1;; ds.Groups_SlotWeapon++) {
+                        int16_t w = ds.Groups_SlotWeapon;
                         if (unit[w] > 0) {
                             // Weapons beyond the new capacity go back to stock
-                            SLOT_RETURNED = 0;
-                            while ((int16_t)(capacity(layout, SLOT_S, w) * *unit) < (int16_t)(unit[w] - SLOT_RETURNED))
-                                SLOT_RETURNED++;
-                            unit[w] -= SLOT_RETURNED;
-                            *slot_stock(weapon_item(layout, w)) += SLOT_RETURNED;
+                            ds.Groups_SlotReturned = 0;
+                            while ((int16_t)(capacity(layout, ds.Groups_SlotShip, w) * *unit)
+                                   < (int16_t)(unit[w] - ds.Groups_SlotReturned))
+                                ds.Groups_SlotReturned++;
+                            unit[w] -= ds.Groups_SlotReturned;
+                            *slot_stock(weapon_item(layout, w)) += ds.Groups_SlotReturned;
                         }
-                        if (SLOT_W == weapons)
+                        if (ds.Groups_SlotWeapon == weapons)
                             break;
                     }
                 }
             }
         } else {
-            SLOT_AVAIL = *slot_stock(ship);
-            if (SLOT_AVAIL > 0 && *unit < 1000) {
+            ds.Groups_SlotAvail = *slot_stock(ship);
+            if (ds.Groups_SlotAvail > 0 && *unit < 1000) {
                 (*unit)++;
                 (*slot_stock(ship))--;
             }
@@ -231,11 +226,11 @@ void Groups_GroupsScreen(void)
     if ((uint16_t)ds.Game_HotspotHit > 0x20 && (uint16_t)ds.Game_HotspotHit < 0x35) {
         TGroup *g = Groups_Selected();
         const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
-        uint8_t row = *(uint8_t *)ds_at(0x0BB9 + g->Kind * 4 + ds.Groups_SlotCategory);
+        uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
         uint16_t k = (uint16_t)(ds.Game_HotspotHit - 0x21);
-        SLOT_S = (int16_t)(k / 5 + 1);
-        SLOT_W = (int16_t)(k % 5 + 1);
-        int16_t s = SLOT_S, w = SLOT_W;
+        ds.Groups_SlotShip = (int16_t)(k / 5 + 1);
+        ds.Groups_SlotWeapon = (int16_t)(k % 5 + 1);
+        int16_t s = ds.Groups_SlotShip, w = ds.Groups_SlotWeapon;
         int16_t *unit = (int16_t *)((uint8_t *)g + row * 0x28 + s * 10 - 21);
         const uint8_t *item = weapon_item(layout, w);
         if (!ds.Mouse_HeldLeft) {
@@ -245,8 +240,8 @@ void Groups_GroupsScreen(void)
             }
         } else {
             int16_t sum = (int16_t)(unit[1] + unit[2] + unit[3] + unit[4]);
-            SLOT_AVAIL = *slot_stock(item);
-            if (SLOT_AVAIL > 0 && unit[w] < (int16_t)(capacity(layout, s, w) * unit[0])
+            ds.Groups_SlotAvail = *slot_stock(item);
+            if (ds.Groups_SlotAvail > 0 && unit[w] < (int16_t)(capacity(layout, s, w) * unit[0])
                 && (g->Kind != 4 || sum < unit[0])) {
                 unit[w]++;
                 (*slot_stock(item))--;
@@ -299,15 +294,15 @@ void Groups_NewGroupScreen(void)
 // 2b8d:08bc loads the slot icons
 void Groups_LoadGroupsGfx(void)
 {
-    ICONS_PTR = System_GetMem(0x2300);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), far_host(ICONS_PTR), 1, 0x1C, 0, 0, 0x140,
-                false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    ds.Groups_IconBuffer = System_GetMem(0x2300);
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\benyil"), far_host(ds.Groups_IconBuffer), 1, 0x1C,
+                0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
 }
 
 static uint8_t *screen_at(uint16_t offset) { return gfx_screen() + offset; }
 static const uint8_t *icon_at(uint16_t offset)
 {
-    return (const uint8_t *)far_host(ICONS_PTR) + offset;
+    return (const uint8_t *)far_host(ds.Groups_IconBuffer) + offset;
 }
 
 static void prefix_location(PString *loc, const char *prefix, uint8_t len)
@@ -327,7 +322,7 @@ void Groups_DrawGroupPanel(bool full)
     TGroup *g = Groups_Selected();
     PString loc, tmp, num;
 
-    Gfx_DrawTextF9((const uint8_t *)ds_at(0x591A + g->Kind * 14), 0xDF, 0x38, 0xD);
+    Gfx_DrawTextF9((const uint8_t *)&ds.Groups_TypeNames[g->Kind - 1], 0xDF, 0x38, 0xD);
     Gfx_DrawTextFC((const uint8_t *)&g->Name, 0x18, 0x38, 0x11);
     PlanetInfo_GetBodyLocationName(&tmp, g->System, g->Planet, g->Moon);
     System_StrStore(&tmp, &loc, 255);
@@ -354,22 +349,22 @@ void Groups_DrawGroupPanel(bool full)
             Blit_FillRect(0x83, 0x35, 10, 12, 0x40);
         else
             Blit_CopyRect(icon_at(0x2F), screen_at(0x42C3), 10, 12);
-        // Page up / down arrows for the slot categories (CatRange at DS:0BB4, 2 bytes per kind)
-        if (*(uint8_t *)ds_at(0x0BB2 + g->Kind * 2) < ds.Groups_SlotCategory)
+        // Page up / down arrows for the slot categories (CatRange[kind])
+        if (ds.Groups_CatRange[g->Kind - 1].Lo < ds.Groups_SlotCategory)
             Blit_CopyRect(icon_at(0), screen_at(0x6DE6), 0x11, 0x1C);
         else
             Blit_FillRect(0x126, 0x57, 0x11, 0x1C, 0x40);
-        if (*(uint8_t *)ds_at(0x0BB3 + g->Kind * 2) > ds.Groups_SlotCategory)
+        if (ds.Groups_CatRange[g->Kind - 1].Hi > ds.Groups_SlotCategory)
             Blit_CopyRect(icon_at(0x12), screen_at(0x9C26), 0x11, 0x1C);
         else
             Blit_FillRect(0x126, 0x7C, 0x11, 0x1C, 0x40);
         Mouse_ShowCursor();
     }
 
-    uint8_t row = *(uint8_t *)ds_at(0x0BB9 + g->Kind * 4 + ds.Groups_SlotCategory);
+    uint8_t row = ds.Groups_SlotA[g->Kind - 1][ds.Groups_SlotCategory - 1];
     const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, ds.Groups_SlotCategory));
     int ships = layout[0];
-    int weapons = *(uint8_t *)ds_at(0x0BCD + g->Kind * 4 + ds.Groups_SlotCategory);
+    int weapons = ds.Groups_SlotB[g->Kind - 1][ds.Groups_SlotCategory - 1];
 
     if (full) {
         // Clear the table cells (column headers, ship counts, weapon counts)
@@ -450,7 +445,7 @@ void Groups_SetupGroupsHotspots(void)
     const TGroup *g = Groups_Selected();
     ds.Groups_AtHomePlanet = g->System == 1 && g->Planet == 5 && g->Moon == 0;
     int16_t pf = Groups_FindPlanetForce(g->System, g->Planet, g->Moon);
-    PF_PTR = ds.Game_Groups + (uint16_t)((32 + pf - 1) * (int)sizeof(TGroup));
+    ds.Groups_PlanetForceList = ds.Game_Groups + (uint16_t)((32 + pf - 1) * (int)sizeof(TGroup));
     ds.Game_CurSystem = g->System;
     ds.Game_CurPlanet[ds.Game_CurSystem - 1] = g->Planet;
     ds.Game_CurMoon[ds.Game_CurSystem - 1] = g->Moon;
@@ -474,7 +469,7 @@ void Groups_SetupGroupsHotspots(void)
     const uint8_t *layout = far_host(Groups_SlotLayout(kind, ds.Groups_SlotCategory));
     Mouse_ClearHotspots(8, 0x20);
     int ships = layout[0];
-    int weapons = *(uint8_t *)ds_at(0x0BCD + kind * 4 + ds.Groups_SlotCategory);
+    int weapons = ds.Groups_SlotB[kind - 1][ds.Groups_SlotCategory - 1];
     for (int s = 1; s <= ships; s++) {
         for (int w = 1; w <= weapons; w++) {
             const uint8_t *item = weapon_item(layout, w);
@@ -506,7 +501,7 @@ void Groups_DrawNewGroupNameAndType(void)
 {
     const TGroup *g = Groups_Selected();
     Gfx_DrawTextFC((const uint8_t *)&g->Name, 0x87, 0x5E, 0xE);
-    Gfx_DrawTextFC((const uint8_t *)ds_at(0x591A + g->Kind * 14), 0x87, 0x77, 0xD);
+    Gfx_DrawTextFC((const uint8_t *)&ds.Groups_TypeNames[g->Kind - 1], 0x87, 0x77, 0xD);
 }
 
 // 2b8d:1659
@@ -562,7 +557,7 @@ void Groups_InitGroupOfKind(void)
     for (int cat = 1; cat <= 4; cat++) {
         if (!Groups_SlotUsed(g->Kind, cat))
             continue;
-        uint8_t row = *(uint8_t *)ds_at(0x0BB9 + g->Kind * 4 + cat);
+        uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
         const uint8_t *layout = far_host(Groups_SlotLayout(g->Kind, cat));
         for (int s = 1; s <= layout[0]; s++) {
             int16_t *unit = (int16_t *)((uint8_t *)g + row * 0x28 + s * 10 - 21);
@@ -598,16 +593,16 @@ void Groups_FirstSlotCategory(void)
         ds.Groups_SlotCategory = ds.Groups_SlotCategory % 4 + 1;
 }
 
-// 2b8d:1abb no units in the two ship categories (tables at DS:0BE5 / 0BE9 / 0BED)
+// 2b8d:1abb no units in the two ship categories (EmptyTests 1..3)
 bool Groups_IsGroupEmpty(int16_t list, int16_t group)
 {
-    return units_empty(Groups_At(list, group), 0x0BED, 0x0BE5, 0x0BE9);
+    return units_empty(Groups_At(list, group), 3, 1, 2);
 }
 
-// 2b8d:1bad the same over the other categories (tables at DS:0BF1 / 0BF5 / 0BF9)
+// 2b8d:1bad the same over the other categories (EmptyTests 4..6)
 bool Groups_IsGroupEmptyOfCargo(int16_t list, int16_t group)
 {
-    return units_empty(Groups_At(list, group), 0x0BF9, 0x0BF1, 0x0BF5);
+    return units_empty(Groups_At(list, group), 6, 4, 5);
 }
 
 // 2b8d:1c9f planet-force index at the location (the last match wins), 0 if none

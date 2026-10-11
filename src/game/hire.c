@@ -9,13 +9,6 @@
 
 #include <string.h>
 
-// Unnamed globals.
-#define CANDIDATE (*(int16_t *)ds_at(0x899C))
-#define KIND (*(int16_t *)ds_at(0x899E))
-#define INFO_SHOWN (*(uint8_t *)ds_at(0x89A0))
-// ? staff kind that is not working for us (developer 4 blocks research), word.
-#define KIND_5D9E (*(int16_t *)ds_at(0x5D9E))
-
 static const uint8_t *ps(const PString *p)
 {
     return (const uint8_t *)p;
@@ -58,15 +51,15 @@ static void say(const uint8_t *line)
 void Hire_HireScreen(void)
 {
     if (ds.Game_ScreenEntered) {
-        CANDIDATE = 0;
-        KIND = 1;
-        INFO_SHOWN = 0;
+        ds.Hire_Candidate = 0;
+        ds.Hire_StaffKind = 1;
+        ds.Hire_InfoShown = 0;
         Hire_SetupHireHotspots();
         RawText_LoadSzFace();
     }
     if ((uint16_t)ds.Game_MenuCommand >= 0x32 && (uint16_t)ds.Game_MenuCommand <= 0x35) {
         int16_t kind = (int16_t)(ds.Game_MenuCommand - 0x31);
-        if (KIND != kind) {
+        if (ds.Hire_StaffKind != kind) {
             static const char *const sfx[4] = {"pilots", "builders", "fighters", "develope"};
             const char *n = sfx[kind - 1];
             PString name;
@@ -74,12 +67,12 @@ void Hire_HireScreen(void)
             memcpy(name.s, n, name.len);
             Sound_PlayButtonSfx(ps(&name));
             Gfx_DrawStatusText(LIT(""));
-            CANDIDATE = 0;
+            ds.Hire_Candidate = 0;
             Hire_DrawCandidateFrames();
             Hire_DrawCandidateInfo();
-            KIND = kind;
+            ds.Hire_StaffKind = kind;
             Hire_LoadHireBackground();
-            INFO_SHOWN = 0;
+            ds.Hire_InfoShown = 0;
             Hire_SetupHireHotspots();
         } else {
             Sound_PlayButtonSfx(LIT("x"));
@@ -87,23 +80,23 @@ void Hire_HireScreen(void)
     }
     if (ds.Game_HotspotHit >= 0x15 && ds.Game_HotspotHit <= 0x17) {
         int16_t k = (int16_t)(ds.Game_HotspotHit - 0x14);
-        if (CANDIDATE != k) {
-            INFO_SHOWN = 0;
-            CANDIDATE = 0;
+        if (ds.Hire_Candidate != k) {
+            ds.Hire_InfoShown = 0;
+            ds.Hire_Candidate = 0;
             Hire_DrawCandidateInfo();
-            CANDIDATE = k;
+            ds.Hire_Candidate = k;
             Hire_DrawCandidateFrames();
             Hire_DrawCandidateInfo();
-            INFO_SHOWN = 1;
+            ds.Hire_InfoShown = 1;
         }
     }
     if (ds.Game_MenuCommand != 0x28)
         return;
-    if (CANDIDATE == 0) {
+    if (ds.Hire_Candidate == 0) {
         Sound_PlayButtonSfx(LIT("x"));
         return;
     }
-    int16_t c = CANDIDATE, t = KIND;
+    int16_t c = ds.Hire_Candidate, t = ds.Hire_StaffKind;
     switch (Hire_CheckHire(t, c)) {
     case HIRE_OK: {
         uint16_t h = hired(t);
@@ -124,8 +117,8 @@ void Hire_HireScreen(void)
                 ds.Game_DevSkill[k - 1] = dev_skills(c)[k - 1];
         }
         Gfx_DrawCredits();
-        if (KIND_5D9E == KIND)
-            KIND_5D9E = 0;
+        if (ds.Advisor_TrainingKind == ds.Hire_StaffKind)
+            ds.Advisor_TrainingKind = 0;
         Sound_PlayButtonSfx(LIT("welcome"));
         break;
     }
@@ -143,7 +136,7 @@ void Hire_HireScreen(void)
         Sound_PlayButtonSfx(LIT("hiba"));
         break;
     }
-    INFO_SHOWN = 0;
+    ds.Hire_InfoShown = 0;
 }
 
 // 3fab:0321
@@ -152,7 +145,7 @@ void Hire_LoadHireBackground(void)
     FarPtr buf = System_GetMem(0x8AC0);
     PString name;
     System_StrLoad(&name, PSTR("grafika\\"));
-    System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[KIND - 1]);
+    System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[ds.Hire_StaffKind - 1]);
     Gfx_LoadPic(ps(&name), far_host(buf), 1, 0x6E, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0x8F,
                 0x40, 0, 0x8F);
     Blit_CopyRect((uint8_t *)far_host(buf) + 0x141, gfx_screen() + 0x3E81, 0x140, 0x6D);
@@ -166,8 +159,8 @@ void Hire_DrawCandidateFrames(void)
     static const int16_t x1[3] = {5, 0x6E, 0xD8}, x2[3] = {0x69, 0xD2, 0x13C};
     for (int i = 0; i < 3; i++)
         Gfx_DrawRectOutline(x1[i], 0x32, x2[i], 0xA0, 0xE8);
-    if (CANDIDATE >= 1 && CANDIDATE <= 3)
-        Gfx_DrawRectOutline(x1[CANDIDATE - 1], 0x32, x2[CANDIDATE - 1], 0xA0, 0xE9);
+    if (ds.Hire_Candidate >= 1 && ds.Hire_Candidate <= 3)
+        Gfx_DrawRectOutline(x1[ds.Hire_Candidate - 1], 0x32, x2[ds.Hire_Candidate - 1], 0xA0, 0xE9);
 }
 
 // SzFace record of candidate c of kind t: string[40], string[81], string[40]
@@ -183,11 +176,11 @@ static const uint8_t *face_text(int16_t t, int16_t c, int line)
 // 3fab:048f
 void Hire_DrawCandidateInfo(void)
 {
-    if (CANDIDATE == 0) {
+    if (ds.Hire_Candidate == 0) {
         Blit_FillRect(10, 0xA4, 0x12C, 0x20, 0xF9);
         return;
     }
-    int16_t c = CANDIDATE, t = KIND;
+    int16_t c = ds.Hire_Candidate, t = ds.Hire_StaffKind;
     bool is_hired = c >= 0 && hired(t) == (uint16_t)c;
     PString s, num, tmp;
     if (!is_hired)
@@ -234,7 +227,8 @@ void Hire_SetupHireHotspots(void)
         h->Y = 0x32;
         h->W = 99;
         h->H = 0x6D;
-        System_StrStore((const PString *)&ds.Staff_Names[KIND - 1][i], (PString *)&h->Caption, 0x12);
+        System_StrStore((const PString *)&ds.Staff_Names[ds.Hire_StaffKind - 1][i],
+                        (PString *)&h->Caption, 0x12);
         h->Repeat_ = 0;
         h->_1A = 0;
     }

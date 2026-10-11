@@ -22,9 +22,6 @@ static bool ok = true;
 
 enum : uint32_t { SEED = 12345 };
 
-#define B8(off) (*(const uint8_t *)ds_at(off))
-#define I16(off) (*(const int16_t *)ds_at(off))
-
 static const TProduct *product(int k)
 {
     return &ds.Research_Products[k - 1];
@@ -47,8 +44,8 @@ static void start_talk(void *arg)
     if (t->race == 3) {
         // Meeting 2's own trigger (sim.c ProcessStoryTimers): the hour after
         // next the timer runs out, MSG 9's box shows, then the talk.
-        *(uint16_t *)ds_at(0x5D54) = 1;
-        *(uint8_t *)ds_at(0x5D56) = 0;
+        ds.Intel_Race2Timer2 = 1;
+        ds.Intel_Race2Done2 = 0;
         ds.Races_Races[0].Status = 3;            // Jaanosians met
         ds.Research_Products[7].State = 5;       // Communicator done
         return;
@@ -87,8 +84,8 @@ static void check_talk_effect(const TalkRun *t)
 {
     switch (t->race) {
     case 2:  // scientist away 60-89 h (the Trade ship follows)
-        CHECK(B8(0x5D50) == 1);
-        CHECK(I16(0x5D52) >= 60 && I16(0x5D52) < 90);
+        CHECK(ds.Intel_Race2Done1 == 1);
+        CHECK((int16_t)ds.Intel_DevAwayTimer >= 60 && (int16_t)ds.Intel_DevAwayTimer < 90);
         break;
     case 3:  // -16,000; the alien item (Hyperspace drive) to analyse
         CHECK(t->credits_after == t->credits - 16000);
@@ -104,8 +101,8 @@ static void check_talk_effect(const TalkRun *t)
         CHECK(product(16)->Stock == 10);
         break;
     case 6:  // the Kall turn cancelled
-        CHECK(B8(0x5D3F) == 1);
-        CHECK(I16(0x5D7A) == 0);
+        CHECK(ds.Intel_KallTurnCancelled == 1);
+        CHECK(ds.Intel_KallTurnTimer == 0);
         break;
     case 7:  // Battle tank; New Earth's Energon halved
         CHECK(product(0x15)->State == 5);
@@ -153,8 +150,8 @@ static void start_scene(void *arg)
     if (scene == 1) {
         // The fall of the Jaanosian base by its own timer: MSG 11's box,
         // then the scene.
-        *(uint16_t *)ds_at(0x5D5C) = 1;
-        *(uint8_t *)ds_at(0x5D5E) = 0;
+        ds.Intel_Race2Timer4 = 1;
+        ds.Intel_Race2Done4 = 0;
         ds.Races_Races[0].Status = 3;
         return;
     }
@@ -222,7 +219,7 @@ static void test_pub(void)
     CHECK(pub_asked[1] == 1);
     CHECK(SDL_strcmp(informer_reply, "I can't tell you anything new.") == 0);
     CHECK(pub_asked[2] == 1);
-    CHECK(B8(0x773E) == 1);                               // the Spy-Hunter has been asked
+    CHECK(ds.Pub_StoryFlags[0] == 1);                     // the Spy-Hunter has been asked
     CHECK(pub_asked[3] == 0);
     CHECK(ds.Game_CurrentScreen == 23);
     CHECK(pub_day[1] == pub_day[0]);                      // no tax day in between
@@ -265,9 +262,9 @@ static void test_university(void)
     CHECK(!r.failed);
     CHECK(!r.tainted);
     CHECK(uni_went);
-    CHECK(I16(0x5D9E) == 4);                              // the developer is away
-    CHECK(I16(0x5D9C) >= 50 && I16(0x5D9C) < 70);        // for 50-69 h
-    CHECK(I16(0x5DA0) == 1);                              // Maths & physics
+    CHECK(ds.Advisor_TrainingKind == 4);                  // the developer is away
+    CHECK(ds.Advisor_TrainingTimer >= 50 && ds.Advisor_TrainingTimer < 70); // for 50-69 h
+    CHECK(ds.Advisor_TrainingCourse == 1);                // Maths & physics
     int32_t paid = uni_credits[0] - uni_credits[1];
     printf("university: paid %d at experience %d\n", (int)paid, uni_exp);
     CHECK(paid % 1000 == 0 && paid >= uni_exp * 1000 && paid < (uni_exp + 10) * 1000);

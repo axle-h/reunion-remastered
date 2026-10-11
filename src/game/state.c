@@ -28,40 +28,6 @@ static const char *const layout_fields[] = {
     "GfxPath_ToolbarBlock.FrameSeg", "GfxPath_ToolbarBlock.PageCount",
 };
 
-// Unnamed DS bytes left out for the same reason: far pointers with no name
-// in dseg.h yet, sorted. Found by running the goldens with the PSP and the
-// EMS page frame moved (heap, DS and EMS pointers change; nothing else
-// did), and every constant DS offset the code reads as a far pointer.
-static const struct {
-    uint16_t ofs, size;
-} layout_ranges[] = {
-    {0x7646, 8},         // ground battle: attacker and defender lists
-    {0x7722, 4},         // advisor's menu lines
-    {0x7726, 12},        // disk screen buffers: back, buttons, frame
-    {0x773A, 4},         // pub: pirates picture
-    {0x776C, 4},         // pub: lines
-    {0x7784, 4},         // pub: animation
-    {0x779E, 12},        // space battle: attacker, defender and side lists
-    {0x77AE, 4},         // space battle: the side's count
-    {0x77D6, 4},         // space battle: losses
-    {0x77DC, 16},        // space battle: view, background, sprites, face
-    {0x7812, 4},         // droids: digits
-    {0x7832, 13 * 4},    // cargo: item stores [1..13]
-    {0x7866, 4},         // cargo: planet ore stocks
-    {0x7ADA, 4},         // shop: panel picture
-    {0x7B0E, 6 * 4},     // system view: backdrop, icons, sprites, frame, ...
-    {0x7C4C, 8},         // InputLine: backup copy, edited string
-    {0x7D62, 12},        // GfxPath: initial block, backgrounds, icon scratch
-    {0x7E08, 12},        // command centre: main face, heroes, off-screen buffer
-    {0x7E18, 4},         // command centre: main animation 5
-    {0x7E24, 4},         // command centre: main animation 4
-    {0x7E40, 8},         // Anim's record and definitions
-    {0x7E56, 4 + 18 * 4 + 17 * 4},  // vector models: projected, normals[0..17], vertices[1..17]
-    {0x7F08, 17 * 4},    // vector models: edges[1..17]
-    {0x7F6E, 17 * 4},    // vector models: faces[1..17]
-    {0x8584, 4},         // vector view's off-screen buffer
-};
-
 static bool layout_field(const char *name, const char *sub)
 {
     for (size_t i = 0; i < SDL_arraysize(layout_fields); i++) {
@@ -141,22 +107,6 @@ static void plan_range(const char *name, uint16_t ofs, uint32_t size, uint16_t e
     plan.runs[plan.nruns++].size = size;
 }
 
-// Leaves out the unnamed layout ranges from the bytes ofs..ofs+size-1 of DS.
-static void plan_ds_bytes(const char *name, uint16_t ofs, uint32_t size, uint16_t elem, int16_t rec)
-{
-    for (size_t i = 0; i < SDL_arraysize(layout_ranges); i++) {
-        uint32_t lo = layout_ranges[i].ofs, hi = lo + layout_ranges[i].size;
-        if (hi <= ofs || lo >= ofs + size)
-            continue;
-        if (lo > ofs)
-            plan_range(name, ofs, lo - ofs, 1, -1);
-        if (hi < ofs + size)
-            plan_ds_bytes(name, (uint16_t)hi, ofs + size - hi, 1, -1);
-        return;
-    }
-    plan_range(name, ofs, size, elem, rec);
-}
-
 // A record field whose record holds pointers goes element by element, field
 // by field.
 static bool record_has_layout(int16_t rec, const char *name)
@@ -177,7 +127,7 @@ static void make_plan(void)
         if ((f->flags & DSF_POINTER) || layout_field(f->name, nullptr))
             continue;
         if (!record_has_layout(f->rec, f->name)) {
-            plan_ds_bytes(f->name, f->ofs, f->elem * f->count, f->elem, f->rec);
+            plan_range(f->name, f->ofs, f->elem * f->count, f->elem, f->rec);
             continue;
         }
         const DsRecord *r = &ds_records[f->rec];
@@ -186,7 +136,7 @@ static void make_plan(void)
                 const DsField *sf = &r->fields[k];
                 if ((sf->flags & DSF_POINTER) || layout_field(f->name, sf->name))
                     continue;
-                plan_ds_bytes(f->name, (uint16_t)(f->ofs + e * r->size + sf->ofs), sf->elem * sf->count,
+                plan_range(f->name, (uint16_t)(f->ofs + e * r->size + sf->ofs), sf->elem * sf->count,
                               1, -1);
             }
     }

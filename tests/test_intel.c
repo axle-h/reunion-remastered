@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
     CHECK(c->Owner == 7 && c->Colony == 1 && c->Population == (int32_t)pop);
     CHECK(c->Resistance == 20 && c->TechLevel == 3 && c->Attitude == 30);
     for (int k = 1; k <= 8; k++) {
-        uint8_t base = *(uint8_t *)ds_at((uint16_t)(0x8A7 + k)), range = *(uint8_t *)ds_at((uint16_t)(0x8AF + k));
+        uint8_t base = ds.Intel_Race7Stores[k - 1], range = ds.Intel_Race7StoresRange[k - 1];
         int32_t v = c->Stores[k - 1];
         CHECK(v >= base && v < base + (range ? range : 1));
     }
@@ -309,8 +309,8 @@ int main(int argc, char *argv[])
     Intel_FirstContact(2, &text.len);
     CHECK(Intel_Race(2)->Status == 4 && messages > 0);
     CHECK(ds.Game_IdeaTimer[7] >= 0x14 && ds.Game_IdeaTimer[7] <= 0x14 + 0x13);
-    uint16_t t1 = *(uint16_t *)ds_at(0x5D4E), t2 = *(uint16_t *)ds_at(0x5D54);
-    uint16_t t3 = *(uint16_t *)ds_at(0x5D58), t4 = *(uint16_t *)ds_at(0x5D5C);
+    uint16_t t1 = (uint16_t)ds.Intel_Race2Timer1, t2 = (uint16_t)ds.Intel_Race2Timer2;
+    uint16_t t3 = (uint16_t)ds.Intel_Race2Timer3, t4 = (uint16_t)ds.Intel_Race2Timer4;
     CHECK(t1 >= 0x28A && t1 < 0x28A + 0x46);
     CHECK(t2 >= t1 + 0x2D0 && t2 < t1 + 0x2D0 + 0x32);
     CHECK(t3 >= t2 + 0x4C4 && t3 < t2 + 0x4C4 + 100);
@@ -326,15 +326,15 @@ int main(int argc, char *argv[])
     Intel_FirstContact(4, &text.len);
     CHECK(Intel_Race(4)->Status == 6);
     CHECK(ds.Game_CurrentScreen == 0x22 && ds.AlienTalk_Race == 5 && ds.Game_ScreenSwitch);
-    CHECK(*(uint16_t *)ds_at(0x5D76) >= 0x5DC && *(uint16_t *)ds_at(0x5D76) < 0x5DC + 500);
+    CHECK(ds.Intel_Race4Timer >= 0x5DC && ds.Intel_Race4Timer < 0x5DC + 500);
     for (int rc = 7; rc <= 10; rc++) {
         Intel_FirstContact((int16_t)rc, &text.len);
         CHECK(Intel_Race(rc)->Status == 2);
     }
-    CHECK(*(uint16_t *)ds_at(0x5D96) >= 200 && *(uint16_t *)ds_at(0x5D96) < 250);
+    CHECK(ds.Intel_Race7to10Timer >= 200 && ds.Intel_Race7to10Timer < 250);
     Intel_FirstContact(5, &text.len);
     CHECK(Intel_Race(5)->Status == 4);
-    CHECK(*(uint16_t *)ds_at(0x5D82) >= 0x14 && *(uint16_t *)ds_at(0x5D82) < 0x28);
+    CHECK(ds.Intel_Race5Timer >= 0x14 && ds.Intel_Race5Timer < 0x28);
     Intel_FirstContact(0xB, &text.len);
     CHECK(Intel_Race(0xB)->Status == 6 && ds.AlienTalk_Race == 10);
     seed = 888;
@@ -369,12 +369,12 @@ int main(int argc, char *argv[])
     CHECK(ds.Game_CurrentScreen == 0x21 && ds.AlienTalk_Scene == 7 && ds.Game_ScreenSwitch);
     AlienTalk_StartAlienTalk(11);
     CHECK(ds.Game_CurrentScreen == 0x22 && ds.AlienTalk_Race == 11);
-    CHECK(((PString *)ds_at(0x78B8))->len == 2 && ((PString *)ds_at(0x78B8))->s[0] == '1');
+    CHECK(ds.AlienTalk_RaceStr.len == 2 && ds.AlienTalk_RaceStr.s[0] == '1');
     AlienTalk_SetupTalkHotspots();
     CHECK(ds.Mouse_HotspotCount == 1 && ds.Mouse_Hotspots[0].X == 6 && ds.Mouse_Hotspots[0].Y == 0x86);
     CHECK(ds.Mouse_Hotspots[0].W == 0xD2 && ds.Mouse_Hotspots[0].H == 0x3F);
     CHECK(ds.Mouse_Hotspots[0].Caption.len == 7);
-    CHECK(*(uint16_t *)ds_at(0x78CC) == 0xFFFF && *(int16_t *)ds_at(0x78CE) == -1);
+    CHECK(ds.AlienTalk_HoverCol == 0xFFFF && ds.AlienTalk_HoverRow == -1);
 
     printf(ok ? "intel OK\n" : "intel FAILED\n");
     return ok ? 0 : 1;

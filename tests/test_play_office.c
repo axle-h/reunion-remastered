@@ -317,9 +317,9 @@ int main(int argc, char *argv[])
     CHECK(irq.ready_box);
     CHECK(irq.screen_after_hologram == 1);
     printf("Jade: bits %x, box %d, rename prompt %d, planet status %d\n", irq.rename_bits,
-           irq.jade_box, irq.rename_jade, *(int8_t *)ds_at(0x47CD + 1 * 8 + 7));
+           irq.jade_box, irq.rename_jade, ds.Galaxy_PlanetStatus[1 - 1][7 - 1]);
     CHECK((irq.rename_bits & UI_INT_RENAME) && irq.jade_box && irq.rename_jade);
-    CHECK(*(int8_t *)ds_at(0x47CD + 1 * 8 + 7) == 0);  // Galaxy::PlanetStatus[1, 7]: Jade known
+    CHECK(ds.Galaxy_PlanetStatus[1 - 1][7 - 1] == 0);  // Jade (Amnesty planet 7) known
     for (int i = 0; i < 3; i++) {
         printf("scene %d: bits %x, then screen %d\n", SCENES[i], irq.scene_bits[i],
                irq.screen_after_scene[i]);

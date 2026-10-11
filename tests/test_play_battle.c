@@ -77,7 +77,7 @@ static TGroup *add_army(const char *name, int system, int planet, int moon, int 
 
 static TBody *body(int system, int idx)
 {
-    FarPtr p = *(FarPtr *)ds_at((uint16_t)(0x4752 + system * 4));
+    FarPtr p = ds.Galaxy_Bodies[system - 1];
     return far_host(far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + idx * 0x41 - 0x41)));
 }
 

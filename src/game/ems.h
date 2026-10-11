@@ -13,12 +13,12 @@
 // The TEmsBlock variables the game uses.
 static inline TEmsBlock *Ems_GameDataBlock(void)
 {
-    return (TEmsBlock *)ds_at(0x8A4E);
+    return &ds.Ems_GameData;
 }
 
 static inline TEmsBlock *Ems_ToolbarBlock(void)
 {
-    return (TEmsBlock *)ds_at(0x7DFA);
+    return &ds.GfxPath_ToolbarBlock;
 }
 
 // 4719:0188: makes blk hold the size bytes at src (state 1). The original

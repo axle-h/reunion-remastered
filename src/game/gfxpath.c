@@ -13,16 +13,6 @@
 void Command_TickAmbientLights(void);   // 3abd:14c5
 void Command_TickPanelDoorAnim(void);   // 3abd:1395
 
-// Unnamed globals.
-#define ICON_SIZE (*(uint16_t *)ds_at(0x54CA))     // size of ICON.ALL (from Gfx_IconAllOpenSize)
-#define EXTRA_SIZE (*(uint16_t *)ds_at(0x54CC))    // further bytes of the block
-#define PAGE2_FLAG (*(uint8_t *)ds_at(0x7C62))     // second page of icons in use
-#define CUR_PAGE (*(uint8_t *)ds_at(0x7C63))       // page shown
-#define BLOCK_INIT (*(uint32_t *)ds_at(0x7D62))    // GetMem block handed to EmsMoveToEms
-#define BG_PTR (*(uint32_t *)ds_at(0x7D66))        // cell backgrounds
-#define TMP_PTR (*(uint32_t *)ds_at(0x7D6A))       // 3C0h-byte icon scratch buffer
-#define ICON_INDEX(n) (*(uint16_t *)ds_at((uint16_t)(0x7D72 + (n) * 2)))
-
 enum : uint16_t {
     PAGE_SIZE = 0x2940,   // 33 rows of 320
     BG_OFS = 0x54FF,      // from the end of the icons: background cells
@@ -30,15 +20,21 @@ enum : uint16_t {
     ARROW_PREV = 0x121,
 };
 
-// Slot records (1..12).
-static inline int16_t *slot_id(int slot)
+// Slot records (1..12). The scans for a free or a given slot have no bound:
+// past slot 12 they read on into the globals after MenuBar, as the original.
+static inline TMenuButton *menu_slot(int n)
 {
-    return (int16_t *)ds_at((uint16_t)(0x7C64 + slot * 21));
+    return ds.GfxPath_MenuBar + (n - 1);
 }
 
-static inline uint8_t *slot_label(int slot)
+static inline int16_t *slot_id(int n)
 {
-    return (uint8_t *)ds_at((uint16_t)(0x7C51 + slot * 21));
+    return &menu_slot(n)->Command;
+}
+
+static inline PString *slot_label(int n)
+{
+    return (PString *)&menu_slot(n)->Caption;
 }
 
 static FarPtr block_base(void)
@@ -46,11 +42,11 @@ static FarPtr block_base(void)
     return Ems_ToolbarBlock()->Data;
 }
 
-// block base + ICON_SIZE + extra, the offset wrapping in 16 bits.
+// block base + IconAllSize + extra, the offset wrapping in 16 bits.
 static FarPtr bar(uint16_t extra)
 {
     FarPtr b = block_base();
-    return far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + ICON_SIZE + extra));
+    return far_ptr((uint16_t)(b >> 16), (uint16_t)((uint16_t)b + ds.GfxPath_IconAllSize + extra));
 }
 
 static uint8_t *bar_host(uint16_t extra)
@@ -68,6 +64,19 @@ static void copy_to_screen(const uint8_t *src, uint16_t ofs)
     Blit_CopyRect(src, gfx_screen() + ofs, 0x140, 0x20);
 }
 
+// The empty 48x32 cell, from the backgrounds (240 wide).
+static void clear_cell(uint8_t *cell)
+{
+    Blit_CopyRectStrided(far_host(ds.GfxPath_CellBackgrounds), cell, 0x30, 0x20, 0xF0, 0x140);
+}
+
+// A 32x32 page arrow from the backgrounds at bg.
+static void draw_arrow(uint16_t bg, uint16_t at)
+{
+    Blit_CopyRectStrided(near_add(ds.GfxPath_CellBackgrounds, bg), bar_host(at), 0x20, 0x20, 0xF0,
+                         0x140);
+}
+
 // Cell k (0..11) of the bar: page k / 6, column k % 6.
 static uint16_t cell_ofs(uint16_t k)
 {
@@ -78,13 +87,12 @@ static void draw_slot(uint16_t k, bool check_icon)
 {
     int slot = k + 1;
     uint8_t *cell = bar_host(cell_ofs(k));
-    Blit_CopyRectStrided(far_host(BG_PTR), cell, 0x30, 0x20, 0xF0, 0x140);
+    clear_cell(cell);
     int16_t id = *slot_id(slot);
-    int8_t icon = (int8_t)*(uint8_t *)ds_at((uint16_t)(0x4E06 + id));
+    int8_t icon = ds.GfxPath_CommandIcon[id];
     if (!check_icon || icon != 0)
         GfxPath_DrawIcon(icon, cell);
-    System_StrStore((const PString *)ds_at((uint16_t)(0x488A + id * 18)),
-                    (PString *)slot_label(slot), 18);
+    System_StrStore((const PString *)&ds.Ui_ButtonLabels[id], slot_label(slot), 18);
 }
 
 // 3a1b:0000
@@ -101,15 +109,15 @@ void GfxPath_SetToolbarAndShow(int16_t screen)
     ds.Game_HotspotHit = 0;
 }
 
-// 3a1b:0030: the screen record (25 bytes at DS:50FB + 25 * screen) has the
-// slot count at +0Ch and the ids after it.
+// 3a1b:0030: the screen record (Ui::Screens) has the slot count at +0Ch and
+// the ids after it.
 void GfxPath_SetToolbar(int16_t screen)
 {
     if (screen == 1)
-        CUR_PAGE = *(uint8_t *)ds_at(0x7C64);  // low byte of slot 0's word
+        ds.GfxPath_PageFlagB = ds.GfxPath_SavedPage;
     else
-        CUR_PAGE = 1;
-    const int8_t *rec = (const int8_t *)ds_at((uint16_t)(0x50FB + screen * 25));
+        ds.GfxPath_PageFlagB = 1;
+    const int8_t *rec = (const int8_t *)&ds.Ui_Screens[screen - 1];
     int16_t count = rec[0x0C];
     for (int16_t i = 1; i <= count; i++)
         *slot_id(i) = rec[0x0C + i];
@@ -123,20 +131,20 @@ void GfxPath_SetToolbar(int16_t screen)
 void GfxPath_RedrawToolbar(void)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
-    BG_PTR = bar(BG_OFS);
-    TMP_PTR = System_GetMem(0x3C0);
-    PAGE2_FLAG = *slot_id(7) != 0;
+    ds.GfxPath_CellBackgrounds = bar(BG_OFS);
+    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
+    ds.GfxPath_PageFlagA = *slot_id(7) != 0;
     for (uint16_t k = 0; k <= 5; k++)
         draw_slot(k, true);
-    if (PAGE2_FLAG == 0) {
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x70), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+    if (ds.GfxPath_PageFlagA == 0) {
+        draw_arrow(0x70, ARROW_PREV);
     } else {
         for (uint16_t k = 6; k <= 11; k++)
             draw_slot(k, true);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar_host(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+        draw_arrow(0x30, ARROW_NEXT);
+        draw_arrow(0x50, ARROW_PREV);
     }
-    System_FreeMem(TMP_PTR, 0x3C0);
+    System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
     Ems_EmsNop(Ems_ToolbarBlock());
     Ems_EmsMapGameData();
 }
@@ -145,8 +153,8 @@ void GfxPath_RedrawToolbar(void)
 void GfxPath_AddToolbarIcon(int16_t id)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
-    BG_PTR = bar(BG_OFS);
-    TMP_PTR = System_GetMem(0x3C0);
+    ds.GfxPath_CellBackgrounds = bar(BG_OFS);
+    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
     uint16_t slot = 1;
     while (*slot_id(slot) != 0)
         slot++;
@@ -156,24 +164,22 @@ void GfxPath_AddToolbarIcon(int16_t id)
             *slot_id(slot) = 0;
     }
     *slot_id(slot) = id;
-    PAGE2_FLAG = (PAGE2_FLAG == 0 && slot != 7) ? 0 : 1;
+    ds.GfxPath_PageFlagA = (ds.GfxPath_PageFlagA == 0 && slot != 7) ? 0 : 1;
 
     uint16_t k = (uint16_t)(slot - 1);
     uint8_t *cell = bar_host(cell_ofs(k));
-    Blit_CopyRectStrided(far_host(BG_PTR), cell, 0x30, 0x20, 0xF0, 0x140);
-    GfxPath_DrawIcon((int8_t)*(uint8_t *)ds_at((uint16_t)(0x4E06 + id)), cell);
-    System_StrStore((const PString *)ds_at((uint16_t)(0x488A + id * 18)),
-                    (PString *)slot_label(slot), 18);
+    clear_cell(cell);
+    GfxPath_DrawIcon(ds.GfxPath_CommandIcon[id], cell);
+    System_StrStore((const PString *)&ds.Ui_ButtonLabels[id], slot_label(slot), 18);
     if (slot == 7) {
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x30), bar_host(ARROW_NEXT), 0x20, 0x20, 0xF0, 0x140);
-        Blit_CopyRectStrided(near_add(BG_PTR, 0x50), bar_host(ARROW_PREV), 0x20, 0x20, 0xF0, 0x140);
+        draw_arrow(0x30, ARROW_NEXT);
+        draw_arrow(0x50, ARROW_PREV);
         for (uint16_t s = 8; s <= 12; s++) {
-            Blit_CopyRectStrided(far_host(BG_PTR), bar_host(cell_ofs((uint16_t)(s - 1))), 0x30,
-                                 0x20, 0xF0, 0x140);
-            slot_label(s)[0] = 0;
+            clear_cell(bar_host(cell_ofs((uint16_t)(s - 1))));
+            slot_label(s)->len = 0;
         }
     }
-    System_FreeMem(TMP_PTR, 0x3C0);
+    System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
     Ems_EmsNop(Ems_ToolbarBlock());
     Ems_EmsMapGameData();
 }
@@ -192,18 +198,11 @@ static void scroll_extras(void)
     }
 }
 
-// Ui_RowOffset[-1 + i]: the table starts one byte before DS:4875.
-static uint8_t row_offset(int i)
-{
-    return *(uint8_t *)ds_at((uint16_t)(0x4874 + i));
-}
-
 static void toggle_pages(void)
 {
-    CUR_PAGE = CUR_PAGE == 0;
-    // BUG? toggles the low byte of slot 0's word (DS:7C64, not a used slot:
-    // they are 1..12), probably meant DS:7C62. SetToolbar(1) reads it back.
-    *(uint8_t *)ds_at(0x7C64) = *(uint8_t *)ds_at(0x7C64) == 0;
+    ds.GfxPath_PageFlagB = ds.GfxPath_PageFlagB == 0;
+    // Where MenuBar[0].Command would be; SetToolbar(1) reads it back.
+    ds.GfxPath_SavedPage = ds.GfxPath_SavedPage == 0;
 }
 
 // 3a1b:0586
@@ -214,7 +213,7 @@ void GfxPath_ScrollToolbarNext(void)
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
         copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
-        ofs = (uint16_t)(row_offset(i) * 0x140 + ofs);
+        ofs = (uint16_t)(ds.Ui_RowOffset[i] * 0x140 + ofs);
         scroll_extras();
     }
     toggle_pages();
@@ -229,7 +228,7 @@ void GfxPath_ScrollToolbarPrev(void)
     uint16_t ofs = PAGE_SIZE;
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
-        ofs = (uint16_t)(ofs - row_offset(i) * 0x140);
+        ofs = (uint16_t)(ofs - ds.Ui_RowOffset[i] * 0x140);
         copy_to_screen(bar_host((uint16_t)(ofs + 1)), 0);
         scroll_extras();
     }
@@ -243,7 +242,7 @@ void GfxPath_ShowToolbar(void)
 {
     Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
-    uint16_t page = CUR_PAGE == 0 ? (uint16_t)(PAGE_SIZE + 1) : 1;
+    uint16_t page = ds.GfxPath_PageFlagB == 0 ? (uint16_t)(PAGE_SIZE + 1) : 1;
     Blit_InterlaceReveal(bar_host(page), gfx_screen(), 0x140, 0x20);
     Mouse_ShowCursor();
     Sound_FreeSampleIfIdle();
@@ -282,8 +281,8 @@ void GfxPath_IconAllIndex(void)
     Gfx_IconAllOpen();
     uint16_t len;
     for (uint16_t i = 0; i <= 0x43; i++) {
-        ICON_INDEX(i) = ds.Gfx_ReadPos;
-        Gfx_IconAllReadChunk((const FarPtr *)ds_at(0x7DFB), &len);
+        ds.GfxPath_IconIndex[i] = ds.Gfx_ReadPos;
+        Gfx_IconAllReadChunk(&ds.GfxPath_ToolbarBlock.Data, &len);
     }
     Gfx_IconAllClose();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -296,9 +295,9 @@ void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
     Ems_EmsMapAll(Ems_ToolbarBlock());
     FarPtr base = block_base();
     uint16_t seg = (uint16_t)(base >> 16);
-    uint16_t src = (uint16_t)((uint16_t)base + ICON_INDEX(icon));
-    uint16_t out = (uint16_t)TMP_PTR;
-    uint16_t tseg = (uint16_t)(TMP_PTR >> 16);
+    uint16_t src = (uint16_t)((uint16_t)base + ds.GfxPath_IconIndex[icon]);
+    uint16_t out = (uint16_t)ds.GfxPath_IconScratch;
+    uint16_t tseg = (uint16_t)(ds.GfxPath_IconScratch >> 16);
     int16_t left = 0x3C0;
     while (left > 0) {
         uint8_t b = *(uint8_t *)far_host(far_ptr(seg, src++));
@@ -313,7 +312,7 @@ void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
                 *(uint8_t *)far_host(far_ptr(tseg, out++)) = (uint8_t)(v + 2);
         }
     }  // the original tests != 0 after each run; a damaged icon would run on
-    Blit_CopyRectStrided(far_host(TMP_PTR), dest + 0x504, 0x27, 0x18, 0x28, 0x140);
+    Blit_CopyRectStrided(far_host(ds.GfxPath_IconScratch), dest + 0x504, 0x27, 0x18, 0x28, 0x140);
     if (System_MemAvail() < ds.Game_MinMemAvail)
         ds.Game_MinMemAvail = (int32_t)System_MemAvail();
     Ems_EmsNop(Ems_ToolbarBlock());
@@ -324,7 +323,7 @@ void GfxPath_ShowScreenBackdrop(void)
 {
     FarPtr buf = System_GetMem(0xBCC0);
     uint8_t path[256] = {8, 'g', 'r', 'a', 'f', 'i', 'k', 'a', '\\'};
-    const uint8_t *name = ds_at((uint16_t)(0x50FB + ds.Game_CurrentScreen * 25));
+    const uint8_t *name = (const uint8_t *)&ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name;
     for (uint8_t i = 1; i <= name[0] && path[0] < 255; i++)
         path[++path[0]] = name[i];
     Gfx_LoadPicScreen(path, far_host(buf), 0x97, Gfx_PalettePtr());
@@ -341,10 +340,10 @@ void GfxPath_FreeToolbarBuffer(void)
 // 3a1b:09b2
 void GfxPath_Init(void)
 {
-    Gfx_IconAllOpenSize(&ICON_SIZE);
-    uint16_t size = (uint16_t)(ICON_SIZE + 0x5500 + EXTRA_SIZE);
-    BLOCK_INIT = System_GetMem(size);
-    System_FillChar(far_host(BLOCK_INIT), size, 2);
-    Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, BLOCK_INIT);
+    Gfx_IconAllOpenSize(&ds.GfxPath_IconAllSize);
+    uint16_t size = (uint16_t)(ds.GfxPath_IconAllSize + 0x5500 + ds.GfxPath_CellsSize);
+    ds.GfxPath_InitBlock = System_GetMem(size);
+    System_FillChar(far_host(ds.GfxPath_InitBlock), size, 2);
+    Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, ds.GfxPath_InitBlock);
     ds.Game_GfxPathProc = far_ptr(0x3A1B, 0x09A3);
 }

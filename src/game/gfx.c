@@ -23,9 +23,6 @@ void Ems_EmsReleaseGameData(void);                                      // 4719:
 
 bool (*gfx_wait_retrace)(void) = timing_wait_retrace;
 
-// Unnamed globals.
-#define SAVED_EXIT_PROC (*(uint32_t *)ds_at(0x89BA))  // ExitProc before Gfx_Init
-
 // Scanlines per frame in mode 13h (31.47 kHz / 70.086 Hz), for WaitScanlines.
 enum : int32_t { SCANLINES_PER_FRAME = 449 };
 
@@ -1051,7 +1048,7 @@ static void call_far_proc(uint32_t p)
 // 405f:1a62, installed as ExitProc by Gfx_Init.
 void Gfx_ExitHandler(void)
 {
-    ds.System_ExitProc = SAVED_EXIT_PROC;
+    ds.System_ExitProc = ds.Gfx_SavedExitProc;
     if (ds.Sound_Enabled && ds.Sound_DeviceType != 1)
         Sound_SbBreakLoop();
     Music_StopMusic();
@@ -1117,6 +1114,6 @@ void Gfx_Init(void)
 {
     scanlines_pending = 0;  // port: every boot starts the same (tests replay boots)
     ds.Game_MinMemAvail = 0x009BF9B0;
-    SAVED_EXIT_PROC = ds.System_ExitProc;
+    ds.Gfx_SavedExitProc = ds.System_ExitProc;
     ds.System_ExitProc = far_ptr(0x405F, 0x1A62);  // Gfx_ExitHandler
 }

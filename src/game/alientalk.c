@@ -15,25 +15,6 @@
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
 
-// Unnamed globals (see alientalk.h).
-#define I16(off) (*(int16_t *)ds_at(off))
-#define U16(off) (*(uint16_t *)ds_at(off))
-#define U8(off) (*(uint8_t *)ds_at(off))
-#define SEL_LINE U16(0x78B4)
-#define LOCKED U8(0x78B6)
-#define RACE_STR ((PString *)ds_at(0x78B8))
-#define MENU_NO I16(0x78BC)
-#define QUESTION_LINE I16(0x78BE)
-#define REPLY_LINE I16(0x78C0)
-#define ANSWER_ID I16(0x78C2)
-#define HOVER_COL U16(0x78CC)
-#define HOVER_ROW I16(0x78CE)
-#define LINE_MAP ((uint8_t *)ds_at(0x78D2)) // [1..] question number for each screen line
-#define BACKDROP_SHOWN U8(0x7E3A)
-#define ANIM_ID I16(0x7E2A)
-#define ANIM_FRAME I16(0x7E2C)
-#define ROOM_FRAMES(a) U8((uint16_t)(0x55D7 + 7 * (a)))
-
 static const uint8_t *ps(const PString *p) { return &p->len; }
 static uint8_t *screen_at(uint16_t off) { return gfx_screen() + off; }
 
@@ -44,7 +25,7 @@ static void text_name(PString *out, const char *prefix, const char *suffix)
     tmp.len = 0;
     for (const char *c = prefix; *c; c++)
         tmp.s[tmp.len++] = *c;
-    System_StrConcat(&tmp, RACE_STR);
+    System_StrConcat(&tmp, (PString *)&ds.AlienTalk_RaceStr);
     for (const char *c = suffix; *c; c++)
         tmp.s[tmp.len++] = *c;
     System_StrStore(&tmp, out, 255);
@@ -112,7 +93,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
         Command_InitRoomAnim();
         Command_StartMainAnim(14);
         Gfx_WaitFramesOrClick(20);
-        int16_t n = (int16_t)(ROOM_FRAMES(ANIM_ID) - 1);
+        int16_t n = (int16_t)(ds.Cc_Doors[ds.Command_AnimId - 1].Frames - 1);
         for (int16_t i = 1; i <= n; i++) {
             Command_StepMainAnim();
             Gfx_WaitFrames(6);
@@ -123,8 +104,8 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     if (scene == 9) {
         Command_InitRoomAnim();
         Command_StartMainAnim(8);
-        ANIM_FRAME = 0;
-        uint16_t n = ROOM_FRAMES(ANIM_ID);
+        ds.Command_AnimFrame = 0;
+        uint16_t n = ds.Cc_Doors[ds.Command_AnimId - 1].Frames;
         for (uint16_t i = 1; n != 0; i++) {
             if (i == 5)
                 Sound_PlayButtonSfx(P("satrobb1"));
@@ -135,8 +116,8 @@ void AlienTalk_PlayAlienScene(int16_t scene)
         }
         Sound_PlayButtonSfx(P("satrobb2"));
         Command_StartMainAnim(9);
-        ANIM_FRAME = 0;
-        n = ROOM_FRAMES(ANIM_ID);
+        ds.Command_AnimFrame = 0;
+        n = ds.Cc_Doors[ds.Command_AnimId - 1].Frames;
         for (uint16_t i = 1; n != 0; i++) {
             if (i == 0x12)
                 Sound_PlayButtonSfx(P("satrobb3"));
@@ -152,8 +133,8 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     if (scene == 10) {
         Command_InitRoomAnim();
         Command_StartMainAnim(13);
-        ANIM_FRAME = 0;
-        uint16_t n = ROOM_FRAMES(ANIM_ID);
+        ds.Command_AnimFrame = 0;
+        uint16_t n = ds.Cc_Doors[ds.Command_AnimId - 1].Frames;
         for (uint16_t i = 1; n != 0; i++) {
             if (i == 10)
                 Sound_PlayButtonSfx(P("tractor"));
@@ -171,7 +152,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     System_MoveFwd(old_pal, ds.Gfx_Palette, 0x300);
     System_FreeMem(save, 0x1540);
     Mouse_ShowCursor();
-    BACKDROP_SHOWN = 0;
+    ds.Command_BackdropShown = 0;
 }
 
 // 2e4b:03a5
@@ -180,7 +161,7 @@ void AlienTalk_StartAlienTalk(int16_t race)
     ds.Game_ScreenSwitch = true;
     ds.Game_CurrentScreen = 0x22;
     ds.AlienTalk_Race = race;
-    System_StrLong(race, 0, RACE_STR, 2);
+    System_StrLong(race, 0, (PString *)&ds.AlienTalk_RaceStr, 2);
 }
 
 // 2e4b:0400
@@ -191,11 +172,10 @@ void AlienTalk_DrawAlienTalkScreen(void)
     uint8_t *pic = far_host(buf);
     uint8_t *pal = Gfx_PalettePtr();
     PString num, name;
-    // The portrait number of the alien: byte table at DS:0D0E, indexed by race.
-    uint8_t portrait = U8((uint16_t)(0x0D0D + ds.AlienTalk_Race));
+    uint8_t portrait = ds.AlienTalk_PortraitByRace[ds.AlienTalk_Race - 1];
 
-    Gfx_LoadPic(P("pics\\atvezeto"), pic, 1, 0x97, 0, 0, 0x140, BACKDROP_SHOWN != 0, pal, 0, 0xB0,
-                0x40, 0, 0xBE);
+    Gfx_LoadPic(P("pics\\atvezeto"), pic, 1, 0x97, 0, 0, 0x140, ds.Command_BackdropShown != 0, pal,
+                0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(pic, screen_at(0x3D40), 0x140, 0x97);
     if (ds.AlienTalk_Race == 6)
         GfxPath_ShowToolbarInstant();
@@ -234,8 +214,8 @@ void AlienTalk_SetupTalkHotspots(void)
     System_StrStore(PSTR("Talking"), (PString *)&h->Caption, 0x12);
     h->Repeat_ = 0;
     h->_1A = 0;
-    HOVER_COL = 0xFFFF;
-    HOVER_ROW = -1;
+    ds.AlienTalk_HoverCol = 0xFFFF;
+    ds.AlienTalk_HoverRow = -1;
 }
 
 // 2e4b:0675
@@ -243,12 +223,12 @@ void AlienTalk_LoadQuestionAnswerId(void)
 {
     PString name, line, id;
     text_name(&name, "kerdes", ".at");
-    TextFile_ReadTextLine(ps(&name), QUESTION_LINE, (uint8_t *)&line);
+    TextFile_ReadTextLine(ps(&name), ds.AlienTalk_QuestionLine, (uint8_t *)&line);
     id.len = 2;
     id.s[0] = line.s[0];
     id.s[1] = line.s[1];
     int16_t code;
-    ANSWER_ID = (int16_t)System_ValLong(&id, &code);
+    ds.AlienTalk_AnswerId = (int16_t)System_ValLong(&id, &code);
 }
 
 // 2e4b:0700
@@ -257,11 +237,11 @@ void AlienTalk_DrawAlienReply(void)
     PString name, line;
     int16_t lines;
     text_name(&name, "valasz", ".at");
-    TextFile_ReadTextLine(ps(&name), REPLY_LINE, (uint8_t *)&line);
+    TextFile_ReadTextLine(ps(&name), ds.AlienTalk_ReplyLine, (uint8_t *)&line);
     Mouse_HideCursor();
     Blit_FillRect(6, 0x86, 0xD8, 0x3F, 0x40);
     Mouse_ShowCursor();
-    TextFile_DrawReply(ps(&line), 6, 0x86, 0x24, false, true, &MENU_NO, &lines);
+    TextFile_DrawReply(ps(&line), 6, 0x86, 0x24, false, true, &ds.AlienTalk_MenuNumber, &lines);
 }
 
 static PString *question(int k)
@@ -269,12 +249,22 @@ static PString *question(int k)
     return (PString *)((uint8_t *)far_host(ds.AlienTalk_QuestionBuf) + (k - 1) * 0x100);
 }
 
+// LineQuestion[i]. The original doesn't check the range: menus of more than
+// 8 text lines run on into Surface::Mode (the clearing loop below does so
+// for the Eran's first menu). Addressed through DS so the same bytes are
+// read and written.
+static uint8_t *line_question(int16_t i)
+{
+    return (uint8_t *)&ds + offsetof(DSeg, AlienTalk_LineQuestion) + (i - 1);
+}
+
 // 2e4b:0780
 void AlienTalk_BuildQuestionMenu(void)
 {
     ds.AlienTalk_MenuLineCount = 0;
     // The race's list of menus: 4 bytes each (count + 3 question numbers).
-    const uint8_t *menu = (const uint8_t *)far_host(ds.Alien_MenuLists[ds.AlienTalk_Race - 1]) + MENU_NO * 4;
+    const uint8_t *menu = (const uint8_t *)far_host(ds.Alien_MenuLists[ds.AlienTalk_Race - 1])
+                          + ds.AlienTalk_MenuNumber * 4;
     memcpy(ds.Alien_CurMenu, menu, 4);
     uint16_t count = ds.Alien_CurMenu[0];
     int16_t lines = 0; // BUG?: the final clearing loop reuses the last question's line count
@@ -284,12 +274,12 @@ void AlienTalk_BuildQuestionMenu(void)
         TextFile_ReadTextLine(ps(&name), (int8_t)ds.Alien_CurMenu[k], (uint8_t *)question(k));
         lines = TextFile_CountLines(ps(question(k)));
         for (int16_t i = ds.AlienTalk_MenuLineCount + 1; i <= ds.AlienTalk_MenuLineCount + lines; i++)
-            LINE_MAP[i - 1] = (uint8_t)k;
+            *line_question(i) = (uint8_t)k;
         ds.AlienTalk_MenuLineCount += lines;
     }
     // Zero as many entries after the last line as the last question had lines.
     for (int16_t i = ds.AlienTalk_MenuLineCount + 1; i <= ds.AlienTalk_MenuLineCount + lines; i++)
-        LINE_MAP[i - 1] = 0;
+        *line_question(i) = 0;
 }
 
 // 2e4b:088d
@@ -299,8 +289,8 @@ void AlienTalk_DrawQuestionMenu(void)
     uint16_t count = ds.Alien_CurMenu[0];
     for (uint16_t k = 1; k <= count; k++) {
         int16_t lines;
-        TextFile_DrawReply(ps(question(k)), 6, (int16_t)(row * 9 + 0x86), 0x24, k == SEL_LINE, false, &ANSWER_ID,
-                           &lines);
+        TextFile_DrawReply(ps(question(k)), 6, (int16_t)(row * 9 + 0x86), 0x24,
+                           k == ds.AlienTalk_SelectedLine, false, &ds.AlienTalk_AnswerId, &lines);
         row += lines;
     }
     if (row > 7)
@@ -313,22 +303,22 @@ void AlienTalk_DrawQuestionMenu(void)
 // 2e4b:092e
 void AlienTalk_HandleTalkMouse(void)
 {
-    uint16_t old_col = HOVER_COL;
-    int16_t old_row = HOVER_ROW;
-    if (LOCKED != 0)
+    uint16_t old_col = ds.AlienTalk_HoverCol;
+    int16_t old_row = ds.AlienTalk_HoverRow;
+    if (ds.AlienTalk_Locked != 0)
         return;
-    HOVER_ROW = (int16_t)((ds.Mouse_ClickY - 0x7D) / 9);
-    if (HOVER_ROW < 1)
-        HOVER_ROW = 0;
-    if (ds.AlienTalk_MenuLineCount < HOVER_ROW)
-        HOVER_ROW = 0;
-    HOVER_COL = ds.Mouse_ClickX > 5;
+    ds.AlienTalk_HoverRow = (int16_t)((ds.Mouse_ClickY - 0x7D) / 9);
+    if (ds.AlienTalk_HoverRow < 1)
+        ds.AlienTalk_HoverRow = 0;
+    if (ds.AlienTalk_MenuLineCount < ds.AlienTalk_HoverRow)
+        ds.AlienTalk_HoverRow = 0;
+    ds.AlienTalk_HoverCol = ds.Mouse_ClickX > 5;
     if (ds.Mouse_ClickX > 0xD8)
-        HOVER_COL = 0;
-    SEL_LINE = (uint16_t)(HOVER_ROW * HOVER_COL);
-    if ((int16_t)SEL_LINE > 0)
-        SEL_LINE = LINE_MAP[SEL_LINE - 1];
-    if (HOVER_COL != old_col || HOVER_ROW != old_row)
+        ds.AlienTalk_HoverCol = 0;
+    ds.AlienTalk_SelectedLine = (uint16_t)(ds.AlienTalk_HoverRow * ds.AlienTalk_HoverCol);
+    if ((int16_t)ds.AlienTalk_SelectedLine > 0)
+        ds.AlienTalk_SelectedLine = *line_question((int16_t)ds.AlienTalk_SelectedLine);
+    if (ds.AlienTalk_HoverCol != old_col || ds.AlienTalk_HoverRow != old_row)
         AlienTalk_DrawQuestionMenu();
 }
 

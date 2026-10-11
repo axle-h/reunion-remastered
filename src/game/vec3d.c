@@ -1,7 +1,5 @@
 #include "game/vec3d.h"
 
-#include <string.h>
-
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/minmax.h"
@@ -27,22 +25,10 @@ static inline void wrw(uint8_t *p, uint16_t off, int16_t v)
     *at(p, (uint16_t)(off + 1)) = (uint8_t)((uint16_t)v >> 8);
 }
 
-static inline uint8_t *ds_ptr(uint16_t off)
-{
-    return ds_at(off);
-}
-
-static inline int16_t ds_word(uint16_t off)
-{
-    return rdw(ds_ptr(off), 0);
-}
-
-// cos500[i], read like the original's [di + 7FD4h] with a 16-bit index.
+// cos500[i] (the callers keep i in 0..359).
 static int32_t cos500(int16_t i)
 {
-    int32_t v;
-    memcpy(&v, ds_at((uint16_t)(VEC3D_COS_TABLE + i * 4)), 4);
-    return v;
+    return ds.Vec3D_CosTable[i];
 }
 
 // System LongMul (low 32 bits) and LongDiv by 500 (truncating, like div).
@@ -109,7 +95,7 @@ static bool face_skipped(int16_t model, int16_t slot, uint8_t face, bool back_pa
 static void draw_face_pass(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint8_t *normals,
                            uint8_t count, bool back_pass)
 {
-    int16_t model = ds_word(VEC3D_MODEL), slot = ds_word(VEC3D_SLOT);
+    int16_t model = ds.Vec3D_Model, slot = ds.Vec3D_Slot;
     uint8_t *pts = face_points;
     for (uint8_t f = 1;; f++) {
         int16_t nx = rdw(normals, (uint16_t)(f * 6 - 6));
@@ -147,7 +133,7 @@ static void draw_face_pass(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint
 void Vec3D_DrawFaces(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint8_t *normals,
                      uint8_t count)
 {
-    int16_t model = ds_word(VEC3D_MODEL), slot = ds_word(VEC3D_SLOT);
+    int16_t model = ds.Vec3D_Model, slot = ds.Vec3D_Slot;
     bool two_sided = (model == 7 && slot == 1) || (model == 12 && slot == 7) ||
                      (model == 18 && slot == 5) || (model == 26 && slot == 7) ||
                      (model == 26 && slot == 9) || (model == 27 && slot == 4);
@@ -315,12 +301,13 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *f
     cy = System_RealDiv(cy, System_LongToReal(nVerts));
     cz = System_RealDiv(cz, System_LongToReal(nVerts));
 
-    uint8_t *cp = ds_ptr((uint16_t)(VEC3D_CENTROIDS + slot * 6));
     int16_t c[3] = {(int16_t)System_Round(cx), (int16_t)System_Round(cy),
                     (int16_t)System_Round(cz)};
     fix_centroid(model, slot, c);
-    for (int i = 0; i < 3; i++)
-        wrw(cp, (uint16_t)(i * 2), c[i]);
+    TVecPoint *cp = &ds.Vec3D_Centroids[slot - 1];
+    cp->X = c[0];
+    cp->Y = c[1];
+    cp->Z = c[2];
 
     // Normals from the first three vertices of each face, in 32 bits.
     for (uint16_t f = 1; f <= nFaces; f++) {
@@ -366,6 +353,18 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *f
 
 // --- polygon fill ----------------------------------------------------------------
 
+// The edge tables as bytes, indexed by 2 * y (signed: see TraceEdge on the
+// original's wrap inside DS).
+static inline uint8_t *edges_a(void)
+{
+    return (uint8_t *)&ds.Vec3D_EdgesA;
+}
+
+static inline uint8_t *edges_b(void)
+{
+    return (uint8_t *)&ds.Vec3D_EdgesB;
+}
+
 // 3e17:11f9
 void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
 {
@@ -399,7 +398,7 @@ void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
     }
 
     // Edges lo..hi into table A, hi..n+1 and 1..lo into table B.
-    uint8_t *a = ds_ptr(VEC3D_EDGES_A), *b = ds_ptr(VEC3D_EDGES_B);
+    uint8_t *a = edges_a(), *b = edges_b();
 #define EDGE(k, table)                                                                      \
     Vec3D_TraceEdge(rdw(pts, (uint16_t)((k) * 4 - 4)), rdw(pts, (uint16_t)((k) * 4 - 2)),   \
                     rdw(pts, (uint16_t)((k) * 4)), rdw(pts, (uint16_t)((k) * 4 + 2)), table)
@@ -436,8 +435,8 @@ void Vec3D_FillSpans(uint8_t *bufSeg, int16_t firstY, int16_t lastY, int16_t col
     uint8_t odd = (uint8_t)colour, even = (uint8_t)(colour + 1);
     uint8_t *buf = bufSeg;
     do {
-        uint16_t xa = (uint16_t)ds_word((uint16_t)(VEC3D_EDGES_A + si));
-        uint16_t xb = (uint16_t)ds_word((uint16_t)(VEC3D_EDGES_B + si));
+        uint16_t xa = (uint16_t)rdw(edges_a() + (int16_t)si, 0);
+        uint16_t xb = (uint16_t)rdw(edges_b() + (int16_t)si, 0);
         uint16_t cx = (uint16_t)(xb - xa);
         uint16_t di = row;
         if (xb < xa) {
@@ -602,6 +601,6 @@ void Vec3D_InitCosTable(void)
     for (int16_t i = 0; i <= 360; i++) {
         Real48 x = System_RealDiv(System_RealMul(System_LongToReal(i), pi), r180);
         int32_t v = System_Round(System_RealMul(System_Cos(x), r500));
-        memcpy(ds_at((uint16_t)(VEC3D_COS_TABLE + i * 4)), &v, 4);
+        ds.Vec3D_CosTable[i] = v;
     }
 }

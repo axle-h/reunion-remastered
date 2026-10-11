@@ -151,10 +151,10 @@ static void test_research(void)
     Sim_ProgressResearch();
     CHECK(p->Progress == 0 && p->State == 5);
 
-    // The developer away at the university (DS:5D9E = 4) stops research.
+    // The developer away at the university (Advisor::TrainingKind = 4) stops research.
     p->State = 2;
     p->Progress = 5000;
-    *(int16_t *)ds_at(0x5D9E) = 4;
+    ds.Advisor_TrainingKind = 4;
     Sim_ProgressResearch();
     CHECK(p->Progress == 5000);
 }
@@ -182,10 +182,10 @@ static void test_production(void)
     CHECK(p->Stock == stock + 2 && p->_1D == 0 && p->_21 == 0);
 }
 
-// FNV-1a over a DS range.
-static uint32_t fnv(uint32_t h, uint16_t from, uint16_t to)
+// FNV-1a over the DS fields from offset `from` up to `to`.
+static uint32_t fnv(uint32_t h, size_t from, size_t to)
 {
-    const uint8_t *p = ds_at(from);
+    const uint8_t *p = (const uint8_t *)&ds + from;
     for (uint32_t i = 0; i < (uint32_t)(to - from); i++)
         h = (h ^ p[i]) * 16777619u;
     return h;
@@ -197,11 +197,11 @@ static uint32_t fnv(uint32_t h, uint16_t from, uint16_t to)
 static uint32_t sim_checksum(void)
 {
     uint32_t h = 2166136261u;
-    h = fnv(h, 0x0000, 0x759E);
-    h = fnv(h, 0x91A0, 0x91EC);
-    h = fnv(h, 0x95A0, 0x95E6);
-    h = fnv(h, 0xA21A, 0xA2BC);
-    h = fnv(h, (uint16_t)offsetof(DSeg, System_RandSeed), (uint16_t)(offsetof(DSeg, System_RandSeed) + 4));
+    h = fnv(h, 0, DSEG_INIT_SIZE);
+    h = fnv(h, offsetof(DSeg, Game_IdeaTimer), offsetof(DSeg, Gfx_ScreenSeg));
+    h = fnv(h, offsetof(DSeg, Game_SelInvention), offsetof(DSeg, Game_CurrentScreen));
+    h = fnv(h, offsetof(DSeg, Game_ColonySetupCount), offsetof(DSeg, Game_Buildings));
+    h = fnv(h, offsetof(DSeg, System_RandSeed), offsetof(DSeg, System_RandSeed) + 4);
     return h;
 }
 
@@ -209,7 +209,7 @@ static uint32_t sim_checksum(void)
 // only), 0 known.
 static int8_t *jade_status(void)
 {
-    return (int8_t *)ds_at(0x47CD + 1 * 8 + 7);
+    return &ds.Galaxy_PlanetStatus[1 - 1][7 - 1];
 }
 
 // Fix (game/fixes.h): Jade, still hidden on 2928-04-01, is found that day
@@ -218,7 +218,7 @@ static int8_t *jade_status(void)
 static void test_jade_found(void)
 {
     reset();
-    *(int16_t *)ds_at(0x481C + 1 * 2) = 0;  // no observatory in Amnesty
+    ds.Sim_Observatories[1 - 1] = 0;  // no observatory in Amnesty
     CHECK(*jade_status() == -3);
 
     fixes.find_jade = true;
@@ -239,7 +239,7 @@ static void test_jade_found(void)
 
     // Later dates too (a game loaded after the date).
     reset();
-    *(int16_t *)ds_at(0x481C + 1 * 2) = 0;
+    ds.Sim_Observatories[1 - 1] = 0;
     set_date(2931, 1, 1, 0);
     Sim_ProcessAllBodyEvents();
     CHECK(*jade_status() == 0);

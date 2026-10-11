@@ -5,8 +5,8 @@
 // work in Mouse_Update(), which Mouse_Poll() calls first, and at every
 // retrace wait once the mouse moved or a button changed (so the cursor
 // follows the mouse during waits that never poll it). Code that polled
-// DS:918E in a loop without a retrace wait (e.g. 405f:077f) should call
-// Mouse_Update() first.
+// Mouse::BtnDown in a loop without a retrace wait (e.g. 405f:077f) should
+// call Mouse_Update() first.
 #pragma once
 
 #include <stdint.h>
@@ -44,9 +44,8 @@ void Mouse_ClearHotspots(int16_t first, int16_t last);
 void Mouse_SetHotspot(int16_t index, int16_t x, uint8_t y, int16_t w, uint8_t h,
                       const uint8_t *caption, uint8_t repeat_, uint8_t flag);
 
-// Hotspot j (1-based, as in Pascal); element 0 is the 27 bytes before
-// ds.Mouse_Hotspots, which is how the original indexes it.
+// Hotspot j (1..66, as in Pascal).
 static inline THotspot *Mouse_Hotspot(int16_t j)
 {
-    return (THotspot *)ds_at(0x8A71) + j;
+    return &ds.Mouse_Hotspots[j - 1];
 }

@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     CHECK(!Options_GameRunning());
 
     // The disk screen keeps the original's five buttons.
-    const uint8_t *rec = (const uint8_t *)ds_at(0x50FB + 0x0C * 25);
+    const uint8_t *rec = (const uint8_t *)&ds.Ui_Screens[0x0C - 1];
     CHECK(rec[0x0C] == 5);
 
     // Frozen money: spending and income are both undone; unfreezing keeps it.
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
     SDL_snprintf(path, sizeof path, "%s/spidysav.1", dir);
     SaveLoad_SetSaveDir(dir);
     SaveLoad_ReadSlotNames();
-    uint8_t *slot = (uint8_t *)far_host(*(FarPtr *)ds_at(0x7734));
+    uint8_t *slot = (uint8_t *)far_host(ds.SaveLoad_SlotTable);
     memcpy(slot + 1, "\x05" "Cheat", 6);
     freeze(true, true);
     Options_Frame();

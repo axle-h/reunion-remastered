@@ -21,13 +21,6 @@ void PlanetList_SetupScrollBarHotspot(void)
     Mouse_SetHotspot(1, 0x134, 0x37, 0xC, 0x8C, (const uint8_t *)PSTR("Scroll bar"), 0, 0);
 }
 
-// Race status byte (Races[owner].Status, DS:6A21 + owner * 0E4h). Read raw
-// because owner 0 and 1 (not aliens) index below the array.
-static int8_t race_status(uint8_t owner)
-{
-    return *(int8_t *)ds_at((uint16_t)(0x6A21 + owner * 0xE4));
-}
-
 // 1390:0047
 void PlanetList_AddListEntry(int16_t sys, int16_t planet, int16_t moon, int16_t bodyIdx)
 {
@@ -37,7 +30,7 @@ void PlanetList_AddListEntry(int16_t sys, int16_t planet, int16_t moon, int16_t 
     bool colony = b->Owner == 1 && b->Colony != 0;
     bool miner = b->Owner == 1 && b->Colony == 0 && b->_0A != 0;
     // Surface::Tileset[SurfaceType] indexes SurfaceColonisable (both 1-based).
-    int16_t tileset = *(int16_t *)ds_at((uint16_t)(0x1A38 + (int8_t)b->SurfaceType * 2));
+    int16_t tileset = ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
     bool accomodable = b->Colony == 0 && b->Miner == 0 && b->InfoLevel > 0x1D && b->Surveyed != 0
                        && b->Owner < 2 && ds.Galaxy_SurfaceColonisable[tileset - 1] != 0;
     bool mineable = b->Owner == 0 && b->Colony == 0 && b->Miner == 0 && b->_0A == 0
@@ -45,8 +38,14 @@ void PlanetList_AddListEntry(int16_t sys, int16_t planet, int16_t moon, int16_t 
     if (accomodable)
         mineable = false;
     bool notAlien = b->Owner < 2;
-    bool known = *(uint8_t *)ds_at((uint16_t)(0x6517 + b->Owner)) != 0 || b->InfoLevel >= 0x28;
-    int8_t status = race_status(b->Owner);
+    // The original also reads Hostile and Status for owners 0 and 1 (below
+    // the arrays), but uses them only for aliens.
+    bool known = false;
+    int8_t status = 0;
+    if (!notAlien) {
+        known = ds.Races_Hostile[b->Owner - 1] != 0 || b->InfoLevel >= 0x28;
+        status = ds.Races_Races[b->Owner - 2].Status;
+    }
     bool aliens = !notAlien && ((known && status == 4) || (!known && b->InfoLevel >= 0x1E));
     bool enemy = !notAlien && status == 2 && known;
     bool friendly = !notAlien && status == 6 && known;

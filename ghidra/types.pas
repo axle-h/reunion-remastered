@@ -228,6 +228,65 @@ type
     Lo, Hi: byte;
   end;
 
+  { --- Tables found while naming the data segment (2026-10-11) --- }
+
+  TVecPoint = record         { 6 bytes; a model point or centroid }
+    X, Y, Z:     integer;    { +00 }
+  end;
+
+  TOrbit = record            { 18 bytes; a body in the system view, PlanetInfo::Orbits }
+    RX, RY:      integer;    { +00  orbit radii, from TBodyName.X/Y }
+    Angle:       integer;    { +04  tenths of a degree }
+    Speed:       word;       { +06  TBodyName.Size }
+    X:           integer;    { +08  where it is drawn }
+    Y:           word;       { +0A }
+    Size:        integer;    { +0C }
+    Half:        integer;    { +0E  Size div 2 }
+    Icon:        byte;       { +10  Galaxy::BodyIcon }
+    Flag:        byte;       { +11  marker: 1 known, owner + 1 alien owner known, 2 the player's }
+  end;
+
+  TViewGroup = record        { 6 bytes; Launch::SystemViewTable }
+    Kind:        integer;    { +00  group kind (<= 4: the player's group), race + 3 for an alien force, 0 none }
+    Index:       integer;    { +02  group number or force index }
+    Moon:        integer;    { +04 }
+  end;
+
+  TRoomAnim = record         { 7 bytes; Cc::Doors, animations of anim\main }
+    Frames: byte;            { +00  frame count (3abd:0c70, 2e4b:0044) }
+    W:      integer;         { +01 }
+    H:      byte;            { +03 }
+    X:      integer;         { +04 }
+    Y:      byte;            { +06 }
+  end;
+
+  TWarAnim = record          { 5 bytes; Cc::Rooms, animations of war\grwar\granim }
+    Frames: byte;            { +00  frame count (3abd:0f19) }
+    Speed:  byte;            { +01  retraces per frame }
+    Repeat_: byte;           { +02  loops }
+    UnitA:  byte;            { +03  unit types that must both be on the field (1537:11f2) }
+    UnitB:  byte;            { +04 }
+  end;
+
+  TLight = record            { 3 bytes; Command::Lights }
+    Ofs:   word;             { +00  pixel offset in the window below the toolbar }
+    Count: byte;             { +02  on/off timer (lights 12..19) }
+  end;
+
+  TGrEffect = record         { 6 bytes; GrWar::Effects }
+    First:  integer;         { +00  first frame in the effect sheet }
+    Sheet:  integer;         { +02  gricon2 sheet (attackers' row; defenders add 1 for effects 1..4) }
+    Frames: integer;         { +04  frame count; its low byte starts the unit's effect timer (1537:188f) }
+  end;
+
+  TSaAnim = record           { 5 bytes; SpWar::SpriteRects, war\war\sa<n>.ani }
+    Frames: byte;            { +00 }
+    Width:  byte;            { +01 }
+    Height: byte;            { +02 }
+    X:      byte;            { +03  screen position of the frame }
+    Y:      byte;            { +04 }
+  end;
+
   { --- Borland units and system --- }
 
   Registers = record         { 20 bytes; Dos.Registers, passed to Intr }

@@ -18,16 +18,6 @@
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
 
-// Unnamed globals of the unit.
-#define ANIM_FRAME (*(int16_t *)ds_at(0x78E6))     // 1-based frame of the animated (FANIM) tiles
-#define FANIM_OFS (*(uint16_t *)ds_at(0x78E8))     // byte offset of that frame in BufD
-#define RADAR_STALE (*(uint16_t *)ds_at(0x7904))   // set to FFFFh by EnterSurface
-#define FELSZ_TILES (*(uint16_t *)ds_at(0x791A))   // tiles of the FELSZ sheet: higher numbers come from BufD
-#define BLINK_COUNTER (*(uint16_t *)ds_at(0x791C)) // mod 20, shares its address with the count table
-#define BLINK_TOGGLE (*(uint8_t *)ds_at(0x791E))   // highlight of finished buildings on/off
-// Count table of CountBuildingsByKind: longint [Flag 0..1][kind 1..25].
-#define KIND_COUNT(flag, kind) (*(int32_t *)ds_at((uint16_t)(0x791C + (flag) * 100 + (kind) * 4)))
-
 static FarPtr far_add(FarPtr p, int32_t delta)
 {
     return far_ptr((uint16_t)(p >> 16), (uint16_t)((uint16_t)p + delta));
@@ -184,7 +174,7 @@ void Surface_EnterSurface(void)
         ds.Surface_RadarBuf = System_GetMem((uint16_t)(w * h));
     else
         ds.Surface_RadarBuf = System_GetMem((uint16_t)(w * 4 * h));
-    RADAR_STALE = 0xFFFF;
+    ds.Surface_RadarStale = 0xFFFF;
 }
 
 // 2ef2:03e7
@@ -216,9 +206,10 @@ void Surface_LoadMap(void)
         for (uint16_t col = 1; col <= (uint16_t)m.width; col++) {
             uint16_t c = cells[(uint16_t)(m.width * (row - 1) + col - 1)];
             *tile_at((int16_t)col, (int16_t)row) = (uint8_t)c;
-            // MapTemplates[TileSet][c / 20 + 1][c % 20]: a nonzero entry is blocked terrain.
-            uint8_t blocked = *(uint8_t *)ds_at(
-                (uint16_t)(0x0D96 + (uint16_t)(ds.Surface_TileSet - 1) * 0xF0 + c));
+            // MapTemplates[TileSet][c / 20 + 1][c % 20]: a nonzero entry is blocked
+            // terrain. Addressed flat, so tiles 240 and up read the next template.
+            const uint8_t *templates = &ds.Surface_MapTemplates[0][0][0];
+            uint8_t blocked = templates[(uint16_t)(ds.Surface_TileSet - 1) * 0xF0 + c];
             *occupy_at((int16_t)col, (int16_t)row) = blocked == 0 ? 0 : 0xFF;
             *building_at((int16_t)col, (int16_t)row) = 0;
         }
@@ -501,12 +492,12 @@ void Surface_DrawModeButtons(void)
 // 2ef2:15de: per frame; the Build / Destroy button alternates at phases 1 and 11.
 void Surface_BlinkModeButton(void)
 {
-    BLINK_COUNTER = (uint16_t)((BLINK_COUNTER + 1) % 0x14);
+    ds.Surface_BlinkCounter = (uint16_t)((ds.Surface_BlinkCounter + 1) % 0x14);
     if (ds.Surface_Mode == 2) {
         int16_t sel = -1;
-        if (BLINK_COUNTER == 1)
+        if (ds.Surface_BlinkCounter == 1)
             sel = 0x2C;
-        if (BLINK_COUNTER == 0xB)
+        if (ds.Surface_BlinkCounter == 0xB)
             sel = 0;
         if (sel == -1)
             return;
@@ -516,9 +507,9 @@ void Surface_BlinkModeButton(void)
     }
     if (ds.Surface_Mode == 6) {
         int16_t sel = -1;
-        if (BLINK_COUNTER == 1)
+        if (ds.Surface_BlinkCounter == 1)
             sel = 0x2C;
-        if (BLINK_COUNTER == 0xB)
+        if (ds.Surface_BlinkCounter == 0xB)
             sel = 0;
         if (sel != -1) {
             Mouse_HideCursor();
@@ -685,8 +676,9 @@ void Surface_DrawMapView(void)
     if (!body_shown(far_host(ds.Game_CurBody)))
         return;
 
-    FANIM_OFS = (uint16_t)((int32_t)(int16_t)((ANIM_FRAME - 1) * 0x100)
-                           * ds.Surface_FanimTileCount[ds.Surface_TileSet - 1]);
+    int16_t frame_ofs = (int16_t)((ds.Surface_AnimTileFrame - 1) * 0x100);
+    ds.Surface_AnimTileOffset =
+        (uint16_t)((int32_t)frame_ofs * ds.Surface_FanimTileCount[ds.Surface_TileSet - 1]);
     const TBuildingType *bt = btype(ds.Surface_SelKind);
     for (uint16_t x = 1; x <= 14; x++) {
         for (uint16_t y = 1; y <= 9; y++) {
@@ -698,16 +690,16 @@ void Surface_DrawMapView(void)
             if (!inside) {
                 if (occ == 0 || occ == 0xFF) {
                     uint16_t t = *tile_at(ax, ay);
-                    if (t < FELSZ_TILES)
+                    if (t < ds.Surface_FelszTiles)
                         Surface_BlitTile(far_host(ds.Surface_BufB), t, sx, sy);
                     else
-                        Surface_BlitTile(buf_at(ds.Surface_BufD, FANIM_OFS),
-                                         (uint16_t)(t - FELSZ_TILES), sx, sy);
+                        Surface_BlitTile(buf_at(ds.Surface_BufD, ds.Surface_AnimTileOffset),
+                                         (uint16_t)(t - ds.Surface_FelszTiles), sx, sy);
                 } else {
                     int16_t bi = (int16_t)*building_at(ax, ay);
                     const TBuilding *b = bldg(bi);
                     Surface_BlitTile(far_host(ds.Surface_BufC), (uint16_t)(occ - 1), sx, sy);
-                    if (b->Flag == 0 && b->Health == 0 && BLINK_TOGGLE != 0) {
+                    if (b->Flag == 0 && b->Health == 0 && ds.Surface_BlinkOn != 0) {
                         // Three nested outlines flash on finished but unpowered buildings.
                         Gfx_DrawRectOutline((int16_t)((x - 1) * 16 + 0x61), (int16_t)((y - 1) * 16 + 0x39),
                                             (int16_t)(x * 16 + 0x5A), (int16_t)(y * 16 + 0x32), 0x11);
@@ -726,11 +718,11 @@ void Surface_DrawMapView(void)
                 // Cursor over something in the way: that cell, red outline.
                 if (occ == 0xFF) {
                     uint16_t t = *tile_at(ax, ay);
-                    if (t < FELSZ_TILES)
+                    if (t < ds.Surface_FelszTiles)
                         Surface_BlitTileInner(far_host(ds.Surface_BufB), t, sx, sy);
                     else
-                        Surface_BlitTileInner(buf_at(ds.Surface_BufD, FANIM_OFS),
-                                              (uint16_t)(t - FELSZ_TILES), sx, sy);
+                        Surface_BlitTileInner(buf_at(ds.Surface_BufD, ds.Surface_AnimTileOffset),
+                                              (uint16_t)(t - ds.Surface_FelszTiles), sx, sy);
                 } else {
                     Surface_BlitTileInner(far_host(ds.Surface_BufC), (uint16_t)(occ - 1), sx, sy);
                 }
@@ -739,7 +731,7 @@ void Surface_DrawMapView(void)
             }
         }
     }
-    BLINK_TOGGLE = BLINK_TOGGLE == 0;
+    ds.Surface_BlinkOn = ds.Surface_BlinkOn == 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -991,11 +983,11 @@ void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon)
 {
     for (int flag = 0; flag <= 1; flag++)
         for (int kind = 1; kind <= 25; kind++)
-            KIND_COUNT(flag, kind) = 0;
+            ds.Surface_KindCounts[flag][kind - 1] = 0;
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = bldg(i);
         if (b->System == system && b->Planet == planet && b->Moon == moon && b->Health == 0)
-            KIND_COUNT((int8_t)b->Flag, b->Kind)++;
+            ds.Surface_KindCounts[(int8_t)b->Flag][b->Kind - 1]++;
     }
 }
 

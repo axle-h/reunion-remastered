@@ -308,10 +308,10 @@ void Message_PromptPlanetName(int16_t sys, int16_t planet)
     System_StrLoad(&s, PSTR("| The new planet's name in "));
     System_StrConcat(&s, (const PString *)&ds.Names_Systems[sys - 1]);
     System_StrConcat(&s, PSTR(" system? &xxxxxxxx |"));
-    // The names of system sys are 13-byte records (string[12]) behind DS:4712[sys].
-    uint32_t table = *(uint32_t *)ds_at((uint16_t)(0x4712 + sys * 4));
+    // The names of system sys are 13-byte records (string[12]) behind Galaxy::Names[sys].
+    uint32_t table = ds.Galaxy_Names[sys - 1];
     FarPtr name = far_ptr((uint16_t)(table >> 16), (uint16_t)((uint16_t)table + planet * 13 - 13));
-    TextFile_SetStringPtr(name);  // the editor keeps it (DS:7C50)
+    TextFile_SetStringPtr(name);  // the editor keeps it (TextFile::InputStr)
     Message_MessageBox(ps(&s), ps(PSTR("")), false, far_host(name), true, 9);
 }
 

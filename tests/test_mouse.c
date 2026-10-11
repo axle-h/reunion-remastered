@@ -21,9 +21,9 @@ static void hotspots(void)
     Mouse_ClearHotspots(1, 66);
     CHECK(ds.Mouse_Hotspots[0].W == 0 && ds.Mouse_Hotspots[65].Caption.len == 0);
 
-    // Element 1 lives at DS:8A8C.
+    // Hotspot 1 is element 0.
     Mouse_SetHotspot(1, 100, 50, 20, 10, cap_a, 1, 4);
-    CHECK((uint8_t *)&ds.Mouse_Hotspots[0] == (uint8_t *)ds_at(0x8A8C));
+    CHECK(Mouse_Hotspot(1) == &ds.Mouse_Hotspots[0]);
     CHECK(ds.Mouse_Hotspots[0].X == 100 && ds.Mouse_Hotspots[0].Y == 50);
     CHECK(ds.Mouse_Hotspots[0].Caption.len == 3 && ds.Mouse_Hotspots[0].Repeat_ == 1
           && ds.Mouse_Hotspots[0]._1A == 4);
@@ -168,25 +168,25 @@ static void poll(void)
     CHECK(ds.Mouse_Buttons == 1 && ds.Mouse_ButtonsChanged == 1);
     CHECK(ds.Mouse_ClickX == ds.Mouse_X && ds.Mouse_ClickY == ds.Mouse_Y);
     CHECK(ds.Mouse_HotspotUnder == 21 && ds.Mouse_CursorShape == 3);
-    CHECK(*(uint8_t *)ds_at(0x8A86) == 1 && *(uint8_t *)ds_at(0x8A85) == 0);
-    CHECK(*(uint8_t *)ds_at(0x8A7A) == 1);
+    CHECK(ds.Mouse_Pressed == 1 && ds.Mouse_Released == 0);
+    CHECK(ds.Mouse_HeldLeft == 1);
 
     Mouse_Poll();  // held: no change
-    CHECK(ds.Mouse_ButtonsChanged == 0 && *(uint8_t *)ds_at(0x8A86) == 0);
+    CHECK(ds.Mouse_ButtonsChanged == 0 && ds.Mouse_Pressed == 0);
 
     button(SDL_BUTTON_LEFT, false, cx, cy);
     button(SDL_BUTTON_RIGHT, true, 0, 0);
     input_pump();
     Mouse_Poll();  // left up, right down: still "a button down", no change
     CHECK(ds.Mouse_BtnDown == 1 && ds.Mouse_BtnRight == 1 && ds.Mouse_BtnLeft == 0);
-    CHECK(ds.Mouse_ButtonsChanged == 0 && *(uint8_t *)ds_at(0x8A7B) == 1);
+    CHECK(ds.Mouse_ButtonsChanged == 0 && ds.Mouse_HeldRight == 1);
     CHECK(ds.Mouse_HotspotUnder == 0 && ds.Mouse_CursorShape == 0);
 
     button(SDL_BUTTON_RIGHT, false, 0, 0);
     input_pump();
     Mouse_Poll();
     CHECK(ds.Mouse_Buttons == 0 && ds.Mouse_ButtonsChanged == 1);
-    CHECK(*(uint8_t *)ds_at(0x8A85) == 1 && *(uint8_t *)ds_at(0x8A86) == 0);
+    CHECK(ds.Mouse_Released == 1 && ds.Mouse_Pressed == 0);
 
     // While the cursor is being redrawn (state 2) the position is not updated.
     ds.Mouse_CursorState = 2;

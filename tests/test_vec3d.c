@@ -16,9 +16,7 @@ static bool ok = true;
 
 static int32_t cos500(int i)
 {
-    int32_t v;
-    memcpy(&v, ds_at((uint16_t)(VEC3D_COS_TABLE + i * 4)), 4);
-    return v;
+    return ds.Vec3D_CosTable[i];
 }
 
 static int16_t *words(uint8_t *p)
@@ -56,8 +54,8 @@ static void cos_table(void)
     }
     CHECK(close);
     CHECK(sym);
-    // The table ends right before the spin words at DS:8578.
-    CHECK(*(int16_t *)ds_at(0x8578) == 0);
+    // The table ends right before the spin words.
+    CHECK(ds.VecLoad_Spin[0] == 0);
 }
 
 static void project(void)
@@ -96,7 +94,7 @@ static void project(void)
 static void trace_edge(void)
 {
     mem_init();
-    uint8_t *t = ds_at(VEC3D_EDGES_A);
+    uint8_t *t = (uint8_t *)&ds.Vec3D_EdgesA;
     int16_t *tab = words(t);
     // Vertical: the whole y range, whatever the direction.
     Vec3D_TraceEdge(7, 12, 7, 5, t);
@@ -146,8 +144,8 @@ static void fill_poly(void)
     CHECK(same);
     CHECK(count == 210);  // 20 + 19 + ... + 1
     // The tables hold the two sides.
-    CHECK(*(int16_t *)ds_at(VEC3D_EDGES_A + 2 * 15) == 25);
-    CHECK(*(int16_t *)ds_at(VEC3D_EDGES_B + 2 * 15) == 10);
+    CHECK(ds.Vec3D_EdgesA[15] == 25);
+    CHECK(ds.Vec3D_EdgesB[15] == 10);
 
     // A span starting on an odd column gets colour + 1 there too.
     SDL_memset(buf, 0, 320 * 40);
@@ -170,16 +168,16 @@ static void prepare(void)
     f[0] = 1, f[1] = 2, f[2] = 3;        // n = (0, 0, 100): toward the centroid
     f[20] = 1, f[21] = 3, f[22] = 2;     // n = (0, 0, -100): flipped
     Vec3D_PrepareObject(1, 2, verts, faces, normals, 4, 2);
-    int16_t *c = ds_at(VEC3D_CENTROIDS + 2 * 6);
-    CHECK(c[0] == 3 && c[1] == 3 && c[2] == 3);  // Round(2.5) = 3
+    const TVecPoint *c = &ds.Vec3D_Centroids[2 - 1];
+    CHECK(c->X == 3 && c->Y == 3 && c->Z == 3);  // Round(2.5) = 3
     int16_t *n = words(normals);
     CHECK(n[0] == 0 && n[1] == 0 && n[2] == 50);
     CHECK(n[3] == 0 && n[4] == 0 && n[5] == 50);
 
     // Model 6 fixes: y = 0, x and z times 3.
     Vec3D_PrepareObject(6, 1, verts, faces, normals, 4, 0);
-    c = ds_at(VEC3D_CENTROIDS + 1 * 6);
-    CHECK(c[0] == 9 && c[1] == 0 && c[2] == 9);
+    c = &ds.Vec3D_Centroids[1 - 1];
+    CHECK(c->X == 9 && c->Y == 0 && c->Z == 9);
 }
 
 // V3.VEC loaded and drawn like the 3D research screen.
@@ -189,16 +187,16 @@ static void model(void)
     CHECK(dseg_init());
     system_init();
     VecLoad_Init();
-    *(FarPtr *)ds_at(0x8584) = System_GetMem(0xAF00);  // as Shop::ShopScreen
+    ds.VecLoad_Buffer = System_GetMem(0xAF00);  // as Shop::ShopScreen
     VecLoad_AllocVecBuffers();
     VecLoad_LoadVec(3);
-    int16_t objects = *(int16_t *)ds_at(0x7E50);
+    int16_t objects = ds.VecLoad_ObjectCount;
     CHECK(objects > 0 && objects <= 17);
     // Every normal has length about 50.
     bool len = true;
     for (int s = 1; s <= objects; s++) {
-        int16_t nf = *(int16_t *)ds_at((uint16_t)(0x7FB0 + 2 * s));
-        int16_t *n = far_host(*(FarPtr *)ds_at((uint16_t)(0x7E5A + 4 * s)));
+        int16_t nf = ds.VecLoad_FaceCount[s - 1];
+        int16_t *n = far_host(ds.VecLoad_Normals[s]);
         for (int i = 0; i < nf; i++) {
             const int16_t *v = n + 3 * i;
             int l2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
@@ -208,7 +206,7 @@ static void model(void)
     CHECK(len);
     VecLoad_DrawFrame();
     // Only the window changed, and only to background and blue-ramp colours.
-    uint8_t *buf = far_host(far_ptr((uint16_t)(*(FarPtr *)ds_at(0x8584) >> 16), 0));
+    uint8_t *buf = far_host(far_ptr((uint16_t)(ds.VecLoad_Buffer >> 16), 0));
     int shaded = 0;
     bool colours = true;
     for (int y = 10; y < 10 + 0x73; y++)
@@ -219,7 +217,7 @@ static void model(void)
         }
     CHECK(colours);
     CHECK(shaded > 500);
-    CHECK(*(uint16_t *)ds_at(0x7E48) == *(uint16_t *)ds_at(0x8578) % 1080);
+    CHECK(ds.VecLoad_Angles[0] == ds.VecLoad_Spin[0] % 1080);
     VecLoad_FreeVecBuffers();
 }
 

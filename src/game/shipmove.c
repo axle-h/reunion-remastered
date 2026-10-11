@@ -24,20 +24,6 @@ void AlienTalk_StartAlienScene(int16_t scene);                                  
 
 #define PS(lit) ((const uint8_t *)PSTR(lit))
 
-// Unnamed globals.
-#define BlinkCounter (*(uint16_t *)ds_at(0x7802))
-#define SpinnerCounter (*(uint16_t *)ds_at(0x7804))
-#define LightOn(i) (*(uint8_t *)ds_at(0x7805 + (i)))          // i = 1..6 (DS:7806..780B)
-#define InRestrictedArea (*(uint8_t *)ds_at(0x780C))          // group at 1:7:0 with planet 7 not yet ours
-#define LightX(i) (*(int16_t *)ds_at(0x07D6 + 2 * (i)))        // typed constants, i = 1..6 (22ca:1ee7)
-#define LightY(i) (*(int16_t *)ds_at(0x07E2 + 2 * (i)))
-#define LightW(i) (*(int16_t *)ds_at(0x07EE + 2 * (i)))
-#define LightH(i) (*(int16_t *)ds_at(0x07FA + 2 * (i)))
-#define Flag787C (*(uint8_t *)ds_at(0x787C))                  // set when returning from the destination screen without choosing?
-#define StoryFlag6004 (*(int16_t *)ds_at(0x6004))
-#define StoryFlag6216 (*(int16_t *)ds_at(0x6216))
-#define StoryFlag63F3 (*(int16_t *)ds_at(0x63F3))
-
 // Far pointer plus a (wrapping) 16-bit offset, as the original computes them.
 static FarPtr far_add(FarPtr p, int32_t delta)
 {
@@ -49,6 +35,10 @@ static FarPtr far_add(FarPtr p, int32_t delta)
 static uint8_t *buf_at(FarPtr p, int32_t delta) { return (uint8_t *)far_host(p) + delta; }
 
 static TBody *bodyp(FarPtr p) { return (TBody *)far_host(p); }
+
+// Research::Products[p].State: 0 while the invention is unknown, so the landing
+// events below happen once.
+static int16_t product_state(int16_t p) { return ds.Research_Products[p - 1].State; }
 
 // Pascal string "planets\nagy<n>" in buf.
 static const uint8_t *nagy_name(uint8_t buf[256], int16_t n)
@@ -89,7 +79,7 @@ void ShipMove_GroupScreen(void)
     int16_t surf;
 
     if (ds.Game_ScreenEntered) {
-        if (ds.Game_PrevScreen == 0x12 && Flag787C == 0)
+        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0)
             Intel_SetGroupTarget(ds.Game_SelGroup, ds.Game_CurSystem,
                                  ds.Game_CurPlanet[ds.Game_CurSystem - 1],
                                  ds.Game_CurMoon[ds.Game_CurSystem - 1]);
@@ -99,13 +89,13 @@ void ShipMove_GroupScreen(void)
             ds.Game_CurMoon[ds.Game_CurSystem - 1] = g->Moon;
             PlanetInfo_SelectCurBody();
         }
-        InRestrictedArea = 0;
+        ds.ShipMove_InRestrictedArea = 0;
         if (g->System == 1 && g->Planet == 7 && g->Moon == 0
             && bodyp(ds.Galaxy_Bodies[0])[6].Owner != 1 && bodyp(ds.Galaxy_Bodies[0])[6].Owner != 2)
-            InRestrictedArea = 1;
+            ds.ShipMove_InRestrictedArea = 1;
         Satellite_SetupGroupScreenMenu();
         surf = bodyp(ds.Game_CurBody)->SurfaceType;
-        if (InRestrictedArea)
+        if (ds.ShipMove_InRestrictedArea)
             surf = 12;
         if (g->Status == 1)
             ShipMove_InitDockView(surf);
@@ -156,20 +146,20 @@ void ShipMove_GroupScreen(void)
             ds.Game_HotspotHit = 0;
             Gfx_DrawStatusText(PS(""));
             surf = bodyp(ds.Game_CurBody)->SurfaceType;
-            if (InRestrictedArea)
+            if (ds.ShipMove_InRestrictedArea)
                 surf = 12;
             if (g->System == 1 && g->Planet == 7 && g->Moon == 0
-                && bodyp(ds.Galaxy_Bodies[0])[6].Owner != 2 && StoryFlag6004 == 0) {
+                && bodyp(ds.Galaxy_Bodies[0])[6].Owner != 2 && product_state(12) == 0) {
                 Message_ShowMessageLine(0xD);
                 Intel_OfferInventionForAnalysis(0xC);
             }
-            if (g->System == 3 && g->Planet == 2 && g->Moon == 1 && StoryFlag6216 == 0) {
+            if (g->System == 3 && g->Planet == 2 && g->Moon == 1 && product_state(22) == 0) {
                 Message_ShowMessageLine(0x15);
                 Intel_OfferInventionForAnalysis(0x16);
                 Intel_OfferInventionForAnalysis(0x17);
                 AlienTalk_StartAlienScene(4);
             }
-            if (g->System == 7 && g->Planet == 1 && g->Moon == 0 && StoryFlag63F3 == 0) {
+            if (g->System == 7 && g->Planet == 1 && g->Moon == 0 && product_state(31) == 0) {
                 Message_ShowMessageLine(0x1F);
                 Intel_OfferInventionForAnalysis(0x1F);
                 Intel_OfferInventionForAnalysis(0x20);
@@ -530,8 +520,8 @@ void ShipMove_DrawDockDoorFrame(int16_t frame)
 // 22ca:1de8: every 6th tick draws a random 24x18 blink sprite
 void ShipMove_AnimateBlinkLight(void)
 {
-    BlinkCounter = (BlinkCounter + 1) % 6;
-    if (BlinkCounter == 0) {
+    ds.ShipMove_BlinkCounter = (ds.ShipMove_BlinkCounter + 1) % 6;
+    if (ds.ShipMove_BlinkCounter == 0) {
         uint16_t r = System_Random(6);
         Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, r * 0x1A + 0x3A07),
                       gfx_screen() + 0xE589, 0x18, 0x12);
@@ -541,8 +531,8 @@ void ShipMove_AnimateBlinkLight(void)
 // 22ca:1e2f: 4-frame 10x16 sprite, a new frame every 8 ticks
 void ShipMove_AnimateSpinner(void)
 {
-    SpinnerCounter = (SpinnerCounter + 1) % 0x20;
-    Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, (SpinnerCounter / 8) * 0xB + 0x43D9),
+    ds.ShipMove_SpinnerCounter = (ds.ShipMove_SpinnerCounter + 1) % 0x20;
+    Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, (ds.ShipMove_SpinnerCounter / 8) * 0xB + 0x43D9),
                   gfx_screen() + 0xBD81, 10, 0x10);
 }
 
@@ -551,12 +541,13 @@ void ShipMove_AnimateLights(void)
 {
     uint16_t idx = System_Random(6) + 1;
     if (System_Random(2) == 0)
-        LightOn(idx) = LightOn(idx) == 0;
+        ds.ShipMove_LightOn[idx - 1] = ds.ShipMove_LightOn[idx - 1] == 0;
     for (int i = 1; i <= 6; i++) {
-        int32_t base = LightOn(i) == 0 ? 0x3619 : 0x2859;
-        int32_t rel = LightX(i) + LightY(i) * 0x140;
+        int32_t base = ds.ShipMove_LightOn[i - 1] == 0 ? 0x3619 : 0x2859;
+        int32_t rel = ds.ShipMove_LightX[i - 1] + ds.ShipMove_LightY[i - 1] * 0x140;
         Blit_CopyRect(buf_at(ds.ShipMove_AnimSheet, base + rel),
-                      gfx_screen() + (uint16_t)(rel + 0x9F89), LightW(i), LightH(i));
+                      gfx_screen() + (uint16_t)(rel + 0x9F89), ds.ShipMove_LightW[i - 1],
+                      ds.ShipMove_LightH[i - 1]);
     }
 }
 

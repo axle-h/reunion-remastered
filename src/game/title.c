@@ -11,14 +11,6 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Unnamed globals.
-#define W16(off) (*(uint16_t *)ds_at(off))
-#define MENU_CHOICE W16(0x5DAA)          // start-up menu result: 1 new game, 2 load, 3 quit
-#define ICON_SIZE W16(0x54CA)            // size of ICON\ICON.ALL
-#define BLOCK_INIT (*(FarPtr *)ds_at(0x7D62))
-#define BG_PTR (*(FarPtr *)ds_at(0x7D66)) // iconmain: cell backgrounds, here the cursor sheet
-#define BACKDROP_SHOWN (*(uint8_t *)ds_at(0x7E3A))
-
 static inline const uint8_t *ps(const PString *p)
 {
     return (const uint8_t *)p;
@@ -26,7 +18,7 @@ static inline const uint8_t *ps(const PString *p)
 
 #define LIT(s) ps(PSTR(s))
 
-// DS:918E is written by the INT 33h callback; here Mouse_Update stands in
+// Mouse::BtnDown is written by the INT 33h callback; here Mouse_Update stands in
 // for it, and a retrace wait lets the platform layer run.
 static void wait_button_release(void)
 {
@@ -95,19 +87,19 @@ void Title_StartMenu(void)
                 0, 0xFF, 0, 0, 0xFF);
     Gfx_FadeIn(0, 0xFF, pal);
     Mouse_ShowCursor();
-    MENU_CHOICE = 0;
-    while (MENU_CHOICE == 0) {
+    ds.Game_StartChoice = 0;
+    while (ds.Game_StartChoice == 0) {
         wait_button_release();
         wait_button_press();
         uint16_t x = (uint16_t)ds.Mouse_X, y = (uint16_t)ds.Mouse_Y;
         if (x < 0x4B || x > 0xFA)
             continue;
         if (y >= 0x30 && y < 0x4C)
-            MENU_CHOICE = 1;
+            ds.Game_StartChoice = 1;
         if (y >= 0x4C && y < 0x69)
-            MENU_CHOICE = 2;
+            ds.Game_StartChoice = 2;
         if (y >= 0x69 && y < 0x85)
-            MENU_CHOICE = 3;
+            ds.Game_StartChoice = 3;
     }
     Mouse_HideCursor();
 }
@@ -119,7 +111,10 @@ void Title_InitTitleAndMainMenu(void)
     static uint8_t tpal[0x300];
 
     GfxPath_IconAllIndex();
-    BG_PTR = far_ptr((uint16_t)(BLOCK_INIT >> 16), (uint16_t)((uint16_t)BLOCK_INIT + ICON_SIZE + 0x54FF));
+    FarPtr init = ds.GfxPath_InitBlock;
+    uint16_t cells = (uint16_t)(ds.GfxPath_IconAllSize + 0x54FF);  // GfxPath's BG_OFS
+    ds.GfxPath_CellBackgrounds =
+        far_ptr((uint16_t)(init >> 16), (uint16_t)((uint16_t)init + cells));
     memset(tpal, 0, 768);
     FarPtr charset = ds.Gfx_Charset;
     Gfx_LoadPic(LIT("grafika\\charset1"),
@@ -132,19 +127,20 @@ void Title_InitTitleAndMainMenu(void)
 
     Ems_EmsMapAll(Ems_ToolbarBlock());
     FarPtr data = Ems_ToolbarBlock()->Data;
-    FarPtr icons = far_ptr((uint16_t)(data >> 16), (uint16_t)((uint16_t)data + ICON_SIZE + 0x54FF));
-    BG_PTR = icons;
+    FarPtr icons = far_ptr((uint16_t)(data >> 16), (uint16_t)((uint16_t)data + cells));
+    ds.GfxPath_CellBackgrounds = icons;
     Gfx_LoadPic(LIT("icon\\iconmain"), far_host(icons), 1, 0x20, 0, 0, 0xF0, false, tpal, 0, 0x21,
                 2, 0, 0x21);
 
     // Six 16x16 cursor shapes from iconmain; colour 2 is transparent.
     static const uint8_t base[6] = {0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF};
+    FarPtr sheet = ds.GfxPath_CellBackgrounds;
     for (int k = 0; k < 6; k++) {
         for (uint16_t row = 1; row <= 0x10; row++) {
             for (uint16_t col = 1; col <= 0x10; col++) {
                 uint8_t v = *(uint8_t *)far_host(
-                    far_ptr((uint16_t)(BG_PTR >> 16),
-                            (uint16_t)((uint16_t)BG_PTR + col + row * 0xF0 + base[k])));
+                    far_ptr((uint16_t)(sheet >> 16),
+                            (uint16_t)((uint16_t)sheet + col + row * 0xF0 + base[k])));
                 ds.Mouse_CursorImages[k][(row - 1) * 16 + (col - 1)] = v == 2 ? 0 : v;
             }
         }
@@ -154,9 +150,9 @@ void Title_InitTitleAndMainMenu(void)
     ds.Game_Hero = (int16_t)(System_Random(2) + 1);
     ds.Game_HeroSpriteX = ds.Game_Hero == 1 ? 0x45 : 1;
     Title_StartMenu();
-    if (MENU_CHOICE == 3)
+    if (ds.Game_StartChoice == 3)
         Gfx_FatalExit();
-    if (MENU_CHOICE == 1) {
+    if (ds.Game_StartChoice == 1) {
         Gfx_BlankPalette(Gfx_PalettePtr(), 0, 0xFF);
         Gfx_LoadPic(LIT("grafika\\choise"), gfx_screen(), 1, 200, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0xFF, 0, 0, 0xFF);
@@ -172,7 +168,7 @@ void Title_InitTitleAndMainMenu(void)
                 0x24, 0, 0xF);
     Gfx_LoadPic(LIT("grafika\\main"), far_host(main), 1, 0x97, 0, 0, 0x140, false, tpal, 0, 0xB0,
                 0x40, 0, 0xBE);
-    BACKDROP_SHOWN = 1;
+    ds.Command_BackdropShown = 1;
     Gfx_BlankPalette(Gfx_PalettePtr(), 0, 0xFF);
     System_MoveFwd(tpal, ds.Gfx_Palette, 0x300);
     Blit_CopyBytes(far_host(text), gfx_screen() + 0x2800, 0x1540);

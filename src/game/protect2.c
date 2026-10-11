@@ -42,8 +42,8 @@ void Protect2_AskDateQuestion(void)
     // correct answer produces: AnswerHash = h with h + 3421h = WordCodes[Q].
     ds.Protect2_AnswerHash = want - PROTECT2_UNANSWERED;
     // Scratch values the original stores along the way (nothing reads them).
-    *(uint32_t *)ds_at(0x087E) = (uint32_t)ds.Protect2_AnswerHash + 0xAA9B;
-    *(uint32_t *)ds_at(0x0886) = (uint32_t)ds.Protect2_AnswerKey * 5 + 0x8613;
+    ds.Protect2_HashEcho = (int32_t)((uint32_t)ds.Protect2_AnswerHash + 0xAA9B);
+    ds.Protect2_KeyEcho = (int32_t)((uint32_t)ds.Protect2_AnswerKey * 5 + 0x8613);
     ds.Protect2_AnswerKey = ds.Protect2_AnswerHash + PROTECT2_UNANSWERED;
     // (The original echoes the hash in the status bar via StrLong/DrawStatusText: debug output.)
     if (ds.Protect2_AnswerKey > PROTECT2_UNANSWERED)

@@ -15,10 +15,6 @@ void Surface_DrawBuildingTiles(int16_t kind, int16_t x, int16_t y); // 2ef2:1b98
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
 
-// Unnamed global: total cost of the colony and the chosen buildings so far
-// (longint; 100000 on entry).
-#define TOTAL_COST (*(int32_t *)ds_at(0x788A))
-
 static int16_t cur_planet(void)
 {
     return ds.Game_CurPlanet[ds.Game_CurSystem - 1];
@@ -50,9 +46,9 @@ void Colonize_ColonizeScreen(void)
 {
     if (ds.Game_ScreenEntered) {
         if ((ds.Game_StaffHired[1] == 2 && ds.Game_CurSystem < 3) || ds.Game_StaffHired[1] == 3) {
-            TOTAL_COST = 100000;
+            ds.Colonize_ColonyCost = 100000;
             const TBody *body = far_host(ds.Game_CurBody);
-            ds.Surface_TileSet = *(int16_t *)ds_at((uint16_t)(0x1A38 + (int8_t)body->SurfaceType * 2));
+            ds.Surface_TileSet = ds.Surface_Tileset[(int8_t)body->SurfaceType - 1];
             Colonize_DrawColonizeScreen();
             Colonize_SetupColonizeHotspots();
             TColonySetup *cs = &ds.Game_ColonySetups[ds.Game_ColonySetupCount++];
@@ -75,7 +71,7 @@ void Colonize_ColonizeScreen(void)
         }
     }
     if (ds.Game_MenuCommand == 0x3B) {
-        if (ds.Game_Credits < TOTAL_COST) {
+        if (ds.Game_Credits < ds.Colonize_ColonyCost) {
             Sound_PlayButtonSfx(P("hiba"));
             Gfx_FlashCredits();
         } else {
@@ -101,7 +97,8 @@ void Colonize_ColonizeScreen(void)
             g->System = (uint8_t)ds.Game_CurSystem;
             g->Planet = (uint8_t)cur_planet();
             g->Moon = (uint8_t)cur_moon();
-            ds.Game_Credits = (int32_t)((uint32_t)ds.Game_Credits - (uint32_t)TOTAL_COST);
+            ds.Game_Credits =
+                (int32_t)((uint32_t)ds.Game_Credits - (uint32_t)ds.Colonize_ColonyCost);
             Gfx_DrawCredits();
         }
     }
@@ -126,12 +123,12 @@ void Colonize_ColonizeScreen(void)
     int16_t *picked = &ds.Game_ColonySetups[ds.Game_ColonySetupCount - 1].Timers[slot - 1];
     if (*picked == 0) {
         // Select: the colony plus the chosen buildings must stay payable.
-        if (TOTAL_COST + bt->Cost <= ds.Game_Credits) {
+        if (ds.Colonize_ColonyCost + bt->Cost <= ds.Game_Credits) {
             Sound_PlayButtonSfx(P("x"));
             Gfx_DrawCredits();
             *picked = 1;
             Surface_DrawBuildingTiles(sb->Building, sb->X, sb->Y);
-            TOTAL_COST += bt->Cost;
+            ds.Colonize_ColonyCost += bt->Cost;
         } else {
             Sound_PlayButtonSfx(P("hiba"));
             Gfx_FlashCredits();
@@ -142,10 +139,10 @@ void Colonize_ColonizeScreen(void)
         *picked = 0;
         Gfx_DrawDitherRect(sb->X, sb->Y, (int16_t)(bt->Width * 16 + sb->X - 1),
                            (int16_t)(bt->Height * 16 + sb->Y - 1), 0x40);
-        TOTAL_COST -= bt->Cost;
+        ds.Colonize_ColonyCost -= bt->Cost;
     }
     PString s;
-    System_StrLong(TOTAL_COST, 0, &s, 0xFF);
+    System_StrLong(ds.Colonize_ColonyCost, 0, &s, 0xFF);
     Gfx_DrawTextF9((const uint8_t *)&s, 0x114, 0xB9, 6);
 }
 

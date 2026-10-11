@@ -12,31 +12,20 @@
 
 #include <string.h>
 
-// Unnamed globals (see shop.h).
-#define PREV_SEL (*(int16_t *)ds_at(0x79F0))
-#define PREV_TOP (*(int16_t *)ds_at(0x79F2))
-#define PREV_QTY (*(int32_t *)ds_at(0x79F4))
-#define PREV_SEL2 (*(int16_t *)ds_at(0x79F8))
-#define QTY_EDIT (*(uint8_t *)ds_at(0x79FB))
-#define SHOW_PICTURE (*(uint8_t *)ds_at(0x79FC))
-#define ORE_NEEDED(k) (*(int32_t *)ds_at((uint16_t)(0x79FA + 4 * (k))))
-#define ORE_STOCK(k) (*(int32_t *)ds_at((uint16_t)(0x7A12 + 4 * (k))))
-#define ORE_FLAG(k) (*(uint8_t *)ds_at((uint16_t)(0x7A2D + (k))))
-#define ORE_LINE(i) ((PString *)ds_at((uint16_t)(0x7A54 + 16 * (i)))) // i = 0..5, string[15]
-#define LIST ((uint8_t *)ds_at(0x7AB6))      // product ids, 1-based: LIST[Sel - 1]
-#define SPIN_FLAG (*(int16_t *)ds_at(0x7E4E)) // ? vec model keeps turning while set
-#define ANGLES ((int16_t *)ds_at(0x7E48))     // vec model angles x, y, z
-#define SLOT_8584 (*(FarPtr *)ds_at(0x8584))  // 320-wide off-screen buffer for the vec view
-#define PANEL_BUF (*(FarPtr *)ds_at(0x7ADA))  // temporary panel picture
-
 #define PRODUCT(k) ds.Research_Products[(k) - 1]
-#define SEL_PRODUCT_ID LIST[ds.Shop_Sel - 1]
+#define SEL_PRODUCT_ID ds.Shop_List[ds.Shop_Sel - 1]
 #define SEL_PRODUCT (&PRODUCT(SEL_PRODUCT_ID))
 #define SPACE_STATION PRODUCT(24) // Research::Products[0x17] in the decompile (index 24)
 
 static const uint8_t *ps(const PString *p)
 {
     return (const uint8_t *)p;
+}
+
+// OreLines[i + 1] (i = 0..5) as a PString.
+static PString *ore_line(int i)
+{
+    return (PString *)&ds.Shop_OreLines[i];
 }
 
 // Each Pascal literal is a const PString; ps(PSTR("...")) gives the pointer
@@ -84,27 +73,27 @@ int32_t Shop_OrderPrice(const TProduct *p, int32_t qty)
 void Shop_ShopScreen(void)
 {
     if (ds.Game_ScreenEntered) {
-        ANGLES[0] = 0;
-        ANGLES[1] = 0;
-        ANGLES[2] = 0;
-        SPIN_FLAG = 1;
+        ds.VecLoad_Angles[0] = 0;
+        ds.VecLoad_Angles[1] = 0;
+        ds.VecLoad_Angles[2] = 0;
+        ds.VecLoad_Spinning = 1;
         ds.Shop_ListMode = false;
-        QTY_EDIT = 0;
+        ds.Shop_QtyEdit = 0;
         GfxPath_ShowScreenBackdrop();
         Shop_BuildProductList();
-        PREV_SEL = ds.Shop_Sel;
-        PREV_SEL2 = ds.Shop_Sel;
+        ds.Shop_PrevSel = ds.Shop_Sel;
+        ds.Shop_PrevSel2 = ds.Shop_Sel;
         Shop_InitProductPicture();
         if (SEL_PRODUCT->_1D == 0)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
-        SHOW_PICTURE = 1;
+        ds.Shop_ShowPicture = 1;
         Shop_SetupShopHotspots();
         ds.Gfx_Palette[0xC0][0] = 0;
         ds.Gfx_Palette[0xC0][1] = 0;
         ds.Gfx_Palette[0xC0][2] = 0x3C;
-        SLOT_8584 = System_GetMem(0xAF00);
+        ds.VecLoad_Buffer = System_GetMem(0xAF00);
         VecLoad_LoadVec(SEL_PRODUCT_ID);
         VecLoad_DrawBlueFrame();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -114,11 +103,11 @@ void Shop_ShopScreen(void)
         Sound_PlayButtonSfx(LIT("select"));
         GfxPath_SetToolbarAndShow(0xE);
         ds.Game_HotspotHit = 0;
-        SPIN_FLAG = 0;
+        ds.VecLoad_Spinning = 0;
         ds.Shop_ListMode = true;
         Shop_SetupShopListHotspots();
         Shop_ShowSelectPanel();
-        PREV_TOP = 0;
+        ds.Shop_PrevTop = 0;
         if (ds.Shop_Sel < 8)
             ds.Shop_Top = 1;
         else
@@ -133,7 +122,7 @@ void Shop_ShopScreen(void)
         GfxPath_SetToolbarAndShow(5);
         ds.Game_HotspotHit = 0;
         ds.Shop_ListMode = false;
-        SPIN_FLAG = 1;
+        ds.VecLoad_Spinning = 1;
         Shop_ShowInfoPanel();
         VecLoad_LoadVec(SEL_PRODUCT_ID);
         VecLoad_DrawBlueFrame();
@@ -146,25 +135,26 @@ void Shop_ShopScreen(void)
             ds.Game_ClockRunning = false;
             GfxPath_SetToolbarAndShow(0xF);
             ds.Mouse_HotspotCount = 0;
-            QTY_EDIT = 1;
+            ds.Shop_QtyEdit = 1;
             ds.Shop_Qty = (int16_t)p->_1D;
             for (int k = 1; k <= 6; k++)
-                ORE_STOCK(k) = long_mul(p->Ores[k - 1], ds.Shop_Qty) + ds.Game_HomeStock[k - 1];
+                ds.Shop_OreStock[k - 1] =
+                    long_mul(p->Ores[k - 1], ds.Shop_Qty) + ds.Game_HomeStock[k - 1];
             ds.Game_Credits += long_mul(p->Price, ds.Shop_Qty);
             Gfx_DrawCredits();
             Shop_DrawOrderSummary();
             Shop_DrawProductInfo(false);
-            SHOW_PICTURE = 0;
+            ds.Shop_ShowPicture = 0;
         }
     }
-    if (ds.Shop_ListMode && QTY_EDIT == 0 && ds.Mouse_ButtonsChanged)
+    if (ds.Shop_ListMode && ds.Shop_QtyEdit == 0 && ds.Mouse_ButtonsChanged)
         Shop_HandleListClick();
-    PREV_SEL = ds.Shop_Sel;
-    PREV_TOP = ds.Shop_Top;
-    if (ds.Game_HotspotHit == 0x15 && QTY_EDIT == 0) {
+    ds.Shop_PrevSel = ds.Shop_Sel;
+    ds.Shop_PrevTop = ds.Shop_Top;
+    if (ds.Game_HotspotHit == 0x15 && ds.Shop_QtyEdit == 0) {
         Sound_PlayButtonSfx(LIT("x"));
-        SHOW_PICTURE = SHOW_PICTURE == 0;
-        if (SHOW_PICTURE)
+        ds.Shop_ShowPicture = ds.Shop_ShowPicture == 0;
+        if (ds.Shop_ShowPicture)
             Shop_ShowProductPicture(false);
         else
             Shop_DrawProductInfo(false);
@@ -198,9 +188,9 @@ void Shop_ShopScreen(void)
         }
     }
     ds.Shop_Sel = next;
-    if (PREV_SEL != ds.Shop_Sel) {
+    if (ds.Shop_PrevSel != ds.Shop_Sel) {
         VecLoad_LoadVec(SEL_PRODUCT_ID);
-        if (SHOW_PICTURE == 0)
+        if (ds.Shop_ShowPicture == 0)
             Shop_DrawProductInfo(true);
         else
             Shop_ShowProductPicture(true);
@@ -210,9 +200,9 @@ void Shop_ShopScreen(void)
             Shop_DrawQueueSummary();
     }
     if ((uint16_t)ds.Game_HotspotHit > 0x16 && (uint16_t)ds.Game_HotspotHit < 0x1B
-        && ds.Shop_Sel != PREV_SEL2 && ds.Mouse_Buttons == 0) {
+        && ds.Shop_Sel != ds.Shop_PrevSel2 && ds.Mouse_Buttons == 0) {
         VecLoad_LoadVec(SEL_PRODUCT_ID);
-        if (SHOW_PICTURE == 0)
+        if (ds.Shop_ShowPicture == 0)
             Shop_DrawProductInfo(true);
         else
             Shop_ShowProductPicture(true);
@@ -224,12 +214,12 @@ void Shop_ShopScreen(void)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
-        PREV_SEL2 = ds.Shop_Sel;
+        ds.Shop_PrevSel2 = ds.Shop_Sel;
     }
 
-    if (QTY_EDIT != 0) {
+    if (ds.Shop_QtyEdit != 0) {
         TProduct *p = SEL_PRODUCT;
-        PREV_QTY = ds.Shop_Qty;
+        ds.Shop_PrevQty = ds.Shop_Qty;
         switch (ds.Game_MenuCommand) {
         case 0x1A: ds.Shop_Qty += 1; break;
         case 0x1B: ds.Shop_Qty -= 1; break;
@@ -253,17 +243,18 @@ void Shop_ShopScreen(void)
             ds.Game_ClockRunning = true;
             ds.Game_Credits -= long_mul(p->Price, ds.Shop_Qty);
             for (int k = 1; k <= 6; k++)
-                ds.Game_HomeStock[k - 1] = ORE_STOCK(k) - long_mul(p->Ores[k - 1], ds.Shop_Qty);
+                ds.Game_HomeStock[k - 1] =
+                    ds.Shop_OreStock[k - 1] - long_mul(p->Ores[k - 1], ds.Shop_Qty);
             Gfx_DrawCredits();
             if (ds.Shop_Qty == 0)
                 Shop_DrawNotProducible();
             else
                 Shop_DrawQueueSummary();
-            QTY_EDIT = 0;
+            ds.Shop_QtyEdit = 0;
             GfxPath_SetToolbarAndShow(ds.Shop_ListMode ? 0xE : 5);
             if (!ds.Shop_ListMode)
-                SPIN_FLAG = 1;
-            SHOW_PICTURE = 1;
+                ds.VecLoad_Spinning = 1;
+            ds.Shop_ShowPicture = 1;
             Shop_ShowProductPicture(false);
             if (!ds.Shop_ListMode)
                 Shop_SetupShopHotspots();
@@ -285,7 +276,7 @@ void Shop_ShopScreen(void)
             while ((int32_t)SPACE_STATION.Stock < ds.Shop_Qty)
                 ds.Shop_Qty--;
         }
-        if (QTY_EDIT != 0 && ds.Shop_Qty != PREV_QTY) {
+        if (ds.Shop_QtyEdit != 0 && ds.Shop_Qty != ds.Shop_PrevQty) {
             Shop_UpdateOrderOres();
             Shop_DrawOreTextsMarked();
             Shop_DrawOrderSummary();
@@ -299,7 +290,7 @@ static void show_panel(const PString *name, bool keep_far)
 {
     FarPtr buf = System_GetMem(0x9EC0);
     if (keep_far)
-        PANEL_BUF = buf;
+        ds.Shop_PanelBuf = buf;
     Gfx_LoadPic(ps(name), far_host(buf), 1, 0x7F, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
     Blit_CopyRect(far_host(buf), gfx_screen() + 0x3D40, 0x7E, 0x7E);
     System_FreeMem(buf, 0x9EC0);
@@ -357,9 +348,10 @@ void Shop_DrawProductList(void)
     int16_t n = ds.Shop_Count;
     if (n > 0xD)
         n = 0xD;
-    if ((PREV_SEL != ds.Shop_Sel || PREV_TOP != ds.Shop_Top) && n > 0) {
+    if ((ds.Shop_PrevSel != ds.Shop_Sel || ds.Shop_PrevTop != ds.Shop_Top) && n > 0) {
         for (int16_t i = 1; i <= n; i++) {
-            const uint8_t *name = ps((const PString *)&PRODUCT(LIST[ds.Shop_Top + i - 2]).Name);
+            const TProduct *p = &PRODUCT(ds.Shop_List[ds.Shop_Top + i - 2]);
+            const uint8_t *name = ps((const PString *)&p->Name);
             if (ds.Shop_Top + i - 1 == ds.Shop_Sel)
                 Gfx_DrawTextFC(name, 0x10, (int16_t)(i * 9 + 0x2E), 0x10);
             else
@@ -385,13 +377,13 @@ void Shop_DrawProductInfo(bool itemChanged)
     Blit_FillRect(0x86, 0x37, 0xB4, 0x73, 0x40);
     Mouse_ShowCursor();
     Gfx_DrawTextF4(talal_line(SEL_PRODUCT_ID, 1), 0x88, 0x3B, 0x1D);
-    if (QTY_EDIT == 0) {
+    if (ds.Shop_QtyEdit == 0) {
         for (int k = 2; k <= 7; k++)
             Gfx_DrawTextF1(talal_line(SEL_PRODUCT_ID, k), 0x88, (int16_t)(k * 10 + 0x33), 0x1D);
     } else {
         Shop_ShowOreStock();
     }
-    if (QTY_EDIT == 0)
+    if (ds.Shop_QtyEdit == 0)
         Shop_SetupOnePieceOreText();
     else
         Shop_UpdateOrderOres();
@@ -408,7 +400,7 @@ void Shop_BuildProductList(void)
     ds.Shop_Count = 0;
     for (int16_t i = 1; i <= 0x23; i++) {
         if (PRODUCT(i).State == 5) {
-            LIST[ds.Shop_Count] = (uint8_t)i;
+            ds.Shop_List[ds.Shop_Count] = (uint8_t)i;
             ds.Shop_Count++;
             if (ds.Game_PrevScreen == 3 && ds.Game_SelInvention == i)
                 ds.Shop_Sel = ds.Shop_Count;
@@ -436,16 +428,16 @@ void Shop_UpdateOrderOres(void)
 {
     const TProduct *p = SEL_PRODUCT;
     for (int k = 1; k <= 6; k++)
-        ORE_FLAG(k) = 0;
+        ds.Shop_OreShort[k - 1] = 0;
     // Reduce the quantity until every ore is in stock.
     for (int k = 1; k <= 6; k++) {
-        while (long_mul(p->Ores[k - 1], ds.Shop_Qty) > ORE_STOCK(k))
+        while (long_mul(p->Ores[k - 1], ds.Shop_Qty) > ds.Shop_OreStock[k - 1])
             ds.Shop_Qty--;
     }
     for (int k = 1; k <= 6; k++) {
-        ORE_NEEDED(k) = long_mul(p->Ores[k - 1], ds.Shop_Qty);
-        if (long_mul(ds.Shop_Qty + 1, p->Ores[k - 1]) > ORE_STOCK(k))
-            ORE_FLAG(k) = 1;
+        ds.Shop_OreNeeded[k - 1] = long_mul(p->Ores[k - 1], ds.Shop_Qty);
+        if (long_mul(ds.Shop_Qty + 1, p->Ores[k - 1]) > ds.Shop_OreStock[k - 1])
+            ds.Shop_OreShort[k - 1] = 1;
     }
     PString num, t;
     System_StrLong(ds.Shop_Qty, 0, &num, 255);
@@ -457,8 +449,8 @@ void Shop_UpdateOrderOres(void)
     System_StrConcat(&t, ds.Shop_Qty < 2 ? PSTR(" )") : PSTR("s )"));
     System_StrStore(&t, (PString *)&ds.Shop_OreHeader, 30);
     for (int i = 0; i < 6; i++) {
-        format_ore(&t, ORE_ORDER[i], ORE_NEEDED(ORE_ORDER[i]));
-        System_StrStore(&t, ORE_LINE(i), 15);
+        format_ore(&t, ORE_ORDER[i], ds.Shop_OreNeeded[ORE_ORDER[i] - 1]);
+        System_StrStore(&t, ore_line(i), 15);
     }
 }
 
@@ -469,7 +461,7 @@ void Shop_SetupOnePieceOreText(void)
     System_StrStore(PSTR("Ore needed: (One piece)"), (PString *)&ds.Shop_OreHeader, 30);
     for (int i = 0; i < 6; i++) {
         format_ore(&t, ORE_ORDER[i], SEL_PRODUCT->Ores[ORE_ORDER[i] - 1]);
-        System_StrStore(&t, ORE_LINE(i), 15);
+        System_StrStore(&t, ore_line(i), 15);
     }
 }
 
@@ -484,7 +476,7 @@ void Shop_DrawOreTexts(void)
 {
     Gfx_DrawTextF4(ps((const PString *)&ds.Shop_OreHeader), 0x88, 0x85, 0x1D);
     for (int i = 0; i < 6; i++)
-        Gfx_DrawTextF1(ps(ORE_LINE(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
+        Gfx_DrawTextF1(ps(ore_line(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
 }
 
 // 32b4:1141
@@ -493,11 +485,11 @@ void Shop_DrawOreTextsMarked(void)
     Gfx_DrawTextF4(ps((const PString *)&ds.Shop_OreHeader), 0x88, 0x85, 0x1D);
     bool any = false;
     for (int i = 0; i < 6; i++) {
-        bool flagged = ORE_FLAG(ORE_ORDER[i]) != 0;
+        bool flagged = ds.Shop_OreShort[ORE_ORDER[i] - 1] != 0;
         if (flagged)
-            Gfx_DrawTextF4(ps(ORE_LINE(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
+            Gfx_DrawTextF4(ps(ore_line(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
         else
-            Gfx_DrawTextF1(ps(ORE_LINE(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
+            Gfx_DrawTextF1(ps(ore_line(i)), ORE_POS[i].x, ORE_POS[i].y, ORE_POS[i].w);
         any = any || flagged;
     }
     if (any) {
@@ -514,12 +506,12 @@ void Shop_ShowOreStock(void)
     PString t;
     System_StrStore(PSTR("Ores in stock"), (PString *)&ds.Shop_OreHeader, 30);
     for (int i = 0; i < 6; i++) {
-        format_ore(&t, ORE_ORDER[i], ORE_STOCK(ORE_ORDER[i]));
-        System_StrStore(&t, ORE_LINE(i), 15);
+        format_ore(&t, ORE_ORDER[i], ds.Shop_OreStock[ORE_ORDER[i] - 1]);
+        System_StrStore(&t, ore_line(i), 15);
     }
     Gfx_DrawTextF4(ps((const PString *)&ds.Shop_OreHeader), 0x88, 0x49, 0x1D);
     for (int i = 0; i < 6; i++)
-        Gfx_DrawTextF1(ps(ORE_LINE(i)), ORE_POS[i].x, ys[i], ORE_POS[i].w);
+        Gfx_DrawTextF1(ps(ore_line(i)), ORE_POS[i].x, ys[i], ORE_POS[i].w);
 }
 
 // Label / value pair of the summary.
@@ -622,7 +614,8 @@ static void set_hot(int16_t j, int16_t x, uint8_t y, int16_t w, uint8_t h, const
 void Shop_SetupShopHotspots(void)
 {
     ds.Mouse_HotspotCount = 2;
-    set_hot(1, 0x81, 0x31, 0xBE, 0x7F, SHOW_PICTURE == 0 ? PSTR("See picture") : PSTR("See info"), 1);
+    set_hot(1, 0x81, 0x31, 0xBE, 0x7F,
+            ds.Shop_ShowPicture == 0 ? PSTR("See picture") : PSTR("See info"), 1);
     set_hot(2, 0, 0x31, 0x80, 0x7F, PSTR("Select"), 1);
 }
 
@@ -630,7 +623,8 @@ void Shop_SetupShopHotspots(void)
 void Shop_SetupShopListHotspots(void)
 {
     ds.Mouse_HotspotCount = 6;
-    set_hot(1, 0x81, 0x31, 0xBE, 0x7F, SHOW_PICTURE == 0 ? PSTR("See picture") : PSTR("See info"), 1);
+    set_hot(1, 0x81, 0x31, 0xBE, 0x7F,
+            ds.Shop_ShowPicture == 0 ? PSTR("See picture") : PSTR("See info"), 1);
     set_hot(2, 0xC, 0x31, 0x68, 0x80, nullptr, 0);
     set_hot(3, 0, 0x31, 0xB, 0x12, PSTR("Scroll up"), 0);
     set_hot(4, 0x72, 0x31, 0xC, 0x12, PSTR("Scroll up"), 0);
@@ -682,22 +676,22 @@ void Shop_HandleListClick(void)
     if (col == 1 && row > 0 && row < 0xE && ds.Mouse_Buttons != 0) {
         do {
             if (row == 0) {
-                PREV_SEL = ds.Shop_Sel;
-                PREV_TOP = ds.Shop_Top;
+                ds.Shop_PrevSel = ds.Shop_Sel;
+                ds.Shop_PrevTop = ds.Shop_Top;
                 Shop_ScrollListUp();
                 ds.Shop_Sel = ds.Shop_Top;
                 Shop_DrawProductList();
             } else if (row == 0xE) {
-                PREV_SEL = ds.Shop_Sel;
-                PREV_TOP = ds.Shop_Top;
+                ds.Shop_PrevSel = ds.Shop_Sel;
+                ds.Shop_PrevTop = ds.Shop_Top;
                 Shop_ScrollListDown();
                 ds.Shop_Sel = (int16_t)(ds.Shop_Top + 0xC);
                 if (ds.Shop_Count < ds.Shop_Sel)
                     ds.Shop_Sel = ds.Shop_Count;
                 Shop_DrawProductList();
             } else {
-                PREV_SEL = ds.Shop_Sel;
-                PREV_TOP = ds.Shop_Top;
+                ds.Shop_PrevSel = ds.Shop_Sel;
+                ds.Shop_PrevTop = ds.Shop_Top;
                 ds.Shop_Sel = (int16_t)(ds.Shop_Top + row - 1);
                 if (ds.Shop_Count < ds.Shop_Sel)
                     ds.Shop_Sel = ds.Shop_Count;
@@ -715,14 +709,14 @@ void Shop_HandleListClick(void)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
-        if (SHOW_PICTURE == 0)
+        if (ds.Shop_ShowPicture == 0)
             Shop_DrawProductInfo(true);
         else
             Shop_ShowProductPicture(true);
         Shop_SetupShopHotspots();
         if (ds.Shop_ListMode)
             Shop_SetupShopListHotspots();
-        PREV_SEL = ds.Shop_Sel;
-        PREV_SEL2 = ds.Shop_Sel;
+        ds.Shop_PrevSel = ds.Shop_Sel;
+        ds.Shop_PrevSel2 = ds.Shop_Sel;
     }
 }

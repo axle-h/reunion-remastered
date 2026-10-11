@@ -22,17 +22,16 @@ static inline TGroup *Groups_Selected(void)
     return Groups_At(ds.Game_GroupList, ds.Game_SelGroup);
 }
 
-// Per-kind tables, read by raw DS offset like the original (kind 0 or a
-// category outside 1..4 reads the neighbouring bytes instead of faulting).
-// TypeSlots[kind].Used[cat]: does the kind show slot category cat (1..4)?
+// Per-kind tables (kind 1..5, slot category cat 1..4).
+// TypeSlots[kind].Used[cat]: does the kind show slot category cat?
 static inline bool Groups_SlotUsed(uint8_t kind, int16_t cat)
 {
-    return *(uint8_t *)ds_at(0x0B3B + kind * 0x14 + cat) != 0;
+    return ds.Groups_TypeSlots[kind - 1].Used[cat - 1] != 0;
 }
 // TypeSlots[kind].Layout[cat]: far pointer to the slot layout blob (see groups.c)
 static inline FarPtr Groups_SlotLayout(uint8_t kind, int16_t cat)
 {
-    return *(uint32_t *)ds_at(0x0B3C + kind * 0x14 + cat * 4);
+    return ds.Groups_TypeSlots[kind - 1].Layout[cat - 1];
 }
 
 // 2b8d:0002 / 0773: screen handlers (screens 0x16 and 0x15)

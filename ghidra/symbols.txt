@@ -539,13 +539,11 @@
 4a81:5b6e Names::Systems: array[1..8] of string[8]
 4a81:5bb6 Names::SystemsShort: array[1..8] of string[6]
 4a81:5bee Gfx::CharsetChars: string
-4a81:489c Ui::ButtonLabels: array[1..77] of string[17]   // folded 488a; 'DISK OPERATIONS' .. 'ALIEN PLANETS'; index from hotspot records at 7c64
 4a81:4e5f Ui::ButtonSounds: array[1..77] of string[8]    // folded 4e56; Main passes 95ea*9+4e56 to 431a:031a; 'disk','maincpu' = SOUND\DISK.SMP, MAINCPU.SMP
 4a81:5114 Ui::Screens: array[1..38] of TScreenInfo       // folded 50fb; Name string[8] ('main','faces','research'.. 'colinfo' = GRAFIKA\*.PIC) + 16 bytes; +9/+A/+B read with 95e6 (Main 1000:0733)
-4a81:4875 Ui::RowOffset: array[1..20] of byte            // folded 4874; 3a1b:0586 (*140h)
-4a81:55de Cc::Doors       // folded 55d7; 3abd:0c70 (frames, w:word, h, x:word, y)
-4a81:5656 Cc::Rooms       // folded 5651; 3abd:0c05
-4a81:5560 SpWar::SpriteRects // folded 555b; 20d4:0a85
+4a81:55de Cc::Doors: array[1..17] of TRoomAnim  // folded 55d7; anim\main<n>.ani (3c64:019c, 3abd:0c70)
+4a81:5656 Cc::Rooms: array[1..14] of TWarAnim  // folded 5651; war\grwar\granim<n>.ani 1..14 (3c64:031d, 3abd:0c05, 1537:11f2); ids 15, 16 read on into SpWar::ScriptPlays
+4a81:5560 SpWar::SpriteRects: array[1..25] of TSaAnim  // folded 555b; war\war\sa<n>.ani: frames and screen rect (3c64:0010, 20d4:0a85)
 4a81:08d8 Groups::SlotLayouts      // 4 variable-length blobs (at 08d8, 0976, 0a14, 0ab2): count bytes + {string, x:word, y:byte, x2:word, y2:byte, 2 bytes} entries: Laser/Twin/Miss/Plasm/Hunter.., Sloop/Trade ship.., Trooper/Tank.., Sat/SypSt..
 4a81:0b50 Groups::TypeSlots: array[1..5] of TTypeSlots  // folded 0b3b/0b3c (20 bytes); 2b8d, 26fe
 4a81:0bb4 Groups::CatRange: array[1..5] of TCatRange  // folded 0bb2
@@ -553,9 +551,8 @@
 4a81:0bd2 Groups::SlotB: array[1..5,1..4] of byte  // folded 0bcd
 4a81:05d8 SpWar::ClassA: array[1..4] of longint    // folded 05d4; 800, 2000, 5000, 12000
 4a81:05e8 SpWar::ClassB: array[1..4] of longint    // folded 05e4; 11, 68, 374, 840
-4a81:07b8 SpWar::ClassBytes                        // 07b8..07cb read as 07b7/07bb/07bf/07c3 + class, 20d4
+4a81:07b8 SpWar::StartX: array[1..4] of byte  // replaces SpWar::ClassBytes; start x by class, plus Random(StartXRange); mirrored for aliens (20d4)
 4a81:085a Protect::WordCodes: array[1..14] of integer  // folded 0858; 2693:0342
-4a81:5cfe Gus::RateTable: array[1..32] of word     // folded 5cfc; 592, 296, 197, ... (sound driver)
 
 # ---------------------------------------------------------------------------
 # Music modules, icons, space-battle animation scripts (docs/formats/)
@@ -1216,7 +1213,6 @@
 4a81:7ab4 Shop::Count: integer   // Number of listed products; DS:7AB6.. = byte list of product indices (1-based, count+1 bytes)
 4a81:79ec Shop::Qty: longint   // Quantity being ordered (+/-1, +/-10 buttons)
 4a81:79fa Shop::ListMode: boolean   // Set after MenuCommand 1Fh / hotspot 16h: product list shown (with picture of the thing). 79FB = quantity edit active, 79FC = info (vs picture) toggle
-4a81:7a12 Shop::OreStock: array[1..6] of longint   // Snapshot of Game ore stocks while ordering (at DS:7A16..)
 4a81:7a34 Shop::OreHeader: string[30]   // 'Ore needed ...' line; DS:7A54.. six string[15] ore lines
 
 # ---------------------------------------------------------------------------
@@ -1384,29 +1380,29 @@
 # ---------------------------------------------------------------------------
 4a81:7c62 GfxPath::PageFlagA: byte          // Toolbar page flags
 4a81:7c63 GfxPath::PageFlagB: byte
-4a81:7d72 GfxPath::IconIndex                // Index of the icons in ICON\ICON.ALL
+4a81:7d72 GfxPath::IconIndex: array[0..67] of word  // offset of each icon in the toolbar block (ICON.ALL read position, 3a1b:0810)
 4a81:7dfa GfxPath::ToolbarBlock: TEmsBlock
 4a81:8a4c Ems::Status: word                 // Last EMS status
 4a81:8a4e Ems::GameData: TEmsBlock          // Block holding Groups, Buildings and Charset
 4a81:54ca GfxPath::IconAllSize: word        // Size of ICON\ICON.ALL
-4a81:4e06 GfxPath::CommandIcon              // Icon number per menu command id
-4a81:789c Groups::PlanetForceList: pointer  // Far pointer to the planet-force group list
+4a81:4e06 GfxPath::CommandIcon: array[0..77] of shortint  // icon number (ICON.ALL) per menu command id, 0 = none (3a1b:00bf)
+4a81:789c Groups::PlanetForceList: pointer  // ^TGroup: the planet force at the shown group's location (2b8d:11bf)
 4a81:78a6 Groups::IconBuffer: pointer
 4a81:7802 ShipMove::BlinkCounter: word
 4a81:7804 ShipMove::SpinnerCounter: word
 4a81:780c ShipMove::InRestrictedArea: boolean
-4a81:78aa Research::FrameCounter: word      // Selection-frame animation counter
+4a81:78aa Research::FrameCounter: integer  // selection frame blink counter 28h..0 (2d66:0891)
 4a81:78ac Research::IconBuffer: pointer     // Icon picture buffer
-4a81:78b0 Research::ProgressFrame: word
-4a81:899c Hire::Candidate: word
-4a81:899e Hire::StaffKind: word
+4a81:78b0 Research::ProgressFrame: integer  // frame of the work-in-progress animation 0..2Ch (2d66:0bae)
+4a81:899c Hire::Candidate: integer  // selected candidate 1..3, 0 = none (3fab:0032)
+4a81:899e Hire::StaffKind: integer  // staff kind shown, 1..4 (3fab:0032)
 4a81:89a0 Hire::InfoShown: boolean
 4a81:5daa Game::StartChoice: integer        // Start menu choice set by Title::StartMenu: 1 new game, 2 load, 3 quit (Halt); SaveLoad::DiskScreen treats 2 as its first showing
-4a81:7e29 Command::ShowHologramOnEntry: boolean
+4a81:7e29 Command::ShowHologramOnEntry: boolean  // set by Sim when the developer comes back on the command screen (1b8a:3d07)
 4a81:7e36 Command::WarAnimBuffer: pointer
 4a81:7e3a Command::BackdropShown: boolean
 4a81:788a Colonize::ColonyCost: longint
-4a81:7fd4 Vec3D::SineTable                  // Built at start-up; shared with the system view's orbits
+4a81:7fd4 Vec3D::CosTable: array[0..360] of longint  // Round(Cos(i deg) * 500), built at start-up (3e17:18db); the system view's orbits use it too (357b:3010)
 4a81:78e6 Surface::AnimTileFrame: integer
 4a81:78e8 Surface::AnimTileOffset: word     // Offset of the animated-tile frame in BufD
 4a81:7904 Surface::RadarStale: word         // FFFFh forces a radar redraw
@@ -1418,35 +1414,364 @@
 # ---------------------------------------------------------------------------
 # Globals reported by the Intel, AlienTalk, battle and Launch ports
 # ---------------------------------------------------------------------------
-4a81:5d4e Intel::Race2Timer1: word          // Race 2 story timers, done flags at 5D50/5D56/5D5A/5D5E
+4a81:5d4e Intel::Race2Timer1: integer  // Race 2 story timers, done flags at 5D50/5D56/5D5A/5D5E (Sim counts them as signed)
 4a81:5d50 Intel::Race2Done1: boolean
-4a81:5d54 Intel::Race2Timer2: word
+4a81:5d54 Intel::Race2Timer2: integer
 4a81:5d56 Intel::Race2Done2: boolean
-4a81:5d58 Intel::Race2Timer3: word
+4a81:5d58 Intel::Race2Timer3: integer
 4a81:5d5a Intel::Race2Done3: boolean
-4a81:5d5c Intel::Race2Timer4: word
+4a81:5d5c Intel::Race2Timer4: integer
 4a81:5d5e Intel::Race2Done4: boolean
-4a81:5d76 Intel::Race4Timer: word
+4a81:5d76 Intel::Race4Timer: integer
 4a81:5d78 Intel::Race4Done: boolean
-4a81:5d82 Intel::Race5Timer: word
+4a81:5d82 Intel::Race5Timer: integer
 4a81:5d84 Intel::Race5Done: boolean
-4a81:5d96 Intel::Race7to10Timer: word
+4a81:5d96 Intel::Race7to10Timer: integer
 4a81:5d98 Intel::Race7to10Done: boolean
 4a81:78b4 AlienTalk::SelectedLine: word
 4a81:78b6 AlienTalk::Locked: boolean
-4a81:78bc AlienTalk::MenuNumber: word
-4a81:78be AlienTalk::QuestionLine: word
-4a81:78c0 AlienTalk::ReplyLine: word
-4a81:78c2 AlienTalk::AnswerId: word
-4a81:0d0e AlienTalk::PortraitByRace         // Alien portrait number per race
+4a81:78bc AlienTalk::MenuNumber: integer  // next menu (reply code, 2e4b:0700), 0 = done
+4a81:78be AlienTalk::QuestionLine: integer  // KERDES<race>.AT line of the chosen question
+4a81:78c0 AlienTalk::ReplyLine: integer  // VALASZ<race>.AT line drawn as the reply
+4a81:78c2 AlienTalk::AnswerId: integer  // reply line named by the question's code (2e4b:0675)
+4a81:0d0e AlienTalk::PortraitByRace: array[1..10] of byte  // Alien portrait number per race (2e4b:0400: szek<n>, alien<n>)
 4a81:787c Launch::DestinationActive: boolean
-4a81:7bc4 Launch::SystemViewTable           // 18 entries of 6 bytes {type, index}
 4a81:7c36 Launch::SelectedEntry: word
 4a81:7c40 Launch::SavedScreen: word
 4a81:7c42 Launch::SavedSystem: word
 4a81:7c44 Launch::SavedPlanet: word
-4a81:7628 GrWar::Buffer1: pointer           // Ground-battle picture buffers
-4a81:762c GrWar::Buffer2: pointer
-4a81:7630 GrWar::Buffer3: pointer
-4a81:7634 GrWar::Buffer4: pointer
-4a81:7638 GrWar::Buffer5: pointer
+4a81:7628 GrWar::RenderBuf: pointer  // renames GrWar::Buffer1; off-screen field, 0BCD0h bytes (1537:0da8)
+4a81:762c GrWar::Background: pointer  // renames GrWar::Buffer2; war\grf<surface> with the side panel, 64000 bytes
+4a81:7630 GrWar::UnitIcons: pointer  // renames GrWar::Buffer3; war\gricon unit sprites, 3C00h bytes (also GrWarUnits)
+4a81:7634 GrWar::EffectIcons: pointer  // renames GrWar::Buffer4; war\gricon2 effect sprites, 2800h bytes
+4a81:7638 GrWar::LostFrames: pointer  // renames GrWar::Buffer5; war\granim frames of the lost screen, 2860h bytes
+4a81:0002 GrWarUnits::WeaponWeight: array[1..3] of longint  // 2, 7, 9: ground weapons 1 and 2 add to the attack sum, 3 to the defence sum (1430:0479)
+4a81:0012 GrWarUnits::TypeAttack: array[1..4] of word  // 2, 13, 28, 0: attack of a race-force or store unit by type (1430:0479)
+4a81:001a GrWarUnits::TypeDefence: array[1..4] of word  // 0, 0, 9, 45: defence likewise
+4a81:0022 GrWar::Cooldown: array[1..4] of integer  // 30, 20, 10, 60: turns between attacks by unit type (1537:1c05)
+4a81:002a GrWar::Vulnerability: array[1..4] of integer  // 40, 20, 5, 10: damage factor of the target's type (1537:1c05); a base (type 5) reads GrWarUnits::SlotCap[1]
+4a81:0032 GrWarUnits::SlotCap: array[1..4] of integer  // 30, 30, 10, 5: most units in one slot (1430:000f)
+4a81:0046 GrWar::DirX: array[1..4] of integer  // -1, 0, 1, 0: tile step of direction 1..4 (left, up, right, down)
+4a81:0050 GrWar::DirY: array[1..4] of integer  // 0, -1, 0, 1
+4a81:0080 GrWar::MoveDelay: array[1..4] of integer  // 7, 6, 4, 10: ticks between steps by unit type (low byte read, 1537:1c05)
+4a81:0088 GrWar::Effects: array[1..8] of TGrEffect  // unit effects: 1..4 attack by type, 5 artillery shot, 7 dies, 8 hit (1537:0da8)
+4a81:00b8 GrWar::BaseOffset: array[0..1,1..2] of byte  // [Sim::PlayerAttacks][side]: 8 centres the 32x32 base sprite (1537:0a0c)
+4a81:00da SaveLoad::OptionX: array[1..6] of integer   // disk screen option buttons (Music 1/2, Stop, Effects, ...): x (1a3e:11ea)
+4a81:00e6 SaveLoad::OptionY: array[1..6] of integer   // y below the toolbar
+4a81:00f2 SaveLoad::OptionW: array[1..6] of integer
+4a81:00fe SaveLoad::OptionH: array[1..6] of integer
+4a81:010a SaveLoad::ButtonX: array[1..4] of integer   // disk screen push buttons, pressed look from diskbr (1a3e:1366)
+4a81:0112 SaveLoad::ButtonY: array[1..4] of integer
+4a81:011a SaveLoad::ButtonW: array[1..4] of integer
+4a81:0122 SaveLoad::ButtonH: array[1..4] of integer
+4a81:012a Advisor::CourseSkills: array[1..4,1..4] of byte  // folded 0125; DevSkill gains of each university course (1b8a:3b83)
+4a81:05c8 SpWar::WeaponPower: array[1..4] of longint  // 2, 7, 40, 200: damage of a fleet's weapons 1..4 (20d4:01d3)
+4a81:05f8 SpWar::Routes: array[1..2,2..7,1..20] of byte  // [RouteSet][ship's len][pos]: route codes 1..9, 0 = end (20d4:0efd); pos 0 reads the byte before the row
+4a81:06e8 SpWar::RouteSet: array[1..8] of byte  // route table (1, 2) of each path
+4a81:06f0 SpWar::PathDirs: array[1..8,1..9] of byte  // direction 1..9 of each route code on path 1..8
+4a81:0738 SpWar::ZonePaths: array[1..9,0..8] of byte  // new path by the ship's zone (3x3, 1 = top left), Random(8) picks; zone 4 starts every ship
+4a81:078a SpWar::DxAttacker: array[1..9] of shortint  // x step of direction 1..9 (9 = stay)
+4a81:0794 SpWar::DxDefender: array[1..9] of shortint  // mirrored
+4a81:079e SpWar::Dy: array[1..9] of shortint
+4a81:07a8 SpWar::CoolBase: array[1..4] of word  // 0, 0, 2, 300: turns between moves by class, plus Random(CoolRange)
+4a81:07b0 SpWar::CoolRange: array[1..4] of word  // 2, 2, 3, 1000
+4a81:07bc SpWar::StartXRange: array[1..4] of byte
+4a81:07c0 SpWar::StartY: array[1..4] of byte
+4a81:07c4 SpWar::StartYRange: array[1..4] of byte
+4a81:07cc SpWar::ExplosionFrames: array[1..4] of byte  // explosion length by class (20d4:0efd)
+4a81:07d0 SpWar::KillChance: array[1..2,1..2] of integer  // [shooter class][target class]: percent chance a hit destroys a small ship outright
+4a81:07d8 ShipMove::LightX: array[1..6] of integer  // typed constants: position and size of the 6 blinking lights in the ship view (22ca:1e78)
+4a81:07e4 ShipMove::LightY: array[1..6] of integer
+4a81:07f0 ShipMove::LightW: array[1..6] of integer
+4a81:07fc ShipMove::LightH: array[1..6] of integer
+4a81:087e Protect2::HashEcho: longint  // AnswerHash + AA9Bh, stored by 2693:0085, never read
+4a81:0886 Protect2::KeyEcho: longint  // AnswerKey * 5 + 8613h, likewise
+4a81:0890 Intel::Race3Stores: array[1..8] of byte  // folded 088f; stores of a body race 3 takes: Stores[k] = base[k] + Random(range[k]) (29b9:06d4)
+4a81:0898 Intel::Race3StoresEarly: array[1..8] of byte  // used instead while Intel::MorgrulAttack2Done is clear
+4a81:08a0 Intel::Race3StoresRange: array[1..8] of byte
+4a81:08a8 Intel::Race7Stores: array[1..8] of byte
+4a81:08b0 Intel::Race7StoresRange: array[1..8] of byte
+4a81:08b8 Intel::Race8Stores: array[1..8] of byte  // only Stores[1] is written, with each k in turn
+4a81:08c0 Intel::Race8StoresRange: array[1..8] of byte
+4a81:08c8 Intel::Race12Stores: array[1..8] of byte  // as for race 8
+4a81:08d0 Intel::Race12StoresRange: array[1..8] of byte
+4a81:0be6 Groups::EmptyTests: array[1..6,1..4] of byte  // [table, kind]: Units rows 1, 2 and the slot count for IsGroupEmpty (2b8d:1abb), the same for IsGroupEmptyOfCargo (1bad); read at 0be5 + 4*(table-1) + kind, so kind 5 reads the next table
+4a81:0bfe Research::TransitionFrames: array[0..19] of integer  // icon frame per transition step (step mod 20), + (kind - 1) * 10 (2d66:0caa, 0d7b)
+4a81:0c26 Research::SkillX: array[1..4] of integer  // x of the developer's four skill values, + 100 (2d66:074c)
+4a81:481e Sim::Observatories: array[1..8] of integer  // folded 481c; completed observatories (building kind 6) per system (1b8a:2178)
+4a81:482e Sim::UniversityCount: integer  // completed universities (building kind 13) anywhere (1b8a:2178)
+4a81:4874 Ui::RowOffset: array[0..20] of byte    // rows scrolled per step of the toolbar scroll, 21 steps of 33 rows in all (3a1b:0586 reads 4874 + i, i = 0..20)
+4a81:488a Ui::ButtonLabels: array[0..77] of string[17]  // was 489c [1..77]; [0] is 17 spaces, the label of an empty slot (3a1b:00bf copies 488a + 18 * id with id 0); 'DISK OPERATIONS' .. 'ALIEN PLANETS'
+4a81:54cc GfxPath::CellsSize: word                   // 1E00h: the 240x32 cell backgrounds after the two bar pages in the toolbar block (3a1b:09b2)
+4a81:54ce Command::StaffX: array[1..4] of word       // command centre: staff figure of kind 1..4, window x (3abd:16bc, hotspots 3abd:08e0)
+4a81:54d6 Command::StaffY: array[1..4] of word       // window y
+4a81:54de Command::StaffSrcX: array[1..4,1..3] of word  // [kind, candidate]: figure in grafika\mainface, x
+4a81:54f6 Command::StaffSrcY: array[1..4,1..3] of word  // y
+4a81:550e Command::StaffW: array[1..4] of word
+4a81:5516 Command::StaffH: array[1..4] of word
+4a81:551e Command::StaffOfSlot: array[1..4] of word  // staff kind drawn for slot 1..4 (3abd:16bc): 3, 2, 4, 1
+4a81:5526 Command::Lights: array[1..19] of TLight    // blinking pixels of the command centre (3abd:14c5): 1..11 random colours, 12..19 on/off timers
+4a81:569c SpWar::ScriptPlays: array[1..25] of integer  // extra plays of anim.def script n before another is picked (20d4:0985)
+4a81:56ce VecLoad::ModelZoom: array[1..35] of byte  // folded 56cd; final scale per model, the solid view zooms up to it (3d38:084a)
+4a81:56f2 VecLoad::ModelMode: array[1..35] of byte  // folded 56f1; projection mode per model, 2 = swap the first two matrix rows (3d38:0000, 01aa)
+4a81:5716 VecLoad::ModelSpin: array[1..35,1..3] of byte  // folded 5713; spin per model and axis, in 1/3 degrees per frame (3d38:084a)
+4a81:5d3e Intel::KallForceSent: boolean  // set while the Kall's force 2 is sent to 2:5:0 (Race4Timer fired, KallTurnTimer not yet; 1b8a:3d07)
+4a81:5d3f Intel::KallTurnCancelled: boolean  // set by the Eran talk (race 6, answer 2) with KallTurnTimer := 0 (Main)
+4a81:5d48 Intel::FirstJumpSeen: boolean  // the first hyperspace jump was shown: message 22h, scene 2 (1b8a:2a0e)
+4a81:5d4a Intel::SatTheftTimer: integer  // Random(10) + 5 after a stock satellite is deployed away from home (28cd:0000); Sim 1b8a:3d07 plays scene 9
+4a81:5d4c Intel::SatTheftDone: boolean  // satellite theft happened: stock satellites only at 1:5 (28cd:062b)
+4a81:5d52 Intel::DevAwayTimer: integer                  // hours the developer is away after the Jaanosian talk (Main); research stops, Sim 1b8a:3d07 grants invention 9 at 0; his figure is hidden (3abd:16bc)
+4a81:5d60 Intel::Invention14Timer: integer  // runs once invention 14 is known: message 1Eh (1b8a:3d07)
+4a81:5d62 Intel::Invention14Revealed: boolean  // set when the story timer at 5D60 ends; until then invention 14 is "Unknown" (2d66:0029, 1b8a:3d07)
+4a81:5d64 Intel::MorgrulAttack1Timer: integer  // the Morgrul's force 1 attacks New Earth (1b8a:3d07)
+4a81:5d66 Intel::MorgrulAttack1Done: boolean
+4a81:5d6a Intel::MorgrulAttack2Timer: integer  // the Morgrul's force 2 attacks New Earth
+4a81:5d6c Intel::MorgrulAttack2Done: boolean
+4a81:5d6d Intel::MorgrulAttack2Open: boolean  // set with MorgrulAttack2Done; cleared by the next space battle won (Main)
+4a81:5d6e Intel::Phoenix1Timer: integer  // runs once invention 12 is done: message 11h, sets Phoenix1Armed
+4a81:5d70 Intel::Phoenix1Done: boolean
+4a81:5d71 Intel::Phoenix1Armed: boolean  // a group in orbit of 2:1:0 starts alien talk 6 (1b8a:2a0e)
+4a81:5d72 Intel::MorgrulAttack3Timer: integer  // the Morgrul's force 3 attacks New Earth
+4a81:5d74 Intel::MorgrulAttack3Done: boolean
+4a81:5d75 Intel::MorgrulAttack3Open: boolean  // set with MorgrulAttack3Done; cleared by the next space battle won (Main)
+4a81:5d7a Intel::KallTurnTimer: integer  // hours until the Kall turn and the Phelonians fall (Sim 1b8a:3d07)
+4a81:5d7c Intel::KallTurnDone: boolean
+4a81:5d7e Intel::JointAttackTimer: integer  // the Morgrul's force 4 and the Kall's force 2 attack New Earth
+4a81:5d80 Intel::JointAttackDone: boolean
+4a81:5d86 Intel::Msg14Timer: integer  // message 14h, after the Morgrul's third attack
+4a81:5d88 Intel::Msg14Done: boolean
+4a81:5d8a Intel::System3Timer: integer  // system 3 becomes known (message 25h); 200 from the pub (Main)
+4a81:5d8e Intel::System4DestroyTimer: integer  // system 4 is annihilated (message 1Bh, scene 7)
+4a81:5d90 Intel::System4Destroyed: boolean  // system 4 annihilated (Sim 1b8a:3d07; 1fd2:0b30, 357b)
+4a81:5d92 Intel::System4WarnTimer: integer  // armed when a fleet first reaches system 4; runs while it has an observatory: message 19h
+4a81:5d94 Intel::System4Warned: boolean
+4a81:5d95 Intel::System4TalkArmed: boolean  // set with System4Warned: a fleet at a colony in system 4 starts alien talk 9 (1b8a:2a0e)
+4a81:5d9a Intel::Pub7Done: boolean  // pub person 7's errand is done (1b8a:006e)
+4a81:5d9c Advisor::TrainingTimer: integer  // hours left at the university (1991:0000; Sim 1b8a:3b83)
+4a81:5d9e Advisor::TrainingKind: integer  // staff kind away at the university, 0 = none; 4 = the developer, who can't research meanwhile (1991, 1b8a, 2d66:0bae)
+4a81:5da0 Advisor::TrainingCourse: integer  // developer course 1..4 (1991:0000); Sim 1b8a:3b83 adds its skill gains
+4a81:5da2 Advisor::TrainingPrice: longint            // price quoted for the university (1991:0580)
+4a81:7618 GrWarUnits::Scratch: array[1..4] of longint  // CollectAvailableForces: units of each type still to put in slots (1430:0479)
+4a81:763c GrWar::LostShown: boolean  // the lost screen animates (1537:3369)
+4a81:763e GrWar::LostFrame: integer  // 1..3
+4a81:7640 GrWar::LostTick: integer  // 1..13
+4a81:7646 GrWarUnits::UnitLists: array[1..2] of pointer  // attackers' and defenders' 21 slots of 27h bytes, the 21st the base (1430:0479)
+4a81:7656 GrWar::ProjectileCount: array[1..2] of integer  // projectiles in flight by side
+4a81:765a GrWarUnits::Totals: array[1..2,1..4] of longint  // [side][type] units in the battle; 1 attackers, 2 defenders (1430:0479)
+4a81:767a GrWarUnits::Pool: array[1..4] of longint  // attackers' units not in a slot
+4a81:768a GrWarUnits::Attack: array[1..2,1..4] of longint  // [side][type] attack sums
+4a81:76aa GrWarUnits::Defence: array[1..2,1..4] of longint  // [side][type] defence sums (GrWar: artillery shots)
+4a81:76ca GrWar::Survivors: array[1..2,1..4] of longint  // [side][type] (1537:2a19)
+4a81:76ea GrWar::Losses: array[1..2,1..4] of longint  // [side][type], shown on the result screen (1537:312c)
+4a81:770b GrWar::BattleOver: boolean  // a side has no units left and the effects are done
+4a81:770c GrWar::Order: integer  // main program: 1 select, 2 paused, 3 move target, 4 attack target
+4a81:770e GrWar::PathDir: integer  // FindPath's first step, 0 = none (1537:2349)
+4a81:7710 GrWar::Spare: integer  // only cleared, by InitBattleUnits (1537:0262)
+4a81:7716 GrWar::Selected: integer  // selected slot, 0 = none
+4a81:771a GrWar::SelectedOwn: boolean  // the selected slot is the attackers'
+4a81:771c Advisor::MenuNumber: integer  // menu shown (Advisor::Menus index), 0 = leave (1991:0580)
+4a81:771e Advisor::Question: integer  // KERDES1.SP line of the chosen question (1991:0000)
+4a81:7720 Advisor::Answer: integer  // VALASZ1.SP line drawn as the answer (1991:0580)
+4a81:7722 Advisor::MenuLines: pointer  // GetMem(131h): array[1..5] of string[60], the menu's lines (1991:08de)
+4a81:7726 SaveLoad::BufBack: pointer                 // grafika\disk, 320x151 (1a3e:0ee5)
+4a81:772a SaveLoad::BufButtons: pointer              // grafika\diskbr, 320x65: the buttons' "on" look and the knob
+4a81:772e SaveLoad::BufFrame: pointer                // anim\main frame of disk.ani, 100x49
+4a81:7738 Pub::Person: integer  // person talked to, 1..10 (Main 1000:1271, 1fd2:02f4)
+4a81:773a Pub::PiratesSheet: pointer  // grafika\pirates, AF00h bytes (1fd2:00d9)
+4a81:773e Pub::StoryFlags: array[1..12] of boolean  // set by Main's pub dialogue (1000:1271); [1] the Spy-Hunter was asked
+4a81:774a Pub::AnyTopic: boolean  // one of TopicAvail[1..6] is set (1fd2:0b30)
+4a81:774b Pub::TopicAvail: array[1..10] of boolean  // topics the trader can be asked about (1fd2:0b30, 0788)
+4a81:7758 Pub::HoverItem: integer  // question under the mouse, 1.. (1fd2:0a8b)
+4a81:775a Pub::Replied: boolean  // the reply is shown: hover frozen, next click continues (Main)
+4a81:775c Pub::HoverCol: word  // 1 inside the question column (1fd2:0a8b)
+4a81:775e Pub::HoverRow: integer  // text row under the mouse (1fd2:0a8b)
+4a81:7760 Pub::PersonStr: string[2]  // Person as text, for KERDES<n>.LOC / VALASZ<n>.LOC (1fd2:02f4)
+4a81:7764 Pub::MenuIdx: integer  // menu of the person (MenuLists[Person][MenuIdx]); set from the reply code, 0 = leave (1fd2:05fe)
+4a81:7766 Pub::QuestionLine: integer  // KERDES<n>.LOC line of the chosen question (1fd2:0544)
+4a81:7768 Pub::ReplyLine: integer  // VALASZ<n>.LOC line drawn as the reply (1fd2:05fe)
+4a81:776a Pub::QuestionCode: integer  // code read by ReadQuestionCode / DrawQuestionMenu (1fd2:0544)
+4a81:776c Pub::Lines: pointer  // GetMem(500h): array[1..5] of string[255], the question lines (1fd2:02f4)
+4a81:7770 Pub::OfferItem: longint  // item of the trader's offer, 1..12 (Main; 1fd2:05fe)
+4a81:7774 Pub::OfferPrice: longint  // price named by the trader (1fd2:05fe)
+4a81:7778 Pub::LineCount: integer  // text lines of the question menu (1fd2:0788)
+4a81:777a Pub::LineItem: array[1..8] of byte  // question number of each text line (1fd2:0788)
+4a81:7782 Pub::LastSound: integer  // last local<n> sound played (1fd2:0e5f)
+4a81:7784 Pub::AnimSheet: pointer  // grafika\kocsmaan, 64000 bytes (1fd2:00d9)
+4a81:7788 SpWar::GroundBattle: boolean  // a ground battle follows the space battle (the player invades / a colony is attacked; 18e0, 1b8a:3546)
+4a81:778a SpWar::RaceMissionHigh: boolean  // the attacking race force's NextMission was 3 or 4 (1b8a:3546)
+4a81:778b Sim::PlayerAttacks: boolean  // set by Launch (18e0:0647) when the player starts a battle, cleared by Sim (1b8a:3b15) when a race attacks; GrWar: the defender's base is the 32x32 sprite
+4a81:778c SpWar::EnemyRace: integer  // the attacking race (1b8a:3546); a won ground battle gives it the body
+4a81:778e SpWar::Exploding: boolean  // an explosion was drawn this step; the battle waits for it (20d4:0efd)
+4a81:7790 SpWar::RepeatsLeft: integer  // plays of the current script still to come before a new pick (20d4:0a85)
+4a81:7792 SpWar::Script: integer  // current anim.def script 1..25, 0 = none
+4a81:7794 SpWar::ScriptStep: integer  // entry in it, 1..140
+4a81:7796 SpWar::ScriptDelay: integer  // ticks until the next entry
+4a81:7798 SpWar::BattleSystem: integer  // where the battle is, set by Launch (18e0:062d) and Sim (1b8a:3921); also GrWar, GrWarUnits
+4a81:779a SpWar::BattlePlanet: integer
+4a81:779c SpWar::BattleMoon: integer
+4a81:779e SpWar::AttackerList: pointer  // 500 ships of 0Ch bytes (20d4:01d3)
+4a81:77a2 SpWar::DefenderList: pointer
+4a81:77a6 SpWar::SideList: pointer  // InitSpaceFleets/ApplySpaceLosses: the list of the race being added
+4a81:77ae SpWar::SideCount: pointer  // and its count, AttackerShipCount or DefenderShipCount
+4a81:77b2 SpWar::AttackerStart: integer  // ship counts when the battle began
+4a81:77b4 SpWar::DefenderStart: integer
+4a81:77b6 SpWar::AttackerLosses: array[1..4] of longint  // ships lost by class (20d4:17f0)
+4a81:77c6 SpWar::DefenderLosses: array[1..4] of longint
+4a81:77d6 SpWar::LossPtr: pointer  // ApplySpaceLosses: the loss array of the last race force handled
+4a81:77da SpWar::BattleOver: boolean  // a side has no ships left and the explosions are done
+4a81:77db SpWar::Retreated: boolean  // set by the main program when the player leaves a battle: a loss (SpWar, GrWar)
+4a81:77dc SpWar::View: pointer  // 160x150 battle view, 5E60h bytes
+4a81:77e0 SpWar::Background: pointer  // war\sphatter, copied into View every step
+4a81:77e4 SpWar::Sprites: pointer  // war\spants: ship dots and explosions, 80 wide
+4a81:77e8 SpWar::Face: pointer  // war\spface<n>: 80x56 pilot portrait
+4a81:77ec SpWar::StepNo: integer  // 1..4; the battle moves on 1
+4a81:77ee SpWar::CurtainLeft: integer  // wipe that reveals a new script's area; Left >= 1000 = done (20d4:0a85)
+4a81:77f0 SpWar::CurtainRight: integer
+4a81:77f2 SpWar::CurtainTop: integer
+4a81:77f4 SpWar::CurtainBottom: integer
+4a81:77f6 SpWar::ScriptsLeft: array[0..3] of byte  // set of 2..25: anim.def scripts not played yet
+4a81:7806 ShipMove::LightOn: array[1..6] of boolean  // light lit, toggled at random (22ca:1e78)
+4a81:7812 Droids::DigitsPic: pointer                 // grafika\szamok, 8980h bytes: droid figures, face digits at +5780h, small digits at +5963h (2527:001f)
+4a81:7816 Cargo::ItemCount: word  // entries in ItemList (2583:0494)
+4a81:7818 Cargo::ItemList: array[1..13] of word  // Cargo::Items indices of the storable items (product done)
+4a81:7832 Cargo::ItemStore: array[1..13] of ^integer  // the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494)
+4a81:7866 Cargo::Stores: ^longint  // the planet's ore stocks (Game::HomeStock or CurBody^.Stores)
+4a81:786a Cargo::ShipUsed: longint  // cargo space used on the ship
+4a81:786e Cargo::ShipCap: longint  // ship cargo capacity
+4a81:7872 Cargo::PlanetCap: longint  // storage space on the planet (planet force Storage * 1000)
+4a81:787a Cargo::Row: integer  // clicked row (hotspot - 14h / 27h, then - 6 for items)
+4a81:788e Satellite::ActionDone: boolean  // a body action was executed (28cd:0948; Main redraws the map)
+4a81:7892 Groups::SavedCategory: integer  // SlotCategory before page up / down (2b8d:0002)
+4a81:7894 Groups::SlotShip: integer  // ship slot of the clicked button (2b8d:0002)
+4a81:7896 Groups::SlotWeapon: integer  // weapon column of the clicked button
+4a81:7898 Groups::SlotAvail: integer  // stock the unit would come from
+4a81:78a2 Groups::SlotReturned: integer  // weapons sent back to stock when ships are removed
+4a81:78b8 AlienTalk::RaceStr: string[2]  // AlienTalk::Race as text, for KERDES<n>.AT / VALASZ<n>.AT (2e4b:03a5)
+4a81:78cc AlienTalk::HoverCol: word  // 1 inside the question column (2e4b:092e)
+4a81:78ce AlienTalk::HoverRow: integer  // text row under the mouse (2e4b:092e)
+4a81:78d2 AlienTalk::LineQuestion: array[1..8] of byte  // question number of each text line (2e4b:0780)
+4a81:791c Surface::BlinkCounter: word  // 0..19, the Build/Destroy button blinks at 1 and 11 (2ef2:15de)
+4a81:7920 Surface::KindCounts: array[0..1,1..25] of longint  // [Building.Flag][Kind]: finished buildings on a body (2ef2:2b9e)
+4a81:79fb Shop::QtyEdit: boolean  // quantity edit active on the shop screen
+4a81:7ab6 Shop::List: array[1..36] of byte  // product numbers of the listed lines (Shop::Count + 1 used); Research reads List[Sel] (2d66:0029)
+4a81:7b0e PlanetInfo::Backdrop: pointer  // system view background, planets\hatter1/2, 320x151 (357b:235a)
+4a81:7b12 PlanetInfo::Icons: pointer  // system view icon sheet, planets\hatter3/4, 320x75 (357b:235a)
+4a81:7b16 PlanetInfo::Sprites: pointer  // planet and moon sprite sheet planets\napr<system> (357b:235a, 10d9)
+4a81:7b1a PlanetInfo::Frame: pointer  // system view frame being composed (357b:29cd)
+4a81:7b1e PlanetInfo::MoonSprite: pointer  // scaled moon sprite (357b:27e9)
+4a81:7b22 PlanetInfo::PlanetSprite: pointer  // scaled planet sprite (357b:270b)
+4a81:7b26 PlanetInfo::BodiesHidden: boolean  // system 4 after its annihilation: bodies not drawn, body hotspots off (357b:18cc)
+4a81:7b28 PlanetInfo::Orbits: array[0..8] of TOrbit  // [0] the planet of the planet view, [k] planet k or moon k (357b:23db, 3010)
+4a81:7bca Launch::SystemViewTable: array[1..18] of TViewGroup  // folded 7bc4; fleets/forces of the planet view's hotspots 1..18, kind 0 = none (357b:18cc)
+4a81:7c38 Launch::SavedBody: word  // with SavedSystem/SavedPlanet: the marked body, 1 = the planet, k + 1 = moon k (357b:27e9)
+4a81:7c3a Launch::AttackIconShown: boolean  // toolbar state last shown: attack icon 37h (18e0:00e8)
+4a81:7c3b Launch::AttackIcon: boolean  // the selected race force can be attacked
+4a81:7c3c Launch::MoveIconShown: boolean  // move icon 38h last shown
+4a81:7c3d Launch::MoveIcon: boolean  // a group is selected
+4a81:7c3e Launch::InvadeIconShown: boolean  // ground battle icon 47h last shown
+4a81:7c3f Launch::InvadeIcon: boolean  // the selected army can invade the race's planet
+4a81:7c46 PlanetInfo::BlinkTimer: integer  // countdown 20..0 of the blinking frame in the unknown-system view (357b:29cd)
+4a81:7c48 PlanetInfo::HasGroups: boolean  // the planet has fleets the player can see (357b:18cc)
+4a81:7c49 PlanetInfo::HasBase: boolean  // the planet has a base/colony the player can see (357b:18cc)
+4a81:7c4a TextFile::InputActive: boolean             // an input line is being edited (398f:0059)
+4a81:7c4b TextFile::InputEscaped: boolean            // set by InputLine (Esc restores the backup); afterwards 1 if Esc ended it (398f:0179), checked by 1a3e:0008
+4a81:7c4c TextFile::InputBackup: pointer             // GetMem(3Ch) copy of the string, restored by Esc
+4a81:7c50 TextFile::InputStr: pointer                // the edited string
+4a81:7c54 TextFile::InputBlink: word                 // cursor blink counter 1..20 (398f:0179)
+4a81:7c56 TextFile::InputCanCancel: boolean          // Esc allowed
+4a81:7c58 TextFile::InputX: integer
+4a81:7c5a TextFile::InputY: integer
+4a81:7c5c TextFile::InputWidth: integer              // characters
+4a81:7c5e TextFile::CursorX: integer                 // cursor underline position
+4a81:7c60 TextFile::CursorY: integer
+4a81:7c64 GfxPath::SavedPage: byte                   // toolbar page of the command centre: toggled with PageFlagB by each scroll (3a1b:0586), restored by SetToolbar(1) (3a1b:0030), 1 at start (Main); where MenuBar[0].Command would be
+4a81:7c66 GfxPath::MenuBar: array[1..12] of TMenuButton  // the toolbar's slots: label and command id (3a1b:0030, Main 1000:089d)
+4a81:7d62 GfxPath::InitBlock: pointer                // GetMem block of the toolbar, handed to Ems::EmsMoveToEms (3a1b:09b2)
+4a81:7d66 GfxPath::CellBackgrounds: pointer          // the cell backgrounds in the toolbar block (icon\iconmain, 240 wide); the cursor sheet at start (321d:026f)
+4a81:7d6a GfxPath::IconScratch: pointer              // GetMem(3C0h): an icon decoded by 3a1b:0864
+4a81:7e08 Command::MainFace: pointer                 // grafika\mainface, E600h bytes: staff figures (3abd:0352)
+4a81:7e0c Command::Heroes: pointer                   // grafika\heroes, 4C40h bytes
+4a81:7e10 Command::Offscreen: pointer                // 64000-byte screen copy while the hologram shows (3abd:04b4)
+4a81:7e14 Command::LightFrame: integer               // frame 0..37 of the first maina5 light loop (3abd:14c5)
+4a81:7e16 Command::LightTimer: integer               // retraces to its next frame
+4a81:7e18 Command::MainA5: pointer                   // grafika\maina5, 5280h bytes: the light loops
+4a81:7e1c Command::Light2Frame: integer              // frame 0..9 of the second light loop
+4a81:7e1e Command::Light2Timer: integer
+4a81:7e20 Command::DoorTimer: integer                // steps until the builders' door turns (3abd:1395); 70..319
+4a81:7e22 Command::DoorCountdown: integer            // retraces to the next door step (4)
+4a81:7e24 Command::MainA4: pointer                   // grafika\maina4, 5B00h bytes: the door strips
+4a81:7e28 Command::DoorDir: boolean                  // door direction, flipped when DoorTimer runs out
+4a81:7e2a Command::AnimId: integer                   // room animation playing (Cc::Doors index; 3abd, 2e4b:0044)
+4a81:7e2c Command::AnimFrame: integer  // frame of the room animation; GrWar resets it (1537:01eb)
+4a81:7e2e Command::AnimDelay: integer                // frames before the next step; 100..299 at the start (3abd:0c05)
+4a81:7e30 Command::AnimTick: integer                 // war animation: retraces to the next frame (3abd:0f19)
+4a81:7e32 Command::AnimRepeat: integer               // war animation: loops left (Cc::Rooms.Repeat)
+4a81:7e34 Command::AnimSpeed: integer                // war animation: AnimTick reload (Cc::Rooms.Speed)
+4a81:7e3c Command::StaffPicked: integer              // staff kind picked in the command centre: the advisor's kind 1..4 (1991)
+4a81:7e3e Command::AdvisorLine: integer  // advisor menu line under the mouse, 0 = none (1991:09e8)
+4a81:7e40 Anim::Record: pointer  // 349h bytes: loaded flag, 140 frame pointers, 140 frame sizes (3c64)
+4a81:7e44 Anim::Script: pointer  // 230h bytes: 140 entries {anim, frame, sound, delay} of an anim.def script (SpWar, Command)
+4a81:7e48 VecLoad::Angles: array[1..3] of word  // model rotation, 1/3 degrees (0..1079) (3d38:01aa)
+4a81:7e50 VecLoad::ObjectCount: integer  // objects in the loaded model (3d38:084a)
+4a81:7e52 VecLoad::Zoom: integer  // ModelZoom of the loaded model (3d38:084a)
+4a81:7e54 VecLoad::WireScale: integer  // scale of the wireframe view (3d38:0cd6)
+4a81:7e56 VecLoad::Projected: pointer  // projected points of the object being drawn (3d38:0000)
+4a81:7e5a VecLoad::Normals: array[0..17] of pointer  // [0] projected normals, [1..17] each object's face normals (3d38:051c)
+4a81:7ea2 VecLoad::Verts: array[1..17] of pointer  // vertices of each object (3d38:051c)
+4a81:7ee6 VecLoad::VertCount: array[1..17] of integer  // (3d38:0696)
+4a81:7f08 VecLoad::Edges: array[1..17] of pointer  // edge index pairs of each object (3d38:051c)
+4a81:7f4c VecLoad::EdgeCount: array[1..17] of integer  // (3d38:0696)
+4a81:7f6e VecLoad::Faces: array[1..17] of pointer  // faces of each object, 20 bytes each (3d38:051c)
+4a81:7fb2 VecLoad::FaceCount: array[1..17] of integer  // (3d38:0696)
+4a81:8578 VecLoad::Spin: array[1..3] of word  // added to Angles every frame (3d38:01aa)
+4a81:8584 VecLoad::Buffer: pointer  // 320-wide off-screen buffer of the model views, allocated by Shop and Command (3d38:01aa)
+4a81:8588 Vec3D::Centroids: array[1..17] of TVecPoint  // folded 8582; rounded centroid of each object, with hand fixes (3e17:04d2)
+4a81:85ee VecLoad::ProjCentroids: array[1..17] of TVecPoint  // projected centroids; Z is the depth to sort by (3d38:01aa)
+4a81:8654 VecLoad::Order: array[1..17] of integer  // drawing order of the objects (3d38:00e5)
+4a81:8676 Vec3D::EdgesA: array[0..199] of integer  // x per scanline of one side of the polygon being filled (3e17:11f9)
+4a81:8806 Vec3D::EdgesB: array[0..199] of integer  // x per scanline of the other side (3e17:11f9)
+4a81:8996 Vec3D::Model: integer  // model being loaded or drawn (3d38:0696)
+4a81:8998 Vec3D::Slot: integer  // object being drawn (3d38:0000)
+4a81:899a VecLoad::Scale: integer  // current scale of the solid view, grows to Zoom (3d38:01aa)
+4a81:89a2 Command::StaffHotspotKind: array[1..4] of integer  // staff kind of command-centre hotspot 1..4 (3abd:08e0)
+4a81:89aa Command::StaffHotspotCount: integer        // staff hotspots in use
+4a81:8a80 Mouse::QuitFlag: boolean                   // Main fades and halts when set; cleared by Mouse::Poll (4758:042d), setter unknown
+4a81:8a84 Mouse::LastPushable: boolean               // Main: the pushable state of the last press; cleared by the callback when no button is down (4758:0000)
+4a81:8a87 Mouse::CursorHidden: boolean               // ? cleared by InitMouse (4758:0314), only read by Main
+4a81:919c Mouse::ViewHotspot: integer  // Mouse_HitTestCursor result in the system view (357b:29cd)
+4a81:0d18 Surface::EdgeScroll: array[1..9,1..14] of byte  // folded 0d09; edge-scroll direction 1..8 (0 none) of each cell of the 14x9 map view, for right-button clicks (Main)
+4a81:5cfc Gus::RateTable: array[1..32] of word  // 592 div n for n active voices (46ca: mov ax,[si+5CFC] with si = 2*(n-1)); was at 5cfe, which ran into 5D3C
+4a81:5d3c Intel::MorgrulAttack3Won: boolean  // a battle was won while MorgrulAttack3Open: pub person 2 becomes available (Main 1000:2cd5, 329d); only set
+4a81:5d67 Intel::FirstBattleWon: boolean  // the first battle (space or ground) was won: ideas 0Dh and 11h scheduled (Main 1000:2c62)
+4a81:5d68 Intel::FirstGroundLost: boolean  // the first ground battle was lost: message 0Eh, idea 11h (Main 1000:3239)
+4a81:5d8c Intel::MorgrulBeaten: boolean  // the Morgrul were eliminated in a ground battle (Main 1000:30eb); only set
+4a81:5d91 Intel::Pub4HintOff: boolean  // ? never set; while clear, pub person 4 gives hint 4 once system 3 is known (Main 1000:2720)
+4a81:5d99 Intel::Pub10Done: boolean  // set by pub person 10's answers 9 and 10, with Pub::StoryFlags[7] (Main 1000:2a3e); only set
+4a81:5da6 Game::FrameCount: longint  // frames since start; past 30000 the protection page may be re-randomised (Main 1000:05da)
+4a81:75f2 Main::PrevKind: longint  // Surface::SelKind before the kind arrows' search (Main 1000:1b8c)
+4a81:75f6 Main::SceneTrack: string[20]  // number of the atv<n> music track of the story scene (Main, screen 33)
+4a81:760b Main::HasBuilderPlant: boolean  // the body has a builder plant (surface Build button); also AddBodyActionItems' unused flag (Main 1000:1539)
+4a81:760c Main::HasVehiclePlant: boolean  // the body has a vehicle plant (surface Build button, Main 1000:1f94)
+4a81:7712 GrWar::TargetX: integer  // field column of a move order (Main 1000:2e51)
+4a81:7714 GrWar::TargetY: integer  // field row of a move order, at most 8
+4a81:7718 GrWar::PrevSelected: integer  // Selected before a click; a change plays the select sound (Main 1000:2dd1)
+4a81:771b GrWar::PrevSelectedOwn: boolean  // SelectedOwn before the click
+4a81:78de Surface::PrevKind: integer  // SelKind before a map click; destroy mode restores it (Main 1000:16e9)
+4a81:78eb Surface::Scrolled: boolean  // the view scrolled this pass: redraw the map and the radar (Main 1000:1e03)
+4a81:7900 Surface::PrevScrollX: integer  // ScrollX before a radar click (Main 1000:1a34)
+4a81:7902 Surface::PrevScrollY: integer
+4a81:7908 Surface::EdgeScrollDir: integer  // EdgeScroll entry under a right-button click, 0 = none (Main 1000:19a4)
+4a81:79f0 Shop::PrevSel: integer  // Sel at the last redraw; a change reloads the model and the panels (32b4:0057, 0aac)
+4a81:79f2 Shop::PrevTop: integer  // Top at the last list redraw (32b4:0aac)
+4a81:79f4 Shop::PrevQty: longint  // Qty before this pass's +/- buttons (32b4:0057)
+4a81:79f8 Shop::PrevSel2: integer  // Sel when the list scroll buttons were last handled (32b4:0057)
+4a81:79fc Shop::ShowPicture: boolean  // the right panel shows the picture, else the info text (32b4:0057)
+4a81:79fe Shop::OreNeeded: array[1..6] of longint  // ore the order uses (32b4:0d21)
+4a81:7a16 Shop::OreStock: array[1..6] of longint  // Game::HomeStock plus the queued order's ore while editing the quantity (32b4:0057)
+4a81:7a2e Shop::OreShort: array[1..6] of boolean  // one more piece would run out of this ore (32b4:0d21)
+4a81:7a54 Shop::OreLines: array[1..6] of string[15]  // the ore lines under OreHeader, in the order 1, 3, 2, 6, 5, 4 (32b4:0d21)
+4a81:7ada Shop::PanelBuf: pointer  // grafika\select while it loads, freed straight after (32b4:074d)
+4a81:7e4e VecLoad::Spinning: boolean  // the model view turns: Main calls DrawFrame every frame (Shop 32b4:0057)
+4a81:8a82 Mouse::HotPushable: boolean  // Main: the hotspot under the mouse repeats while held or has a command (1000:0899)
+4a81:8a83 Mouse::HeldPhase: boolean  // Main: wait for the button's release on this pass (1000:023d)
+4a81:8a88 Mouse::HiddenClick: boolean  // Main: CursorHidden and no right button, forces hotspot 999 (1000:05aa)

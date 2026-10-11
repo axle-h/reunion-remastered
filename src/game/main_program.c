@@ -52,39 +52,9 @@
 // 26eb:0000 Cheat::Apply (unit not ported; Cheat_Requested is never set).
 void Cheat_Apply(void);
 
-// --- Unnamed globals ---------------------------------------------------------
-#define B8(off) (*(uint8_t *)ds_at(off))
-#define I8(off) (*(int8_t *)ds_at(off))
-#define W16(off) (*(uint16_t *)ds_at(off))
-#define I16(off) (*(int16_t *)ds_at(off))
-#define I32(off) (*(int32_t *)ds_at(off))
-#define FP(off) (*(FarPtr *)ds_at(off))
-
-#define START_CHOICE I16(0x5DAA)    // Game::StartChoice: 1 new game, 2 load, 3 quit
-#define FRAME_COUNT I32(0x5DA6)     // frames since start (feeds the protection check)
-#define QUIT_FLAG B8(0x8A80)        // fade and Halt; cleared by Mouse_Poll, setter unknown
-#define HOT_PUSHABLE B8(0x8A82)     // hotspot under the mouse repeats / has a command
-#define HELD_PHASE B8(0x8A83)       // run phase B (button held) on this pass
-#define LAST_PUSHABLE B8(0x8A84)    // HOT_PUSHABLE of the previous press
-#define CURSOR_HIDDEN B8(0x8A87)    // ? only read here
-#define HIDDEN_CLICK B8(0x8A88)     // CURSOR_HIDDEN and no right button: hit 999
-#define TOOLBAR_TOGGLE B8(0x7C62)   // GfxPath::PageFlagA: toolbar page toggle allowed
-#define TOOLBAR_PAGE1 B8(0x7C63)    // GfxPath::PageFlagB: first toolbar page shown
-#define TEXT_INPUT B8(0x7C4A)       // a TextFile input line is active
-#define VEC_ACTIVE B8(0x7E4E)       // VecLoad model animating (info screen)
-#define SURF_SCROLL_DIR I16(0x7908) // edge-scroll direction under the click (1..8)
-#define BATTLE_SYSTEM I16(0x7798)   // body of the pending battle
-#define BATTLE_PLANET I16(0x779A)
-#define BATTLE_MOON I16(0x779C)
-
-// Menu-bar button n (1..12): 21-byte records with the label at 7C51 and the
-// command id at 7C64 (read as a word; the start-up code stores a byte).
-#define MENU_LABEL(n) ((const uint8_t *)ds_at((uint16_t)(0x7C51 + (n) * 21)))
-#define MENU_CMD(n) I16((uint16_t)(0x7C64 + (n) * 21))
-
-// CurPlanet/CurMoon by Pascal index (CurPlanet[0] aliases CurSystem).
-#define CUR_PLANET(s) I16((uint16_t)(0x7AE4 + (s) * 2))
-#define CUR_MOON(s) I16((uint16_t)(0x7AF4 + (s) * 2))
+// CurPlanet/CurMoon by Pascal index.
+#define CUR_PLANET(s) ds.Game_CurPlanet[(s) - 1]
+#define CUR_MOON(s) ds.Game_CurMoon[(s) - 1]
 #define CUR_SYS ds.Game_CurSystem
 
 static inline const uint8_t *ps(const PString *p)
@@ -93,11 +63,11 @@ static inline const uint8_t *ps(const PString *p)
 }
 #define LIT(s) ps(PSTR(s))
 
-// TScreenInfo bytes +09 (show picture), +0A (reload menu bar), +0B (menu
-// command that opens it, shortint).
+// Ui::Screens[screen]: TScreenInfo bytes +09 (show picture), +0A (reload
+// menu bar), +0B (menu command that opens it, shortint).
 static inline uint8_t *screen_info(int16_t screen)
 {
-    return (uint8_t *)ds_at((uint16_t)(0x50FB + screen * 25));
+    return (uint8_t *)&ds.Ui_Screens[screen - 1];
 }
 
 static inline TBody *cur_body(void)
@@ -111,22 +81,12 @@ static inline TBuilding *building(int16_t i)
     return (TBuilding *)far_host(ds.Game_Buildings) + (i - 1);
 }
 
-// Surface::BuildingTypes[k] as raw bytes (folded base DS:6553, 63 bytes):
-// +0F needed product, +10 builder skill, +12 needs builder plant, +13 needs
-// vehicle plant, +13+SurfaceType allowed on that surface, +27 cost.
-static inline uint8_t *building_type(int16_t k)
+// Surface::BuildingTypes[k]. Of the unnamed bytes, _10 is the builder skill
+// needed, _12[0] needs a builder plant, _12[1] needs a vehicle plant and
+// _12[1 + SurfaceType] allows that surface.
+static inline TBuildingType *building_type(int16_t k)
 {
-    return (uint8_t *)ds_at((uint16_t)(0x6553 + k * 0x3F));
-}
-
-static inline int16_t felsz_height(int16_t t)
-{
-    return I16((uint16_t)(offsetof(DSeg, Surface_FelszHeight) - 2 + t * 2));
-}
-
-static inline int16_t fanim_height(int16_t t)
-{
-    return I16((uint16_t)(offsetof(DSeg, Surface_FanimHeight) - 2 + t * 2));
+    return &ds.Surface_BuildingTypes[k - 1];
 }
 
 static void add_credits(int32_t d)
@@ -170,8 +130,8 @@ static void startup(void)
     ds.Blit_HookRow = 999;
     Mouse_InitMouse();
     Mouse_HideCursor();
-    HELD_PHASE = 0;
-    LAST_PUSHABLE = 0;
+    ds.Mouse_HeldPhase = 0;
+    ds.Mouse_LastPushable = 0;
     Title_InitTitleAndMainMenu();
 
     // 238,000 bytes, 266,000 with a GUS. The port's heap is the DOS one, so
@@ -185,11 +145,11 @@ static void startup(void)
     Music_ApplyMusicTrack();
     Command_LoadCommandGfx();
     GfxPath_SetToolbarAndShow(1);
-    TOOLBAR_PAGE1 = 1;
-    B8(0x7C64) = 1;  // byte store into slot 0's command word
-    TOOLBAR_TOGGLE = 1;
+    ds.GfxPath_PageFlagB = 1;
+    ds.GfxPath_SavedPage = 1;  // where MenuBar[0].Command would be
+    ds.GfxPath_PageFlagA = 1;
     GfxPath_ShowToolbar();
-    if (START_CHOICE != 2)
+    if (ds.Game_StartChoice != 2)
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
 
     ds.Game_CurrentScreen = 1;
@@ -200,17 +160,17 @@ static void startup(void)
     ds.Game_ScreenSwitch = 0;
     ds.Game_ClockRunning = 1;
     // Command centre animation state.
-    W16(0x7E14) = 1;
-    W16(0x7E16) = 1;
-    W16(0x7E20) = 1;
-    W16(0x7E22) = 1;
-    W16(0x7E1C) = 1;
-    W16(0x7E1E) = 1;
-    B8(0x7E29) = 0;  // Command::ShowHologramOnEntry
-    VEC_ACTIVE = 0;
-    W16(0x7E48) = 0;
-    W16(0x7E4A) = 0;
-    W16(0x7E4C) = 0;
+    ds.Command_LightFrame = 1;
+    ds.Command_LightTimer = 1;
+    ds.Command_DoorTimer = 1;
+    ds.Command_DoorCountdown = 1;
+    ds.Command_Light2Frame = 1;
+    ds.Command_Light2Timer = 1;
+    ds.Command_ShowHologramOnEntry = 0;
+    ds.VecLoad_Spinning = 0;
+    ds.VecLoad_Angles[0] = 0;
+    ds.VecLoad_Angles[1] = 0;
+    ds.VecLoad_Angles[2] = 0;
     for (ds.Main_I = 1; ds.Main_I <= 6; ds.Main_I++)
         ds.Game_HomeStock[ds.Main_I - 1] = 0;
     CUR_SYS = 1;
@@ -221,7 +181,7 @@ static void startup(void)
     ds.Game_ColonySetupCount = 0;
     ds.Game_BuildingCount = 0;
     ds.Game_CurResearch = 0;
-    W16(0x78AA) = 0;  // Research::FrameCounter
+    ds.Research_FrameCounter = 0;
     ds.Game_GroupList = 0;
     ds.Game_SelGroup = 0;
     ds.Game_SelGroup1 = 0;
@@ -232,24 +192,24 @@ static void startup(void)
     ds.Message_LogCount = 0;
     ds.Gfx_FlashStep = 0;
     ds.Gfx_FlashCount = 0;
-    for (uint16_t a = 0x773E; a <= 0x7749; a++)  // pub story flags
-        B8(a) = 0;
+    for (int i = 0; i < 12; i++)
+        ds.Pub_StoryFlags[i] = 0;
     ds.Game_StoryStage = 1;
     for (ds.Main_I = 1; ds.Main_I <= 0x23; ds.Main_I++)
         ds.Game_IdeaTimer[ds.Main_I - 1] = -1;
-    W16(0x5D58) = (uint16_t)(System_Random(400) + 6000);  // Intel::Race2Timer3
+    ds.Intel_Race2Timer3 = (int16_t)(System_Random(400) + 6000);
     ds.Cheat_Used = 0;
     ds.Cheat_Requested = 0;
     ds.Game_BattleFlag = 0;
-    W16(0x5D9C) = 0;
-    W16(0x5D9E) = 0;
-    W16(0x5DA0) = 0;
+    ds.Advisor_TrainingTimer = 0;
+    ds.Advisor_TrainingKind = 0;
+    ds.Advisor_TrainingCourse = 0;
     for (int i = 0; i < 4; i++)
         ds.Game_StaffExp[i] = 0;
     // BUG? i runs to 5 over DevSkill[1..4]; the fifth word is ProductionRate,
     // set just below.
     for (ds.Main_I = 1; ds.Main_I <= 5; ds.Main_I++)
-        W16((uint16_t)(0x95AA + ds.Main_I * 2)) = 0;
+        *(ds.Main_I <= 4 ? &ds.Game_DevSkill[ds.Main_I - 1] : &ds.Game_ProductionRate) = 0;
     for (int i = 0; i < 4; i++)
         ds.Game_StaffHired[i] = 0;
     ds.Game_ProductionRate = 10;
@@ -260,9 +220,9 @@ static void startup(void)
     ds.Game_Hour = 23;
     Gfx_DrawGameDate();
     ds.Sound_SampleBuf = 0;
-    TEXT_INPUT = 0;
+    ds.TextFile_InputActive = 0;
     SaveLoad_LoadInit();
-    if (START_CHOICE == 2) {
+    if (ds.Game_StartChoice == 2) {
         ds.Game_PrevScreen = 1;
         ds.Game_CurrentScreen = 12;
         ds.Game_ScreenSwitch = 1;
@@ -308,14 +268,14 @@ static void animate_screens(void)
     if (s == 20) {
         if (ds.Game_Ticks % 10 == 8
             && (ds.Surface_Mode == 1 || ds.Surface_Mode == 2 || ds.Surface_Mode == 6)) {
-            I16(0x78E6) = (int16_t)(I16(0x78E6) % 3 + 1);  // Surface::AnimTileFrame
+            ds.Surface_AnimTileFrame = (int16_t)(ds.Surface_AnimTileFrame % 3 + 1);
             Surface_DrawMapView();
         }
         Surface_BlinkModeButton();
     }
-    if (VEC_ACTIVE)
+    if (ds.VecLoad_Spinning)
         VecLoad_DrawFrame();
-    if (TEXT_INPUT)
+    if (ds.TextFile_InputActive)
         TextFile_InputTick();
     if (s == 3)
         Research_AnimateCurrentResearch();
@@ -327,11 +287,11 @@ static void animate_screens(void)
         Command_TickPanelDoorAnim();
     if (s == 17)
         ShipMove_AnimateGroupView();
-    if (s == 29 && B8(0x77DA) == 0)  // battle not retreated
+    if (s == 29 && ds.SpWar_BattleOver == 0)
         SpWar_PlayWarAnimScript();
-    if (s == 32 && B8(0x770B) == 0)  // ground battle running
+    if (s == 32 && ds.GrWar_BattleOver == 0)
         GrWar_BattleTick();
-    if (s == 32 && B8(0x770B) != 0)
+    if (s == 32 && ds.GrWar_BattleOver != 0)
         GrWar_AnimateResultScreen();
     if (s == 7 || s == 18)
         PlanetInfo_UpdateOrbitPositions();
@@ -349,7 +309,7 @@ static void animate_screens(void)
 static void hit_test(int16_t *hit)
 {
     Mouse_HitTest((uint16_t *)hit);
-    if (TOOLBAR_PAGE1 == 0 && (uint16_t)*hit >= 1 && (uint16_t)*hit <= 6)
+    if (ds.GfxPath_PageFlagB == 0 && (uint16_t)*hit >= 1 && (uint16_t)*hit <= 6)
         *hit += 6;
 }
 
@@ -362,7 +322,7 @@ static bool hit_pushable(int16_t hit)
         return true;
     if (h >= 0x14 && Mouse_Hotspot((int16_t)(h - 0x14))->Repeat_ != 0)
         return true;
-    return h >= 1 && h <= 12 && MENU_CMD(h) != 0;
+    return h >= 1 && h <= 12 && ds.GfxPath_MenuBar[h - 1].Command != 0;
 }
 
 // The hint line for the hotspot under the mouse.
@@ -370,7 +330,7 @@ static void draw_hint(int16_t hit)
 {
     uint16_t h = (uint16_t)hit;
     if (h >= 1 && h <= 12)
-        Gfx_DrawStatusText(MENU_LABEL(h));
+        Gfx_DrawStatusText((const uint8_t *)&ds.GfxPath_MenuBar[h - 1].Caption);
     else if (h == 0 || h == 0xD)
         Gfx_DrawStatusText(LIT(""));
     else if (h == 0xE)
@@ -392,7 +352,7 @@ uint64_t Game_EventWaitFrames;
 static bool wait_for_event(void)
 {
     do {
-        if (FRAME_COUNT > 30000 && ds.Game_Ticks > 99 && ds.Game_ClockRunning
+        if (ds.Game_FrameCount > 30000 && ds.Game_Ticks > 99 && ds.Game_ClockRunning
             && System_Random(200) == 0)
             PlanetInfo_RandomizeProtectPage();
         Sound_FreeSampleIfIdle();
@@ -408,20 +368,20 @@ static bool wait_for_event(void)
             return false;
         Game_EventWaitFrames++;  // port addition
         Gfx_PaletteFlashTick();
-        FRAME_COUNT = (int32_t)((uint32_t)FRAME_COUNT + 1);
+        ds.Game_FrameCount = (int32_t)((uint32_t)ds.Game_FrameCount + 1);
         animate_screens();
 
         ds.Game_PrevHotspotHit = ds.Game_HotspotHit;
         hit_test(&ds.Game_HotspotHit);
         if (ds.Game_HotspotHit != ds.Game_PrevHotspotHit)
             draw_hint(ds.Game_HotspotHit);
-        HOT_PUSHABLE = hit_pushable(ds.Game_HotspotHit);
-    } while (!ds.Game_ScreenSwitch && !QUIT_FLAG
+        ds.Mouse_HotPushable = hit_pushable(ds.Game_HotspotHit);
+    } while (!ds.Game_ScreenSwitch && !ds.Mouse_QuitFlag
              && (ds.Mouse_Buttons == 0 || ds.Game_HotspotHit == 0
-                 || (HOT_PUSHABLE && !ds.Mouse_ButtonsChanged))
-             && (ds.Mouse_Buttons != 0 || HOT_PUSHABLE || !ds.Mouse_ButtonsChanged
+                 || (ds.Mouse_HotPushable && !ds.Mouse_ButtonsChanged))
+             && (ds.Mouse_Buttons != 0 || ds.Mouse_HotPushable || !ds.Mouse_ButtonsChanged
                  || ds.Game_HotspotHit != ds.Game_PrevHotspotHit)
-             && (CURSOR_HIDDEN == 0 || ds.Mouse_HeldRight != 0));
+             && (ds.Mouse_CursorHidden == 0 || ds.Mouse_HeldRight != 0));
     return true;
 }
 
@@ -460,45 +420,45 @@ static bool leaving(int16_t screen)
 
 static void free_left_screen_buffers(void)
 {
-    if (leaving(1) && FP(0x7E08) != 0) {
-        System_FreeMem(FP(0x7E08), 0xE600);
-        System_FreeMem(FP(0x7E0C), 0x4C40);
-        System_FreeMem(FP(0x7E18), 0x5280);
-        System_FreeMem(FP(0x7E24), 0x5B00);
+    if (leaving(1) && ds.Command_MainFace != 0) {
+        System_FreeMem(ds.Command_MainFace, 0xE600);
+        System_FreeMem(ds.Command_Heroes, 0x4C40);
+        System_FreeMem(ds.Command_MainA5, 0x5280);
+        System_FreeMem(ds.Command_MainA4, 0x5B00);
         Command_FreeRoomAnim();
     }
     if (leaving(2))
         System_FreeMem(ds.RawText_SzFace, 0x7B0);
     if (leaving(3))
-        System_FreeMem(FP(0x78AC), 0x6901);  // Research::IconBuffer
+        System_FreeMem(ds.Research_IconBuffer, 0x6901);
     if (leaving(4))
-        System_FreeMem(FP(0x7812), 0x8980);
+        System_FreeMem(ds.Droids_DigitsPic, 0x8980);
     if (leaving(5)) {
-        VEC_ACTIVE = 0;
+        ds.VecLoad_Spinning = 0;
         VecLoad_FreeVecBuffers();
-        System_FreeMem(FP(0x8584), 0xAF00);
+        System_FreeMem(ds.VecLoad_Buffer, 0xAF00);
         System_FreeMem(ds.RawText_SzTalal, 0x1DAB);
     }
     if (leaving(7)) {
-        System_FreeMem(FP(0x7B16), 0x6900);
-        System_FreeMem(FP(0x7B0E), 0xBCC0);
-        System_FreeMem(FP(0x7B12), 24000);
+        System_FreeMem(ds.PlanetInfo_Sprites, 0x6900);
+        System_FreeMem(ds.PlanetInfo_Backdrop, 0xBCC0);
+        System_FreeMem(ds.PlanetInfo_Icons, 24000);
     }
     if (leaving(8))
         System_FreeMem(ds.RawText_SzFaj, 0x1440);
     if (leaving(12))
-        System_FreeMem(FP(0x7734), 0x108);  // SaveLoad::SlotTable
+        System_FreeMem(ds.SaveLoad_SlotTable, 0x108);
     if (leaving(16)) {
         System_FreeMem(ds.ShipInfo_Backdrop, 0xBCC0);
         System_FreeMem(ds.ShipInfo_Sprites, 0x5000);
     }
     if (leaving(12)) {
         Anim_FreeMainAnim(0x11);
-        System_FreeMem(FP(0x7E40), 0x349);
-        System_FreeMem(FP(0x7E44), 0x230);
-        System_FreeMem(FP(0x772E), 0x1324);
-        System_FreeMem(FP(0x7726), 0xBCC0);
-        System_FreeMem(FP(0x772A), 0x5140);
+        System_FreeMem(ds.Anim_Record, 0x349);
+        System_FreeMem(ds.Anim_Script, 0x230);
+        System_FreeMem(ds.SaveLoad_BufFrame, 0x1324);
+        System_FreeMem(ds.SaveLoad_BufBack, 0xBCC0);
+        System_FreeMem(ds.SaveLoad_BufButtons, 0x5140);
     }
     if (leaving(17)) {
         System_FreeMem(ds.ShipMove_AnimSheet, 0x9100);
@@ -506,22 +466,22 @@ static void free_left_screen_buffers(void)
         System_FreeMem(ds.ShipMove_Stars, 0x1E1B);
     }
     if (leaving(18)) {
-        System_FreeMem(FP(0x7B16), 0x6900);
-        System_FreeMem(FP(0x7B0E), 0xBCC0);
-        System_FreeMem(FP(0x7B12), 24000);
+        System_FreeMem(ds.PlanetInfo_Sprites, 0x6900);
+        System_FreeMem(ds.PlanetInfo_Backdrop, 0xBCC0);
+        System_FreeMem(ds.PlanetInfo_Icons, 24000);
     }
     if (leaving(19)) {
         if (ds.Game_CurrentScreen != 32) {
-            System_FreeMem(FP(0x7646), 0x333);
-            System_FreeMem(FP(0x764A), 0x333);
+            System_FreeMem(ds.GrWarUnits_UnitLists[0], 0x333);
+            System_FreeMem(ds.GrWarUnits_UnitLists[1], 0x333);
         }
-        System_FreeMem(FP(0x7630), 0x3C00);  // GrWar::Buffer3
+        System_FreeMem(ds.GrWar_UnitIcons, 0x3C00);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(20)) {
         int16_t t = ds.Surface_TileSet;
-        System_FreeMem(FP(0x790E), 0x820);  // Surface::RadarColors
+        System_FreeMem(ds.Surface_RadarColors, 0x820);
         if (ds.Surface_RadarDouble == 0)
             System_FreeMem(ds.Surface_RadarBuf, (uint16_t)(ds.Surface_MapWidth * ds.Surface_MapHeight));
         else
@@ -529,39 +489,39 @@ static void free_left_screen_buffers(void)
                            (uint16_t)(ds.Surface_MapWidth * 4 * ds.Surface_MapHeight));
         System_FreeMem(ds.Surface_BufA, 0x24FF);
         System_FreeMem(ds.Surface_BufC, 0xF000);
-        if (fanim_height(t) != 0)
-            System_FreeMem(ds.Surface_BufD, (uint16_t)(fanim_height(t) * 0x140));
-        System_FreeMem(ds.Surface_BufB, (uint16_t)(felsz_height(t) * 0x140));
+        if (ds.Surface_FanimHeight[t - 1] != 0)
+            System_FreeMem(ds.Surface_BufD, (uint16_t)(ds.Surface_FanimHeight[t - 1] * 0x140));
+        System_FreeMem(ds.Surface_BufB, (uint16_t)(ds.Surface_FelszHeight[t - 1] * 0x140));
         System_FreeMem(ds.Surface_BuildingLayer, 0x2A30);
         System_FreeMem(ds.Surface_OccupyLayer, 0x1518);
         System_FreeMem(ds.Surface_TileLayer, 0x1518);
     }
     if (leaving(22))
-        System_FreeMem(FP(0x78A6), 0x2300);  // Groups::IconBuffer
+        System_FreeMem(ds.Groups_IconBuffer, 0x2300);
     if (leaving(23)) {
-        System_FreeMem(FP(0x773A), 0xAF00);
-        System_FreeMem(FP(0x7784), 64000);
+        System_FreeMem(ds.Pub_PiratesSheet, 0xAF00);
+        System_FreeMem(ds.Pub_AnimSheet, 64000);
     }
     if (leaving(24))
-        System_FreeMem(FP(0x7722), 0x131);
+        System_FreeMem(ds.Advisor_MenuLines, 0x131);
     if (leaving(25))
-        System_FreeMem(FP(0x776C), 0x500);
+        System_FreeMem(ds.Pub_Lines, 0x500);
     if (leaving(29)) {
-        System_FreeMem(FP(0x77DC), 0x5E60);
-        System_FreeMem(FP(0x77E0), 0x5E60);
-        System_FreeMem(FP(0x77E4), 0xF00);
-        System_FreeMem(FP(0x77E8), 0x1180);
-        System_FreeMem(FP(0x779E), 0x177C);
-        System_FreeMem(FP(0x77A2), 0x177C);
-        System_FreeMem(FP(0x7E40), 0x349);
-        System_FreeMem(FP(0x7E44), 0x230);
+        System_FreeMem(ds.SpWar_View, 0x5E60);
+        System_FreeMem(ds.SpWar_Background, 0x5E60);
+        System_FreeMem(ds.SpWar_Sprites, 0xF00);
+        System_FreeMem(ds.SpWar_Face, 0x1180);
+        System_FreeMem(ds.SpWar_AttackerList, 0x177C);
+        System_FreeMem(ds.SpWar_DefenderList, 0x177C);
+        System_FreeMem(ds.Anim_Record, 0x349);
+        System_FreeMem(ds.Anim_Script, 0x230);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(32)) {
-        System_FreeMem(FP(0x7646), 0x333);
-        System_FreeMem(FP(0x764A), 0x333);
-        System_FreeMem(FP(0x7638), 0x2860);  // GrWar::Buffer5
+        System_FreeMem(ds.GrWarUnits_UnitLists[0], 0x333);
+        System_FreeMem(ds.GrWarUnits_UnitLists[1], 0x333);
+        System_FreeMem(ds.GrWar_LostFrames, 0x2860);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
@@ -611,16 +571,16 @@ static void surface_enter(void)
     if (ds.Game_PrevScreen == 17)
         GfxPath_AddToolbarIcon(0x10);
     Satellite_AddBodyActionItems(CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS),
-                                 (bool *)ds_at(0x760B));
+                                 (bool *)&ds.Main_HasBuilderPlant);
     GfxPath_ShowToolbar();
     body = cur_body();
-    ds.Surface_TileSet = I16((uint16_t)(0x1A38 + (int8_t)body->SurfaceType * 2));  // Tileset[type]
+    ds.Surface_TileSet = ds.Surface_Tileset[(int8_t)body->SurfaceType - 1];
     ds.Surface_MapVariant = (int8_t)body->_16;
-    ds.Surface_CanBuild = B8((uint16_t)(0x1A4F + ds.Surface_TileSet)) != 0  // SurfaceColonisable
+    ds.Surface_CanBuild = ds.Galaxy_SurfaceColonisable[ds.Surface_TileSet - 1] != 0
                           && body->Colony != 0 && cur_body()->Owner == 1;
-    W16(0x791A) = W16((uint16_t)(0x1810 + ds.Surface_TileSet * 2));  // FelszTiles := FelszTileCount[t]
+    ds.Surface_FelszTiles = (uint16_t)ds.Surface_FelszTileCount[ds.Surface_TileSet - 1];
     ds.Surface_Mode = 1;
-    I16(0x78E6) = 3;
+    ds.Surface_AnimTileFrame = 3;
     ds.Surface_SelKind = 1;
     Surface_EnterSurface();
     Surface_SetupSurfaceHotspots();
@@ -630,7 +590,7 @@ static void surface_enter(void)
     }
     Surface_DrawBuildingPreview(ds.Surface_SelKind);
     Surface_RegisterBuildingAnims(CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS));
-    B8(0x791E) = 1;  // Surface::BlinkOn
+    ds.Surface_BlinkOn = 1;
     Surface_DrawMapView();
     Surface_DrawKindArrows();
     Surface_RebuildRadar();
@@ -642,16 +602,16 @@ static void surface_enter(void)
 // destroy a building.
 static void surface_map_click(void)
 {
-    I16(0x78DE) = ds.Surface_SelKind;  // kind before the click
+    ds.Surface_PrevKind = ds.Surface_SelKind;
     if (ds.Surface_Mode == 2) {
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
         if (ds.Surface_Mode == 2) {
             Surface_BuildOnCurrentPlanet(ds.Surface_SelKind, click_cell_x(1, 0), click_cell_y(1, 0));
-            add_credits(-*(int32_t *)(building_type(ds.Surface_SelKind) + 0x27));
+            add_credits(-building_type(ds.Surface_SelKind)->Cost);
             Gfx_DrawCredits();
             ds.Surface_Mode = 4;
             Surface_ShowBuildingInfoView();
-            if (I16(0x78DE) != ds.Surface_SelKind)
+            if (ds.Surface_PrevKind != ds.Surface_SelKind)
                 Surface_DrawBuildingPreview(ds.Surface_SelKind);
             Surface_SetupSimpleInfoHotspots();
             if (ds.Surface_SelKind == 7) {
@@ -661,7 +621,7 @@ static void surface_map_click(void)
         } else {
             ds.Surface_Mode = 2;
             Sound_PlayButtonSfx(LIT("hiba"));
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
             Surface_DrawMapView();
         }
     } else if (ds.Surface_Mode == 1) {
@@ -676,7 +636,7 @@ static void surface_map_click(void)
                 Sound_PlayButtonSfx(LIT("x"));
                 Surface_DrawKindArrows();
                 Surface_ShowBuildingInfoView();
-                if (I16(0x78DE) != ds.Surface_SelKind)
+                if (ds.Surface_PrevKind != ds.Surface_SelKind)
                     Surface_DrawBuildingPreview(ds.Surface_SelKind);
                 Surface_SetupSimpleInfoHotspots();
             }
@@ -697,7 +657,7 @@ static void surface_map_click(void)
         } else {
             Sound_PlayButtonSfx(LIT("x"));
         }
-        ds.Surface_SelKind = I16(0x78DE);
+        ds.Surface_SelKind = ds.Surface_PrevKind;
         ds.Surface_Mode = 1;
     }
     if (ds.Surface_Mode == 2 || ds.Surface_Mode == 6)
@@ -715,20 +675,20 @@ static bool kind_selectable(int16_t k)
         return false;
     if (k == 5 && (body->_03 == 0 || body->Deposits[0] < 10))
         return false;
-    uint8_t *bt = building_type(k);
-    if (bt[0x0F] == 0) {
-        if ((int32_t)ds.Game_StaffExp[1] < (int32_t)(int8_t)bt[0x10])
+    const TBuildingType *bt = building_type(k);
+    if (bt->NeedProduct == 0) {
+        if ((int32_t)ds.Game_StaffExp[1] < (int32_t)(int8_t)bt->_10)
             return false;  // falls into the product check with product 0
-    } else if ((int8_t)bt[0x0F] < 1
-               || I16((uint16_t)(0x5D88 + (int8_t)bt[0x0F] * 0x35)) != 5) {  // Products[p].State
+    } else if ((int8_t)bt->NeedProduct < 1
+               || ds.Research_Products[(int8_t)bt->NeedProduct - 1].State != 5) {
         return false;
     }
-    return bt[0x13 + (int8_t)body->SurfaceType] != 0;
+    return bt->_12[1 + (int8_t)body->SurfaceType] != 0;
 }
 
 static void surface_build_button(void)
 {
-    uint8_t *bt = building_type(ds.Surface_SelKind);
+    const TBuildingType *bt = building_type(ds.Surface_SelKind);
     Surface_DrawModeButtons();
     ds.Game_HotspotHit = 0;
     if (ds.Surface_Mode == 2) {
@@ -737,9 +697,10 @@ static void surface_build_button(void)
         Surface_DrawModeButtons();
         return;
     }
-    B8(0x760B) = Surface_CountBuildings(0x16, CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS), true) > 0;
-    B8(0x760C) = Surface_CountBuildings(0x17, CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS), true) > 0;
-    if (*(int32_t *)(bt + 0x27) > ds.Game_Credits) {
+    int16_t sys = CUR_SYS, planet = CUR_PLANET(sys), moon = CUR_MOON(sys);
+    ds.Main_HasBuilderPlant = Surface_CountBuildings(0x16, sys, planet, moon, true) > 0;
+    ds.Main_HasVehiclePlant = Surface_CountBuildings(0x17, sys, planet, moon, true) > 0;
+    if (bt->Cost > ds.Game_Credits) {
         Sound_PlayButtonSfx(LIT("hiba"));
         Gfx_FlashCredits();
     } else if (ds.Game_StaffExp[1] == 0) {
@@ -748,18 +709,20 @@ static void surface_build_button(void)
         Message_ShowMessageNoLog(LIT(" You cannot have two command centres built! "));
     } else if (ds.Surface_SelKind == 0x19) {
         Message_ShowMessageNoLog(LIT(" You already have a colony! "));
-    } else if (bt[0x12] != 0 && B8(0x760B) == 0) {
+    } else if (bt->_12[0] != 0 && ds.Main_HasBuilderPlant == 0) {
         Message_ShowMessageNoLog(LIT(" This building needs a builder plant! "));
-    } else if (bt[0x13] != 0 && B8(0x760C) == 0) {
+    } else if (bt->_12[1] != 0 && ds.Main_HasVehiclePlant == 0) {
         Message_ShowMessageNoLog(LIT(" This building needs a vehicle plant! "));
-    } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt[0x10]) {
+    } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt->_10) {
         Sound_PlayButtonSfx(LIT("build"));
         ds.Surface_Mode = 2;
-        W16(0x791C) = 0;
+        ds.Surface_BlinkCounter = 0;
         Surface_BlinkModeButton();
     } else {
         PString msg;
-        System_StrLoad(&msg, (const PString *)ds_at((uint16_t)(0x586A + ds.Game_StaffHired[1] * 0x13)));
+        // Staff::Names[2, StaffHired[2]]; none hired reads Names[1, 3].
+        const PStr18 *name = &ds.Staff_Names[0][0] + 2 + ds.Game_StaffHired[1];
+        System_StrLoad(&msg, (const PString *)name);
         System_StrConcat(&msg, PSTR(" is not able to construct this building"));
         Message_ShowMessageNoLog(ps(&msg));
     }
@@ -771,10 +734,10 @@ static void screen_surface(void)
     if (ds.Game_ScreenEntered)
         surface_enter();
     Satellite_HandleBodyActions();
-    if (B8(0x788E)) {  // a body action changed the map
+    if (ds.Satellite_ActionDone) {
         Surface_RebuildRadar();
         Surface_DrawBuildingPreview(ds.Surface_SelKind);
-        B8(0x791E) = 1;
+        ds.Surface_BlinkOn = 1;
         if (ds.Surface_Mode < 3)
             Surface_DrawMapView();
         if (ds.Surface_Mode == 6)
@@ -798,18 +761,18 @@ static void screen_surface(void)
         && ds.Mouse_HeldLeft)
         surface_map_click();
 
-    SURF_SCROLL_DIR = 0;
+    ds.Surface_EdgeScrollDir = 0;
     mode = ds.Surface_Mode;
     if (ds.Game_HotspotHit == 0x15 && ds.Mouse_Buttons && !ds.Mouse_HeldLeft
         && (mode == 1 || mode == 2 || mode == 6)) {
         int16_t col = (int16_t)((int16_t)(ds.Mouse_ClickX - 0x5D) / 16 + 1);
         int16_t row = (int16_t)((int16_t)(ds.Mouse_ClickY - 0x35) / 16 + 1);
-        SURF_SCROLL_DIR = B8((uint16_t)(0x0D09 + row * 14 + col));  // edge-scroll table
+        ds.Surface_EdgeScrollDir = ds.Surface_EdgeScroll[row - 1][col - 1];
     }
     if (ds.Game_HotspotHit == 0x16 && ds.Mouse_Buttons && (mode == 1 || mode == 2 || mode == 6)) {
         // Click on the radar: centre the view there.
-        I16(0x7900) = ds.Surface_ScrollX;
-        I16(0x7902) = ds.Surface_ScrollY;
+        ds.Surface_PrevScrollX = ds.Surface_ScrollX;
+        ds.Surface_PrevScrollY = ds.Surface_ScrollY;
         if (ds.Surface_RadarDouble) {
             ds.Surface_ScrollX = (int16_t)((ds.Mouse_ClickX - ds.Surface_RadarX) / 2 - 6);
             ds.Surface_ScrollY = (int16_t)((ds.Mouse_ClickY - ds.Surface_RadarY) / 2 - 3);
@@ -826,9 +789,10 @@ static void screen_surface(void)
             ds.Surface_ScrollY = 0;
         if ((int16_t)ds.Surface_MapHeight - 9 < ds.Surface_ScrollY)
             ds.Surface_ScrollY = (int16_t)(ds.Surface_MapHeight - 9);
-        bool moved = ds.Surface_ScrollX != I16(0x7900) || ds.Surface_ScrollY != I16(0x7902);
+        bool moved = ds.Surface_ScrollX != ds.Surface_PrevScrollX
+                     || ds.Surface_ScrollY != ds.Surface_PrevScrollY;
         if (moved)
-            B8(0x791E) = 1;
+            ds.Surface_BlinkOn = 1;
         if (moved)
             Surface_DrawMapView();
         if (moved)
@@ -836,11 +800,9 @@ static void screen_surface(void)
     }
 
     // Previous / next building kind.
-    int16_t old_kind = ds.Surface_SelKind;
     if ((ds.Game_HotspotHit == 0x17 || ds.Game_HotspotHit == 0x18)
         && (mode == 1 || mode == 2 || mode == 3 || mode == 6) && ds.Surface_CanBuild) {
-        I16(0x75F4) = (int16_t)(ds.Surface_SelKind >> 15);
-        I16(0x75F2) = ds.Surface_SelKind;
+        ds.Main_PrevKind = ds.Surface_SelKind;
         if (ds.Game_HotspotHit == 0x17) {
             int16_t last = (int16_t)(ds.Surface_SelKind - 1);
             for (ds.Main_I = 1; ds.Main_I <= last; ds.Main_I++)
@@ -852,7 +814,7 @@ static void screen_surface(void)
                 if (kind_selectable((int16_t)ds.Main_I))
                     ds.Surface_SelKind = (int16_t)ds.Main_I;
         }
-        if ((ds.Surface_SelKind >> 15) != I16(0x75F4) || ds.Surface_SelKind != old_kind) {
+        if (ds.Main_PrevKind != ds.Surface_SelKind) {
             Sound_PlayButtonSfx(LIT("x"));
             if (ds.Surface_Mode == 2)
                 ds.Surface_Mode = 1;
@@ -874,30 +836,30 @@ static void screen_surface(void)
     }
 
     // Scroll buttons and edge scrolling.
-    int16_t dir = SURF_SCROLL_DIR;
-    B8(0x78EB) = 0;
+    int16_t dir = ds.Surface_EdgeScrollDir;
+    ds.Surface_Scrolled = 0;
     if ((ds.Game_HotspotHit == 0x1A || dir == 3 || dir == 5 || dir == 7) && ds.Surface_ScrollX > 0
         && ds.Mouse_Buttons) {
         ds.Surface_ScrollX--;
-        B8(0x78EB) = 1;
+        ds.Surface_Scrolled = 1;
     }
     if ((ds.Game_HotspotHit == 0x1B || dir == 4 || dir == 6 || dir == 8)
         && ds.Surface_ScrollX < (int16_t)ds.Surface_MapWidth - 14 && ds.Mouse_Buttons) {
         ds.Surface_ScrollX++;
-        B8(0x78EB) = 1;
+        ds.Surface_Scrolled = 1;
     }
     if ((ds.Game_HotspotHit == 0x1C || dir == 1 || dir == 5 || dir == 6) && ds.Surface_ScrollY > 0
         && ds.Mouse_Buttons) {
         ds.Surface_ScrollY--;
-        B8(0x78EB) = 1;
+        ds.Surface_Scrolled = 1;
     }
     if ((ds.Game_HotspotHit == 0x1D || dir == 2 || dir == 7 || dir == 8)
         && ds.Surface_ScrollY < (int16_t)ds.Surface_MapHeight - 9 && ds.Mouse_Buttons) {
         ds.Surface_ScrollY++;
-        B8(0x78EB) = 1;
+        ds.Surface_Scrolled = 1;
     }
-    if (B8(0x78EB)) {
-        B8(0x791E) = 1;
+    if (ds.Surface_Scrolled) {
+        ds.Surface_BlinkOn = 1;
         Surface_DrawMapView();
         Surface_DrawRadar();
     }
@@ -912,14 +874,14 @@ static void screen_surface(void)
             ds.Surface_Mode = 1;
         } else {
             ds.Surface_Mode = 6;
-            W16(0x791C) = 0;
+            ds.Surface_BlinkCounter = 0;
             Surface_BlinkModeButton();
         }
     }
     if ((ds.Game_HotspotHit == 0x15 || ds.Game_HotspotHit == 0x16)
         && (ds.Surface_Mode == 3 || ds.Surface_Mode == 4)) {
         Sound_PlayButtonSfx(LIT("x"));
-        B8(0x791E) = 1;
+        ds.Surface_BlinkOn = 1;
         Surface_DrawMapView();
         Surface_SetupSurfaceHotspots();
         ds.Surface_Mode = 1;
@@ -927,13 +889,6 @@ static void screen_surface(void)
 }
 
 // --- Screens 23/25: pub ------------------------------------------------------------
-
-#define PUB_PERSON I16(0x7738)  // person talked to (1..10)
-#define PUB_MENU I16(0x7764)    // question menu number, 0 = leave
-#define PUB_LINE I16(0x7758)    // selected question line
-#define PUB_ANSWER I16(0x7766)  // answer code of the chosen question
-#define PUB_REPLY I16(0x7768)   // reply line
-#define PUB_REPLIED B8(0x775A)  // reply shown, next click continues
 
 static void screen_pub(void)
 {
@@ -943,7 +898,7 @@ static void screen_pub(void)
         Pub_SetupPubHotspots();
     }
     if ((uint16_t)ds.Game_HotspotHit > 0x14 && (uint16_t)ds.Game_HotspotHit < 0x1F) {
-        PUB_PERSON = (int16_t)(ds.Game_HotspotHit - 0x14);
+        ds.Pub_Person = (int16_t)(ds.Game_HotspotHit - 0x14);
         Sound_PlayButtonSfx(LIT("talk"));
         ds.Game_CurrentScreen = 25;
         ds.Game_ScreenSwitch = 1;
@@ -953,76 +908,80 @@ static void screen_pub(void)
 static void pub_dialog_enter(void)
 {
     TPubPerson *p = ds.Pub_People;
-    PUB_MENU = 1;
-    PUB_REPLY = 0;
-    int16_t who = PUB_PERSON;
-    if (who == 1 && B8(0x773E)) {
+    ds.Pub_MenuIdx = 1;
+    ds.Pub_ReplyLine = 0;
+    int16_t who = ds.Pub_Person;
+    if (who == 1 && ds.Pub_StoryFlags[0]) {
         if (p[1].State == 2 && p[1].Timer < 1)
-            PUB_MENU = 3;
+            ds.Pub_MenuIdx = 3;
         else
-            PUB_MENU = 2;
+            ds.Pub_MenuIdx = 2;
     }
-    if (who == 2 && B8(0x7740) && !B8(0x773F))
-        PUB_MENU = 2;
-    if (who == 2 && B8(0x773F))
-        PUB_MENU = B8(0x774A) == 0 ? 10 : 3;
-    if (who == 3 && B8(0x7749))
-        PUB_MENU = 2;
-    if (who == 4 && !B8(0x7741) && p[8].State == 2)
-        PUB_MENU = 3;
-    if (who == 5 && B8(0x7742) && !B8(0x7743) && ds.Races_Races[5].Status == 2
+    if (who == 2 && ds.Pub_StoryFlags[2] && !ds.Pub_StoryFlags[1])
+        ds.Pub_MenuIdx = 2;
+    if (who == 2 && ds.Pub_StoryFlags[1])
+        ds.Pub_MenuIdx = ds.Pub_AnyTopic == 0 ? 10 : 3;
+    if (who == 3 && ds.Pub_StoryFlags[11])
+        ds.Pub_MenuIdx = 2;
+    if (who == 4 && !ds.Pub_StoryFlags[3] && p[8].State == 2)
+        ds.Pub_MenuIdx = 3;
+    if (who == 5 && ds.Pub_StoryFlags[4] && !ds.Pub_StoryFlags[5] && ds.Races_Races[5].Status == 2
         && ds.Races_Races[6].Status == 2)
-        PUB_MENU = 2;
-    if (who == 6 && p[1].State == 2 && !B8(0x7740))
-        PUB_MENU = 2;
-    if (who == 6 && !B8(0x7742)
-        && (ds.Galaxy_SystemStatus[4] == 1 || ds.Galaxy_SystemStatus[5] == 1) && B8(0x5D98) == 0)
-        PUB_MENU = 4;
-    if (who == 6 && p[8].State == 2 && !B8(0x7741) && !B8(0x7747))
-        PUB_MENU = 3;
-    if (who == 7 && B8(0x7748))
-        PUB_MENU = B8(0x7744) == 0 ? 6 : 2;
-    if (who == 7 && B8(0x7748) && B8(0x7745))
-        PUB_MENU = 3;
-    if (who == 9 && B8(0x7741)) {
-        if (B8(0x7746) == 0)
-            PUB_MENU = 2;
+        ds.Pub_MenuIdx = 2;
+    if (who == 6 && p[1].State == 2 && !ds.Pub_StoryFlags[2])
+        ds.Pub_MenuIdx = 2;
+    if (who == 6 && !ds.Pub_StoryFlags[4]
+        && (ds.Galaxy_SystemStatus[4] == 1 || ds.Galaxy_SystemStatus[5] == 1)
+        && ds.Intel_Race7to10Done == 0)
+        ds.Pub_MenuIdx = 4;
+    if (who == 6 && p[8].State == 2 && !ds.Pub_StoryFlags[3] && !ds.Pub_StoryFlags[9])
+        ds.Pub_MenuIdx = 3;
+    if (who == 7 && ds.Pub_StoryFlags[10])
+        ds.Pub_MenuIdx = ds.Pub_StoryFlags[6] == 0 ? 6 : 2;
+    if (who == 7 && ds.Pub_StoryFlags[10] && ds.Pub_StoryFlags[7])
+        ds.Pub_MenuIdx = 3;
+    if (who == 9 && ds.Pub_StoryFlags[3]) {
+        if (ds.Pub_StoryFlags[8] == 0)
+            ds.Pub_MenuIdx = 2;
         else
-            PUB_MENU = Pub_FindActiveDeal() < 1 ? 6 : 3;
+            ds.Pub_MenuIdx = Pub_FindActiveDeal() < 1 ? 6 : 3;
     }
     Pub_LoadPersonPortrait();
     Pub_BuildQuestionMenu();
     Pub_DrawQuestionMenu();
     Pub_SetupTalkHotspot();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    PUB_REPLIED = 0;
+    ds.Pub_Replied = 0;
 }
 
+// Pub::Deals[deal].Kind; deal 0 (none active) reads the bytes before Deals,
+// as the original does.
 static uint8_t pub_deal_kind(int16_t deal)
 {
-    return B8((uint16_t)(0x040C + deal * 0x18 + 0x0C));  // Pub::Deals[deal].Kind
+    const TPubDeal *d = ds.Pub_Deals + (deal - 1);
+    return d->Kind;
 }
 
 // The effects of the chosen question (1000:24d3..2a5e).
 static void pub_answer(void)
 {
     TPubPerson *p = ds.Pub_People;
-    int16_t who = PUB_PERSON, a = PUB_ANSWER;
+    int16_t who = ds.Pub_Person, a = ds.Pub_QuestionLine;
     if (who == 1) {
         if (a == 1) {
-            B8(0x773E) = 1;
+            ds.Pub_StoryFlags[0] = 1;
             System_StrStore(PSTR("Spy-Hunter   "), (PString *)&p[0].Name, 13);
         } else if (a == 2) {
-            PUB_REPLY = B8(0x773F) == 0 ? 4 : 6;
+            ds.Pub_ReplyLine = ds.Pub_StoryFlags[1] == 0 ? 4 : 6;
         } else if (a == 4) {
             p[1].State = 1;
-            W16(0x5D8A) = 200;
+            ds.Intel_System3Timer = 200;
         }
     }
     ds.Main_I = 0;
     if (who == 2) {
         if (a == 8) {
-            B8(0x773F) = 1;
+            ds.Pub_StoryFlags[1] = 1;
             ds.Galaxy_SystemStatus[2] = 0;
         } else if (a == 5) {
             add_credits(-30000);
@@ -1037,73 +996,72 @@ static void pub_answer(void)
             bool found = false;
             for (size_t i = 0; i < sizeof tracks / sizeof tracks[0]; i++) {
                 if (a == tracks[i].answer) {
-                    I16(0x7770) = tracks[i].track;
-                    I16(0x7772) = 0;
+                    ds.Pub_OfferItem = tracks[i].track;
                     found = true;
                     break;
                 }
             }
             if (!found && a == 0x17) {
-                add_credits(-I32(0x7774));
+                add_credits(-ds.Pub_OfferPrice);
                 p[1].Timer = (int16_t)(System_Random(100) + 100);
             }
         }
     }
     if (who == 3)
-        B8(0x7749) = 1;
+        ds.Pub_StoryFlags[11] = 1;
     ds.Main_I = ds.Races_Races[1].Status > 0;
-    if (B8(0x5D5E) && !B8(0x5D6C))
+    if (ds.Intel_Race2Done4 && !ds.Intel_MorgrulAttack2Done)
         ds.Main_I = 2;
     if (ds.Galaxy_SystemStatus[1] == 1 && ds.Races_Races[3].Status == 0)
         ds.Main_I = 3;
-    if (ds.Galaxy_SystemStatus[3] == 1 && B8(0x5D91) == 0)
+    if (ds.Galaxy_SystemStatus[3] == 1 && ds.Intel_Pub4HintOff == 0)
         ds.Main_I = 4;
     if (who == 4) {
         if (a == 1) {
-            PUB_REPLY = 2;
+            ds.Pub_ReplyLine = 2;
             if ((uint16_t)ds.Main_I != 0)
-                PUB_REPLY = 3;
+                ds.Pub_ReplyLine = 3;
         } else if (a == 3) {
             add_credits(-500);
-            PUB_REPLY = (int16_t)(ds.Main_I + 4);
+            ds.Pub_ReplyLine = (int16_t)(ds.Main_I + 4);
             if ((uint16_t)ds.Main_I == 3)
                 ds.Galaxy_PlanetStatus[1][4] = 0;
         } else if (a == 5) {
-            B8(0x7741) = 1;
+            ds.Pub_StoryFlags[3] = 1;
             System_StrStore(PSTR("Pirate Leader"), (PString *)&p[8].Name, 13);
             add_credits(-500);
         }
     }
     if (who == 5) {
         if (a == 5) {
-            B8(0x7743) = 1;
+            ds.Pub_StoryFlags[5] = 1;
             p[4].Timer = (int16_t)(System_Random(100) + 100);
             p[4].Deal = 1;
         } else if (a == 6) {
-            B8(0x7743) = 1;
+            ds.Pub_StoryFlags[5] = 1;
             p[4].Timer = (int16_t)(System_Random(100) + 100);
             p[4].Deal = 2;
         }
     }
     if (who == 6) {
         if (a == 8) {
-            B8(0x7740) = 1;
+            ds.Pub_StoryFlags[2] = 1;
         } else if (a == 10) {
-            B8(0x7740) = 1;
+            ds.Pub_StoryFlags[2] = 1;
             System_StrStore(PSTR("Spy          "), (PString *)&p[1].Name, 13);
         } else if (a == 11) {
-            B8(0x7747) = 1;
+            ds.Pub_StoryFlags[9] = 1;
         } else if (a == 13) {
-            B8(0x7742) = 1;
+            ds.Pub_StoryFlags[4] = 1;
             add_credits(-5000);
         } else if (a == 6 || a == 15) {
-            PUB_REPLY = 3;
+            ds.Pub_ReplyLine = 3;
             if (ds.Races_Races[2].Status == 0)
-                PUB_REPLY = 8;
+                ds.Pub_ReplyLine = 8;
             if (ds.Races_Races[3].Status == 0)
-                PUB_REPLY = 8;
+                ds.Pub_ReplyLine = 8;
             if (ds.Races_Races[0].Status == 0)
-                PUB_REPLY = 7;
+                ds.Pub_ReplyLine = 7;
         }
     }
     if (who == 7) {
@@ -1112,25 +1070,25 @@ static void pub_answer(void)
             p[6].Timer = (int16_t)(System_Random(100) + 100);
             p[6].Deal = 2;
         } else if (a == 5) {
-            B8(0x7745) = 1;
+            ds.Pub_StoryFlags[7] = 1;
         }
     }
     if (who == 7) {
-        B8(0x7748) = 1;
+        ds.Pub_StoryFlags[10] = 1;
         System_StrStore(PSTR("Bounty-Hunter"), (PString *)&p[6].Name, 13);
     }
     if (who == 9) {
         if (a == 2) {
-            B8(0x7746) = 1;
+            ds.Pub_StoryFlags[8] = 1;
             Pub_StartPubDealWindows();
         } else if (a == 5) {
-            PUB_REPLY = 6;
+            ds.Pub_ReplyLine = 6;
             p[8].Timer = (int16_t)(System_Random(100) + 100);
             p[8].Deal = (uint8_t)(Pub_FindActiveDeal() + 10);
         } else if (a == 6 || a == 7 || a == 8) {
             static const int32_t price[] = {10000, 50000, 100000};
             if (pub_deal_kind(Pub_FindActiveDeal()) < a - 4) {
-                PUB_REPLY = 6;
+                ds.Pub_ReplyLine = 6;
                 add_credits(-price[a - 6]);
                 p[8].Timer = (int16_t)(System_Random(100) + 100);
                 p[8].Deal = (uint8_t)Pub_FindActiveDeal();
@@ -1147,8 +1105,8 @@ static void pub_answer(void)
         } else if (a == 8) {
             p[9].State = 1;
         } else if (a == 9 || a == 10) {
-            B8(0x7744) = 1;
-            B8(0x5D99) = 1;
+            ds.Pub_StoryFlags[6] = 1;
+            ds.Intel_Pub10Done = 1;
             p[9].State = 1;
         }
     }
@@ -1164,32 +1122,34 @@ static void screen_pub_dialog(void)
         ds.Game_CurrentScreen = 23;
         ds.Game_ScreenSwitch = 1;
     }
-    if (ds.Game_HotspotHit == 0x15 && ds.Mouse_Buttons && !PUB_REPLIED) {
-        W16(0x775C) = 0xFFFF;
-        W16(0x775E) = 0xFFFF;
-        if (PUB_LINE > 0) {
-            PUB_ANSWER = I8((uint16_t)(0x0402 + PUB_LINE));  // Pub::CurMenu.Items[line]
-            PUB_LINE = 0;
+    if (ds.Game_HotspotHit == 0x15 && ds.Mouse_Buttons && !ds.Pub_Replied) {
+        ds.Pub_HoverCol = 0xFFFF;
+        ds.Pub_HoverRow = -1;
+        if (ds.Pub_HoverItem > 0) {
+            // CurMenu.Items[line]; the trader's menu 6 can list 6 questions, the
+            // sixth in ItemQty[1] (1fd2:0788), so index the bytes.
+            ds.Pub_QuestionLine = ((const int8_t *)&ds.Pub_CurMenu)[ds.Pub_HoverItem];
+            ds.Pub_HoverItem = 0;
             Pub_ReadQuestionCode();
-            PUB_REPLY = I16(0x776A);
+            ds.Pub_ReplyLine = ds.Pub_QuestionCode;
             pub_answer();
             Pub_ShowReply();
-            PUB_REPLIED = 1;
+            ds.Pub_Replied = 1;
             ds.Game_HotspotHit = 0;
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
             ds.Mouse_Hotspots[0].Repeat_ = 1;
             Gfx_DrawCredits();
         }
     }
-    if (ds.Game_HotspotHit == 0x15 && PUB_REPLIED) {
-        if (PUB_MENU == 0) {
+    if (ds.Game_HotspotHit == 0x15 && ds.Pub_Replied) {
+        if (ds.Pub_MenuIdx == 0) {
             ds.Game_CurrentScreen = 23;
             ds.Game_ScreenSwitch = 1;
         } else {
-            PUB_REPLIED = 0;
+            ds.Pub_Replied = 0;
             Pub_BuildQuestionMenu();
             Pub_DrawQuestionMenu();
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
             ds.Mouse_Hotspots[0].Repeat_ = 0;
         }
     }
@@ -1199,9 +1159,9 @@ static void screen_pub_dialog(void)
 
 static void select_battle_body(void)
 {
-    CUR_SYS = BATTLE_SYSTEM;
-    CUR_PLANET(BATTLE_SYSTEM) = BATTLE_PLANET;
-    CUR_MOON(CUR_SYS) = BATTLE_MOON;
+    CUR_SYS = ds.SpWar_BattleSystem;
+    CUR_PLANET(ds.SpWar_BattleSystem) = ds.SpWar_BattlePlanet;
+    CUR_MOON(CUR_SYS) = ds.SpWar_BattleMoon;
 }
 
 static void screen_space_battle(void)
@@ -1216,69 +1176,65 @@ static void screen_space_battle(void)
         SpWar_EnterSpaceBattle();
         SpWar_ClearHotspots();
         SpWar_LoadWarAnimDef((int16_t)(System_Random(0x19) + 1));
-        // set DS:77F6 := set DS:77F6 - [byte DS:7792] (a set of 0..31)
-        uint8_t e = B8(0x7792);
+        // ScriptsLeft := ScriptsLeft - [Script] (a set of 0..31, low byte of Script)
+        uint8_t e = (uint8_t)ds.SpWar_Script;
         if (e < 32)
-            B8((uint16_t)(0x77F6 + e / 8)) &= (uint8_t)~(1u << (e % 8));
+            ds.SpWar_ScriptsLeft[e / 8] &= (uint8_t)~(1u << (e % 8));
     }
     if (ds.Game_MenuCommand == 0x3E) {  // retreat
         SpWar_FreeWarAnims();
         Sound_StopSbVoice();
         Sound_PlayButtonSfx(LIT("retreat"));
         GfxPath_SetToolbarAndShow(0x1E);
-        B8(0x77DA) = 1;
-        B8(0x77DB) = 1;
+        ds.SpWar_BattleOver = 1;
+        ds.SpWar_Retreated = 1;
         SpWar_EndSpaceBattle();
     }
     if (ds.Game_MenuCommand == 0x41) {  // battle over
         Sound_FreeWarSndBuf();
         Sound_PlayButtonSfx(LIT("endbattl"));
         if (!ds.SpWar_PlayerWon)
-            Intel_SpaceBattleLost(BATTLE_SYSTEM, BATTLE_PLANET);
+            Intel_SpaceBattleLost(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet);
         else
-            Intel_SpaceBattleWon(BATTLE_SYSTEM, BATTLE_PLANET);
+            Intel_SpaceBattleWon(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet);
         select_battle_body();
-        if (B8(0x778B))
-            ds.Game_CurrentScreen = B8(0x7788) == 0 || !ds.SpWar_PlayerWon ? 7 : 19;
-        if (B8(0x778B) == 0)
-            ds.Game_CurrentScreen = B8(0x7788) == 0 || ds.SpWar_PlayerWon ? 7 : 19;
+        if (ds.Sim_PlayerAttacks)
+            ds.Game_CurrentScreen = ds.SpWar_GroundBattle == 0 || !ds.SpWar_PlayerWon ? 7 : 19;
+        if (ds.Sim_PlayerAttacks == 0)
+            ds.Game_CurrentScreen = ds.SpWar_GroundBattle == 0 || ds.SpWar_PlayerWon ? 7 : 19;
         ds.Game_ScreenSwitch = 1;
-        if (ds.SpWar_PlayerWon && B8(0x5D67) == 0) {
-            B8(0x5D67) = 1;
+        if (ds.SpWar_PlayerWon && ds.Intel_FirstBattleWon == 0) {
+            ds.Intel_FirstBattleWon = 1;
             Intel_ScheduleIdea(0xD, 0x14, 0x14);
             Intel_ScheduleIdea(0x11, 0x5A, 0x32);
         }
-        if (ds.SpWar_PlayerWon && B8(0x5D6D)) {
-            B8(0x5D6D) = 0;
+        if (ds.SpWar_PlayerWon && ds.Intel_MorgrulAttack2Open) {
+            ds.Intel_MorgrulAttack2Open = 0;
             Intel_ScheduleIdea(0x12, 3, 0);
             Message_ShowMessageLine(0x10);
             AlienTalk_StartAlienScene(3);
             ds.Game_StoryStage = 3;
         }
-        if (ds.SpWar_PlayerWon && B8(0x5D75)) {
-            B8(0x5D75) = 0;
+        if (ds.SpWar_PlayerWon && ds.Intel_MorgrulAttack3Open) {
+            ds.Intel_MorgrulAttack3Open = 0;
             Message_ShowMessageLine(0x13);
             ds.Pub_People[1].State = 2;
-            B8(0x5D3C) = 1;
+            ds.Intel_MorgrulAttack3Won = 1;
             Intel_ScheduleIdea(0x14, 0x1E, 10);
             Intel_ScheduleIdea(0x19, 500, 100);
             AlienTalk_StartAlienScene(3);
             ds.Game_StoryStage = 4;
         }
-        if (ds.SpWar_PlayerWon && BATTLE_SYSTEM == 8)
+        if (ds.SpWar_PlayerWon && ds.SpWar_BattleSystem == 8)
             ds.Pub_People[9].State = 2;
     }
 }
 
 // --- Screen 32: ground battle --------------------------------------------------------
 
-#define GW_ORDER I16(0x770C)   // 1 select, 3 move target, 4 attack target
-#define GW_UNIT I16(0x7716)    // selected unit (1..20 own, else enemy)
-#define GW_OWN B8(0x771A)      // selected unit is the player's
-
 static uint8_t *gw_unit_record(void)
 {
-    return (uint8_t *)far_host(FP(0x7646)) + GW_UNIT * 0x27 - 0x27;
+    return (uint8_t *)far_host(ds.GrWarUnits_UnitLists[0]) + ds.GrWar_Selected * 0x27 - 0x27;
 }
 
 static void ground_battle_won_story(void)
@@ -1293,9 +1249,9 @@ static void ground_battle_won_story(void)
     Message_ShowMessage(ps(&msg));
     if (body->Owner == 3) {
         Message_ShowMessageLine(0x23);
-        B8(0x5D8C) = 1;
-        B8(0x5D71) = 0;
-        B8(0x5D70) = 1;
+        ds.Intel_MorgrulBeaten = 1;
+        ds.Intel_Phoenix1Armed = 0;
+        ds.Intel_Phoenix1Done = 1;
         Intel_OfferInventionForAnalysis(0x13);
         Intel_ScheduleIdea(0x13, 0x32, 0x14);
         if (ds.Races_Races[2].Status > 0)
@@ -1311,7 +1267,7 @@ static void ground_battle_won_story(void)
         ds.Game_CurrentScreen = 36;
         ds.Game_ScreenSwitch = 1;
     }
-    if (B8(0x780C) && ds.Research_Products[0xB].State == 0) {  // ShipMove::InRestrictedArea
+    if (ds.ShipMove_InRestrictedArea && ds.Research_Products[0xB].State == 0) {
         Message_ShowMessageLine(0xD);
         Intel_OfferInventionForAnalysis(0xC);
     }
@@ -1340,42 +1296,43 @@ static void screen_ground_battle(void)
         GrWar_InitBattleUnits();
         GrWar_EnterGroundBattle();
         GrWar_SetupBattleHotspots();
-        GW_ORDER = 1;
+        ds.GrWar_Order = 1;
     }
     if (ds.Game_HotspotHit == 0x15) {
-        if (GW_ORDER == 1) {
+        if (ds.GrWar_Order == 1) {
             ds.Main_I = GrWar_FindUnitNearPoint((int16_t)(ds.Mouse_ClickX - 6),
                                                 (int16_t)(ds.Mouse_ClickY - 6), 3);
             if (ds.Main_I > 0) {
-                I16(0x7718) = GW_UNIT;
-                B8(0x771B) = GW_OWN;
-                GW_OWN = (int16_t)ds.Main_I < 100;
-                GW_UNIT = (int16_t)ds.Main_I;
-                if (!GW_OWN)
-                    GW_UNIT = (int16_t)(ds.Main_I - 100);
+                ds.GrWar_PrevSelected = ds.GrWar_Selected;
+                ds.GrWar_PrevSelectedOwn = ds.GrWar_SelectedOwn;
+                ds.GrWar_SelectedOwn = (int16_t)ds.Main_I < 100;
+                ds.GrWar_Selected = (int16_t)ds.Main_I;
+                if (!ds.GrWar_SelectedOwn)
+                    ds.GrWar_Selected = (int16_t)(ds.Main_I - 100);
                 GrWar_SetHotspotFlags(0);
-                if (I16(0x7718) != GW_UNIT || B8(0x771B) != GW_OWN)
+                if (ds.GrWar_PrevSelected != ds.GrWar_Selected
+                    || ds.GrWar_PrevSelectedOwn != ds.GrWar_SelectedOwn)
                     Sound_PlayGrSnd(0x14);
             }
         }
-        if (GW_ORDER == 3) {
+        if (ds.GrWar_Order == 3) {
             uint8_t *u = gw_unit_record();
-            GW_ORDER = 1;
+            ds.GrWar_Order = 1;
             GrWar_SetHotspotFlags(0);
-            I16(0x7712) = (int16_t)((ds.Mouse_ClickX - 0x3A) / 16);
-            I16(0x7714) = (int16_t)((ds.Mouse_ClickY - 0x2E) / 16);
-            if (I16(0x7714) > 8)
-                I16(0x7714) = 8;
+            ds.GrWar_TargetX = (int16_t)((ds.Mouse_ClickX - 0x3A) / 16);
+            ds.GrWar_TargetY = (int16_t)((ds.Mouse_ClickY - 0x2E) / 16);
+            if (ds.GrWar_TargetY > 8)
+                ds.GrWar_TargetY = 8;
             u[0x0F] = 2;  // order: move to
-            u[0x10] = B8(0x7712);
-            u[0x11] = B8(0x7714);
+            u[0x10] = (uint8_t)ds.GrWar_TargetX;
+            u[0x11] = (uint8_t)ds.GrWar_TargetY;
             u[0x12] = 0;
             Sound_PlayGrSnd(0x15);
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
         }
-        if (GW_ORDER == 4) {
+        if (ds.GrWar_Order == 4) {
             uint8_t *u = gw_unit_record();
-            GW_ORDER = 1;
+            ds.GrWar_Order = 1;
             GrWar_SetHotspotFlags(0);
             ds.Main_I = GrWar_FindUnitNearPoint(ds.Mouse_ClickX, ds.Mouse_ClickY, 2);
             if (ds.Main_I < 1) {
@@ -1386,29 +1343,30 @@ static void screen_ground_battle(void)
                 u[0x12] = 0;
                 Sound_PlayGrSnd(0x15);
             }
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
         }
     }
     if (ds.Game_HotspotHit == 0x16) {
-        if (GW_UNIT < 1 || GW_UNIT > 0x14 || !GW_OWN) {
+        if (ds.GrWar_Selected < 1 || ds.GrWar_Selected > 0x14 || !ds.GrWar_SelectedOwn) {
             Sound_PlayGrSnd(0x16);
         } else {
-            GW_ORDER = 3;
+            ds.GrWar_Order = 3;
             GrWar_SetHotspotFlags(5);
             Sound_PlayGrSnd(0x1E);
         }
     }
     if (ds.Game_HotspotHit == 0x17) {
         bool ok = false;
-        if (GW_UNIT > 0 && GW_OWN) {
-            if (GW_UNIT < 0x15)
+        if (ds.GrWar_Selected > 0 && ds.GrWar_SelectedOwn) {
+            if (ds.GrWar_Selected < 0x15)
                 ok = true;
-            else if (B8(0x778B)
-                     && Surface_CountBuildings(0x12, BATTLE_SYSTEM, BATTLE_PLANET, BATTLE_MOON, true) > 0)
+            else if (ds.Sim_PlayerAttacks
+                     && Surface_CountBuildings(0x12, ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet,
+                                               ds.SpWar_BattleMoon, true) > 0)
                 ok = true;
         }
         if (ok) {
-            GW_ORDER = 4;
+            ds.GrWar_Order = 4;
             GrWar_SetHotspotFlags(5);
             Sound_PlayGrSnd(0x1F);
         } else {
@@ -1417,21 +1375,21 @@ static void screen_ground_battle(void)
     }
     if (ds.Game_HotspotHit == 0x18) {
         Sound_PlayGrSnd(0x16);
-        GW_ORDER = 1;
+        ds.GrWar_Order = 1;
         GrWar_SetHotspotFlags(0);
     }
     if (ds.Game_HotspotHit == 0x19) {
-        if (GW_ORDER > 1)
+        if (ds.GrWar_Order > 1)
             Sound_PlayGrSnd(0x16);
-        GW_ORDER = 1;
+        ds.GrWar_Order = 1;
         GrWar_SetHotspotFlags(0);
     }
     if (ds.Game_MenuCommand == 0x48) {  // retreat
         Sound_StopSbVoice();
         Sound_PlayButtonSfx(LIT("retreat"));
         GfxPath_SetToolbarAndShow(0x1E);
-        B8(0x770B) = 1;
-        B8(0x77DB) = 1;
+        ds.GrWar_BattleOver = 1;
+        ds.SpWar_Retreated = 1;
         GrWar_EndGroundBattle();
     }
     if (ds.Game_MenuCommand == 0x41) {  // battle over
@@ -1441,48 +1399,51 @@ static void screen_ground_battle(void)
         ds.Game_CurrentScreen = 7;
         select_battle_body();
         PlanetInfo_SelectCurBody();
-        if (!ds.GrWar_PlayerWon && BATTLE_SYSTEM == 1 && BATTLE_PLANET == 5 && BATTLE_MOON == 0) {
+        if (!ds.GrWar_PlayerWon && ds.SpWar_BattleSystem == 1 && ds.SpWar_BattlePlanet == 5
+            && ds.SpWar_BattleMoon == 0) {
             ds.Game_CurrentScreen = 35;  // Earth lost: death ending
             ds.Game_ScreenSwitch = 1;
         }
         if (ds.GrWar_PlayerWon)
             ground_battle_won_story();
-        if (ds.GrWar_PlayerWon && B8(0x5D67) == 0) {
-            B8(0x5D67) = 1;
+        if (ds.GrWar_PlayerWon && ds.Intel_FirstBattleWon == 0) {
+            ds.Intel_FirstBattleWon = 1;
             Intel_ScheduleIdea(0xD, 0x14, 0x14);
         }
-        if (!ds.Game_ScreenSwitch && !ds.GrWar_PlayerWon && B8(0x5D68) == 0) {
-            B8(0x5D68) = 1;
+        if (!ds.Game_ScreenSwitch && !ds.GrWar_PlayerWon && ds.Intel_FirstGroundLost == 0) {
+            ds.Intel_FirstGroundLost = 1;
             Message_ShowMessageLine(0xE);
             Intel_ScheduleIdea(0x11, 5, 5);
         }
-        if (ds.GrWar_PlayerWon && B8(0x5D6D)) {
-            B8(0x5D6D) = 0;
+        if (ds.GrWar_PlayerWon && ds.Intel_MorgrulAttack2Open) {
+            ds.Intel_MorgrulAttack2Open = 0;
             Message_ShowMessageLine(0x10);
             AlienTalk_StartAlienScene(3);
             ds.Game_StoryStage = 3;
         }
-        if (ds.GrWar_PlayerWon && B8(0x5D75)) {
-            B8(0x5D75) = 0;
+        if (ds.GrWar_PlayerWon && ds.Intel_MorgrulAttack3Open) {
+            ds.Intel_MorgrulAttack3Open = 0;
             Message_ShowMessageLine(0x10);
             ds.Pub_People[1].State = 2;
-            B8(0x5D3C) = 1;
+            ds.Intel_MorgrulAttack3Won = 1;
             Intel_ScheduleIdea(0x14, 0x1E, 10);
             Intel_ScheduleIdea(0x19, 500, 100);
             AlienTalk_StartAlienScene(3);
             ds.Game_StoryStage = 4;
         }
-        GW_UNIT = 0;
-        if (ds.GrWar_PlayerWon && B8(0x778B))
-            Intel_ClearBodyFull(BATTLE_SYSTEM, BATTLE_PLANET, BATTLE_MOON);
-        if (!ds.GrWar_PlayerWon && B8(0x778B) == 0)
-            Intel_PurgeBody(BATTLE_SYSTEM, BATTLE_PLANET, BATTLE_MOON);
-        if (ds.GrWar_PlayerWon && B8(0x778B))
-            Intel_ClaimBodyForPlayer(BATTLE_SYSTEM, BATTLE_PLANET, BATTLE_MOON);
-        if (!ds.GrWar_PlayerWon && B8(0x778B) == 0)
+        ds.GrWar_Selected = 0;
+        if (ds.GrWar_PlayerWon && ds.Sim_PlayerAttacks)
+            Intel_ClearBodyFull(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet, ds.SpWar_BattleMoon);
+        if (!ds.GrWar_PlayerWon && ds.Sim_PlayerAttacks == 0)
+            Intel_PurgeBody(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet, ds.SpWar_BattleMoon);
+        if (ds.GrWar_PlayerWon && ds.Sim_PlayerAttacks)
+            Intel_ClaimBodyForPlayer(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet,
+                                     ds.SpWar_BattleMoon);
+        if (!ds.GrWar_PlayerWon && ds.Sim_PlayerAttacks == 0)
             // BUG? the arguments are pushed as (system, planet, moon, owner)
             // against ClaimBodyForRace(owner, system, planet, moon).
-            Intel_ClaimBodyForRace(BATTLE_SYSTEM, BATTLE_PLANET, BATTLE_MOON, I16(0x778C));
+            Intel_ClaimBodyForRace(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet,
+                                   ds.SpWar_BattleMoon, ds.SpWar_EnemyRace);
     }
 }
 
@@ -1490,7 +1451,7 @@ static void screen_ground_battle(void)
 
 static void screen_story_music(void)
 {
-    PString *track = (PString *)ds_at(0x75F6);  // string[20]
+    PString *track = (PString *)&ds.Main_SceneTrack;
     track->len = 0;
     switch (ds.AlienTalk_Scene) {
     case 1: System_StrStore(PSTR("1"), track, 0x14); break;
@@ -1518,21 +1479,16 @@ static void screen_story_music(void)
     ds.Game_ScreenEntered = 0;
 }
 
-#define AT_LOCKED B8(0x78B6)       // AlienTalk::Locked: reply shown
-#define AT_MENU I16(0x78BC)        // AlienTalk::MenuNumber, 0 = done
-#define AT_LINE I16(0x78B4)        // AlienTalk::SelectedLine
-#define AT_QUESTION I16(0x78BE)    // AlienTalk::QuestionLine
-
 static void alien_talk_answer(void)
 {
-    int16_t race = ds.AlienTalk_Race, q = AT_QUESTION;
+    int16_t race = ds.AlienTalk_Race, q = ds.AlienTalk_QuestionLine;
     if (race == 2) {
         if (q == 4) {
-            B8(0x5D50) = 1;  // Intel::Race2Done1
-            W16(0x5D52) = (uint16_t)(System_Random(0x1E) + 0x3C);
+            ds.Intel_Race2Done1 = 1;
+            ds.Intel_DevAwayTimer = (int16_t)(System_Random(0x1E) + 0x3C);
         } else if (q == 5 || q == 6) {
-            B8(0x5D50) = 1;
-            W16(0x5D52) = 0;
+            ds.Intel_Race2Done1 = 1;
+            ds.Intel_DevAwayTimer = 0;
         }
     }
     if (race == 3 && q == 6) {
@@ -1551,11 +1507,12 @@ static void alien_talk_answer(void)
     }
     if (race == 6) {
         if (q == 2) {
-            B8(0x5D3F) = 1;
-            W16(0x5D7A) = 0;
+            ds.Intel_KallTurnCancelled = 1;
+            ds.Intel_KallTurnTimer = 0;
             Intel_SetForceTarget(4, 2, 3, 3, 0);
-        } else if (q == 5 && B8(0x5D74) == 0 && I16(0x5D72) > 0) {
-            I16(0x5D72) += 0xFA;
+        } else if (q == 5 && ds.Intel_MorgrulAttack3Done == 0
+                   && ds.Intel_MorgrulAttack3Timer > 0) {
+            ds.Intel_MorgrulAttack3Timer += 0xFA;
         }
     }
     if (race == 7) {
@@ -1588,35 +1545,35 @@ static void screen_alien_talk(void)
     ds.Game_ClockRunning = 0;
     if (ds.Game_ScreenEntered) {
         Music_PlayTrack(LIT("talk"));
-        B8(0x7E3A) = 1;  // Command::BackdropShown
+        ds.Command_BackdropShown = 1;
         if (ds.AlienTalk_Race == 6)
             AlienTalk_PlayAlienScene(10);
-        AT_MENU = 1;
+        ds.AlienTalk_MenuNumber = 1;
         AlienTalk_DrawAlienTalkScreen();
         AlienTalk_BuildQuestionMenu();
         AlienTalk_DrawQuestionMenu();
         AlienTalk_SetupTalkHotspots();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-        AT_LOCKED = 0;
-        B8(0x7E3A) = 1;
+        ds.AlienTalk_Locked = 0;
+        ds.Command_BackdropShown = 1;
     }
-    if (ds.Game_HotspotHit == 0x15 && ds.Mouse_Buttons && !AT_LOCKED) {
-        W16(0x78CC) = 0xFFFF;
-        W16(0x78CE) = 0xFFFF;
-        if (AT_LINE > 0) {
-            AT_QUESTION = I8((uint16_t)(0x0D0A + AT_LINE));  // Alien::CurMenu[line]
-            AT_LINE = 0;
+    if (ds.Game_HotspotHit == 0x15 && ds.Mouse_Buttons && !ds.AlienTalk_Locked) {
+        ds.AlienTalk_HoverCol = 0xFFFF;
+        ds.AlienTalk_HoverRow = -1;
+        if ((int16_t)ds.AlienTalk_SelectedLine > 0) {
+            ds.AlienTalk_QuestionLine = (int8_t)ds.Alien_CurMenu[ds.AlienTalk_SelectedLine];
+            ds.AlienTalk_SelectedLine = 0;
             AlienTalk_LoadQuestionAnswerId();
-            I16(0x78C0) = I16(0x78C2);  // ReplyLine := AnswerId
+            ds.AlienTalk_ReplyLine = ds.AlienTalk_AnswerId;
             alien_talk_answer();
             AlienTalk_DrawAlienReply();
-            AT_LOCKED = 1;
+            ds.AlienTalk_Locked = 1;
             ds.Game_HotspotHit = 0;
             ds.Mouse_Hotspots[0].Repeat_ = 1;
         }
     }
-    if (ds.Game_HotspotHit == 0x15 && AT_LOCKED) {
-        if (AT_MENU == 0) {
+    if (ds.Game_HotspotHit == 0x15 && ds.AlienTalk_Locked) {
+        if (ds.AlienTalk_MenuNumber == 0) {
             ds.Game_CurrentScreen = 1;
             ds.Game_ScreenSwitch = 1;
             if (ds.AlienTalk_Race == 9 && ds.Pub_People[4].State == 2)
@@ -1624,10 +1581,10 @@ static void screen_alien_talk(void)
             if (ds.AlienTalk_Race == 6)
                 Message_ShowMessageLine(0x30);
         } else {
-            AT_LOCKED = 0;
+            ds.AlienTalk_Locked = 0;
             AlienTalk_BuildQuestionMenu();
             AlienTalk_DrawQuestionMenu();
-            HELD_PHASE = 1;
+            ds.Mouse_HeldPhase = 1;
             ds.Mouse_Hotspots[0].Repeat_ = 0;
         }
     }
@@ -1793,9 +1750,9 @@ void Game_Main(void)
 {
     startup();
     for (;;) {
-        HIDDEN_CLICK = CURSOR_HIDDEN != 0 && ds.Mouse_BtnRight == 0;
+        ds.Mouse_HiddenClick = ds.Mouse_CursorHidden != 0 && ds.Mouse_BtnRight == 0;
         Ems_EmsMapGameData();
-        if (!ds.Game_ScreenSwitch && !HELD_PHASE && !HIDDEN_CLICK) {
+        if (!ds.Game_ScreenSwitch && !ds.Mouse_HeldPhase && !ds.Mouse_HiddenClick) {
             if (!wait_for_event())
                 return;
         }
@@ -1804,30 +1761,30 @@ void Game_Main(void)
             ds.Game_HotspotHit = 0;
             ds.Game_ScreenEntered = 1;
         }
-        if (HIDDEN_CLICK)
+        if (ds.Mouse_HiddenClick)
             ds.Game_HotspotHit = 999;
         ds.Game_PressHotspot = ds.Game_HotspotHit;
-        HOT_PUSHABLE = !HIDDEN_CLICK && hit_pushable(ds.Game_HotspotHit);
-        if (LAST_PUSHABLE)
-            HELD_PHASE = 1;
-        LAST_PUSHABLE = HOT_PUSHABLE;
-        HOT_PUSHABLE = 0;
-        if (!QUIT_FLAG && HELD_PHASE) {
+        ds.Mouse_HotPushable = !ds.Mouse_HiddenClick && hit_pushable(ds.Game_HotspotHit);
+        if (ds.Mouse_LastPushable)
+            ds.Mouse_HeldPhase = 1;
+        ds.Mouse_LastPushable = ds.Mouse_HotPushable;
+        ds.Mouse_HotPushable = 0;
+        if (!ds.Mouse_QuitFlag && ds.Mouse_HeldPhase) {
             if (!wait_for_release())
                 return;
         }
-        HELD_PHASE = 0;
+        ds.Mouse_HeldPhase = 0;
         if (ds.Game_ScreenSwitch) {
             ds.Game_PrevHotspotHit = ds.Game_HotspotHit;
             ds.Game_HotspotHit = 0;
             ds.Game_ScreenEntered = 1;
         }
-        if (QUIT_FLAG)
+        if (ds.Mouse_QuitFlag)
             Gfx_FatalExit();
 
-        if (!ds.Game_ScreenSwitch && ds.Game_HotspotHit == 0xD && TOOLBAR_TOGGLE) {
+        if (!ds.Game_ScreenSwitch && ds.Game_HotspotHit == 0xD && ds.GfxPath_PageFlagA) {
             Sound_PlayButtonSfx(LIT("icon"));
-            if (TOOLBAR_PAGE1 == 0)
+            if (ds.GfxPath_PageFlagB == 0)
                 GfxPath_ScrollToolbarPrev();
             else
                 GfxPath_ScrollToolbarNext();
@@ -1841,7 +1798,7 @@ void Game_Main(void)
         if (!ds.Game_ScreenSwitch)
             ds.Game_ScreenEntered = 0;
         if (ds.Game_HotspotHit != 0 && (uint16_t)ds.Game_HotspotHit < 13) {
-            ds.Game_MenuCommand = MENU_CMD(ds.Game_HotspotHit);
+            ds.Game_MenuCommand = ds.GfxPath_MenuBar[ds.Game_HotspotHit - 1].Command;
             // Last match wins (command 7 opens screen 9, not 6).
             for (ds.Main_I = 1; ds.Main_I <= 38; ds.Main_I++) {
                 int16_t cmd = (int8_t)screen_info((int16_t)ds.Main_I)[0x0B];
@@ -1862,11 +1819,11 @@ void Game_Main(void)
             if (ds.Game_HotspotHit == 0 || (uint16_t)ds.Game_HotspotHit > 12) {
                 ds.Game_MenuCommand = 0;
             } else {
-                ds.Game_MenuCommand = MENU_CMD(ds.Game_HotspotHit);
+                ds.Game_MenuCommand = ds.GfxPath_MenuBar[ds.Game_HotspotHit - 1].Command;
                 if (ds.Game_MenuCommand != 0) {
                     if (ds.Game_SoundFx == 2)
-                        Sound_PlayButtonSfx(  // Ui::ButtonSounds[cmd]
-                            (const uint8_t *)ds_at((uint16_t)(0x4E56 + ds.Game_MenuCommand * 9)));
+                        Sound_PlayButtonSfx(
+                            (const uint8_t *)&ds.Ui_ButtonSounds[ds.Game_MenuCommand - 1]);
                     else
                         Sound_PlayButtonSfx(LIT("x"));
                 }

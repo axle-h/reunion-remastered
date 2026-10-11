@@ -11,7 +11,6 @@
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
-#define L(off) (*(int32_t *)ds_at(off))
 
 int main(int argc, char *argv[])
 {
@@ -25,9 +24,9 @@ int main(int argc, char *argv[])
     System_FillChar(far_host(ds.Game_Groups), 2 * 32 * sizeof(TGroup), 0);
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
-    *(int16_t *)ds_at(0x7798) = 3;
-    *(int16_t *)ds_at(0x779A) = 2;
-    *(int16_t *)ds_at(0x779C) = 0;
+    ds.SpWar_BattleSystem = 3;
+    ds.SpWar_BattlePlanet = 2;
+    ds.SpWar_BattleMoon = 0;
     TGroup *g = Groups_At(0, 1);
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
     g->Units[1][0] = (TGroupSlot){.ShipType = 100, .Weapons = {10, 20, 30, 0}};
@@ -36,13 +35,13 @@ int main(int argc, char *argv[])
     memcpy(far_host(ds.Game_CurBody), &body, sizeof body);
 
     GrWarUnits_CollectAvailableForces();
-    CHECK(L(0x765A) == 100);
-    CHECK(L(0x768A) == 10 * 2 + 20 * 7);   // attack: weapons 1 and 2 weighted 2 and 7
-    CHECK(L(0x76AA) == 30 * 9);            // defence: weapon 3 weighted 9
-    int cap = *(int16_t *)ds_at(0x32);     // most units per slot of type 1
+    CHECK(ds.GrWarUnits_Totals[0][0] == 100);
+    CHECK(ds.GrWarUnits_Attack[0][0] == 10 * 2 + 20 * 7);   // weapons 1 and 2 weighted 2 and 7
+    CHECK(ds.GrWarUnits_Defence[0][0] == 30 * 9);           // weapon 3 weighted 9
+    int cap = ds.GrWarUnits_SlotCap[0];                     // most units per slot of type 1
     int slots = (100 + cap - 1) / cap;
     CHECK(ds.GrWarUnits_AttackerSlotCount == slots);
-    CHECK(L(0x767A) == 0);                 // all of it fits in slots
+    CHECK(ds.GrWarUnits_Pool[0] == 0);                      // all of it fits in slots
     CHECK(ds.GrWarUnits_DefenderSlotCount == 0);
 
     GrWarUnits_SetupUnitHotspots();

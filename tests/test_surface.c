@@ -202,10 +202,10 @@ static void counting(void)
     CHECK(Surface_CountBuildings(4, 1, 2, 0, false) == 0);
 
     Surface_CountBuildingsByKind(1, 1, 0);
-    CHECK(*(int32_t *)ds_at(0x791C + 0 * 100 + 4 * 4) == 1);
-    CHECK(*(int32_t *)ds_at(0x791C + 1 * 100 + 4 * 4) == 1);
-    CHECK(*(int32_t *)ds_at(0x791C + 1 * 100 + 17 * 4) == 1);
-    CHECK(*(int32_t *)ds_at(0x791C + 0 * 100 + 17 * 4) == 0);
+    CHECK(ds.Surface_KindCounts[0][4 - 1] == 1);
+    CHECK(ds.Surface_KindCounts[1][4 - 1] == 1);
+    CHECK(ds.Surface_KindCounts[1][17 - 1] == 1);
+    CHECK(ds.Surface_KindCounts[0][17 - 1] == 0);
 
     Surface_DeleteBuilding(2);
     CHECK(ds.Game_BuildingCount == 4);

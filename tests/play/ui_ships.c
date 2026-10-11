@@ -23,13 +23,7 @@ enum : int {
 };
 
 // Unnamed globals of the cargo screen (cargo.c) and the text editor.
-#define CARGO_ITEMS ((const uint16_t *)ds_at(0x7816))  // [0] count, [1..] Cargo item index
-#define CARGO_ITEM_STORE ((const uint32_t *)ds_at(0x782E))
-#define CARGO_STORES (*(const uint32_t *)ds_at(0x7866))
-#define CARGO_SHIP_USED (*(const int32_t *)ds_at(0x786A))
-#define CARGO_SHIP_CAP (*(const int32_t *)ds_at(0x786E))
-#define CARGO_PLANET_CAP (*(const int32_t *)ds_at(0x7872))
-#define TEXT_INPUT (*(const uint8_t *)ds_at(0x7C4A))    // the blinking edit cursor is shown
+#define TEXT_INPUT (ds.TextFile_InputActive)  // the blinking edit cursor is shown
 
 // Names are padded with blanks in places ("Texon   ", "Kremir  "): those
 // are ignored, as on screen.
@@ -102,7 +96,7 @@ void ui_group_location(const char *name, char *out, size_t n)
 
 static const int16_t *grid_unit(const TGroup *g, int cat, int s)
 {
-    uint8_t row = *(const uint8_t *)ds_at((uint16_t)(0x0BB9 + g->Kind * 4 + cat));
+    uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
     return (const int16_t *)((const uint8_t *)g + row * 0x28 + s * 10 - 21);
 }
 
@@ -150,9 +144,9 @@ int ui_group_units(const char *name, const char *ship, const char *weapon)
 
 void ui_cargo_space(int32_t *used, int32_t *cap, int32_t *planet_cap)
 {
-    *used = CARGO_SHIP_USED;
-    *cap = CARGO_SHIP_CAP;
-    *planet_cap = CARGO_PLANET_CAP;
+    *used = ds.Cargo_ShipUsed;
+    *cap = ds.Cargo_ShipCap;
+    *planet_cap = ds.Cargo_PlanetCap;
 }
 
 // Row of the cargo screen: 1..6 ores, 7.. the items shown.
@@ -161,8 +155,8 @@ static int cargo_row(const char *item, int *item_index)
     for (int i = 1; i <= 6; i++)
         if (pstr_is(&ds.Names_Ores[i - 1], item))
             return i;
-    for (int r = 1; r <= CARGO_ITEMS[0]; r++) {
-        int idx = CARGO_ITEMS[r];
+    for (int r = 1; r <= ds.Cargo_ItemCount; r++) {
+        int idx = ds.Cargo_ItemList[r - 1];
         if (pstr_is(product_name((uint8_t)ds.Cargo_Items[idx - 1]), item)) {
             *item_index = idx;
             return r + 6;
@@ -191,8 +185,8 @@ int32_t ui_cargo_planet(const char *item)
     if (row == 0)
         return 0;
     if (row <= 6)
-        return ((const int32_t *)far_host(CARGO_STORES))[row - 1];
-    return *(const int16_t *)far_host(CARGO_ITEM_STORE[idx]);
+        return ((const int32_t *)far_host(ds.Cargo_Stores))[row - 1];
+    return *(const int16_t *)far_host(ds.Cargo_ItemStore[idx - 1]);
 }
 
 // Body hotspots of the system view (PlanetInfo_SetupSystemViewHotspots):
@@ -269,7 +263,7 @@ void ui_open_group(const char *name, int screen)
 // The New Group screen's type line (Groups_DrawNewGroupNameAndType).
 static bool type_shown(const char *type)
 {
-    return pstr_is(ds_at((uint16_t)(0x591A + selected_group()->Kind * 14)), type);
+    return pstr_is(&ds.Groups_TypeNames[selected_group()->Kind - 1], type);
 }
 
 typedef struct {

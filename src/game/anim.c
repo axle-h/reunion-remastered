@@ -6,12 +6,9 @@
 #include "game/gfx.h"
 #include "game/system.h"
 
+// The animation record (Anim::Record) and the frame counts of the three
+// kinds: SpWar::SpriteRects (war), Cc::Doors (main) and Cc::Rooms (gr).
 enum : uint16_t {
-    ANIM_RECORD_PTR = 0x7E40,  // DS:7E40, far pointer to the animation record
-    WAR_ANIM_TABLE = 0x555B,   // DS:555B + 5 * id: frames, width, height, x, y
-    MAIN_ANIM_TABLE = 0x55D7,  // DS:55D7 + 7 * id: frames, width:word, height, x:word, y
-    GR_ANIM_TABLE = 0x5651,    // DS:5651 + 5 * id: frames, delay, loops, ?, ?
-
     // Offsets in the record (frames count from 1).
     REC_LOADED = 0x000,
     REC_PTRS = 0x001,   // 140 far pointers
@@ -36,7 +33,7 @@ static inline void wr16(FarPtr p, uint16_t off, uint16_t v)
 
 static inline FarPtr record(void)
 {
-    return *(FarPtr *)ds_at(ANIM_RECORD_PTR);
+    return ds.Anim_Record;
 }
 
 static inline FarPtr frame_ptr(FarPtr rec, uint16_t frame)
@@ -119,40 +116,37 @@ static void free_anim(uint8_t frames, bool check_size)
 // 3c64:0010
 void Anim_LoadWarAnim(uint16_t id)
 {
-    load_anim(id, PSTR("war\\war\\sa"), *(uint8_t *)ds_at((uint16_t)(WAR_ANIM_TABLE + id * 5)), 5,
-              true);
+    load_anim(id, PSTR("war\\war\\sa"), ds.SpWar_SpriteRects[id - 1].Frames, 5, true);
 }
 
 // 3c64:011e
 void Anim_FreeWarAnim(uint16_t id)
 {
-    free_anim(*(uint8_t *)ds_at((uint16_t)(WAR_ANIM_TABLE + id * 5)), false);
+    free_anim(ds.SpWar_SpriteRects[id - 1].Frames, false);
 }
 
 // 3c64:019c
 void Anim_LoadMainAnim(uint16_t id)
 {
-    load_anim(id, PSTR("anim\\main"), *(uint8_t *)ds_at((uint16_t)(MAIN_ANIM_TABLE + id * 7)), 4,
-              false);
+    load_anim(id, PSTR("anim\\main"), ds.Cc_Doors[id - 1].Frames, 4, false);
 }
 
 // 3c64:028d
 void Anim_FreeMainAnim(uint16_t id)
 {
-    free_anim(*(uint8_t *)ds_at((uint16_t)(MAIN_ANIM_TABLE + id * 7)), true);
+    free_anim(ds.Cc_Doors[id - 1].Frames, true);
 }
 
 // 3c64:031d
 void Anim_LoadGrAnim(uint16_t id)
 {
-    load_anim(id, PSTR("war\\grwar\\granim"), *(uint8_t *)ds_at((uint16_t)(GR_ANIM_TABLE + id * 5)),
-              4, false);
+    load_anim(id, PSTR("war\\grwar\\granim"), ds.Cc_Rooms[id - 1].Frames, 4, false);
 }
 
 // 3c64:0415
 void Anim_FreeGrAnim(uint16_t id)
 {
-    free_anim(*(uint8_t *)ds_at((uint16_t)(GR_ANIM_TABLE + id * 5)), true);
+    free_anim(ds.Cc_Rooms[id - 1].Frames, true);
 }
 
 // 3c64:0496

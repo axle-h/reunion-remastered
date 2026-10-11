@@ -208,20 +208,20 @@ void ui_click(int x, int y)
 
 // --- Toolbar ---
 
-// Toolbar slot records 1..12 (DS:7C51 + 21n: label string[18], command).
+// Toolbar slots 1..12 (GfxPath::MenuBar: label string[18], command).
 static const uint8_t *slot_label(int slot)
 {
-    return (const uint8_t *)ds_at((uint16_t)(0x7C51 + slot * 21));
+    return (const uint8_t *)&ds.GfxPath_MenuBar[slot - 1].Caption;
 }
 
 static int16_t slot_command(int slot)
 {
-    return *(const int16_t *)ds_at((uint16_t)(0x7C64 + slot * 21));
+    return ds.GfxPath_MenuBar[slot - 1].Command;
 }
 
 static bool page1_shown(void)
 {
-    return *(const uint8_t *)ds_at(0x7C63) != 0;
+    return ds.GfxPath_PageFlagB != 0;
 }
 
 // Pascal string p equals s, ignoring case and p's blanks at both ends

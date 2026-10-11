@@ -48,12 +48,12 @@ int main(int argc, char *argv[])
     }
     icons_free(&icons);
 
-    // Slots: ids at DS:7C64 + 21 * slot.
+    // Slots: ids in GfxPath::MenuBar.
     for (int i = 1; i <= 12; i++)
-        *(int16_t *)ds_at((uint16_t)(0x7C64 + i * 21)) = 0;
+        ds.GfxPath_MenuBar[i - 1].Command = 0;
     CHECK(!GfxPath_ToolbarHasIcon(5));
-    *(int16_t *)ds_at(0x7C64 + 21) = 5;
-    *(int16_t *)ds_at(0x7C64 + 2 * 21) = 9;
+    ds.GfxPath_MenuBar[0].Command = 5;
+    ds.GfxPath_MenuBar[1].Command = 9;
     CHECK(GfxPath_ToolbarHasIcon(5) && GfxPath_ToolbarHasIcon(9) && !GfxPath_ToolbarHasIcon(7));
 
     GfxPath_FreeToolbarBuffer();

@@ -383,28 +383,28 @@ static void test_colonize(void)
     ds.Game_ColonySetupCount = 1;
     ds.Game_ScreenEntered = 0;
     ds.Game_MenuCommand = 0;
-    *(int32_t *)ds_at(0x788A) = 100000;
+    ds.Colonize_ColonyCost = 100000;
     ds.Game_Credits = 100000 + 50000;
     const TStarterBuilding *sb = &ds.Colony_StarterBuildings[2];
     const TBuildingType *bt = &ds.Surface_BuildingTypes[sb->Building - 1];
     ds.Game_StaffExp[1] = 100;
     ((uint8_t *)bt)[0x13 + 1] = 1;  // suitable for surface type 1
     ds.Game_HotspotHit = 0x17 + 3;
-    int32_t before = *(int32_t *)ds_at(0x788A);
+    int32_t before = ds.Colonize_ColonyCost;
     ds.Game_ColonySetups[0].Timers[2] = 0;
     if (Colonize_TypeAvailable(bt)) {
         Colonize_ColonizeScreen();
         CHECK(ds.Game_ColonySetups[0].Timers[2] == (bt->Cost + before <= ds.Game_Credits ? 1 : 0));
         if (ds.Game_ColonySetups[0].Timers[2] == 1) {
-            CHECK(*(int32_t *)ds_at(0x788A) == before + bt->Cost);
+            CHECK(ds.Colonize_ColonyCost == before + bt->Cost);
             Colonize_ColonizeScreen();  // clicking again deselects
             CHECK(ds.Game_ColonySetups[0].Timers[2] == 0);
-            CHECK(*(int32_t *)ds_at(0x788A) == before);
+            CHECK(ds.Colonize_ColonyCost == before);
         }
         // Not enough credits: nothing is picked.
         ds.Game_Credits = before + bt->Cost - 1;
         Colonize_ColonizeScreen();
-        CHECK(ds.Game_ColonySetups[0].Timers[2] == 0 && *(int32_t *)ds_at(0x788A) == before);
+        CHECK(ds.Game_ColonySetups[0].Timers[2] == 0 && ds.Colonize_ColonyCost == before);
     }
 
     // Colonise (3Bh) with too little money does nothing; cancel (3Ah) frees
@@ -425,7 +425,7 @@ static void test_colonize(void)
     ds.Game_ColonySetupCount = 1;
     ds.Surface_BufC = System_GetMem(0xF000);
     ds.Game_Credits = 120000;
-    *(int32_t *)ds_at(0x788A) = 100000;
+    ds.Colonize_ColonyCost = 100000;
     ds.Game_MenuCommand = 0x3B;
     ds.Game_PlanetForceCount = 1;
     ds.Game_CurrentScreen = 0x15;
@@ -488,29 +488,29 @@ static void test_system_view(void)
     for (int i = 0; i < 360; i++) {
         static const double pi = 3.14159265358979323846;
         int32_t v = (int32_t)(500.0 * __builtin_sin(i * pi / 180.0) + (i < 180 ? 0.5 : -0.5));
-        *(int32_t *)ds_at((uint16_t)(0x7FD4 + i * 4)) = v;
+        ds.Vec3D_CosTable[i] = v;
     }
     ds.Galaxy_SystemStatus[7] = 1;
     System_FillChar(vid_screen, 320 * 200, 0);
     PlanetInfo_InitSystemView();
     // One orbit record per planet, from the name table.
     const TBodyName *nm = (const TBodyName *)far_host(ds.Galaxy_Names[7]);
-    const uint8_t *rec = ds_at(0x7B28 + 18 * 3);
-    CHECK(*(int16_t *)rec == nm[2].X && *(int16_t *)(rec + 2) == nm[2].Y && *(uint16_t *)(rec + 6) == nm[2].Size);
-    CHECK(*(int16_t *)(rec + 4) >= 0 && *(int16_t *)(rec + 4) < 3600);
+    const TOrbit *rec = &ds.PlanetInfo_Orbits[3];
+    CHECK(rec->RX == nm[2].X && rec->RY == nm[2].Y && rec->Speed == nm[2].Size);
+    CHECK(rec->Angle >= 0 && rec->Angle < 3600);
 
     // Hand-placed planet 1 at 90 degrees: x = 160 + rx, y = 75, size 24.
-    uint8_t *r1 = ds_at(0x7B28 + 18);
-    *(int16_t *)r1 = 60;
-    *(int16_t *)(r1 + 2) = 30;
-    *(int16_t *)(r1 + 4) = 900;
-    *(uint16_t *)(r1 + 6) = 10;
+    TOrbit *r1 = &ds.PlanetInfo_Orbits[1];
+    r1->RX = 60;
+    r1->RY = 30;
+    r1->Angle = 900;
+    r1->Speed = 10;
     ds.Galaxy_PlanetStatus[7][0] = 0;  // Mercury known (the Sun starts all -1)
     PlanetInfo_UpdateOrbitPositions();
-    CHECK(*(int16_t *)(r1 + 8) == 220);
-    CHECK(*(uint16_t *)(r1 + 10) == 75);
-    CHECK(*(int16_t *)(r1 + 12) == 24 && *(int16_t *)(r1 + 14) == 12);
-    CHECK(*(int16_t *)(r1 + 4) == 905);  // advanced by speed / 2
+    CHECK(r1->X == 220);
+    CHECK(r1->Y == 75);
+    CHECK(r1->Size == 24 && r1->Half == 12);
+    CHECK(r1->Angle == 905);  // advanced by speed / 2
     CHECK(Mouse_Hotspot(0x14)->X == 220 - 12 - 3);
     CHECK(Mouse_Hotspot(0x14)->Y == (uint8_t)(75 - 12 + 0x2E));
     CHECK(Mouse_Hotspot(0x14)->W == 24 && Mouse_Hotspot(0x14)->H == 24);
@@ -535,9 +535,9 @@ static void test_system_view(void)
     CHECK(pstr_is((const PString *)&Mouse_Hotspot(0x14)->Caption, "Phobos"));
     CHECK(pstr_is((const PString *)&Mouse_Hotspot(0x15)->Caption, "Deimos"));
     PlanetInfo_ReloadSystemView();
-    const uint8_t *m1 = ds_at(0x7B28 + 18);
+    const TOrbit *m1 = &ds.PlanetInfo_Orbits[1];
     const TMoonList *ml = (const TMoonList *)far_host(ds.Galaxy_MoonLists[7]) + 3;
-    CHECK(*(int16_t *)m1 == nm[ml->Moons[0] - 1].X);
+    CHECK(m1->RX == nm[ml->Moons[0] - 1].X);
 }
 
 static void test_baseeff(void)

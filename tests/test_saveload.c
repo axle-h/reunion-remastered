@@ -46,14 +46,14 @@ int main(int argc, char *argv[])
     ds.Game_Credits = 120000;
     ds.Game_Year = 2927; ds.Game_Month = 8; ds.Game_Day = 13; ds.Game_Hour = 23;
     ds.Game_StoryStage = 1;
-    *(uint16_t *)ds_at(0x5D40) = 0x1234;
-    *(uint32_t *)ds_at(0x5DA2) = 0xCAFEF00D;
+    ds.Intel_LaunchTimer = 0x1234;
+    ds.Advisor_TrainingPrice = (int32_t)0xCAFEF00D;
     ((uint8_t *)far_host(ds.Message_Log))[5] = 0x5A;
     ((uint8_t *)far_host(ds.Game_Groups))[100] = 0xA5;
 
     SaveLoad_ReadSlotNames();
-    CHECK(*(int16_t *)ds_at(0x7732) == 1);
-    uint8_t *slot = (uint8_t *)far_host(*(FarPtr *)ds_at(0x7734));
+    CHECK(ds.SaveLoad_SelectedSlot == 1);
+    uint8_t *slot = (uint8_t *)far_host(ds.SaveLoad_SlotTable);
     CHECK(slot[0] == 0 && slot[1] == 20);   // "Empty---------------"
     memcpy(slot + 1, "\x06" "Hello!", 7);
 
@@ -88,10 +88,13 @@ int main(int argc, char *argv[])
     memset(far_host(ds.Game_Buildings), 0xEE, 14000);
     memset(far_host(ds.Game_Groups), 0xEE, 0x2840);
     memset(far_host(ds.Message_Log), 0xEE, 0x31B);
-    memset(ds_at(0x5D3C), 0xEE, 0x70);
-    memset(ds_at(0x95A0), 0xEE, 0x50);
+    // The story timers up to Research::Products, and Game's state from
+    // SelInvention to PressHotspot.
+    uint8_t *story = (uint8_t *)&ds.Intel_LaunchTimer, *game = (uint8_t *)&ds.Game_SelInvention;
+    memset(story, 0xEE, (size_t)((uint8_t *)&ds.Research_Products - story));
+    memset(game, 0xEE, (size_t)((uint8_t *)&ds.Game_PressHotspot - game));
     SaveLoad_ReadSlotNames();   // now sees the file
-    slot = (uint8_t *)far_host(*(FarPtr *)ds_at(0x7734));
+    slot = (uint8_t *)far_host(ds.SaveLoad_SlotTable);
     CHECK(slot[0] == 1 && slot[1] == 6 && memcmp(slot + 2, "Hello!", 6) == 0);
     CHECK(SaveLoad_Transfer(false));
     CHECK(ds.Game_Credits == 120000 && ds.Game_BuildingCount == 23);
@@ -99,8 +102,10 @@ int main(int argc, char *argv[])
     CHECK(memcmp(far_host(ds.Game_Groups), gsnap, 0x2840) == 0);
     CHECK(memcmp(far_host(ds.Message_Log), msnap, 0x31B) == 0);
     // Every saved block of the DS mirror is back (the slot table pointer differs).
-    CHECK(*(uint16_t *)ds_at(0x5D40) == 0x1234 && *(uint32_t *)ds_at(0x5DA2) == 0xCAFEF00D);
-    CHECK(memcmp(ds_at(0x95A0), snap + 0x95A0, 0x22) == 0);
+    CHECK(ds.Intel_LaunchTimer == 0x1234 && ds.Advisor_TrainingPrice == (int32_t)0xCAFEF00D);
+    // SelInvention .. Credits.
+    size_t game_len = (size_t)((uint8_t *)(&ds.Game_Credits + 1) - game);
+    CHECK(memcmp(game, snap + offsetof(DSeg, Game_SelInvention), game_len) == 0);
 
     // Saving again is stable.
     SaveLoad_SetSaveDir(dir);

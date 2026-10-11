@@ -1,6 +1,6 @@
 # Plan: native C memory (retire the DOS address space)
 
-Status: in progress (Stages 0-2 done). Decided by Alex, 2026-10-11. This is the
+Status: in progress (Stages 0-2, Stage 3 interfaces and Stage 4.1 done). Decided by Alex, 2026-10-11. This is the
 refactor PLAN.md Phase 4 always intended ("Start faithful, clean up
 afterwards ... refactor into idiomatic C once a subsystem matches"). Every
 unit is ported and the whole game plays through (`test_play_game`), so the

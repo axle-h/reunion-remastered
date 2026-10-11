@@ -25,7 +25,7 @@ enum : int {
     LOG_X = 10, LOG_Y = 0x30,
 };
 
-#define CDS_BUF (*(const FarPtr *)ds_at(0x78AC))  // research icon sheet (research.c)
+#define CDS_BUF (ds.Research_IconBuffer)  // research icon sheet (research.c)
 
 // --- Navigation ---
 
@@ -132,12 +132,10 @@ bool ui_developer_skills(int skills[4])
 {
     if (ui_screen() != 3)
         return false;
-    // Research_DrawDeveloperSkills: at the x of the layout table DS:0C24
-    // (entries 1..4) + 100, y BCh.
-    const int16_t *xs = (const int16_t *)ds_at(0xC24);
+    // Research_DrawDeveloperSkills: at Research::SkillX[k] + 100, y BCh.
     for (int k = 1; k <= 4; k++) {
         int32_t v;
-        if (!ui_read_number(xs[k] + 100, 0xBC, 2, &v))
+        if (!ui_read_number(ds.Research_SkillX[k - 1] + 100, 0xBC, 2, &v))
             return false;
         skills[k - 1] = v;
     }

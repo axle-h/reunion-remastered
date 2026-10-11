@@ -12,10 +12,6 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-#define W(off) (*(int16_t *)ds_at(off))
-#define B(off) (*(uint8_t *)ds_at(off))
-#define FPV(off) (*(FarPtr *)ds_at(off))
-
 static bool wait_retrace(void) { return true; }
 
 static uint8_t *grid(void) { return (uint8_t *)far_host(ds.GrWar_BattleGrids); }
@@ -68,21 +64,24 @@ static void find_path(void)
 }
 
 // Unit lists as the unit assignment screen leaves them.
-static GrBattleUnit *list(int side) { return (GrBattleUnit *)far_host(FPV(0x7642 + 4 * side)); }
+static GrBattleUnit *list(int side)
+{
+    return (GrBattleUnit *)far_host(ds.GrWarUnits_UnitLists[side - 1]);
+}
 
 static void setup_field(void)
 {
     for (int s = 1; s <= 2; s++) {
-        FPV(0x7642 + 4 * s) = System_GetMem(21 * 0x27);
-        System_FillChar(far_host(FPV(0x7642 + 4 * s)), 21 * 0x27, 0);
+        ds.GrWarUnits_UnitLists[s - 1] = System_GetMem(21 * 0x27);
+        System_FillChar(far_host(ds.GrWarUnits_UnitLists[s - 1]), 21 * 0x27, 0);
     }
     ds.GrWarUnits_AttackerSlotCount = 1;
     ds.GrWarUnits_DefenderSlotCount = 1;
     ds.GrWar_BattleGrids = System_GetMem(0xC6);
     ds.GrWar_Projectiles = System_GetMem(0x708);
     System_FillChar(far_host(ds.GrWar_Projectiles), 0x708, 0);
-    W(0x7654 + 2) = 0;
-    W(0x7654 + 4) = 0;
+    ds.GrWar_ProjectileCount[0] = 0;
+    ds.GrWar_ProjectileCount[1] = 0;
 }
 
 static void geometry(void)
@@ -123,7 +122,7 @@ static void geometry(void)
     CHECK(GrWar_DirectionToward16(0, 0, 40, 0) == GrWar_DirectionToward16(0, 0, 80, 0));
 
     GrWar_StartUnitEffect(1, 1, 5);
-    CHECK(a->effect == 5 && a->effTimer == B(5 * 6 + 0x86) && a->effDelay == 3);
+    CHECK(a->effect == 5 && a->effTimer == (uint8_t)ds.GrWar_Effects[4].Frames && a->effDelay == 3);
 }
 
 // One round: two adjacent type-1 slots hit each other; damage = count * attack / total * strength / 500.
@@ -139,16 +138,16 @@ static void round_damage(void)
         b->type = 5; b->count = 1; b->hp = 100; b->y = 4; b->x = s == 1 ? 0 : 15;
     }
     for (int s = 1; s <= 2; s++) {
-        memcpy(ds_at(0x7646 + 16 * s + 4 * 1), &(int32_t){10}, 4);        // totals
-        memcpy(ds_at(0x7676 + 16 * s + 4 * 1), &(int32_t){100}, 4);       // attack sums
+        ds.GrWarUnits_Totals[s - 1][0] = 10;
+        ds.GrWarUnits_Attack[s - 1][0] = 100;
     }
-    // unit type 1 strength (word table at DS:28) and cooldown (DS:20)
-    int32_t strength = W(0x28 + 2 * 1);
+    // unit type 1 vulnerability and cooldown
+    int32_t strength = ds.GrWar_Vulnerability[0];
     int32_t expect = 10 * 100 / 10 * strength / 500;
     if (expect < 1) expect = 1;
     if (expect > 15) expect = 15;
     ds.System_RandSeed = 1234;
-    B(0x770B) = 0;
+    ds.GrWar_BattleOver = 0;
     ds.Game_BattleFlag = false;
     ds.Gfx_Charset = 0;
     GrWar_BattleRound();
@@ -159,9 +158,10 @@ static void round_damage(void)
     CHECK((a->count == 10) != (d->count == 10));
     CHECK(vic->count == 10 - expect);
     CHECK(att->count == 10);
-    CHECK(att->cooldown == W(0x20 + 2 * 1) - 1);
+    CHECK(att->cooldown == ds.GrWar_Cooldown[0] - 1);
     CHECK(vic->effect == 8 && att->effect == 1);
-    CHECK(vic->effTimer == B(8 * 6 + 0x86) || vic->effTimer == B(8 * 6 + 0x86) - 1);
+    uint8_t hit_frames = (uint8_t)ds.GrWar_Effects[7].Frames;
+    CHECK(vic->effTimer == hit_frames || vic->effTimer == hit_frames - 1);
 
     // The victim strikes back in the next round once its effect has run out
     a->effect = d->effect = 0;
@@ -178,10 +178,10 @@ static void losses(void)
     // Totals 10 / 20 of type 1; survivors 4 attackers (slot) + 2 unassigned, 5 defenders.
     list(1)[0].type = 1; list(1)[0].count = 4;
     list(2)[0].type = 1; list(2)[0].count = 5;
-    memcpy(ds_at(0x7646 + 16 + 4), &(int32_t){10}, 4);
-    memcpy(ds_at(0x7646 + 32 + 4), &(int32_t){20}, 4);
-    memcpy(ds_at(0x7676 + 4), &(int32_t){2}, 4);
-    W(0x7798) = 3; W(0x779A) = 2; W(0x779C) = 0;
+    ds.GrWarUnits_Totals[0][0] = 10;
+    ds.GrWarUnits_Totals[1][0] = 20;
+    ds.GrWarUnits_Pool[0] = 2;
+    ds.SpWar_BattleSystem = 3; ds.SpWar_BattlePlanet = 2; ds.SpWar_BattleMoon = 0;
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
@@ -197,10 +197,7 @@ static void losses(void)
         ds.Races_Races[r].ForceCount = 0;
 
     GrWar_ApplyGroundLosses();
-    int32_t l1, l2, s1;
-    memcpy(&s1, ds_at(0x76C6 + 4), 4);
-    memcpy(&l1, ds_at(0x76E6 + 4), 4);
-    memcpy(&l2, ds_at(0x76F6 + 4), 4);
+    int32_t s1 = ds.GrWar_Survivors[0][0], l1 = ds.GrWar_Losses[0][0], l2 = ds.GrWar_Losses[1][0];
     CHECK(s1 == 6);   // 4 in the slot + 2 unassigned
     CHECK(l1 == 4);   // 10 - 6
     CHECK(l2 == 15);  // 20 - 5
@@ -218,7 +215,7 @@ static void pick_anim(void)
     // Types present on either side make the animation eligible.
     for (int s = 1; s <= 2; s++)
         for (int t = 1; t <= 4; t++)
-            memcpy(ds_at(0x7646 + 16 * s + 4 * t), &(int32_t){s == 1 ? 3 : 0}, 4);
+            ds.GrWarUnits_Totals[s - 1][t - 1] = s == 1 ? 3 : 0;
     for (int i = 0; i < 20; i++) {
         int16_t id = GrWar_PickBattleAnim();
         CHECK(id >= 1 && id <= 14);

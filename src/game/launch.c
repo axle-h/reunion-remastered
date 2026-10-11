@@ -1,11 +1,11 @@
 #include "game/launch.h"
 
 #include "game/groups.h"
+#include "game/intel.h"
 #include "game/sound.h"
 #include "game/system.h"
 
 // Routines of units that are not ported yet (stubs in stubs.c).
-void Intel_SetGroupTarget(int16_t group, int16_t system, int16_t planet, int16_t moon); // 29b9:0e66
 void GfxPath_SetToolbarAndShow(int16_t screen);  // 3a1b:0019
 void GfxPath_SetToolbar(int16_t screen);         // 3a1b:0030
 void GfxPath_AddToolbarIcon(int16_t id);         // 3a1b:0366
@@ -16,26 +16,12 @@ void PlanetInfo_ReloadSystemView(void);          // 357b:26ee
 void PlanetInfo_SelectCurBody(void);             // 357b:3253
 void Message_ShowMessageNoLog(const uint8_t *text); // 34b0:0197
 
-// Unnamed globals.
-#define W(off) (*(int16_t *)ds_at(off))
-#define B(off) (*(uint8_t *)ds_at(off))
-#define DS_787C B(0x787C)    // set while the destination screen is active (map must not set a target)
-#define SYS_TYPE(i) W(0x7BC4 + (i) * 6) // system view table, 1..18 entries of {type, index}; type <= 4: group
-#define SYS_IDX(i) W(0x7BC6 + (i) * 6)
-#define SEL_ENTRY W(0x7C36)  // selected system-view table entry
-#define SEL_MOON W(0x7C38)   // moon number + 1 for the system view cursor
-#define TB_A B(0x7C3A)       // toolbar state last shown (icons 0x37 / 0x38 / 0x47)
-#define TB_B B(0x7C3B)
-#define TB_C B(0x7C3C)
-#define TB_D B(0x7C3D)
-#define TB_E B(0x7C3E)
-#define TB_F B(0x7C3F)
-#define SAVED_SCREEN W(0x7C40) // destination screen: where to return, and the map position to restore
-#define SAVED_SYSTEM W(0x7C42)
-#define SAVED_PLANET W(0x7C44)
-// Race records of 0xE4 bytes at DS:6A1C; byte +5 is a state, +0x1B*i bytes of per-entry data.
-#define RACE_STATE(i) B(0x6A21 + (i) * 0xE4)
-#define RACE_DATA(i, k) B(0x6A1C + (i) * 0xE4 + (k) * 0x1B)
+// The system view table (Launch::SystemViewTable, filled by PlanetInfo): Kind <= 4 is a
+// group, else the force of race Kind - 3; Index is the group or force number.
+#define SYS_VIEW(i) (ds.Launch_SystemViewTable[(i) - 1])
+// Races::Races[i].Status and Forces[k].Moon (Intel_Race also reaches "race 1").
+#define RACE_STATE(i) (Intel_Race(i)->Status)
+#define RACE_MOON(i, k) (Intel_Race(i)->Forces[(k) - 1].Moon)
 
 // Game_CurPlanet[CurSystem] / Game_CurMoon[CurSystem] (arrays are 1-based in the original).
 #define CUR_PLANET (ds.Game_CurPlanet[ds.Game_CurSystem - 1])
@@ -50,18 +36,18 @@ void Launch_MapScreen(void)
     uint16_t hit;
 
     if (ds.Game_ScreenEntered) {
-        if (ds.Game_PrevScreen == 0x12 && DS_787C == 0)
+        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0)
             Intel_SetGroupTarget(ds.Game_SelGroup, ds.Game_CurSystem, CUR_PLANET, CUR_MOON);
         int16_t p = ds.Game_PrevScreen;
         if ((p != 8 && p != 0x11 && p != 0x12 && p != 0x13 && p != 0x14 && p != 0x15 && p != 0x16
              && p != 0x1D && p != 0x1F && p != 0x20)
             || ds.Game_MenuCommand == 0x22)
             CUR_PLANET = 0;
-        SEL_ENTRY = 0;
-        SEL_MOON = 0;
-        TB_A = 0;
-        TB_E = 0;
-        TB_C = 0;
+        ds.Launch_SelectedEntry = 0;
+        ds.Launch_SavedBody = 0;
+        ds.Launch_AttackIconShown = 0;
+        ds.Launch_InvadeIconShown = 0;
+        ds.Launch_MoveIconShown = 0;
         if (CUR_PLANET == 0) {
             GfxPath_SetToolbarAndShow(7);
         } else {
@@ -93,10 +79,10 @@ void Launch_MapScreen(void)
     hit = (uint16_t)ds.Game_HotspotHit;
     if (hit > 0x14 && hit < 0x27 && CUR_PLANET != 0 && ds.Mouse_HeldLeft == 0) {
         int16_t e = ds.Game_HotspotHit - 0x14;
-        if (SYS_TYPE(e) < 5) {
+        if (SYS_VIEW(e).Kind < 5) {
             Sound_PlayButtonSfx(SFX("controll"));
             ds.Game_GroupList = 0;
-            ds.Game_SelGroup = SYS_IDX(e);
+            ds.Game_SelGroup = SYS_VIEW(e).Index;
             ds.Game_ShownGroupCount = ds.Game_GroupCount;
             ds.Game_CurrentScreen = 0x11;
             ds.Game_ScreenSwitch = true;
@@ -112,50 +98,52 @@ void Launch_MapScreen(void)
         && ds.Mouse_Buttons == 0) {
         int16_t e = ds.Game_HotspotHit - 0x14;
         Sound_PlayButtonSfx(SFX("x"));
-        TB_F = 0;
+        ds.Launch_InvadeIcon = 0;
         bool anyFighter = false;
         for (int16_t i = 1; i <= 0x12; i++)
-            if (SYS_TYPE(i) == 1)
+            if (SYS_VIEW(i).Kind == 1)
                 anyFighter = true;
-        SEL_ENTRY = ds.Game_HotspotHit - 0x14;
-        if (SYS_TYPE(e) < 5) {
-            TGroup *g = Groups_At(0, SYS_IDX(e));
-            SEL_MOON = g->Moon + 1;
+        ds.Launch_SelectedEntry = ds.Game_HotspotHit - 0x14;
+        if (SYS_VIEW(e).Kind < 5) {
+            TGroup *g = Groups_At(0, SYS_VIEW(e).Index);
+            ds.Launch_SavedBody = g->Moon + 1;
             ds.Game_GroupList = 0;
-            ds.Game_SelGroup = SYS_IDX(e);
+            ds.Game_SelGroup = SYS_VIEW(e).Index;
             ds.Game_ShownGroupCount = ds.Game_GroupCount;
-            TB_B = 0;
-            TB_D = 1;
+            ds.Launch_AttackIcon = 0;
+            ds.Launch_MoveIcon = 1;
             ds.Game_SelGroup0 = ds.Game_SelGroup;
             CUR_MOON = g->Moon;
             PlanetInfo_SelectCurBody();
             TBody *body = (TBody *)far_host(ds.Game_CurBody);
             if ((int8_t)body->Owner > 1 && body->InfoLevel > 0x27
                 && (int8_t)RACE_STATE((int8_t)body->Owner) < 6)
-                TB_F = g->Kind == 1 ? 1 : 0;
+                ds.Launch_InvadeIcon = g->Kind == 1 ? 1 : 0;
         } else {
-            SEL_MOON = RACE_DATA(SYS_TYPE(e) - 3, SYS_IDX(e)) + 1;
-            if (anyFighter && (int8_t)RACE_STATE(SYS_TYPE(e) - 3) < 6)
-                TB_B = 1;
+            ds.Launch_SavedBody = RACE_MOON(SYS_VIEW(e).Kind - 3, SYS_VIEW(e).Index) + 1;
+            if (anyFighter && (int8_t)RACE_STATE(SYS_VIEW(e).Kind - 3) < 6)
+                ds.Launch_AttackIcon = 1;
             else
-                TB_B = 0;
-            TB_F = 0;
-            TB_D = 0;
+                ds.Launch_AttackIcon = 0;
+            ds.Launch_InvadeIcon = 0;
+            ds.Launch_MoveIcon = 0;
         }
-        if (TB_B != TB_A || TB_D != TB_C || TB_F != TB_E) {
+        if (ds.Launch_AttackIcon != ds.Launch_AttackIconShown
+            || ds.Launch_MoveIcon != ds.Launch_MoveIconShown
+            || ds.Launch_InvadeIcon != ds.Launch_InvadeIconShown) {
             GfxPath_SetToolbar(7);
             GfxPath_AddToolbarIcon(0x21);
-            if (TB_B)
+            if (ds.Launch_AttackIcon)
                 GfxPath_AddToolbarIcon(0x37);
-            if (TB_D)
+            if (ds.Launch_MoveIcon)
                 GfxPath_AddToolbarIcon(0x38);
-            if (TB_F)
+            if (ds.Launch_InvadeIcon)
                 GfxPath_AddToolbarIcon(0x47);
             GfxPath_ShowToolbar();
         }
-        TB_C = TB_D;
-        TB_A = TB_B;
-        TB_E = TB_F;
+        ds.Launch_MoveIconShown = ds.Launch_MoveIcon;
+        ds.Launch_AttackIconShown = ds.Launch_AttackIcon;
+        ds.Launch_InvadeIconShown = ds.Launch_InvadeIcon;
     }
 
     // A planet was clicked in the system view of an empty selection.
@@ -175,11 +163,11 @@ void Launch_MapScreen(void)
             GfxPath_SetToolbar(7);
             GfxPath_AddToolbarIcon(0x21);
             GfxPath_ShowToolbar();
-            SEL_ENTRY = 0;
-            SEL_MOON = 0;
-            TB_A = 0;
-            TB_E = 0;
-            TB_C = 0;
+            ds.Launch_SelectedEntry = 0;
+            ds.Launch_SavedBody = 0;
+            ds.Launch_AttackIconShown = 0;
+            ds.Launch_InvadeIconShown = 0;
+            ds.Launch_MoveIconShown = 0;
             PlanetInfo_SetupSystemViewHotspots();
             PlanetInfo_ReloadSystemView();
         }
@@ -208,12 +196,12 @@ void Launch_MapScreen(void)
         if (ds.Game_StaffExp[2] == 0) {
             MSG(" You haven't got a fighter! ");
         } else {
-            RACE_STATE(SYS_TYPE(SEL_ENTRY) - 3) = 2;
-            W(0x7798) = ds.Game_CurSystem;
-            W(0x779A) = CUR_PLANET;
-            W(0x779C) = 0;
-            B(0x7788) = 0;
-            B(0x778B) = 1;
+            RACE_STATE(SYS_VIEW(ds.Launch_SelectedEntry).Kind - 3) = 2;
+            ds.SpWar_BattleSystem = ds.Game_CurSystem;
+            ds.SpWar_BattlePlanet = CUR_PLANET;
+            ds.SpWar_BattleMoon = 0;
+            ds.SpWar_GroundBattle = 0;
+            ds.Sim_PlayerAttacks = 1;
             ds.Game_CurrentScreen = 0x1D;
             ds.Game_ScreenSwitch = true;
         }
@@ -228,11 +216,11 @@ void Launch_MapScreen(void)
             CUR_MOON = Groups_At(0, ds.Game_SelGroup)->Moon;
             PlanetInfo_SelectCurBody();
             RACE_STATE(((TBody *)far_host(ds.Game_CurBody))->Owner) = 2; // BUG? Owner as a signed char in the original
-            W(0x7798) = ds.Game_CurSystem;
-            W(0x779A) = CUR_PLANET;
-            W(0x779C) = CUR_MOON;
-            B(0x7788) = 1;
-            B(0x778B) = 1;
+            ds.SpWar_BattleSystem = ds.Game_CurSystem;
+            ds.SpWar_BattlePlanet = CUR_PLANET;
+            ds.SpWar_BattleMoon = CUR_MOON;
+            ds.SpWar_GroundBattle = 1;
+            ds.Sim_PlayerAttacks = 1;
             ds.Game_CurrentScreen = 0x1D;
             ds.Game_ScreenSwitch = true;
         }
@@ -268,13 +256,13 @@ void Launch_DestinationScreen(void)
             GfxPath_AddToolbarIcon(0x21);
             GfxPath_ShowToolbar();
         }
-        DS_787C = 1;
-        SAVED_SCREEN = ds.Game_PrevScreen;
-        SAVED_SYSTEM = ds.Game_CurSystem;
-        SAVED_PLANET = CUR_PLANET;
+        ds.Launch_DestinationActive = 1;
+        ds.Launch_SavedScreen = ds.Game_PrevScreen;
+        ds.Launch_SavedSystem = ds.Game_CurSystem;
+        ds.Launch_SavedPlanet = CUR_PLANET;
         if (ds.Game_PrevScreen != 7)
-            SEL_ENTRY = 0;
-        SEL_MOON = Groups_At(0, ds.Game_SelGroup)->Moon + 1;
+            ds.Launch_SelectedEntry = 0;
+        ds.Launch_SavedBody = Groups_At(0, ds.Game_SelGroup)->Moon + 1;
         PlanetInfo_SetupSystemViewHotspots();
         PlanetInfo_InitSystemView();
     }
@@ -311,10 +299,10 @@ void Launch_DestinationScreen(void)
         if (ds.Mouse_HeldLeft == 0) {
             Sound_PlayButtonSfx(SFX("moveship"));
             ds.Game_ScreenSwitch = true;
-            ds.Game_CurrentScreen = SAVED_SCREEN;
+            ds.Game_CurrentScreen = ds.Launch_SavedScreen;
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
             CUR_MOON = 0;
-            DS_787C = 0;
+            ds.Launch_DestinationActive = 0;
         } else {
             Sound_PlayButtonSfx(SFX("planet"));
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
@@ -329,27 +317,27 @@ void Launch_DestinationScreen(void)
     if (CUR_PLANET == 0 && ds.Game_HotspotHit == 0x27) {
         Sound_PlayButtonSfx(SFX("moveship"));
         ds.Game_ScreenSwitch = true;
-        ds.Game_CurrentScreen = SAVED_SCREEN;
+        ds.Game_CurrentScreen = ds.Launch_SavedScreen;
         CUR_PLANET = 0;
         CUR_MOON = 0;
-        DS_787C = 0;
+        ds.Launch_DestinationActive = 0;
     }
 
     hit = (uint16_t)ds.Game_HotspotHit;
     if (hit > 0x26 && CUR_PLANET > 0 && !ds.Game_ScreenSwitch) {
         Sound_PlayButtonSfx(SFX("moveship"));
         ds.Game_ScreenSwitch = true;
-        ds.Game_CurrentScreen = SAVED_SCREEN;
+        ds.Game_CurrentScreen = ds.Launch_SavedScreen;
         CUR_MOON = ds.Game_HotspotHit - 0x27;
-        DS_787C = 0;
+        ds.Launch_DestinationActive = 0;
     }
 
     if (ds.Game_MenuCommand == 0x39) {
         ds.Game_ScreenSwitch = true;
-        ds.Game_CurrentScreen = SAVED_SCREEN;
-        DS_787C = 1;
-        ds.Game_CurSystem = SAVED_SYSTEM;
-        CUR_PLANET = SAVED_PLANET;
+        ds.Game_CurrentScreen = ds.Launch_SavedScreen;
+        ds.Launch_DestinationActive = 1;
+        ds.Game_CurSystem = ds.Launch_SavedSystem;
+        CUR_PLANET = ds.Launch_SavedPlanet;
     }
 
     if (ds.Game_MenuCommand == 0x21 && CUR_PLANET > 0) {

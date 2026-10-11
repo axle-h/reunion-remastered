@@ -16,21 +16,11 @@
 #include "game/textfile.h"
 #include "platform/fs.h"
 
-// --- Globals without a name in dseg.h ---------------------------------------
-#define SLOT_SEL (*(int16_t *)ds_at(0x7732))         // selected slot 1..12
-#define SLOT_TABLE (*(FarPtr *)ds_at(0x7734))        // 12 x {Used: boolean; Name: string[20]}
-#define NOSAVE_FLAG (*(uint8_t *)ds_at(0x7C4B))      // set when InputLine was cancelled
-#define SCREEN_FLAG (*(uint8_t *)ds_at(0x7C63))      // set to 1 when leaving the screen
-#define FIRST_SHOW (*(uint8_t *)ds_at(0x5DAA))       // 2 on the first visit (palette not faded)
-#define BUF_BACK (*(FarPtr *)ds_at(0x7726))          // disk.pic, 320x151
-#define BUF_BUTTONS (*(FarPtr *)ds_at(0x772A))       // diskbr.pic, 320x65
-#define BUF_FRAME (*(FarPtr *)ds_at(0x772E))         // animation frame, 100x49
-
 enum { SLOT_SIZE = 0x16, SLOT_COUNT = 12 };
 
 static uint8_t *slot_entry(int16_t n)
 {
-    return (uint8_t *)far_host(SLOT_TABLE) + (n - 1) * SLOT_SIZE;
+    return (uint8_t *)far_host(ds.SaveLoad_SlotTable) + (n - 1) * SLOT_SIZE;
 }
 
 // --- Files -------------------------------------------------------------------
@@ -165,12 +155,12 @@ static bool transfer(FILE *f, uint8_t *name, bool save)
 
 bool SaveLoad_Transfer(bool save)
 {
-    if (!save && !*slot_entry(SLOT_SEL))
+    if (!save && !*slot_entry(ds.SaveLoad_SelectedSlot))
         return false;
-    FILE *f = open_slot(SLOT_SEL, save);
+    FILE *f = open_slot(ds.SaveLoad_SelectedSlot, save);
     if (!f)
         return false;
-    bool ok = transfer(f, slot_entry(SLOT_SEL) + 1, save);
+    bool ok = transfer(f, slot_entry(ds.SaveLoad_SelectedSlot) + 1, save);
     fclose(f);
     return ok;
 }
@@ -188,7 +178,7 @@ bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save)
 // 1a3e:029c
 void SaveLoad_SaveLoadGame(bool save)
 {
-    if (!save && !*slot_entry(SLOT_SEL))
+    if (!save && !*slot_entry(ds.SaveLoad_SelectedSlot))
         return;
     if (!SaveLoad_Transfer(save))
         return; // original: run-time error 100
@@ -226,7 +216,7 @@ void SaveLoad_LoadInit(void)
 void SaveLoad_ReadSlotNames(void)
 {
     // Allocated afresh on every call, as in the original.
-    SLOT_TABLE = System_GetMem(0x108);
+    ds.SaveLoad_SlotTable = System_GetMem(0x108);
     for (int16_t n = 1; n <= SLOT_COUNT; n++) {
         uint8_t *e = slot_entry(n);
         FILE *f = open_slot(n, false);
@@ -240,16 +230,10 @@ void SaveLoad_ReadSlotNames(void)
             fclose(f);
         }
     }
-    SLOT_SEL = 1;
+    ds.SaveLoad_SelectedSlot = 1;
 }
 
 // --- Disk screen ---------------------------------------------------------------
-
-// The original's button geometry: word tables in the data segment.
-static int16_t tab(uint16_t base, int16_t idx)
-{
-    return *(int16_t *)ds_at((uint16_t)(base + idx * 2));
-}
 
 static uint8_t *screen_at(uint16_t off)
 {
@@ -266,7 +250,7 @@ static void DrawSlotNames(void)
 {
     for (int16_t n = 1; n <= SLOT_COUNT; n++) {
         const uint8_t *name = slot_entry(n) + 1;
-        if (n == SLOT_SEL)
+        if (n == ds.SaveLoad_SelectedSlot)
             Gfx_DrawTextB3(name, 0x10, (n - 1) * 9 + 0x40, 0x13);
         else
             Gfx_DrawTextB0(name, 0x10, (n - 1) * 9 + 0x40, 0x13);
@@ -276,9 +260,9 @@ static void DrawSlotNames(void)
 // 1a3e:0da2: animation frame 'frame' of disk.ani to the screen.
 static void DrawDiskFrame(int16_t frame)
 {
-    Anim_DrawAnimKeyed((uint16_t)(frame + 1), far_host(BUF_FRAME));
+    Anim_DrawAnimKeyed((uint16_t)(frame + 1), far_host(ds.SaveLoad_BufFrame));
     Mouse_HideCursor();
-    Blit_CopyRectStrided(far_host(BUF_FRAME), screen_at(0xBC26), 100, 0x31, 100, 0x140);
+    Blit_CopyRectStrided(far_host(ds.SaveLoad_BufFrame), screen_at(0xBC26), 100, 0x31, 100, 0x140);
     Mouse_ShowCursor();
 }
 
@@ -291,7 +275,7 @@ static void DrawKnob(int16_t step)
         frame = 3;
     if (y < 0x31)
         y = 0x31;
-    Blit_BlitTransparent(buf_at(BUF_BUTTONS, frame * 0x4F + 0x141),
+    Blit_BlitTransparent(buf_at(ds.SaveLoad_BufButtons, frame * 0x4F + 0x141),
                          screen_at((uint16_t)(y * 0x140 + 0xB0)), 0x4E, 0x12, 0x40);
 }
 
@@ -301,20 +285,20 @@ static void RestoreKnobBackground(int16_t step)
     int16_t y = (int16_t)(step * -5 + 0x98);
     if (y < 0x31)
         y = 0x31;
-    Blit_CopyRect(buf_at(BUF_BACK, (y - 0x31) * 0x140 + 0xB0), screen_at((uint16_t)(y * 0x140 + 0xB0)),
-                  0x4E, 0x12);
+    Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, (y - 0x31) * 0x140 + 0xB0),
+                  screen_at((uint16_t)(y * 0x140 + 0xB0)), 0x4E, 0x12);
 }
 
 // 1a3e:11ea: button idx (1..6) from the "on" (diskbr) or "off" (disk) picture.
 static void DrawOptionButton(int16_t idx, bool on)
 {
-    int16_t x = tab(0xD8, idx), y = tab(0xE4, idx);
+    int16_t x = ds.SaveLoad_OptionX[idx - 1], y = ds.SaveLoad_OptionY[idx - 1];
+    int16_t w = ds.SaveLoad_OptionW[idx - 1], h = ds.SaveLoad_OptionH[idx - 1];
     uint8_t *dest = screen_at((uint16_t)((y + 0x31) * 0x140 + x));
     if (on)
-        Blit_CopyRect(buf_at(BUF_BUTTONS, (y - 0x27) * 0x140 + x - 0x89), dest, tab(0xF0, idx),
-                      tab(0xFC, idx));
+        Blit_CopyRect(buf_at(ds.SaveLoad_BufButtons, (y - 0x27) * 0x140 + x - 0x89), dest, w, h);
     else
-        Blit_CopyRect(buf_at(BUF_BACK, y * 0x140 + x), dest, tab(0xF0, idx), tab(0xFC, idx));
+        Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, y * 0x140 + x), dest, w, h);
 }
 
 // 1a3e:12d3
@@ -332,13 +316,13 @@ static void DrawOptionButtons(void)
 // 1a3e:1366
 static void DrawPressedButton(int16_t idx, bool pressed)
 {
-    int16_t x = tab(0x108, idx), y = tab(0x110, idx);
+    int16_t x = ds.SaveLoad_ButtonX[idx - 1], y = ds.SaveLoad_ButtonY[idx - 1];
+    int16_t w = ds.SaveLoad_ButtonW[idx - 1], h = ds.SaveLoad_ButtonH[idx - 1];
     uint8_t *dest = screen_at((uint16_t)(x + 0x110 + (y + 0x9A) * 0x140));
     if (pressed)
-        Blit_CopyRect(buf_at(BUF_BUTTONS, (y + 0x15) * 0x140 + x), dest, tab(0x118, idx), tab(0x120, idx));
+        Blit_CopyRect(buf_at(ds.SaveLoad_BufButtons, (y + 0x15) * 0x140 + x), dest, w, h);
     else
-        Blit_CopyRect(buf_at(BUF_BACK, (y + 0x69) * 0x140 + x + 0x110), dest, tab(0x118, idx),
-                      tab(0x120, idx));
+        Blit_CopyRect(buf_at(ds.SaveLoad_BufBack, (y + 0x69) * 0x140 + x + 0x110), dest, w, h);
 }
 
 // 1a3e:146e
@@ -384,25 +368,26 @@ static void DiskScreenCloseAnim(void)
 // 1a3e:0ee5
 static void DiskScreenInit(void)
 {
-    *(FarPtr *)ds_at(0x7E40) = System_GetMem(0x349);
-    *(FarPtr *)ds_at(0x7E44) = System_GetMem(0x230);
-    BUF_FRAME = System_GetMem(0x1324);
-    *(uint8_t *)far_host(*(FarPtr *)ds_at(0x7E40)) = 0;
+    ds.Anim_Record = System_GetMem(0x349);
+    ds.Anim_Script = System_GetMem(0x230);
+    ds.SaveLoad_BufFrame = System_GetMem(0x1324);
+    *(uint8_t *)far_host(ds.Anim_Record) = 0;
     Anim_LoadMainAnim(0x11);
-    BUF_BACK = System_GetMem(0xBCC0);
-    BUF_BUTTONS = System_GetMem(0x5140);
+    ds.SaveLoad_BufBack = System_GetMem(0xBCC0);
+    ds.SaveLoad_BufButtons = System_GetMem(0x5140);
     uint8_t *pal = Gfx_PalettePtr();
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), far_host(BUF_BACK), 1, 0x97, 0, 0, 0x140,
-                FIRST_SHOW != 2, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), far_host(BUF_BUTTONS), 1, 0x41, 0, 0,
-                0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Blit_CopyRect(far_host(BUF_BACK), screen_at(0x3D40), 0x140, 0x97);
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), far_host(ds.SaveLoad_BufBack), 1, 0x97, 0,
+                0, 0x140, ds.Game_StartChoice != 2, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), far_host(ds.SaveLoad_BufButtons), 1, 0x41,
+                0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Blit_CopyRect(far_host(ds.SaveLoad_BufBack), screen_at(0x3D40), 0x140, 0x97);
     DrawDiskFrame(ds.Game_MusicTrack == 0 ? 0x16 : 0);
     DrawOptionButtons();
     DrawSlotNames();
     Gfx_FadeIn(0x40, 0xFE, pal);
-    if (FIRST_SHOW == 2)
-        FIRST_SHOW = 0;
+    // StartChoice 2 (load from the start menu): the first showing, palette not faded.
+    if (ds.Game_StartChoice == 2)
+        ds.Game_StartChoice = 0;
 }
 
 // 1a3e:103b
@@ -420,34 +405,36 @@ static void SetupDiskHotspots(void)
 void SaveLoad_DiskScreen(void)
 {
     if (ds.Game_ScreenEntered) {
-        GfxPath_SetToolbarAndShow(FIRST_SHOW == 2 ? 0x26 : 0x0C);
+        GfxPath_SetToolbarAndShow(ds.Game_StartChoice == 2 ? 0x26 : 0x0C);
         SaveLoad_ReadSlotNames();
         DiskScreenInit();
         SetupDiskHotspots();
     }
-    if (ds.Game_MenuCommand == 0x2F && *slot_entry(SLOT_SEL) != 0) {
+    if (ds.Game_MenuCommand == 0x2F && *slot_entry(ds.SaveLoad_SelectedSlot) != 0) {
         SaveLoad_LoadGame();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 1;
-        SCREEN_FLAG = 1;
+        ds.GfxPath_PageFlagB = 1;
     }
     if (ds.Game_MenuCommand == 0x30) {
-        uint8_t *name = slot_entry(SLOT_SEL) + 1;
-        if (*slot_entry(SLOT_SEL) == 0) {
+        int16_t sel = ds.SaveLoad_SelectedSlot;
+        uint8_t *name = slot_entry(sel) + 1;
+        if (*slot_entry(sel) == 0) {
             // "Save <n>" for an empty slot, truncated to 20 characters.
             char tmp[32];
-            int len = SDL_snprintf(tmp, sizeof tmp, "Save %d", SLOT_SEL);
+            int len = SDL_snprintf(tmp, sizeof tmp, "Save %d", sel);
             name[0] = (uint8_t)len;
             memcpy(name + 1, tmp, (size_t)len);
         }
-        TextFile_SetStringPtr(far_ptr((uint16_t)(SLOT_TABLE >> 16),
-                                      (uint16_t)((uint16_t)SLOT_TABLE + (SLOT_SEL - 1) * SLOT_SIZE + 1)));
-        TextFile_InputLine(name, 0x10, (SLOT_SEL - 1) * 9 + 0x40, 0x13, true);
-        if (NOSAVE_FLAG == 0)
+        FarPtr table = ds.SaveLoad_SlotTable;
+        TextFile_SetStringPtr(far_ptr((uint16_t)(table >> 16),
+                                      (uint16_t)((uint16_t)table + (sel - 1) * SLOT_SIZE + 1)));
+        TextFile_InputLine(name, 0x10, (sel - 1) * 9 + 0x40, 0x13, true);
+        if (ds.TextFile_InputEscaped == 0)
             SaveLoad_SaveGame();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 1;
-        SCREEN_FLAG = 1;
+        ds.GfxPath_PageFlagB = 1;
     }
     if (ds.Game_MenuCommand == 0x49)
         Gfx_FatalExit();
@@ -490,8 +477,8 @@ void SaveLoad_DiskScreen(void)
             slot = 1;
         if (slot > 12)
             slot = 12;
-        if (SLOT_SEL != slot) {
-            SLOT_SEL = slot;
+        if (ds.SaveLoad_SelectedSlot != slot) {
+            ds.SaveLoad_SelectedSlot = slot;
             DrawSlotNames();
         }
     }

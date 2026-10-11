@@ -19,13 +19,6 @@ void GfxPath_ShowToolbar(void);                          // 3a1b:0704
 bool GfxPath_ToolbarHasIcon(int16_t id);                 // 3a1b:07ca
 void Surface_AutoPlaceBuilding(int16_t kind, int16_t system, int16_t planet, int16_t moon); // 2ef2:29b1
 
-// Unnamed globals.
-#define DS_5D4A (*(uint16_t *)ds_at(0x5D4A)) // Random(10) + 5 after a deployment away from home
-#define DS_5D4C (*(uint8_t *)ds_at(0x5D4C))  // nonzero: stock satellites only at 1:5
-#define DS_788E (*(uint8_t *)ds_at(0x788E))  // HandleBodyActions: something was executed
-// Table at DS:1A4F indexed by Surface_Tileset[SurfaceType]; nonzero = habitable.
-#define TILESET_FLAG(st) (*(uint8_t *)ds_at((uint16_t)(0x1A4F + ds.Surface_Tileset[(st) - 1])))
-
 // Research_Products[k] / Game_IdeaTimer[k] hold Pascal Products[k + 1] / IdeaTimer[k + 1]
 // (DS:5DAC + 35h*k): the decompile's indices are already 0-based, so they are used as is.
 // [2] = Satellite, [6] = Control Centre (idea 7), [0xB] = Radio (idea 0xC).
@@ -38,6 +31,12 @@ static TBody *CurBody(void)
 // The location of the selected body: CurPlanet/CurMoon of CurSystem.
 #define CUR_PLANET (ds.Game_CurPlanet[ds.Game_CurSystem - 1])
 #define CUR_MOON (ds.Game_CurMoon[ds.Game_CurSystem - 1])
+
+// SurfaceColonisable of the body's tileset (Surface::Tileset[SurfaceType]).
+static bool Colonisable(const TBody *b)
+{
+    return ds.Galaxy_SurfaceColonisable[ds.Surface_Tileset[b->SurfaceType - 1] - 1] != 0;
+}
 
 static bool AtLocation(const TGroup *g, int16_t system, int16_t planet)
 {
@@ -54,7 +53,7 @@ void Satellite_DeployStockSatellite(void)
     } else {
         CurBody()->Satellite = 0xE2;
         ds.Research_Products[2].Stock--;
-        DS_5D4A = System_Random(10) + 5;
+        ds.Intel_SatTheftTimer = System_Random(10) + 5;
     }
 }
 
@@ -135,7 +134,7 @@ void Satellite_ColonizeBody(void)
     b->_0A = 1;
     Satellite_TakeTradeShips(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 1);
     if (ds.Research_Products[6].State == 0 && ds.Game_IdeaTimer[6] == -1) {
-        if (b->Surveyed != 0 && TILESET_FLAG(b->SurfaceType) != 0) {
+        if (b->Surveyed != 0 && Colonisable(b)) {
             Intel_ScheduleIdea(7, 0x14, 0x28);
             b->InfoLevel += 10;
             Message_ShowMessageLine(4);
@@ -270,7 +269,7 @@ void Satellite_AddBodyActionItems(int16_t system, int16_t planet, int16_t moon, 
     int16_t cs = ds.Game_CurSystem, cp = CUR_PLANET, cm = CUR_MOON;
 
     *any = false;
-    if ((DS_5D4C == 0 || (system == 1 && planet == 5)) && b->Satellite == 0
+    if ((ds.Intel_SatTheftDone == 0 || (system == 1 && planet == 5)) && b->Satellite == 0
         && ((b->Colony == 0 && b->_0A == 0) || b->Owner >= 2)
         && ds.Research_Products[2].Stock > 0 && !GfxPath_ToolbarHasIcon(0x46)) {
         GfxPath_AddToolbarIcon(0x46);
@@ -303,7 +302,7 @@ void Satellite_AddBodyActionItems(int16_t system, int16_t planet, int16_t moon, 
         *any = true;
     }
     if (ds.Research_Products[6].State == 5 && b->Colony == 0 && b->Miner == 0 && b->InfoLevel > 29
-        && b->Surveyed != 0 && b->Owner < 2 && TILESET_FLAG(b->SurfaceType) != 0
+        && b->Surveyed != 0 && b->Owner < 2 && Colonisable(b)
         && ds.Game_ColonySetupCount < 10 && !GfxPath_ToolbarHasIcon(5)) {
         GfxPath_AddToolbarIcon(5);
         *any = true;
@@ -313,34 +312,34 @@ void Satellite_AddBodyActionItems(int16_t system, int16_t planet, int16_t moon, 
 // 28cd:0948: executes the body action menu commands and refreshes the menu
 void Satellite_HandleBodyActions(void)
 {
-    DS_788E = 0;
+    ds.Satellite_ActionDone = 0;
     if (ds.Game_MenuCommand == 10) {
         Satellite_ColonizeBody();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
         Surface_AutoPlaceBuilding(0x19, ds.Game_CurSystem, CUR_PLANET, CUR_MOON);
     }
     if (ds.Game_MenuCommand == 0x46) {
         Satellite_DeployStockSatellite();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
     }
     if (ds.Game_MenuCommand == 0x14) {
         Satellite_DeploySatellite();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
     }
     if (ds.Game_MenuCommand == 0x43) {
         Satellite_DeploySpySat();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
     }
     if (ds.Game_MenuCommand == 0x44) {
         Satellite_DeploySpyShip();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
     }
     if (ds.Game_MenuCommand == 0x45) {
         Satellite_DeploySolarSat();
-        DS_788E = 1;
+        ds.Satellite_ActionDone = 1;
     }
     const TBody *b = CurBody(); // read before the redraw, as the original does
-    if (DS_788E != 0) {
+    if (ds.Satellite_ActionDone != 0) {
         if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == 0)
             PlanetInfo_DrawPlanetInfoText();
         if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == 1)

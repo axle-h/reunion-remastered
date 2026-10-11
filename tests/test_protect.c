@@ -2,6 +2,7 @@
 // AlienTalk always pass without asking, and leave the state a correct answer
 // leaves (Key1 / Lives refreshed, AnswerKey = WordCodes[question], ...).
 #include <stdio.h>
+#include <string.h>
 
 #include "game/alientalk.h"
 #include "game/credits.h"
@@ -95,8 +96,8 @@ int main(int argc, char *argv[])
     CHECK(ds.Protect2_AnswerKey == key);
     CHECK(ds.Protect2_AnswerHash == key - 0x3421);
     CHECK(ds.Protect2_Lives == 0x109);
-    CHECK(*(uint32_t *)ds_at(0x087E) == (uint32_t)(key - 0x3421) + 0xAA9B);
-    CHECK(*(uint32_t *)ds_at(0x0886) == 0x3421u * 5 + 0x8613);
+    CHECK((uint32_t)ds.Protect2_HashEcho == (uint32_t)(key - 0x3421) + 0xAA9B);
+    CHECK((uint32_t)ds.Protect2_KeyEcho == 0x3421u * 5 + 0x8613);
     // A second call does not ask again.
     Protect2_AskDateQuestion();
     CHECK(ds.Protect2_Lives == 0x109);
@@ -122,16 +123,15 @@ int main(int argc, char *argv[])
     // Armed but never asked: the colony step answers instead of scribbling.
     reset();
     ds.Protect2_QuestionIndex = 3;
-    uint8_t before[0x100];
-    for (int i = 0; i < 0x100; i++)
-        before[i] = *(uint8_t *)ds_at((uint16_t)(0x2000 + i));
+    // The scribble hit random DS offsets: any block of DS data is a witness.
+    static TBody before[32];
+    memcpy(before, ds.Galaxy_AmnestyBodies, sizeof before);
     ds.System_RandSeed = 1;
     Protect2_EnforceDateCheck();
     CHECK(ds.Protect2_AnswerKey == ds.Protect_WordCodes[2]);
     CHECK(ds.Protect2_Lives >= 0xD7D && ds.Protect2_Lives <= 0xD7D + 6);
     CHECK(ds.Protect2_ScribbleDone == 0);
-    for (int i = 0; i < 0x100; i++)
-        CHECK(*(uint8_t *)ds_at((uint16_t)(0x2000 + i)) == before[i]);
+    CHECK(memcmp(before, ds.Galaxy_AmnestyBodies, sizeof before) == 0);
 
     // The Halt at Lives == 107h is gone.
     ds.Protect2_Lives = 0x107;

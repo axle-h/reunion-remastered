@@ -79,24 +79,25 @@ int main(int argc, char *argv[])
 
     // Without the other units no race is active, so no topics are offered.
     Pub_UpdateTopicAvailability();
-    for (int i = 0x774A; i <= 0x7754; i++)
-        CHECK(*(uint8_t *)ds_at((uint16_t)i) == 0);
+    CHECK(ds.Pub_AnyTopic == 0);
+    for (int i = 0; i < 10; i++)
+        CHECK(ds.Pub_TopicAvail[i] == 0);
 
-    // A reply's two-digit code is the next question menu, DS:7764 (0 leaves
-    // the dialog); the question code at DS:776A is left alone (1fd2:075f).
+    // A reply's two-digit code is the next question menu, MenuIdx (0 leaves
+    // the dialog); QuestionCode is left alone (1fd2:075f).
     system_init();
-    *(int16_t *)ds_at(0x7738) = 1;                                 // person (not the trader)
-    memcpy(ds_at(0x7760), "\x01" "1", 2);                          // NUM_STR = '1'
+    ds.Pub_Person = 1;                                             // not the trader
+    memcpy(&ds.Pub_PersonStr, "\x01" "1", 2);                      // '1'
     for (int16_t r = 1; r <= 3; r++) {
         uint8_t line[256];
         TextFile_ReadTextLine((const uint8_t *)"\x0B" "valasz1.loc", r, line);
         int16_t want = (int16_t)((line[1] - '0') * 10 + (line[2] - '0'));
-        *(int16_t *)ds_at(0x7768) = r;                             // reply line
-        *(int16_t *)ds_at(0x7764) = 99;
-        *(int16_t *)ds_at(0x776A) = 0x55;
+        ds.Pub_ReplyLine = r;
+        ds.Pub_MenuIdx = 99;
+        ds.Pub_QuestionCode = 0x55;
         Pub_ShowReply();
-        CHECK(*(int16_t *)ds_at(0x7764) == want);
-        CHECK(*(int16_t *)ds_at(0x776A) == 0x55);
+        CHECK(ds.Pub_MenuIdx == want);
+        CHECK(ds.Pub_QuestionCode == 0x55);
     }
 
     fs_shutdown();

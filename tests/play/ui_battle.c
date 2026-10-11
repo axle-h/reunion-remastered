@@ -25,23 +25,6 @@ enum : int {
     THINK = 8,             // retraces between looks at the ground battle
 };
 
-static int32_t ds32(uint16_t off)
-{
-    int32_t v;
-    memcpy(&v, ds_at(off), 4);
-    return v;
-}
-
-static int16_t ds16(uint16_t off)
-{
-    return *(const int16_t *)ds_at(off);
-}
-
-static uint8_t ds8(uint16_t off)
-{
-    return *(const uint8_t *)ds_at(off);
-}
-
 // --- Observers ---
 
 bool ui_battle_over(void)
@@ -51,7 +34,7 @@ bool ui_battle_over(void)
     int s = ui_screen();
     return (s == SCREEN_SPACE || s == SCREEN_GROUND) && !ds.Game_ScreenSwitch
            && ui_toolbar_has_command(CMD_END_BATTLE)
-           && (s == SCREEN_SPACE ? ds8(0x77DA) != 0 : ds8(0x770B) != 0);
+           && (s == SCREEN_SPACE ? ds.SpWar_BattleOver != 0 : ds.GrWar_BattleOver != 0);
 }
 
 bool ui_battle_won(void)
@@ -66,8 +49,8 @@ void ui_battle_losses(UiLosses *out)
     // EndSpaceBattle / EndGroundBattle print these longints on the picture.
     bool ground = ui_screen() == SCREEN_GROUND;
     for (int c = 1; c <= 4; c++) {
-        out->own[c - 1] = ds32((uint16_t)((ground ? 0x76E6 : 0x77B2) + 4 * c));
-        out->enemy[c - 1] = ds32((uint16_t)((ground ? 0x76F6 : 0x77C2) + 4 * c));
+        out->own[c - 1] = ground ? ds.GrWar_Losses[0][c - 1] : ds.SpWar_AttackerLosses[c - 1];
+        out->enemy[c - 1] = ground ? ds.GrWar_Losses[1][c - 1] : ds.SpWar_DefenderLosses[c - 1];
     }
 }
 
@@ -77,23 +60,24 @@ int ui_space_ships(bool own)
     return own ? ds.SpWar_AttackerShipCount : ds.SpWar_DefenderShipCount;
 }
 
-// The GrWar unit lists: side 1 the player's (DS:7646), side 2 the enemy's
-// (DS:764A), slot counts at DS:764E/7650. Records are 39 bytes (grwar.h).
+// The GrWar unit lists (GrWarUnits::UnitLists): side 1 the player's, side 2
+// the enemy's, with their slot counts. Records are 39 bytes (grwar.h).
 static const uint8_t *battle_unit(int side, int i)
 {
-    FarPtr list = *(const FarPtr *)ds_at((uint16_t)(0x7642 + 4 * side));
+    FarPtr list = ds.GrWarUnits_UnitLists[side - 1];
     uint16_t ofs = (uint16_t)((uint16_t)list + (i - 1) * 0x27);
     return (const uint8_t *)far_host(far_ptr((uint16_t)(list >> 16), ofs));
 }
 
 static int battle_slots(int side)
 {
-    return ds16((uint16_t)(0x764C + 2 * side));
+    return side == 1 ? ds.GrWarUnits_AttackerSlotCount : ds.GrWarUnits_DefenderSlotCount;
 }
 
 int ui_ground_stacks(bool own, UiStack out[20])
 {
-    if (ui_screen() != SCREEN_GROUND || ds8(0x770B) != 0)  // the result picture covers the field
+    // The result picture covers the field.
+    if (ui_screen() != SCREEN_GROUND || ds.GrWar_BattleOver != 0)
         return 0;
     int side = own ? 1 : 2, n = 0;
     for (int i = 1; i <= battle_slots(side) && n < 20; i++) {
@@ -103,9 +87,9 @@ int ui_ground_stacks(bool own, UiStack out[20])
         if (count <= 0)
             continue;
         // RenderBattle draws the sprite at the tile plus the step towards the
-        // next tile (DS:44/4E direction tables), field origin (64, 52).
+        // next tile (GrWar::DirX/DirY), field origin (64, 52).
         uint8_t dir = u[8], step = u[0x0A];
-        int dx = ds16((uint16_t)(0x44 + 2 * dir)), dy = ds16((uint16_t)(0x4E + 2 * dir));
+        int dx = ds.GrWar_DirX[dir - 1], dy = ds.GrWar_DirY[dir - 1];
         out[n++] = (UiStack){
             .slot = i,
             .type = u[0],
@@ -133,8 +117,8 @@ int ui_assign_slots(UiStack out[20])
 
 int ui_assign_pool(int type)
 {
-    // "Trooper / Battle tank / Aircraft / Rocket launcher  <n>" (DS:7676 table).
-    return ui_screen() == SCREEN_ASSIGN ? ds32((uint16_t)(0x7676 + 4 * type)) : 0;
+    // "Trooper / Battle tank / Aircraft / Rocket launcher  <n>" (GrWarUnits::Pool).
+    return ui_screen() == SCREEN_ASSIGN ? ds.GrWarUnits_Pool[type - 1] : 0;
 }
 
 // --- Star map: own invasion ---
@@ -197,8 +181,9 @@ bool ui_space_battle(UiLosses *losses)
 {
     if (!ui_wait_screen(SCREEN_SPACE, 3000))
         play_fail("ui_space_battle: no space battle screen");
-    // (Log only: the fleets as they were when the screen opened, DS:77B2/77B4.)
-    play_log("space battle: %d own ships against %d", ds16(0x77B2), ds16(0x77B4));
+    // (Log only: the fleets as they were when the screen opened, SpWar::AttackerStart, DefenderStart.)
+    play_log("space battle: %d own ships against %d", ds.SpWar_AttackerStart,
+             ds.SpWar_DefenderStart);
     if (!ui_wait_until(battle_over, nullptr, BATTLE_TIMEOUT) || !ui_wait_idle(2000))
         play_fail("ui_space_battle: the battle did not end");
     bool won = ui_battle_won();
@@ -315,10 +300,10 @@ static int nearest(const UiStack *a, const UiStack *list, int n)
 }
 
 // Selection shown in the left panel: the stack's name, Pcs and Str
-// (DS:7716 selected slot, DS:771A own side).
+// (GrWar::Selected slot, GrWar::SelectedOwn side).
 static bool own_selected(int slot)
 {
-    return ds16(0x7716) == slot && ds8(0x771A) != 0;
+    return ds.GrWar_Selected == slot && ds.GrWar_SelectedOwn != 0;
 }
 
 // Selects own stack `s` and orders it to attack enemy stack `e`.

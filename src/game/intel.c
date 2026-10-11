@@ -12,10 +12,6 @@
 #include "game/surface.h"
 #include "game/system.h"
 
-// Unnamed globals: story timers (word) with a "done" flag byte behind each.
-#define U16(off) (*(uint16_t *)ds_at(off))
-#define U8(off) (*(uint8_t *)ds_at(off))
-
 static FarPtr far_add(FarPtr p, int32_t delta)
 {
     // The offset wraps at 64 KB like the original's 16-bit arithmetic.
@@ -65,30 +61,30 @@ void Intel_FirstContact(int16_t race, const uint8_t *msg)
             Intel_ScheduleIdea(8, 0x14, 0x14);
             Message_ShowMessageLine(5);
         }
-        if (U8(0x5D50) == 0)
-            U16(0x5D4E) = (uint16_t)(System_Random(0x46) + 0x28A);
-        if (U8(0x5D56) == 0)
-            U16(0x5D54) = (uint16_t)(U16(0x5D4E) + 0x2D0 + System_Random(0x32));
-        if (U8(0x5D5A) == 0)
-            U16(0x5D58) = (uint16_t)(U16(0x5D54) + 0x4C4 + System_Random(100));
-        if (U8(0x5D5E) == 0)
-            U16(0x5D5C) = (uint16_t)(U16(0x5D58) + 100 + System_Random(0x14));
+        if (ds.Intel_Race2Done1 == 0)
+            ds.Intel_Race2Timer1 = (int16_t)(System_Random(0x46) + 0x28A);
+        if (ds.Intel_Race2Done2 == 0)
+            ds.Intel_Race2Timer2 = (int16_t)(ds.Intel_Race2Timer1 + 0x2D0 + System_Random(0x32));
+        if (ds.Intel_Race2Done3 == 0)
+            ds.Intel_Race2Timer3 = (int16_t)(ds.Intel_Race2Timer2 + 0x4C4 + System_Random(100));
+        if (ds.Intel_Race2Done4 == 0)
+            ds.Intel_Race2Timer4 = (int16_t)(ds.Intel_Race2Timer3 + 100 + System_Random(0x14));
     }
     if (race == 3 && ds.Research_Products[7].State == 0 && ds.Game_IdeaTimer[7] == -1)
         Message_ShowMessageLine(5);
     if (race == 4) {
         Message_ShowMessageLine(0xF);
         AlienTalk_StartAlienTalk(5);
-        if (U8(0x5D78) == 0)
-            U16(0x5D76) = (uint16_t)(System_Random(500) + 0x5DC);
+        if (ds.Intel_Race4Done == 0)
+            ds.Intel_Race4Timer = (int16_t)(System_Random(500) + 0x5DC);
     }
-    if (race == 5 && U8(0x5D84) == 0)
-        U16(0x5D82) = (uint16_t)(System_Random(0x14) + 0x14);
+    if (race == 5 && ds.Intel_Race5Done == 0)
+        ds.Intel_Race5Timer = (int16_t)(System_Random(0x14) + 0x14);
     if (race == 7 || race == 8 || race == 9 || race == 10) {
-        if (U8(0x5D98) == 0 && (int16_t)U16(0x5D96) < 1) {
+        if (ds.Intel_Race7to10Done == 0 && ds.Intel_Race7to10Timer < 1) {
             Message_ShowMessageLine(0x1C);
-            if (U8(0x5D98) == 0)
-                U16(0x5D96) = (uint16_t)(System_Random(0x32) + 200);
+            if (ds.Intel_Race7to10Done == 0)
+                ds.Intel_Race7to10Timer = (int16_t)(System_Random(0x32) + 200);
         }
     }
     if (race == 0xB) {
@@ -241,10 +237,10 @@ void Intel_DestroyBody(int16_t system, int16_t planet, int16_t moon)
     }
 }
 
-// Garrison stores of a new colony: base byte table at `base_off` + k, random range at `range_off` + k (k = 1..8).
-static uint32_t stock(uint16_t base_off, uint16_t range_off, int k)
+// Store k (1..8) of a race's new colony: base[k] + Random(range[k]).
+static uint32_t stock(const uint8_t base[8], const uint8_t range[8], int k)
 {
-    return U8((uint16_t)(base_off + k)) + System_Random(U8((uint16_t)(range_off + k)));
+    return base[k - 1] + System_Random(range[k - 1]);
 }
 
 // 29b9:06d4
@@ -262,26 +258,27 @@ void Intel_ClaimBodyForRace(int16_t owner, int16_t system, int16_t planet, int16
     b->Attitude = 0x1E;
     if (owner == 3) {
         for (int k = 1; k <= 8; k++)
-            b->Stores[k - 1] = (int32_t)stock(0x88F, 0x89F, k);
-        if (U8(0x5D6C) == 0) {
+            b->Stores[k - 1] = (int32_t)stock(ds.Intel_Race3Stores, ds.Intel_Race3StoresRange, k);
+        if (ds.Intel_MorgrulAttack2Done == 0) {
             // The first set is overwritten (its random numbers are still drawn).
             for (int k = 1; k <= 8; k++)
-                b->Stores[k - 1] = (int32_t)stock(0x897, 0x89F, k);
+                b->Stores[k - 1] =
+                    (int32_t)stock(ds.Intel_Race3StoresEarly, ds.Intel_Race3StoresRange, k);
         }
     }
     if (owner == 7) {
         for (int k = 1; k <= 8; k++)
-            b->Stores[k - 1] = (int32_t)stock(0x8A7, 0x8AF, k);
+            b->Stores[k - 1] = (int32_t)stock(ds.Intel_Race7Stores, ds.Intel_Race7StoresRange, k);
     }
     if (owner == 8) {
         // BUG?: every pass writes Stores[1]; the other seven are left alone.
         for (int k = 1; k <= 8; k++)
-            b->Stores[0] = (int32_t)stock(0x8B7, 0x8BF, k);
+            b->Stores[0] = (int32_t)stock(ds.Intel_Race8Stores, ds.Intel_Race8StoresRange, k);
     }
     if (owner == 0xC) {
         // BUG?: same as for owner 8.
         for (int k = 1; k <= 8; k++)
-            b->Stores[0] = (int32_t)stock(0x8C7, 0x8CF, k);
+            b->Stores[0] = (int32_t)stock(ds.Intel_Race12Stores, ds.Intel_Race12StoresRange, k);
     }
 }
 
