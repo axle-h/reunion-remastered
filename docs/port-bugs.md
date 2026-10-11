@@ -4,7 +4,9 @@ Bugs found by playing the port, with root cause and status. Bugs of the
 original game itself go in [bugs.md](bugs.md) instead.
 
 Each entry: what was seen, root cause (`file:line` in the port, `seg:off` in
-the original), fix, and how it was verified. Status: **open**,
+the original), fix, and how it was verified. The `test_diff_*` tests named
+below were retired with the real-mode memory model; they are at the tag
+`last-real-mode` ([difftest.md](difftest.md)). Status: **open**,
 **investigating**, **fixed**, **not a bug** (the original does the same).
 
 ## 1. "Choose your hero" voice plays at the main menu

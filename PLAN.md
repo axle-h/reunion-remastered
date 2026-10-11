@@ -16,6 +16,7 @@ from the user's own copy; we never ship the assets.
 | Music | libxmp | Plays the ProTracker MODs as-is |
 | Build | CMake (≥ 3.25) with presets | Uses system SDL3/libxmp if found, otherwise fetches them with `FetchContent` |
 | VCS | git | `vendor/` and the Ghidra database are git-ignored |
+| Verification | Differential tests while porting, then golden state hashes | Unicorn ran the original's routines on the port's real-mode memory until every unit matched; native C memory retired them (docs/difftest.md, tag `last-real-mode`). Golden hashes of the layout-independent state and the playthrough's proof guard behaviour since |
 
 ## What we're working from
 
@@ -171,8 +172,10 @@ exit code 10 shows the victory sequence, 15 restarts).
 ### Phase 6: verification
 - **Side-by-side runs** in DOSBox-X (installed) vs the port from identical
   saves; compare screens and key state.
-- **Memory diffs**: DOSBox-X debugger dumps of DS at chosen points vs the port's
-  mirrored state struct.
+- **Differential tests** (done, then retired; docs/difftest.md): the
+  original's routines under Unicorn on the port's memory. They replaced the
+  planned DOSBox-X memory diffs, which were never used and went with the
+  real-mode memory model.
 - **Save compatibility**: load original saves in the port and vice versa.
 - **Asset tests**: C loaders vs Python tool output.
 

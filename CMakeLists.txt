@@ -91,51 +91,6 @@ target_compile_definitions(reunion PRIVATE REUNION_DEFAULT_DATA_DIR="${REUNION_D
 # (e.g. no game data). They get the data directory as argv[1].
 include(CTest)
 if(BUILD_TESTING)
-    # Differential tests (docs/difftest.md) run the original code under
-    # Unicorn: tests/test_diff_*.c, and the tests listed in REUNION_DIFF_USERS.
-    option(REUNION_DIFFTEST "Build the differential tests (needs Unicorn)" ON)
-    set(REUNION_DIFF_USERS test_travel)
-    if(REUNION_DIFFTEST)
-        find_package(PkgConfig QUIET)
-        if(PkgConfig_FOUND)
-            pkg_check_modules(UNICORN QUIET IMPORTED_TARGET unicorn>=2.0)
-        endif()
-        if(UNICORN_FOUND)
-            set(REUNION_UNICORN PkgConfig::UNICORN)
-        else()
-            # Test-only dependency: a static x86-only build, no tests/samples.
-            block()
-                set(UNICORN_ARCH "x86" CACHE STRING "" FORCE)
-                set(UNICORN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-                set(UNICORN_INSTALL OFF CACHE BOOL "" FORCE)
-                set(UNICORN_LEGACY_STATIC_ARCHIVE OFF CACHE BOOL "" FORCE)
-                set(BUILD_SHARED_LIBS OFF)
-                # QEMU needs GNU C; our global C_EXTENSIONS OFF would break it.
-                set(CMAKE_C_EXTENSIONS ON)
-                set(CMAKE_C_STANDARD 11)
-                FetchContent_Declare(unicorn
-                    GIT_REPOSITORY https://github.com/unicorn-engine/unicorn.git
-                    GIT_TAG 2.1.4
-                    GIT_SHALLOW TRUE
-                    SYSTEM
-                    EXCLUDE_FROM_ALL)
-                FetchContent_MakeAvailable(unicorn)
-                # Third-party code: keep our build log free of its warnings.
-                foreach(t IN ITEMS unicorn unicorn-common x86_64-softmmu)
-                    if(TARGET ${t})
-                        target_compile_options(${t} PRIVATE -w)
-                    endif()
-                endforeach()
-            endblock()
-            set(REUNION_UNICORN unicorn)
-        endif()
-        add_library(reunion_diff STATIC tests/diff/diff.c tests/diff/dseg_names.c)
-        target_include_directories(reunion_diff PUBLIC tests)
-        target_link_libraries(reunion_diff PUBLIC reunion_core ${REUNION_UNICORN})
-        target_compile_definitions(reunion_diff PRIVATE
-            REUNION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-    endif()
-
     # The playthrough fixture (docs/playthrough.md), for tests/test_play_*.c.
     file(GLOB REUNION_PLAY_SOURCES CONFIGURE_DEPENDS tests/play/*.c)
     add_library(reunion_play STATIC ${REUNION_PLAY_SOURCES})
@@ -145,17 +100,8 @@ if(BUILD_TESTING)
     file(GLOB REUNION_TESTS CONFIGURE_DEPENDS tests/test_*.c)
     foreach(src IN LISTS REUNION_TESTS)
         get_filename_component(name "${src}" NAME_WE)
-        set(diff_user OFF)
-        if(name MATCHES "^test_diff_" OR name IN_LIST REUNION_DIFF_USERS)
-            set(diff_user ON)
-        endif()
-        if(diff_user AND NOT REUNION_DIFFTEST)
-            continue()
-        endif()
         add_executable(${name} ${src})
-        if(diff_user)
-            target_link_libraries(${name} PRIVATE reunion_diff)
-        elseif(name MATCHES "^test_play_" OR name STREQUAL "test_golden")
+        if(name MATCHES "^test_play_" OR name STREQUAL "test_golden")
             target_link_libraries(${name} PRIVATE reunion_play)
         else()
             target_link_libraries(${name} PRIVATE reunion_core)

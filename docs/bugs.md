@@ -7,8 +7,8 @@ the code) until Phase 7, when each fix goes behind a clear switch.
 ## Fixed in the port
 
 Switches in `fixes` (`src/game/fixes.h`). All are on in the game; the port
-menu (F1, Fixes) switches each one, `REUNION_ORIGINAL=1` turns them all off,
-and the differential tests always run without them.
+menu (F1, Fixes) switches each one, and `REUNION_ORIGINAL=1` turns them all
+off (the golden hashes, `tests/test_golden.c`, check both).
 
 | Switch | Original behaviour | Fix |
 |---|---|---|

@@ -53,8 +53,9 @@ typedef struct {
     "4600:click:264,16;5000:click:24,16;8000:quit"
 
 static const GoldenCase cases[] = {
-    // The menu bar's screens (docs/difftest.md), each followed by its Back
-    // button: shop, research, ship info, system view, surface, message log.
+    // The command centre's menu bar (y=16: x=24 shop, 72 research, 120 ship
+    // info, 168 system view, 216 surface, 264 message log), each screen left
+    // by its Back button (x=24).
     {.name = "boot",
      .script = "seed:1;" NEW_GAME ";1000:click:24,16;1400:click:24,16;1700:click:72,16;2100:click:24,16;"
                "2400:click:120,16;2800:click:24,16;3100:click:168,16;3500:click:24,16;"

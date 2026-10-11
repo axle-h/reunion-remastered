@@ -1,7 +1,7 @@
 // Fixes to the original game (docs/bugs.md, "Fixed in the port"). Each fix is
 // a switch so the original behaviour stays reproducible: all are on unless
 // the port menu's config (platform/config.h) turns one off; REUNION_ORIGINAL=1
-// turns them all off, and so do the differential tests.
+// turns them all off.
 #pragma once
 
 typedef struct Fixes {
