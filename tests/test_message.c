@@ -49,7 +49,8 @@ static bool key_pressed_snapshot(void)
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
     system_init();
     Ems_Init();

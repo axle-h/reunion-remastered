@@ -668,8 +668,10 @@ void PlanetInfo_GetBodyLocationName(PString *result, int16_t sys, int16_t planet
 // 357b:3d77
 void PlanetInfo_RandomizeProtectPage(void)
 {
+    // A word store into the longint: the high word stays.
     if (ds.Protect_Key2 == 0x1F5F)
-        *(uint16_t *)&ds.Protect_PageIndex = (uint16_t)(System_Random(20) + 1);
+        ds.Protect_PageIndex = (int32_t)(((uint32_t)ds.Protect_PageIndex & 0xFFFF0000u)
+                                         | (uint16_t)(System_Random(20) + 1));
 }
 
 // ---------------------------------------------------------------------------

@@ -7,11 +7,7 @@
 // per piece, _21 = hours left on the piece in progress (0 = none started),
 // Produced / SpaceBuilt = where it can be built, Ores[k] = ore k per piece.
 //
-// Unnamed state (DS): 79F0 selection and 79F2 top at the last redraw, 79F4
-// quantity before the last change, 79F8 selection the info was drawn for,
-// 79FA ListMode, 79FB quantity editor active, 79FC picture (1) or info (0),
-// 79FE..7A15 OreNeeded[1..6], 7A2E..7A33 flags "one more piece runs out
-// of ore k", 7A54.. six string[15] ore lines (ores 1,3,2,6,5,4).
+// State: the Shop_* fields of DS (game/dseg.h).
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"

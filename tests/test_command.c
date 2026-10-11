@@ -26,7 +26,8 @@ static bool count_retrace(void)
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     SDL_memset(vid_palette, 0, sizeof vid_palette);
     CHECK(dseg_init());
     system_init();

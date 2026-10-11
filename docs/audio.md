@@ -102,7 +102,7 @@ effect is a speed change. `ScanAdlibPorts` (OPL timer test with VGA retrace
 waits) is not ported; the OPL is "found" at 388h whenever audio works.
 
 The original allocates the tune buffer on its heap when it finds an AdLib.
-The port keeps it outside the emulated memory (`tune_buf` in
+The port keeps it outside the heap (`tune_buf` in
 `game/adlibmusic.c`; `AdlibMusic_TuneBuf` stays nil), so the heap is the
 same whatever music the game started with and the port menu can switch to
 the AdLib tunes at any time. The original's heap with an AdLib was 31,700 bytes

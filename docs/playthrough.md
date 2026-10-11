@@ -113,8 +113,7 @@ hash).
    the prefix, so it is again one script from power-on; resumes can chain.
    Replaying a prefix runs at about 200,000 retraces/s, so the whole game
    replays in seconds: no in-memory snapshots (they would also have to carry
-   the audio and AdLib player state, and the statics outside
-   the emulated memory).
+   the audio and AdLib player state, and the port's own statics).
 4. **Runner** ([tests/play/run.h](../tests/play/run.h)). A policy test is a
    list of steps; `play_main` takes a checkpoint before each step, so
    `PLAY_RESUME=step` restarts from that step of the last recording and

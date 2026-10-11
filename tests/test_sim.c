@@ -14,6 +14,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -27,7 +28,8 @@ static char read_key(void) { return '\r'; }
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
     system_init();
     Ems_Init();
@@ -404,7 +406,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("no game data, skipping\n");
         return 77;

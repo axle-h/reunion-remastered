@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 22ca:0105: screen 0x11 handler
 void ShipMove_GroupScreen(void);

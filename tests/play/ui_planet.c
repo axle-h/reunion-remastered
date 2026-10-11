@@ -4,7 +4,6 @@
 
 #include "game/dseg.h"
 #include "game/groups.h"
-#include "game/mem.h"
 #include "game/mouse.h"
 #include "play/play.h"
 #include "play/ui.h"

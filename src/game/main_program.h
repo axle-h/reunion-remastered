@@ -14,7 +14,7 @@ void Game_Main(void);
 
 // The unit initialisers that head Main (1000:01a1..0200), in the original
 // order. Units the port replaces by platform code (Crt, Gus, SoundDrv,
-// AdlibMusic) are skipped. Needs mem_init, fs_init, dseg_init, system_init.
+// AdlibMusic) are skipped. Needs fs_init, dseg_init, system_init.
 void Game_InitUnits(void);
 
 // Port addition for test fixtures (tests/play/): retraces spent in the main

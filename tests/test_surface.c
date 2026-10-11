@@ -8,7 +8,6 @@
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/fixes.h"
-#include "game/mem.h"
 #include "game/mouse.h"
 #include "game/surface.h"
 #include "game/system.h"
@@ -274,7 +273,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("no REUNION.PRG, skipping\n");
         return 77;

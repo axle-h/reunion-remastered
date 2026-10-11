@@ -7,8 +7,8 @@
 //   7686+4t  attackers' attack sum             7696+4t  defenders' attack sum
 //   76A6+4t  attackers' defence sum            76B6+4t  defenders' defence sum
 // (all are 7646 + 16*s + 4*t, which is how GrWar addresses them) and the
-// slots are two lists of up to 20 39-byte records at the far pointers DS:7646
-// (attackers) and DS:764A (defenders).
+// slots are two lists of up to 20 39-byte records, GrWarUnits_UnitLists[0]
+// (attackers, DS:7646) and [1] (defenders, DS:764A).
 #pragma once
 
 #include <stdint.h>

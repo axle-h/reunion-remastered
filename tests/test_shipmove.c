@@ -16,8 +16,9 @@ static bool ok = true;
 
 static void viewport(void)
 {
-    mem_init();
-    uint8_t *src = mem + 0x30000;
+    dseg_clear();
+    vid_clear();
+    static uint8_t src[0x10000];
     for (uint32_t i = 0; i < 0xBCC0; i++)
         src[i] = (uint8_t)(i % 251 + 1);
     ShipMove_BlitViewport(src);
@@ -130,7 +131,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping the data tests\n");
         return ok ? 77 : 1;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("no REUNION.PRG, skipping the data tests\n");
         return ok ? 77 : 1;

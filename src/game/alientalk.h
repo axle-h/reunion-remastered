@@ -2,10 +2,8 @@
 // conversation screen (22h) with its question menu, plus the scheme A
 // verifier (see protect.h).
 //
-// Conversation state (unnamed DS words): 78B4 highlighted menu line, 78B6
-// "locked" flag, 78B8 race number as string[2], 78BC menu number, 78BE
-// question line, 78C0 reply line, 78C2 answer id, 78CC / 78CE hover column
-// and row. Texts: TEXT\KERDES<race>.AT (questions) and VALASZ<race>.AT.
+// Conversation state: the AlienTalk_* fields of DS (game/dseg.h). Texts:
+// TEXT\KERDES<race>.AT (questions) and VALASZ<race>.AT.
 #pragma once
 
 #include <stdint.h>

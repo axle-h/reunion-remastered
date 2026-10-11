@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 
 // 48c7:0000 InitSystem, the part the port needs: the selector variables and
 // Test8086, and an empty heap. Needs dseg_init() first.

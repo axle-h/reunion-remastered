@@ -3,8 +3,8 @@
 // candidate's price is Staff_Price, the "scholarly level" Staff_Level; the
 // hired one's current experience lives in Game_StaffExp.
 //
-// Unnamed state (DS): 899C selected candidate (0 = none), 899E staff kind
-// 1..4, 89A0 set once the candidate's info was typed out.
+// State: Hire_Candidate (0 = none), Hire_StaffKind 1..4 and the other
+// Hire_* fields of DS (game/dseg.h).
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"

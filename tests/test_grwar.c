@@ -8,6 +8,7 @@
 #include "game/gfx.h"
 #include "game/system.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -225,7 +226,8 @@ static void pick_anim(void)
 
 int main(int argc, char *argv[])
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (argc < 2 || !fs_init(argv[1]) || !dseg_init()) {
         printf("no game data\n");
         return 77;

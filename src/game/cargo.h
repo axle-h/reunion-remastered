@@ -1,9 +1,9 @@
 // Unit Cargo (2583): cargo transfer screen between a planet's stores and the
 // selected group's ship (screen 13).
 //
-// Screen state lives in unnamed globals (see cargo.c): the list of storable
-// items (DS:7816), pointers to the planet's item counts (DS:782E), the planet
-// store table (DS:7866) and the used/total space longints (DS:786A..7874).
+// Screen state: the Cargo_* fields of DS (game/dseg.h): the storable items,
+// pointers to the planet's item counts and its store table, and the used and
+// total space.
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"

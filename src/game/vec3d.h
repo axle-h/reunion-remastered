@@ -15,7 +15,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 3e17:0000: one line per edge, from (x + 46h, y + 32h) of the projected
 // points, in the segment starting at bufSeg (stride Gfx_LineStride).

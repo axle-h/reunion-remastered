@@ -5,8 +5,8 @@
 #include <stdint.h>
 
 // 4265:000c: name is a Pascal string. Reads GRWAR\<name>.PIC into the tune
-// buffer (the port's own, not on the emulated heap) and undoes the obfuscation: reverse the bytes, add
-// 2Fh to each. Files over 31,700 bytes are ignored (the buffer keeps the old
+// buffer (the port's own, not a heap block) and undoes the obfuscation:
+// reverse the bytes, add 2Fh to each. Files over 31,700 bytes are ignored (the buffer keeps the old
 // tune). Does nothing without an AdLib.
 void AdlibMusic_LoadMusicFile(const uint8_t *name);
 // 4265:01d6: stop, load, start.

@@ -10,7 +10,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 3a1b:0000: Gfx's WaitVRetrace again.
 void GfxPath_WaitVRetrace(void);

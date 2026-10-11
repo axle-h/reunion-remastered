@@ -2,25 +2,15 @@
 // solid view (3D research screen) and the wireframe hologram, through Vec3D
 // (docs/formats/vec.md).
 //
-// Data segment state (no names in dseg.h yet; arrays indexed by object slot
-// 1..17):
-//   DS:7E48/7E4A/7E4C  angles in 1/3 degree (0..1079), DS:8578/857A/857C spin
-//   DS:7E50  object count, DS:7E52 zoom[n], DS:7E54 wireframe scale
-//   DS:7E56  projected vertices (far), DS:7E5A[0..17] normals (far; [0] holds
-//            the projected normals), DS:7E9E[slot] vertices, DS:7EE4[slot]
-//            vertex counts, DS:7F04[slot] edges, DS:7F4A[slot] edge counts,
-//            DS:7F6A[slot] faces, DS:7FB0[slot] face counts
-//   DS:8584  far pointer to the 320-wide off-screen buffer, allocated by the
-//            caller: AF00h bytes for the solid view (Shop::ShopScreen; its
-//            114x115 window is at offset 0CCCh), 8980h for the wireframe
-//            (ShowHologram)
-//   DS:85EE  projected centroids, DS:8652[1..17] draw order
-//   DS:8996  model, DS:8998 slot being drawn, DS:899A vertex scale
+// State: the VecLoad_* and Vec3D_* fields of DS (game/dseg.h), arrays
+// indexed by object slot 1..17. VecLoad_Buffer, the 320-wide off-screen
+// buffer, is allocated by the caller as a whole segment: AF00h bytes in the
+// original for the solid view (Shop::ShopScreen; its 114x115 window is at
+// offset 0CCCh), 8980h for the wireframe (ShowHologram).
 #pragma once
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 3d38:0000 (near): projects object slot's vertices (zoom) and normals (40h)
 // and draws its faces into the buffer.

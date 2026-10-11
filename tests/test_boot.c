@@ -10,7 +10,6 @@
 #include "game/ems.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
-#include "game/mem.h"
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
@@ -46,7 +45,8 @@ static int run(const char *script)
     autopilot_set_script(script);
     halt_code = -2;
     if (setjmp(out) == 0) {
-        mem_init();
+        dseg_clear();
+        vid_clear();
         if (!dseg_init())
             return -3;
         system_init();

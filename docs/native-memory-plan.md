@@ -1,10 +1,52 @@
 # Plan: native C memory (retire the DOS address space)
 
-Status: in progress (Stages 0-2 done; Stages 3-4 done except heap blocks and procedure pointers). Decided by Alex, 2026-10-11. This is the
+Status: **done** (2026-10-11). Decided by Alex, 2026-10-11. This is the
 refactor PLAN.md Phase 4 always intended ("Start faithful, clean up
 afterwards ... refactor into idiomatic C once a subsystem matches"). Every
 unit is ported and the whole game plays through (`test_play_game`), so the
 faithful memory model has done its job.
+
+## Result
+
+`mem[]`, `FarPtr`, `far_ptr`/`far_host`, `ds_at`, `ghidra_host`, the Borland
+heap and the EMM are gone (docs/port.md, "Memory"). `ds` is a C global with
+every global the code uses named (734 fields) and typed host pointers;
+procedure variables are C function pointers; heap blocks are C
+allocations; video memory is the video layer's own 64 KB. Saves are
+written field by field and stay byte-identical. The proof still wins and
+`test_play_game` records it byte for byte.
+
+Where the work differed from the plan below:
+
+- **Order.** A typed pointer needs 8 bytes and the packed mirror had 4, so
+  interfaces and the screen came first, then naming (4.1), saves (4.2), DS
+  out of `mem[]` and typed pointer fields, then the heap and procedures
+  (Stage 3 "Order as done").
+- **DS keeps the original's order with no padding** (Stage 4.3 "As done"):
+  the original reads and writes past arrays into the next globals.
+- **The proof was re-recorded first:** the committed one no longer replayed
+  at the start (later game-logic fixes had changed the run).
+- **Goldens re-baselined twice, from the previous commit's code:** the
+  message log's unused bytes (stale heap contents) left the state stream
+  (Stage 2), and four constant bytes that turned out to be data, not a
+  pointer, joined it (Alien::MenuData, Stage 4). Both changed only what is
+  hashed; the code of the day matched the new goldens.
+- **Two original behaviours found and kept on purpose:** race 10's last
+  alien-talk menu is the 4 bytes after the menu table (where the pointer
+  table's unused race-1 entry was), and stars of the flight view drawn past
+  the backdrop land in the star table that follows it on the heap, which
+  changes the game's random numbers (`src/game/shipmove.c`).
+- **One accepted difference, on screen only:** where the original shows
+  heap memory the game never wrote (the flight view's bottom rows on its
+  first frames, the bottom rows of shop pictures shorter than their
+  window), the port shows colour 0. Reproducing the original's leftovers
+  would need the Borland heap back. One proof golden sample was updated
+  for it.
+- **Kept:** loading the initial data from the player's `REUNION.PRG` (the
+  open question below stays open), and the original's DS offsets in
+  comments and the field table, as the link to the disassembly.
+
+The rest of this file is the plan as written.
 
 ## Goal
 

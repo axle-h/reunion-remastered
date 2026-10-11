@@ -10,7 +10,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // One ship of a fleet list (12-byte records, lists are 1-based, max 500).
 typedef struct [[gnu::packed]] SpShip {

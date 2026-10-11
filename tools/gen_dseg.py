@@ -360,8 +360,7 @@ def generate(types, kept, dropped):
         "#include <stddef.h>",
         "#include <stdint.h>",
         "",
-        "#include \"game/mem.h\"",
-        "",
+
         "#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__",
         "#error \"the DS mirror assumes a little-endian host\"",
         "#endif",
@@ -428,13 +427,14 @@ def generate(types, kept, dropped):
     out.append("")
     out += [
         "",
-        "// The data segment (game/dseg.c). Far pointers into it (segment",
-        "// MEM_DS_SEG) are offsets in it (game/mem.h).",
+        "// The data segment (game/dseg.c).",
         "extern DSeg ds;",
         "",
         "// Fills DS 0000..DSEG_INIT_SIZE-1 from GRWAR\\REUNION.PRG and zeroes the",
         "// rest, like the original at startup. Needs fs_init().",
         "bool dseg_init(void);",
+        "// Zeroes DS (dseg_init does so first).",
+        "void dseg_clear(void);",
         "// The byte at offset orig of the original's DS, where the port keeps it",
         "// (for the far pointers DS held, and code that reads past an array as",
         "// the original does). nullptr past the end.",

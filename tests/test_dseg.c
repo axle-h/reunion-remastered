@@ -4,6 +4,7 @@
 
 #include "game/dseg.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 
@@ -27,7 +28,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     check(dseg_init(), "dseg_init");
 
     check(pstr_is(&ds.Galaxy_SunNames[0].Name, "Mercury"), "SunNames[1]");

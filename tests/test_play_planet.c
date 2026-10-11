@@ -6,7 +6,6 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 #include "platform/fs.h"
 #include "play/play.h"
 #include "play/ui.h"

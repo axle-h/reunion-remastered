@@ -1,12 +1,12 @@
 // shipinfo: hotspot layout of the icon grid, selection markers and icon
-// placement drawn into the emulated video memory.
+// placement drawn into video memory.
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/groups.h"
-#include "game/mem.h"
 #include "game/mouse.h"
 #include "game/shipinfo.h"
 #include "game/system.h"
@@ -17,13 +17,19 @@ static bool ok = true;
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     ds.Mouse_CursorState = 1;  // hidden: Hide/ShowCursor leave the screen alone
-    // Blocks at segment starts in the address space (the buffer is addressed from its segment).
-    ds.Game_Groups = (TGroup (*)[32])(mem + 0x30000);
-    ds.ShipInfo_Sprites = mem + 0x40000;
-    ds.ShipInfo_Backdrop = mem + 0x50000;
-    ds.ShipInfo_Buffer = mem + 0x60000;
+    // A segment each (the buffer is addressed from its segment).
+    static uint8_t groups[0x10000], sprites[0x10000], backdrop[0x10000], buffer[0x10000];
+    SDL_memset(groups, 0, sizeof groups);
+    SDL_memset(sprites, 0, sizeof sprites);
+    SDL_memset(backdrop, 0, sizeof backdrop);
+    SDL_memset(buffer, 0, sizeof buffer);
+    ds.Game_Groups = (TGroup (*)[32])groups;
+    ds.ShipInfo_Sprites = sprites;
+    ds.ShipInfo_Backdrop = backdrop;
+    ds.ShipInfo_Buffer = buffer;
 }
 
 static void hotspots(void)

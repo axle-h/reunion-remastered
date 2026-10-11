@@ -9,6 +9,7 @@
 #include "game/spwar.h"
 #include "game/system.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -17,7 +18,8 @@ static bool wait_retrace(void) { return true; }
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
     system_init();
     ds.Gfx_LineStride = 320;
@@ -160,7 +162,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("no game data, skipping\n");
         return 77;

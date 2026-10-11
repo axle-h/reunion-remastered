@@ -26,7 +26,6 @@
 #include <stdint.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 
 // One slot of a unit list (39 bytes, 1-based in lists of 21).
 typedef struct [[gnu::packed]] GrBattleUnit {

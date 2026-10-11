@@ -10,6 +10,7 @@
 #include "game/vec3d.h"
 #include "game/vecload.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -24,15 +25,25 @@ static int16_t *words(uint8_t *p)
     return (int16_t *)p;
 }
 
-// The start of segment seg of mem[], as scratch memory.
+// Scratch memory, addressed by the segment numbers the tests were written
+// with, 5000h..6FFFh (cleared by reset()).
+static uint8_t scratch[0x20000];
+
 static uint8_t *seg_host(uint16_t seg)
 {
-    return mem + seg * 16;
+    return scratch + (seg - 0x5000) * 16;
+}
+
+static void reset(void)
+{
+    dseg_clear();
+    vid_clear();
+    SDL_memset(scratch, 0, sizeof scratch);
 }
 
 static void cos_table(void)
 {
-    mem_init();
+    reset();
     Vec3D_InitCosTable();
     CHECK(cos500(0) == 500);
     CHECK(cos500(30) == 433);   // 433.01
@@ -60,7 +71,7 @@ static void cos_table(void)
 
 static void project(void)
 {
-    mem_init();
+    reset();
     Vec3D_InitCosTable();
     uint8_t *src = seg_host(0x5000), *dst = seg_host(0x5100);
     int16_t *s = words(src), *d = words(dst);
@@ -93,7 +104,7 @@ static void project(void)
 
 static void trace_edge(void)
 {
-    mem_init();
+    reset();
     uint8_t *t = (uint8_t *)&ds.Vec3D_EdgesA;
     int16_t *tab = words(t);
     // Vertical: the whole y range, whatever the direction.
@@ -121,7 +132,7 @@ static void trace_edge(void)
 
 static void fill_poly(void)
 {
-    mem_init();
+    reset();
     uint8_t *buf = seg_host(0x6000);
     uint8_t *pts = seg_host(0x5000);
     int16_t *p = words(pts);
@@ -157,7 +168,7 @@ static void fill_poly(void)
 
 static void prepare(void)
 {
-    mem_init();
+    reset();
     system_init();
     uint8_t *verts = seg_host(0x5000), *faces = seg_host(0x5100), *normals = seg_host(0x5200);
     int16_t *v = words(verts);
@@ -183,7 +194,7 @@ static void prepare(void)
 // V3.VEC loaded and drawn like the 3D research screen.
 static void model(void)
 {
-    mem_init();
+    reset();
     CHECK(dseg_init());
     system_init();
     VecLoad_Init();

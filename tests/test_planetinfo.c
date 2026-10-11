@@ -8,6 +8,7 @@
 #include "game/baseeff.h"
 #include "game/colonize.h"
 #include "game/droids.h"
+#include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/mouse.h"
@@ -39,7 +40,8 @@ static TBody *body(int sys, int idx)
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("dseg_init failed\n");
         exit(77);

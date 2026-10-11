@@ -10,6 +10,11 @@ enum : uint32_t { DS_FILE_SEG = 0x3A81 };
 
 DSeg ds;
 
+void dseg_clear(void)
+{
+    SDL_memset(&ds, 0, sizeof ds);
+}
+
 // The field (or, for an element of a record holding pointers, the record
 // field) that holds the original's byte orig, where its element starts in
 // the port's DS, and the byte's offset in the original's element.
@@ -77,9 +82,10 @@ static void copy_field(const DsField *f, uint8_t *dst, const uint8_t *src)
 }
 
 // DOS adds the load segment to every word listed in the MZ relocation table.
-// In DS those are the segments of far pointers (the galaxy and menu tables
-// into DS, Scale's row procedures into code); a pointer into DS also gets
-// its offset moved to where the port keeps that byte.
+// In DS those are the segments of far pointers: the galaxy and menu tables
+// into DS, which become host pointers, and Scale's row procedures into
+// code, which nothing in the port calls (kept as far values in Ghidra's
+// numbering, segment + 1000h).
 static bool apply_relocations(const uint8_t *exe, size_t size, const uint8_t *image)
 {
     size_t count = exe[6] | exe[7] << 8;
@@ -94,19 +100,16 @@ static bool apply_relocations(const uint8_t *exe, size_t size, const uint8_t *im
             continue;
         uint16_t at = (uint16_t)(linear - base - 2);  // the far pointer's offset word
         uint16_t off = (uint16_t)(image[at] | image[at + 1] << 8);
-        uint16_t seg = (uint16_t)((image[at + 2] | image[at + 3] << 8) + MEM_LOAD_SEG);
+        uint16_t seg = (uint16_t)(image[at + 2] | image[at + 3] << 8);
         DsByte where;
         if (!locate(at, &where))
             continue;
-        uint8_t *target = seg == MEM_DS_SEG ? dseg_orig(off) : nullptr;
         if (where.field->flags & DSF_HOST) {
-            // A host pointer (into DS; nothing else is relocated there).
+            uint8_t *target = seg == DS_FILE_SEG ? dseg_orig(off) : nullptr;
             SDL_memcpy(where.at + where.rest / 4 * sizeof(void *), &target, sizeof(void *));
         } else {
-            if (target)
-                off = (uint16_t)(target - (uint8_t *)&ds);
-            FarPtr p = far_ptr(seg, off);
-            SDL_memcpy(where.at + where.rest, &p, 4);
+            uint32_t far = (uint32_t)(seg + 0x1000) << 16 | off;
+            SDL_memcpy(where.at + where.rest, &far, 4);
         }
     }
     return true;
@@ -115,7 +118,7 @@ static bool apply_relocations(const uint8_t *exe, size_t size, const uint8_t *im
 bool dseg_init(void)
 {
     // The rest of the segment is zero, as after System's ClearBss.
-    SDL_memset(&ds, 0, sizeof ds);
+    dseg_clear();
     size_t size;
     uint8_t *exe = fs_load("GRWAR\\REUNION.PRG", &size);
     if (!exe)

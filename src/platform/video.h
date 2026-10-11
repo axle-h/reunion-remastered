@@ -15,6 +15,9 @@ enum : int {
 // memory (segment A000h) it points to.
 extern uint8_t (*vid_screen)[VID_WIDTH];
 
+// Zeroes video memory (all 64 KB).
+void vid_clear(void);
+
 // VGA DAC palette, 6 bits per component (0..63), as written to port 3C9h.
 extern uint8_t vid_palette[256][3];
 

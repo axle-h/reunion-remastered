@@ -4,7 +4,6 @@
 
 #include "game/dseg.h"
 #include "game/main_program.h"
-#include "game/mem.h"
 #include "game/mouse.h"
 #include "platform/video.h"
 #include "play/play.h"

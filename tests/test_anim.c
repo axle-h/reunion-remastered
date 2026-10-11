@@ -22,7 +22,8 @@ static uint8_t *scr(void)
 
 static void decoder(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     // 9-byte magic, width 4, height 2, then: literal 5, skip 2, run 2 x 7,
     // skip (word) 1, run (word) 2 x 9.
     static const uint8_t block[] = {'S', 'p', 'i', 'd', 'y', 'A', 'n', 'i', 'm', 4, 0, 2, 0,
@@ -38,7 +39,8 @@ static void decoder(void)
 
 static void wedge(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     static uint8_t s[0x8000];
     for (int i = 0; i < 0x8000; i++)
         s[i] = (uint8_t)(i % 251 + 1);
@@ -59,7 +61,8 @@ static void wedge(void)
 
 static void setup(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
     system_init();
     // The record Anim::Record points to (InitRoomAnim allocates it).

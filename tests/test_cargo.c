@@ -5,6 +5,7 @@
 #include "game/cargo.h"
 #include "game/dseg.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -15,7 +16,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
 
     // Storage units per ship type, from the typed constants.

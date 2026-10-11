@@ -1,5 +1,5 @@
 // blit: the Blit unit's copies, transparent/flipped blits, fills and cursor
-// save/restore on small buffers in the emulated address space.
+// save/restore on small buffers.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -11,9 +11,10 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-// Two off-screen 320-wide buffers.
-#define SRC ((uint8_t *)far_host(far_ptr(0x5000, 0)))
-#define DST ((uint8_t *)far_host(far_ptr(0x6000, 0)))
+// Two off-screen 320-wide buffers, a segment each.
+static uint8_t src_seg[0x10000], dst_seg[0x10000];
+#define SRC src_seg
+#define DST dst_seg
 
 static uint8_t *px(uint8_t *p, int x, int y)
 {
@@ -29,7 +30,10 @@ static bool count_retrace(void)
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
+    SDL_memset(src_seg, 0, sizeof src_seg);
+    SDL_memset(dst_seg, 0, sizeof dst_seg);
     gfx_wait_retrace = count_retrace;
     retraces = 0;
 }

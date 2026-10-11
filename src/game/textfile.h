@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // Keyboard access of the editor (Crt.KeyPressed / Crt.ReadKey); tests
 // replace them to queue keys.

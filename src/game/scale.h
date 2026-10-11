@@ -4,7 +4,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 3955:0000 .. 02f4: ScaleRowN copies the 32-pixel row at src into N pixels
 // at dst, dropping 32 - N fixed columns (one unrolled movs sequence each).

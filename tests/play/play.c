@@ -10,7 +10,6 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
-#include "game/mem.h"
 #include "game/options.h"
 #include "game/state.h"
 #include "platform/config.h"
@@ -215,7 +214,7 @@ static PlayResult boot_and_run(const char *script)
         trace = fopen(path, "w");
     }
     if (setjmp(game_out) == 0) {
-        mem_init();
+        vid_clear();
         if (dseg_init()) {
             system_init();
             Game_InitUnits();

@@ -1,31 +1,43 @@
 # Porting notes
 
-## The data segment mirror (`src/game/dseg.h`)
+## The data segment (`src/game/dseg.h`)
 
-The first pass of the port keeps the original's global data exactly where the
-DOS program had it, so the port's state can be compared byte for byte with
-DS dumps from DOSBox-X. All globals live in one struct, `DSeg ds`, that covers
-DS `0000–a543` (Ghidra segment `4a81`):
+The original's globals are one C global, `DSeg ds`, generated from the
+symbols: DS `0000–a543` of `REUNION.PRG` (Ghidra segment `4a81`), field by
+field in the original's order.
 
-- Every variable named in `ghidra/symbols.txt` is a field at its original
-  offset, called `Unit_Name` (`Game::Credits` → `ds.Game_Credits`). Names
-  without a unit are Borland's own and get `System_`.
+- Every variable named in `ghidra/symbols.txt` is a field, called
+  `Unit_Name` (`Game::Credits` → `ds.Game_Credits`). Names without a unit
+  are Borland's own and get `System_`. The game code reaches every global
+  by name; the original's DS offsets are only in the comments and the field
+  table.
 - Records come from `ghidra/types.pas` with the Pascal layout (packed, no
-  alignment). Pascal arrays become 0-based C arrays: the comment gives the
-  Pascal bounds, and the C index is the Pascal index minus the lower bound
-  (`Galaxy::SunNames[3]` → `ds.Galaxy_SunNames[2]`).
+  alignment): they are the game's data formats, loaded from the executable,
+  saved and kept in heap blocks. Pascal arrays become 0-based C arrays: the
+  comment gives the Pascal bounds, and the C index is the Pascal index minus
+  the lower bound (`Galaxy::SunNames[3]` → `ds.Galaxy_SunNames[2]`).
 - `boolean` is `uint8_t`, since the original may store any byte value.
-  Strings are `PStrN` / `PString` (length byte + chars). Pointers are
-  `uint32_t` far pointer *values* (segment:offset), not C pointers. `real` is
-  the 6-byte `Real48`.
-- Bytes nobody has named yet are `_pad_XXXX` arrays; untyped labels are a
-  single `uint8_t`. Every record field and every DS field has a
-  `static_assert` on its offset, so a layout mistake fails the build.
+  Strings are `PStrN` / `PString` (length byte + chars). `real` is the
+  6-byte `Real48`. `pointer` and `^T` are host pointers (`uint8_t *`, `T *`);
+  procedural types (`TProc = procedure;` in `types.pas`) are C function
+  pointers. `farptr` marks the few real-mode far pointer values nothing uses
+  any more (the Borland heap's variables, interrupt vectors).
+- `DSeg` keeps the original's globals in order with no padding: in a dozen
+  places the original reads or writes past an array into the next globals
+  (alien-talk lines into `Surface::Mode`, race 0/1 records before
+  `Races::Races`, index 0 of 1-based tables), and those stay the same
+  bytes. Only pointer fields differ in size from the original. Bytes nobody
+  named are `_pad_XXXX` arrays.
 
-`dseg_init()` (in `src/game/dseg.c`) does what the original's startup does:
-it copies the typed constants, DS `0000–759d`, from the load image of the
+`dseg_init()` (`src/game/dseg.c`) does what the original's startup does: it
+copies the typed constants, DS `0000–759d`, from the load image of the
 player's `GRWAR\REUNION.PRG` and leaves the rest zeroed. The data segment
-starts at file offset `header paragraphs * 16 + 3A81h * 16`.
+starts at file offset `header paragraphs * 16 + 3A81h * 16`. The copy goes
+field by field through the field table (`src/game/dsfields.c`, generated
+too: every field's original offset, its offset in `DSeg`, its size and
+whether it holds pointers), and the far pointers into DS that DOS
+relocated (the galaxy and menu tables) become host pointers.
+`dseg_orig(offset)` gives the port's byte for an original DS offset.
 
 ### Regenerating
 
@@ -47,40 +59,37 @@ The generator never stops on bad entries. It prints a warning and:
 Renaming a symbol renames its field, so code using the old name stops
 compiling; that's intended.
 
-## Memory model
+## Memory
 
-The game keeps DOS far pointers (`segment:offset`) in its data: to globals,
-to video memory, to heap blocks and to procedures. So that ported code can
-use them unchanged, `src/game/mem.h` emulates the real-mode address space as
-one 1 MB (+64 KB) array, `mem[]`, with everything at its original address:
+The port has no emulated address space; the game's state is ordinary C:
 
 | What | Where |
 |---|---|
-| Data segment | `MEM_DS_SEG` = load segment + 3A81h; `ds` is a `DSeg` view of it |
-| Video memory | `A000:0000`; `vid_screen` points there after `mem_init()` |
-| Heap | from `MEM_HEAP_SEG` (after the stack) to `A000:0000`, managed by `System_GetMem`/`System_FreeMem` (`src/game/system.c`) exactly as Borland's System unit does; if it reaches video memory it goes on above it to `F000:0000`. `System_MemAvail`/`MaxAvail` always report 640 KB, so the game's memory checks pass |
+| Data segment | `ds`, a C global (above) |
+| Video memory | `vid_screen` (`src/platform/video.c`): the VGA's 64 KB at A000h, of which rows 0..199 are shown; `gfx_screen()` is the drawing target |
+| Heap | `System_GetMem`/`System_FreeMem` (`src/game/system.c`): zeroed C blocks, freed by the next `system_init`. `System_MemAvail`/`MaxAvail` always report 640 KB, so the game's memory checks pass |
+
+Buffers the original addresses through their 64 KB segment, with 16-bit
+offsets that can wrap past the block (drawing buffers, map layers), are
+whole segments (`System_GetSegment`); code that relies on the wrap keeps a
+`(uint16_t)` offset from the segment's start and says so. One pair keeps the
+original's heap layout on purpose: the flight view's backdrop and star
+table (`src/game/shipmove.c`), because stars drawn past the backdrop land in
+the star table and change the game's random numbers.
 
 There is no EMS: unit Ems (`src/game/ems.c`) keeps the game data and toolbar
-blocks on the heap, as on a DOS machine without an EMM.
+blocks on the heap, as on a DOS machine without an EMM. The AdLib tune
+buffer, which only the port's own player reads, is a C array (docs/audio.md).
 
-One exception: the AdLib tune buffer, which only the port's own player
-reads, is a C array rather than a heap block (docs/audio.md), so the heap
-doesn't depend on the music chosen at start-up.
-
-`far_host(p)` turns a stored far pointer into a host pointer, and
-`ghidra_host(seg, off)` does the same for Ghidra's segment numbering.
-Far *code* pointers (procedure variables such as `Game::GrWarProc`) will need
-a table mapping original entry points to C functions.
-
-`MEM_PSP_SEG` is provisional. To diff memory against the original in
-DOSBox-X, set it to the PSP segment the original gets there.
-
-Start-up order: `mem_init()`, then `fs_init()`, then `dseg_init()`, then
-`system_init()` (heap variables).
+The game's state can be serialised in a form that doesn't depend on any of
+this (`src/game/state.h`: DS field by field without pointers, the blocks
+behind them, the screen and the palette); golden hashes of it
+(`tests/test_golden.c`, `tests/golden/`) and the playthrough's hashes
+check that changes keep the behaviour.
 
 ## Start-up and leaving the game
 
-`src/main.c` runs `mem_init`, `fs_init`, `dseg_init`, `system_init`, the unit
+`src/main.c` runs `fs_init`, `vid_clear`, `dseg_init`, `system_init`, the unit
 initialisers in Main's order (`Game_InitUnits`) and then `Game_Main`, the main
 program body (`src/game/main_program.c`). The original never returns from
 Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
@@ -88,7 +97,7 @@ Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
 
 - `System_Halt` / `RunError` run the ExitProc chain, then call
   `system_exit_handler` with the exit code. Code 15 (start.exe: restart)
-  boots again from `mem_init`; code 10 (start.exe: VICTORY) will play the
+  boots again; code 10 (start.exe: VICTORY) will play the
   victory cut-scene.
 - Closing the window sets a quit request that `timing_wait_retrace()` turns
   into a call of the quit handler at the next retrace. Every waiting loop of
@@ -96,8 +105,8 @@ Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
   Loops that only poll the mouse get a retrace every few `Mouse_Update`
   calls (`timing_idle_poll`).
 
-All game state is in the emulated memory, which the next boot rebuilds, so
-nothing left on the abandoned C stack matters.
+All game state is in DS, heap blocks and video memory, which the next boot
+rebuilds, so nothing left on the abandoned C stack matters.
 
 ## Port menu (port addition)
 
@@ -139,7 +148,7 @@ next frame, since the menu may have been opened in the middle of anything:
   again on the new hardware (`Music_SwitchDevice`); the start menu keeps
   CHOISE.SPD's hero voice held back on any hardware (`Music_HoldHeroVoice`,
   [port-bugs.md](port-bugs.md) #1). The AdLib tune buffer is not on the
-  emulated heap (see Memory model), so any switch works the same whatever
+  heap (see Memory), so any switch works the same whatever
   the game started with. The cut-scenes only have modules, which the
   original played on both cards (on a Sound Blaster through its own software
   mixer): None silences them (`cutscene_music_changed`), the other two sound

@@ -2,11 +2,8 @@
 // picks a question from a menu (rkerdes1.sp); the answer line comes from
 // valasz1.sp, its first two characters naming the next menu.
 //
-// Unnamed state (DS): 771C menu number (0 = leave), 771E question id, 7720
-// answer id, 7722 far ^array[1..5] of string[60] (the menu lines), 7E3C
-// advisor kind 1..4 (set where the screen is opened), 7E3E highlighted menu
-// line; 5D9C/5D9E/5DA0/5DA2 story state set by the answers (5D9E = kind that
-// is on strike).
+// State: the Advisor_* fields of DS (game/dseg.h); Advisor_Training* is
+// story state set by the answers.
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"

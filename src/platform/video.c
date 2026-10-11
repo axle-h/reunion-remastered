@@ -13,6 +13,11 @@ static uint8_t video_memory[0x10000];
 uint8_t (*vid_screen)[VID_WIDTH] = (uint8_t (*)[VID_WIDTH])video_memory;
 uint8_t vid_palette[256][3];
 
+void vid_clear(void)
+{
+    SDL_memset(video_memory, 0, sizeof video_memory);
+}
+
 uint8_t vid12_screen[VID12_HEIGHT][VID12_WIDTH];
 uint8_t vid_attr[16] = { 0, 1, 2, 3, 4, 5, 0x14, 7, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f };
 static VidMode mode = VID_MODE_13H;

@@ -4,15 +4,27 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
-#include "game/mem.h"
+#include "game/dseg.h"
 #include "game/scale.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-#define SRC ((uint8_t *)far_host(far_ptr(0x5000, 0)))  // 320 wide
-#define DST ((uint8_t *)far_host(far_ptr(0x6000, 0)))
+// Scratch buffers, 320 wide, cleared by reset().
+static uint8_t src_seg[0x10000], dst_seg[0x10000], tmp_seg[0x10000];
+#define SRC src_seg
+#define DST dst_seg
+
+static void reset(void)
+{
+    dseg_clear();
+    vid_clear();
+    SDL_memset(src_seg, 0, sizeof src_seg);
+    SDL_memset(dst_seg, 0, sizeof dst_seg);
+    SDL_memset(tmp_seg, 0, sizeof tmp_seg);
+}
 
 static const uint16_t entry[17] = {0x0000, 0x0034, 0x0068, 0x009a, 0x00ca, 0x00f8,
                                    0x0124, 0x0150, 0x017d, 0x01aa, 0x01dd, 0x0215,
@@ -70,7 +82,7 @@ static void rows(const uint8_t *code)
         CHECK(n == w);
         if (n != w)
             continue;
-        mem_init();
+        reset();
         fill_source();
         SDL_memset(DST, 0xEE, 64);
         Scale_RowProcTable[w - 16](SRC, DST);
@@ -89,7 +101,7 @@ static void sprite(void)
 {
     for (int size = 14; size <= 34; size++) {
         int clamped = size < 16 ? 16 : size > 32 ? 32 : size;
-        mem_init();
+        reset();
         fill_source();
         Scale_ScaleSprite(SRC, DST, (int16_t)size);
         const uint8_t *d = DST;
@@ -100,7 +112,7 @@ static void sprite(void)
         bool same = true;
         for (int r = 0; r < 32; r++) {
             if (err >= 0) {
-                uint8_t *tmp = far_host(far_ptr(0x7000, 0));
+                uint8_t *tmp = tmp_seg;
                 Scale_RowProcTable[clamped - 16](SRC + r * 320, tmp);
                 SDL_memcpy(ref, tmp, (size_t)clamped);
                 same = same && SDL_memcmp(ref, d + kept * 320, (size_t)clamped) == 0;
@@ -115,7 +127,7 @@ static void sprite(void)
         CHECK(d[kept * 320] == 0);  // nothing below the last row
     }
     // Full size is a plain copy.
-    mem_init();
+    reset();
     fill_source();
     Scale_ScaleSprite(SRC, DST, 32);
     bool same = true;

@@ -3,7 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 #include "game/mouse.h"
 #include "platform/video.h"
 #include "play/play.h"

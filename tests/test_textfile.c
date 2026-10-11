@@ -10,6 +10,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
@@ -44,7 +45,8 @@ static char read_key(void)
 
 static void reset(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     CHECK(dseg_init());
     system_init();
     Ems_Init();

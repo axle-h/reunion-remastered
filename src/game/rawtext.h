@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 
-#include "game/mem.h"
 
 // 4049:0011 / 0083 / 00f3: GetMem + read the whole file into
 // ds.RawText_SzFace (7B0h bytes) / SzTalal (1DABh) / SzFaj (1440h).

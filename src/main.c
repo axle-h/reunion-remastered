@@ -1,13 +1,13 @@
-// Boots the port: SDL, the platform layer and the game's emulated DOS memory,
-// then runs the original start-up (unit initialisers, Main) until it halts.
+// Boots the port: SDL, the platform layer and the game's state, then runs the
+// original start-up (unit initialisers, Main) until it halts.
 //
 // Leaving the game: the original ends with Halt, deep inside screen code, and
 // many waiting loops never return. The port unwinds instead of returning:
 // System_Halt (after the ExitProc chain) and a window-close request (seen by
 // timing_wait_retrace at the next retrace, i.e. inside every waiting loop)
 // both longjmp back to main(), and so does the port menu's Restart. Game state
-// lives in the emulated memory, which boot() rebuilds from scratch, so
-// nothing on the abandoned C stack matters.
+// lives in DS (game/dseg.h), heap blocks and video memory, which boot()
+// rebuilds from scratch, so nothing on the abandoned C stack matters.
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <setjmp.h>
@@ -18,7 +18,6 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
-#include "game/mem.h"
 #include "game/music.h"
 #include "game/options.h"
 #include "game/state.h"
@@ -101,11 +100,11 @@ static const char *find_data_dir(int argc, char *argv[])
     return REUNION_DEFAULT_DATA_DIR;
 }
 
-// 1000:01a1 up to Main's body: the emulated machine and the unit
+// 1000:01a1 up to Main's body: video memory, DS, the heap and the unit
 // initialisers, in the original order.
 static bool boot(void)
 {
-    mem_init();
+    vid_clear();
     if (!dseg_init())
         return false;
     system_init();

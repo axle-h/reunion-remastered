@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
-#include "game/mem.h"
 #include "game/system.h"
+#include "platform/video.h"
 
 static bool ok = true;
 
@@ -334,7 +334,8 @@ static void test_heap(void)
 
 int main(void)
 {
-    mem_init();
+    dseg_clear();
+    vid_clear();
     system_runerror_handler = catch_error;
     test_strings();
     test_str_val();

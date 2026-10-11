@@ -3,14 +3,7 @@
 // animations. The screen handlers themselves are in Main (1000:1271); Sim
 // (1b8a:006e) uses the deal windows.
 //
-// Unnamed state (DS): 773A pirates sheet (far), 7738 person talked to, 774A..
-// 7754 topic availability flags, 7758 selected question item, 775A hover
-// frozen, 775C/775E hover column/row, 7760 string[2] person number, 7764 menu
-// index of the person (MenuLists[person][idx]) / reply code, 7766 question
-// line, 7768 reply line, 776A code read by ReadQuestionCode / DrawReply, 776C
-// far ^array[1..5] of string[255] (question lines), 7770 long item index of an
-// offer, 7774 long price, 7778 number of text lines + 7779.. map line ->
-// menu item, 7782 last sound, 7784 kocsmaan sheet (far).
+// State: the Pub_* fields of DS (game/dseg.h).
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"

@@ -6,13 +6,13 @@
 #include "game/adlib.h"
 #include "game/adlibmusic.h"
 #include "game/dseg.h"
-#include "game/mem.h"
 #include "game/music.h"
 #include "game/sound.h"
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/config.h"
 #include "platform/fs.h"
+#include "platform/video.h"
 
 static int16_t buf[AUDIO_RATE * 2];
 
@@ -47,7 +47,8 @@ int main(int argc, char *argv[])
         printf("no game data, skipping\n");
         return 77;
     }
-    mem_init();
+    dseg_clear();
+    vid_clear();
     if (!dseg_init()) {
         printf("no REUNION.PRG, skipping\n");
         return 77;
@@ -70,7 +71,7 @@ int main(int argc, char *argv[])
     AdlibMusic_Init();
     Music_InitMusicDevices();
     CHECK(ds.AdlibMusic_Present && ds.AdlibMusic_Inited);
-    // The tune buffer is not on the emulated heap.
+    // The tune buffer is not a heap block.
     CHECK(ds.AdlibMusic_TuneBuf == 0 && system_heap_used() == heap_start);
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
     CHECK(!Adlib_Playing());

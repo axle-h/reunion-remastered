@@ -16,7 +16,6 @@
 #include "game/gfxpath.h"
 #include "game/groups.h"
 #include "game/intel.h"
-#include "game/mem.h"
 #include "game/message.h"
 #include "game/minmax.h"
 #include "game/planetinfo.h"
