@@ -10,7 +10,9 @@ The game data isn't part of this repository; put your own copy in `vendor/`.
 
 Needs a C23 compiler (GCC 14+ or Clang 18+), CMake 3.25+ and Ninja. SDL3 is
 used from the system when installed (`dnf install SDL3-devel`), otherwise it
-is downloaded and built automatically.
+is downloaded and built automatically. On Linux, building SDL needs
+`libdecor-devel` for the window's title bar under GNOME on Wayland; without it
+the window has none and can't be moved.
 
 ```sh
 cmake --preset debug          # or: release, asan, trap
