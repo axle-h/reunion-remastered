@@ -17,7 +17,8 @@
 
 #include "game/dseg.h"
 
-// 357b:0031: 3 hotspots, or 1 when ds.PlanetInfo_AlienMode is set.
+// 357b:0031: 3 hotspots (4 with the colony stats), or 1 when
+// ds.PlanetInfo_AlienMode is set.
 void PlanetInfo_SetupPlanetInfoHotspots(void);
 // 357b:0359
 void PlanetInfo_DrawPlanetInfoText(void);

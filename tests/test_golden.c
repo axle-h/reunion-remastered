@@ -23,6 +23,7 @@
 #include "game/saveload.h"
 #include "game/state.h"
 #include "platform/autopilot.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 #include "platform/input.h"
 #include "platform/timing.h"
@@ -183,6 +184,9 @@ static void run_case(const GoldenCase *c)
 {
     cur = c;
     SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "REUNION_ORIGINAL", c->original ? "1" : "0", true);
+    // The golden files describe the game without the colony stats, which
+    // add a hotspot to the planet info screen.
+    config.colony_stats = false;
     char script[1100];
     if (c->script[0] == '@')
         SDL_snprintf(script, sizeof script, "@%s/%s", REUNION_SOURCE_DIR, c->script + 1);

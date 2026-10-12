@@ -118,10 +118,16 @@ int main(void)
     press(SDLK_RIGHT);
     CHECK(config.display == CONFIG_WINDOWED);
 
-    // Game.
+    // Game: the colony stats are on by default.
     go_to(SEC_GAME);
     press(SDLK_RETURN);
     CHECK(config.skip_intro);
+    CHECK(menu_row_count() == 2 && row_is(1, "[x] Colony stats"));
+    press(SDLK_DOWN);
+    press(SDLK_RETURN);
+    CHECK(!config.colony_stats && row_is(1, "[ ] Colony stats"));
+    press(SDLK_RETURN);
+    CHECK(config.colony_stats);
 
     // Fixes: a row per fix, all on; one off, then all on again.
     go_to(SEC_FIXES);

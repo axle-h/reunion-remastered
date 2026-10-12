@@ -59,6 +59,7 @@ typedef enum : int {
     R_DISPLAY,
     R_SIZE,
     R_SKIP_INTRO,
+    R_COLONY_STATS,
     R_FIXES_ON,
     R_FIXES_OFF,
     R_RESTART,
@@ -201,6 +202,9 @@ static void build_rows(void)
         r = add(ROW_TOGGLE, R_SKIP_INTRO, "Skip intro",
                 "Start at the title screen, without the credits and intro.");
         r->on = config.skip_intro;
+        r = add(ROW_TOGGLE, R_COLONY_STATS, "Colony stats",
+                "Planet info: click POP for food, housing, health and demands.");
+        r->on = config.colony_stats;
         break;
     case SEC_FIXES:
         r = add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
@@ -336,6 +340,9 @@ static void act(const Row *r, int dir)
         for (int i = 0; i < hooks.fix_count; i++)
             config_set_fix(hooks.fixes[i].key, r->id == R_FIXES_ON);
         changed(MENU_CHANGED_FIXES);
+        break;
+    case R_COLONY_STATS:
+        config.colony_stats = !config.colony_stats;
         break;
     case R_RESTART:
         input_request_restart();

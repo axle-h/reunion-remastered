@@ -25,7 +25,7 @@ build/debug/reunion
 `REUNION_DATA_DIR` CMake setting (default `vendor/Reunion_DOS_EN`).
 F1 opens the port menu over the game: cheats, music (None, Sound Blaster,
 UltraSound), effects and volumes, display mode and size, skipping the
-intro, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
+intro, the colony stats, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
 the SDL pref directory (`~/.local/share/Reunion/Reunion` on Linux).
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
 `screenshots` directory there.
@@ -33,6 +33,11 @@ Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
 The port fixes a few things in the original that can make the game
 unwinnable (docs/bugs.md, "Fixed in the port"); each can be switched off in
 the port menu, and `REUNION_ORIGINAL=1` plays without any of them.
+
+On the planet info screen of one of your colonies, clicking the POP row
+shows its stats: housing, food and health capacity, the disease timer, how
+close the people are to demanding a Stadium or a University, and where
+their mood and numbers are heading. Switch it off in the port menu (Game).
 
 Like the original `start.exe`, the port plays the CREDITS and INTRO
 cut-scenes before the game and VICTORY after it is won. Skip intro in the

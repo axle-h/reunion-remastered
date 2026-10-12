@@ -559,6 +559,10 @@ Habitable surfaces are Earth-like, Icy, Desert, Rocky and Tropical.
 
 ### Taxes, morale and growth
 
+In the port, clicking the POP row on a colony's planet info screen shows
+the numbers below for that colony: capacities, disease timer, Stadium and
+University thresholds, target mood and growth (port menu, Game).
+
 - **Tax levels**: None, Very low, Low, Normal, High, Difficult, Very
   difficult, Oppressing (0–7).
 - **Daily income per colony**: round(pop × tax × development × (attitude +

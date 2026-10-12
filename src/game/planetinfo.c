@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "game/blit.h"
+#include "game/colonystats.h"
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/mouse.h"
@@ -204,6 +205,11 @@ void PlanetInfo_SetupPlanetInfoHotspots(void)
         Mouse_SetHotspot(1, 0, 0x31, 0x39, 0x2F, P("SEE OWNER INFO"), 1, 0);
         Mouse_SetHotspot(2, 0, 0x61, 0x39, 0x2F, P("SHIPS"), 1, 0);
         Mouse_SetHotspot(3, 0, 0x91, 0x60, 0x37, P("SEE SURFACE"), 1, 0);
+        // Port addition (game/colonystats.h): the POP row.
+        if (ColonyStats_Available()) {
+            ds.Mouse_HotspotCount = 4;
+            Mouse_SetHotspot(4, 0x3A, 0x43, 0x100, 0x0B, P("COLONY STATS"), 1, 0);
+        }
     } else {
         ds.Mouse_HotspotCount = 1;
         Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, P("SEE PLANET INFO"), 1, 0);

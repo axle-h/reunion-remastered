@@ -1,5 +1,6 @@
 #include "game/baseeff.h"
 
+#include "game/colonystats.h"
 #include "game/dseg.h"
 #include "game/gfxpath.h"
 #include "game/planetinfo.h"
@@ -45,6 +46,8 @@ void BaseEff_BaseEffScreen(void)
             body->TechLevel = 7;
         if (ds.PlanetInfo_AlienMode == 0)
             PlanetInfo_DrawPlanetInfoText();
+        if (ds.PlanetInfo_AlienMode == COLONY_STATS_MODE)
+            ColonyStats_Draw();
     }
     if (ds.Game_MenuCommand == 0x27) {
         TBody *body = ds.Game_CurBody;
@@ -53,6 +56,8 @@ void BaseEff_BaseEffScreen(void)
             body->TechLevel = 0;
         if (ds.PlanetInfo_AlienMode == 0)
             PlanetInfo_DrawPlanetInfoText();
+        if (ds.PlanetInfo_AlienMode == COLONY_STATS_MODE)
+            ColonyStats_Draw();
     }
     const TBody *body = ds.Game_CurBody;
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == 0x15) {
@@ -77,6 +82,14 @@ void BaseEff_BaseEffScreen(void)
             PlanetInfo_SetupPlanetInfoHotspots();
             ds.Game_HotspotHit = 0;
         }
+    }
+    // Port addition (game/colonystats.h): the POP row opens the colony stats.
+    if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == COLONY_STATS_HIT) {
+        Sound_PlayButtonSfx(P("x"));
+        ds.PlanetInfo_AlienMode = COLONY_STATS_MODE;
+        ColonyStats_Draw();
+        PlanetInfo_SetupPlanetInfoHotspots();
+        ds.Game_HotspotHit = 0;
     }
     if (ds.PlanetInfo_AlienMode != 0 && ds.Game_HotspotHit == 0x15) {
         Sound_PlayButtonSfx(P("x"));

@@ -10,6 +10,7 @@ static constexpr Config DEFAULTS = {
     .display = CONFIG_WINDOWED,
     .window_width = 1280,  // 320x200 shown 4:3, times 4
     .window_height = 960,
+    .colony_stats = true,
 };
 
 Config config = DEFAULTS;
@@ -149,6 +150,8 @@ static void set_value(const char *section, const char *key, const char *v)
         config.fullscreen_refresh = SDL_clamp((float)SDL_atof(v), 0.0f, 1000.0f);
     else if (IS("game", "skip_intro") && parse_bool(v, &b))
         config.skip_intro = b;
+    else if (IS("game", "colony_stats") && parse_bool(v, &b))
+        config.colony_stats = b;
 #undef IS
 }
 
@@ -231,13 +234,14 @@ bool config_save(void)
                            "fullscreen_refresh = %g\n"
                            "\n[game]\n"
                            "skip_intro = %s\n"
+                           "colony_stats = %s\n"
                            "\n[fixes]\n",
                            on_off(config.freeze_money), on_off(config.freeze_ore),
                            MUSIC_NAMES[config.music], on_off(config.effects), config.music_volume,
                            config.effects_volume, DISPLAY_NAMES[config.display],
                            config.window_width, config.window_height, config.fullscreen_width,
                            config.fullscreen_height, (double)config.fullscreen_refresh,
-                           on_off(config.skip_intro)) > 0;
+                           on_off(config.skip_intro), on_off(config.colony_stats)) > 0;
     for (int i = 0; ok && i < config.fix_count; i++)
         ok = SDL_IOprintf(io, "%s = %s\n", config.fix_keys[i], on_off(config.fix_on[i])) > 0;
     ok = SDL_CloseIO(io) && ok;

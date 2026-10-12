@@ -24,7 +24,7 @@ int main(void)
     config_reset();
     CHECK(config.music == CONFIG_MUSIC_SETUP && config.effects && config.music_volume == 100);
     CHECK(config.display == CONFIG_WINDOWED && config.window_width == 1280 && config.window_height == 960);
-    CHECK(!config.freeze_money && !config.skip_intro);
+    CHECK(!config.freeze_money && !config.skip_intro && config.colony_stats);
     CHECK(config_fix("anything"));
     CHECK(config_save());  // no path: nothing written
     CHECK(!SDL_GetPathInfo(path, nullptr));
@@ -50,6 +50,7 @@ int main(void)
                      "fullscreen_refresh = 59.94\n"
                      "[game]\n"
                      "skip_intro = yes\n"
+                     "colony_stats = off\n"
                      "colour = blue\n"
                      "[other]\n"
                      "freeze_money = off\n"
@@ -64,7 +65,7 @@ int main(void)
     CHECK(config.music_volume == 100 && config.effects_volume == 30);
     CHECK(config.display == CONFIG_DESKTOP && config.window_width == 960 && config.window_height == 960);
     CHECK(SDL_fabsf(config.fullscreen_refresh - 59.94f) < 0.001f);
-    CHECK(config.skip_intro);
+    CHECK(config.skip_intro && !config.colony_stats);
     CHECK(!config_fix("find_jade") && config_fix("mine_all_systems") && config_fix("unlisted"));
 
     // Saved and loaded back unchanged.
@@ -79,6 +80,7 @@ int main(void)
     CHECK(config.freeze_money == before.freeze_money && config.music == before.music);
     CHECK(config.effects_volume == before.effects_volume && config.display == before.display);
     CHECK(config.fullscreen_width == 1920 && config.fullscreen_height == 1080);
+    CHECK(!config.colony_stats);
     CHECK(SDL_fabsf(config.fullscreen_refresh - before.fullscreen_refresh) < 0.001f);
     CHECK(config.fix_count == 3 && !config_fix("drifting_ship") && !config_fix("find_jade"));
 

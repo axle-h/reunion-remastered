@@ -11,6 +11,7 @@
 #include "game/blit.h"
 #include "game/cargo.h"
 #include "game/colonize.h"
+#include "game/colonystats.h"
 #include "game/droids.h"
 #include "game/fixes.h"
 #include "game/dseg.h"
@@ -826,6 +827,9 @@ void Sim_ProcessAllBodyEvents(void)
         PlanetInfo_DrawPlanetInfoText();
     if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == 1)
         PlanetInfo_DrawStoresList();
+    // Port addition (game/colonystats.h).
+    if (ds.Game_CurrentScreen == 8 && ds.PlanetInfo_AlienMode == COLONY_STATS_MODE)
+        ColonyStats_Draw();
 }
 
 // 1b8a:2178

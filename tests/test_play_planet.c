@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
+#include "game/gfx.h"
 #include "platform/fs.h"
 #include "play/play.h"
 #include "play/ui.h"
@@ -24,6 +25,7 @@ enum : int {
 
 static struct {
     bool listed_droids;
+    bool stats_shown, stats_clean, stats_closed;
     int tax, mood, droids_before, droids_after, mines, derricks_wanted, derricks;
     int32_t population;
     char kind_first[20];
@@ -54,6 +56,23 @@ static void act1(void *unused)
     seen.population = ui_population();
     seen.mood = ui_mood();
     play_dump("tax");
+
+    // The colony stats (port addition): the POP row opens them, a click on
+    // them goes back. Clicked above the Food bar, so the cursor stands on
+    // the bars while they are drawn; once it has moved away, no background
+    // (colour F9h) may be left in the bar.
+    ui_click(100, 0x48);
+    ui_wait_idle(200);
+    seen.stats_shown = ds.PlanetInfo_AlienMode == 4 && ds.Mouse_HotspotCount == 1;
+    play_mouse(300, 190, 0);
+    play_wait(5);
+    seen.stats_clean = true;
+    for (int x = 100; x < 116; x++)
+        seen.stats_clean &= gfx_screen()[0x4D * 320 + x] != 0xF9;
+    play_dump("colony-stats");
+    ui_hotspot("SEE PLANET INFO");
+    ui_wait_idle(200);
+    seen.stats_closed = ds.PlanetInfo_AlienMode == 0 && ds.Mouse_HotspotCount == 4;
 
     // E5: a third mine; when it works, a droid from stock.
     ui_planet_main();
@@ -206,6 +225,7 @@ int main(int argc, char *argv[])
     CHECK(seen.droids_after == seen.droids_before + 1);
     CHECK(seen.derricks == seen.derricks_wanted);
     CHECK(seen.listed_droids);
+    CHECK(seen.stats_shown && seen.stats_clean && seen.stats_closed);
 
     char script[1100];
     SDL_snprintf(script, sizeof script, "@%s", record);

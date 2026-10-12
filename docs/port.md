@@ -170,7 +170,16 @@ next frame, since the menu may have been opened in the middle of anything:
   window was dragged to), full screen at a chosen display mode, or desktop
   full screen. Alt+Enter toggles between the window and the last full-screen
   choice.
-- **Game.** Skip intro.
+- **Game.** Skip intro, and the port's additions to the game's screens,
+  on by default. The game reads `config` when it draws, so no request is
+  needed. Golden runs (`tests/test_golden.c`) switch them off, since they
+  add hotspots to the state stream.
+  - **Colony stats** (`src/game/colonystats.c`): the POP row of your
+    colony's planet info screen becomes hotspot 4, "COLONY STATS", which
+    shows an overlay (`PlanetInfo_AlienMode` 4) with what the next daily
+    colony update will decide. `ColonyStats_Compute` repeats
+    `Sim_ProcessBodyEvents` without its chances and writes no state.
+    `test_colonystats` checks it against the real update.
 - **Fixes.** One switch per fix in `game/fixes.h`, listed in `Fixes_List`
   (a new fix needs a line there; `test_options` checks), plus all on / all
   off. With `REUNION_ORIGINAL=1` they show off and can't be changed.
