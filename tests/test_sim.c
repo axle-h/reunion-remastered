@@ -407,6 +407,26 @@ static void test_station_storage(void)
     fixes.station_storage = true;
 }
 
+// Fix (game/fixes.h): New Earth's set-up places its last starter building
+// this hour, and Apollo's, next in the list, still counts down in the same
+// hour. Off, it moves into the freed slot and is skipped.
+static void test_colony_setups(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        fixes.colony_setups = fix;
+        ds.Game_ColonySetupCount = 2;
+        ds.Game_ColonySetups[0] = (TColonySetup){.Active = 1, .System = 1, .Planet = 5, .Timers = {1}};
+        ds.Game_ColonySetups[1] =
+            (TColonySetup){.Active = 1, .System = 1, .Planet = 5, .Moon = 1, .Timers = {3}};
+        Sim_UpdateColonySetups();
+        CHECK(ds.Game_ColonySetupCount == 1);
+        CHECK(ds.Game_ColonySetups[0].Moon == 1);
+        CHECK(ds.Game_ColonySetups[0].Timers[0] == (fix ? 2 : 3));
+    }
+    fixes.colony_setups = true;
+}
+
 static void test_golden(void)
 {
     reset();
@@ -452,6 +472,7 @@ int main(int argc, char *argv[])
     test_build_on_moons();
     test_meteorite_droids();
     test_station_storage();
+    test_colony_setups();
     test_golden();
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

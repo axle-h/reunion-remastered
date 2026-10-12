@@ -889,8 +889,6 @@ void Sim_UpdateColonySetups(void)
 {
     int16_t k = 1;
     Protect_DateColonyStep();
-    // BUG? k also advances after a removal, so the entry moved into slot k
-    // waits until the next hour.
     for (; k <= ds.Game_ColonySetupCount; k++) {
         TColonySetup *s = colony_setup(k);
         if (s->Active == 0)
@@ -910,6 +908,10 @@ void Sim_UpdateColonySetups(void)
             for (int16_t m = k; m <= last; m++)
                 memcpy(colony_setup(m), colony_setup((int16_t)(m + 1)), 0x10);
             ds.Game_ColonySetupCount--;
+            // The original goes on with k + 1, so the entry moved into slot k
+            // waits until the next hour. Port fix (game/fixes.h): slot k again.
+            if (fixes.colony_setups)
+                k--;
         }
     }
 }

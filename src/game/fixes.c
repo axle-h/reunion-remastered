@@ -17,6 +17,11 @@ static constexpr Fixes ALL = {
     .away_staff_hidden = true,
     .cargo_planet_cap = true,
     .station_storage = true,
+    .garrison_losses = true,
+    .colony_setups = true,
+    .demolish_droids = true,
+    .building_limit = true,
+    .spy_reports = true,
 };
 
 Fixes fixes = ALL;
@@ -53,6 +58,17 @@ const FixInfo Fixes_List[] = {
     {"station_storage", "Miner stations",
      "Bodies with only a Miner station keep mining after a conquest.",
      &fixes.station_storage},
+    {"garrison_losses", "Garrison losses",
+     "After a space battle each garrison loses the ships it really lost.",
+     &fixes.garrison_losses},
+    {"colony_setups", "Colony set-up",
+     "Two new colonies get their starter buildings on time.", &fixes.colony_setups},
+    {"demolish_droids", "Demolishing mines",
+     "A demolished mine's droid goes back into the colony's stock.", &fixes.demolish_droids},
+    {"building_limit", "Building limit",
+     "At 1,000 buildings a new one is refused before it is paid for.", &fixes.building_limit},
+    {"spy_reports", "Spy reports",
+     "Spy reports on armies, garrisons and weapons name the race.", &fixes.spy_reports},
 };
 
 const int Fixes_Count = (int)SDL_arraysize(Fixes_List);

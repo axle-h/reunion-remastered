@@ -4,8 +4,10 @@
 #include <string.h>
 
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/planetinfo.h"
 #include "game/spwar.h"
 #include "game/system.h"
 #include "platform/fs.h"
@@ -156,6 +158,68 @@ static void test_losses(void)
     CHECK(ds.Game_CurMoon[0] == 0);
 }
 
+static TBody *zeus_body(int16_t moon)
+{
+    ds.Game_CurMoon[0] = moon;
+    PlanetInfo_SelectCurBody();
+    return ds.Game_CurBody;
+}
+
+// Fix (game/fixes.h): a battle at Zeus (Amnesty 4), whose planet and first
+// two moons the Morgruls (race 3, at war: status 2) hold with 10 fighters
+// each. The fight destroys moon 2's ten and nothing else. An ally (race 4,
+// status 6) has a force elsewhere, which leaves LossPtr on the player's side.
+static void test_garrison_losses(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        fixes.garrison_losses = fix;
+        ds.Game_GroupCount = 0;
+        ds.Game_PlanetForceCount = 0;
+        for (int r = 0; r < 11; r++) {
+            ds.Races_Races[r].Status = 0;
+            ds.Races_Races[r].ForceCount = 0;
+        }
+        ds.Races_Races[3 - 2].Status = 2;
+        TRace *ally = &ds.Races_Races[4 - 2];
+        ally->Status = 6;
+        ally->ForceCount = 1;
+        ally->Forces[0].System = 2;
+        ally->Forces[0].Active = 1;
+        ds.Game_CurSystem = 1;
+        ds.Game_CurPlanet[0] = 4;
+        ds.SpWar_BattleSystem = 1;
+        ds.SpWar_BattlePlanet = 4;
+        ds.SpWar_BattleMoon = 0;
+        CHECK(ds.Galaxy_MoonLists[0][3].Count >= 2);
+        for (int16_t m = 0; m <= 2; m++) {
+            TBody *b = zeus_body(m);
+            b->Owner = 3;
+            memset(b->Stores, 0, sizeof b->Stores);
+            b->Stores[0] = 10;
+        }
+        SpWar_InitSpaceFleets();
+        CHECK(ds.SpWar_DefenderShipCount == 30);
+        CHECK(ship(ds.SpWar_DefenderList, 25)->id == (fix ? 202 : 0xC9));
+        ds.SpWar_DefenderShipCount = 20;  // moon 2's ten, added last, are gone
+        SpWar_ApplySpaceLosses();
+        if (fix) {
+            CHECK(zeus_body(0)->Stores[0] == 10);
+            CHECK(zeus_body(1)->Stores[0] == 10);
+            CHECK(zeus_body(2)->Stores[0] == 2);
+            CHECK(ds.SpWar_DefenderLosses[0] == 8 && ds.SpWar_AttackerLosses[0] == 0);
+        } else {
+            // The planet and moon 2 keep a fifth, moon 1 gains the planet's
+            // survivors; the net loss of 8 goes to the player's side.
+            CHECK(zeus_body(0)->Stores[0] == 2);
+            CHECK(zeus_body(1)->Stores[0] == 18);
+            CHECK(zeus_body(2)->Stores[0] == 2);
+            CHECK(ds.SpWar_DefenderLosses[0] == 0 && ds.SpWar_AttackerLosses[0] == 8);
+        }
+    }
+    fixes.garrison_losses = true;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -167,6 +231,7 @@ int main(int argc, char *argv[])
     dseg_init();
     test_step();
     test_losses();
+    test_garrison_losses();
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");
     return ok ? 0 : 1;

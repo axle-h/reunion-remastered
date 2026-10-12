@@ -757,7 +757,8 @@ void Surface_AddBuilding(uint8_t kind, uint8_t system, uint8_t planet, uint8_t m
 // 2ef2:2581
 void Surface_BuildOnCurrentPlanet(int16_t kind, int16_t x, int16_t y)
 {
-    // BUG? A full building table plays the 'x' sound; the 'buildin' branch is skipped.
+    // A full building table plays the 'x' sound and places nothing; the
+    // caller charges for it all the same (fixes.building_limit).
     if (ds.Game_BuildingCount > 999)
         Sound_PlayButtonSfx("x");
     if (ds.Game_BuildingCount < 1000) {

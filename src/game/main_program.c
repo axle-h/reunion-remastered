@@ -17,6 +17,7 @@
 #include "game/credits.h"
 #include "game/droids.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
@@ -626,6 +627,27 @@ static void surface_enter(void)
     RawText_Nop();
 }
 
+// Port fix (game/fixes.h, demolish_droids): after a demolition, a droid
+// beyond the body's Mines and Miner stations goes back into the stock the
+// droid screen takes it from (Droids_HandleDroidsScreen). A body with no
+// planet force has no stock: there only a Miner station's droid can go,
+// with the station.
+static void return_spare_droid(void)
+{
+    int16_t sys = CUR_SYS, planet = CUR_PLANET(sys), moon = CUR_MOON(sys);
+    TBody *b = cur_body();
+    int16_t places = (int16_t)(Surface_CountBuildings(0x19, sys, planet, moon, false)
+                               + Surface_CountBuildings(4, sys, planet, moon, false));
+    if (b->_0A <= places)
+        return;
+    b->_0A--;
+    int16_t force = Groups_FindPlanetForce(sys, planet, moon);
+    if (sys == 1 && planet == 5 && moon == 0)
+        ds.Research_Products[1].Stock++;
+    else if (force != 0)
+        Groups_At(1, force)->Items[12]++;
+}
+
 // Clicks on the map (hotspot 0x15) with the left button: place, select or
 // destroy a building.
 static void surface_map_click(void)
@@ -633,7 +655,12 @@ static void surface_map_click(void)
     ds.Surface_PrevKind = ds.Surface_SelKind;
     if (ds.Surface_Mode == 2) {
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
-        if (ds.Surface_Mode == 2) {
+        if (ds.Surface_Mode == 2 && fixes.building_limit && ds.Game_BuildingCount > 999) {
+            // The original refuses the building (Surface_BuildOnCurrentPlanet)
+            // and charges it all the same. Port fix: refused, nothing paid.
+            Sound_PlayButtonSfx("x");
+            ds.Mouse_HeldPhase = 1;
+        } else if (ds.Surface_Mode == 2) {
             Surface_BuildOnCurrentPlanet(ds.Surface_SelKind, click_cell_x(1, 0), click_cell_y(1, 0));
             add_credits(-building_type(ds.Surface_SelKind)->Cost);
             Gfx_DrawCredits();
@@ -675,6 +702,8 @@ static void surface_map_click(void)
             && building(ds.Surface_SelBuilding)->Health == 0) {
             Sound_PlayButtonSfx("destruct");
             Surface_DeleteBuilding(ds.Surface_SelBuilding);
+            if (fixes.demolish_droids)
+                return_spare_droid();
             PlanetInfo_BalanceBuildingPower(CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS));
             Surface_LoadMap();
             Surface_RegisterBuildingAnims(CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS));

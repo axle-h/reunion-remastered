@@ -610,8 +610,13 @@ static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int1
         Message_ShowMessage(msg);
     }
     if (kind == 3) {
-        // BUG?: the "Information on" line is built and then replaced by the next one.
-        SDL_snprintf(msg, sizeof msg, "  Their garrison troops are on| %s: ", title);
+        // The original builds "    Information on: <race>|" and then
+        // replaces it with this. Port fix (game/fixes.h): keeps it.
+        msg[0] = '\0';
+        if (fixes.spy_reports)
+            SDL_snprintf(msg, sizeof msg, "    Information on: %s|", name);
+        size_t n = SDL_strlen(msg);
+        SDL_snprintf(msg + n, sizeof msg - n, "  Their garrison troops are on| %s: ", title);
         for (int i = 1; i <= 4; i++) {
             if (i & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
@@ -629,16 +634,21 @@ static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int1
 // 29b9:185e (nested in ShowRaceIntel)
 static void show_race_army_info(int16_t race)
 {
-    char msg[256];
+    char msg[256], name[256];
     const TRace *r = Intel_Race(race);
+    pstr_get(name, sizeof name, &r->Name);
     int16_t forces = r->ForceCount;
     for (int16_t f = 1; f <= forces; f++) {
         const TRaceForce *rf = &r->Forces[f - 1];
         if (rf->Mission == 0 || rf->Active == 0)
             continue;
-        // BUG?: a first line " Information on: <race> |" is built and then
-        // replaced by the next one.
-        SDL_snprintf(msg, sizeof msg, "  The %d. army power is  ", f);
+        // The original builds " Information on: <race> |" and then
+        // replaces it with this. Port fix (game/fixes.h): keeps it.
+        msg[0] = '\0';
+        if (fixes.spy_reports)
+            SDL_snprintf(msg, sizeof msg, " Information on: %s |", name);
+        size_t n = SDL_strlen(msg);
+        SDL_snprintf(msg + n, sizeof msg - n, "  The %d. army power is  ", f);
         for (int k = 1; k <= 4; k++) {
             if (k & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
@@ -658,8 +668,12 @@ static void show_race_weapon_info(int16_t race)
 {
     const TRace *r = Intel_Race(race);
     const uint8_t *flags = (const uint8_t *)r->KnownSystems; // [0..3] ship classes, [4..7] ground units
-    // BUG?: " Information on: <race>" is built and then replaced by this.
-    char msg[256] = "    Their weapons are |";
+    // The original builds " Information on: <race>" and then replaces it
+    // with this. Port fix (game/fixes.h): keeps it, on the same line.
+    char msg[256] = "", name[256];
+    if (fixes.spy_reports)
+        SDL_snprintf(msg, sizeof msg, " Information on: %s", pstr_get(name, sizeof name, &r->Name));
+    SDL_strlcat(msg, "    Their weapons are |", sizeof msg);
     for (int k = 1; k <= 4; k++) {
         if (flags[k - 1] != 0)
             append_name(msg, &ds.Names_ShipClasses[k - 1], " ");

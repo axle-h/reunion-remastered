@@ -5,6 +5,7 @@
 
 #include "game/blit.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/le.h"
 #include "game/mouse.h"
@@ -95,8 +96,11 @@ static bool button_down(void)
 void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t *buf,
                         bool edit, uint8_t maxLen)
 {
-    char lines[7][55] = {};  // string[54], 1..6 (the original has no room for more)
-    int16_t len[7] = {};
+    // string[54], 1..6 in the original, which has no room for more; 7 with
+    // fixes.spy_reports, whose garrison reports have 7.
+    char lines[8][55] = {};
+    int16_t len[8] = {};
+    int16_t maxLines = fixes.spy_reports ? 7 : 6;
 
     if (voice[0] != '\0')
         Sound_PlayButtonSfx(voice);
@@ -105,19 +109,19 @@ void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t
     int16_t editCol = 0, editLine = 0;
     for (size_t i = 0; text[i] != '\0' && i < 255; i++) {
         if (text[i] != '|') {
-            // BUG? more than 6 lines overflow the original's array; extra text is dropped here.
-            if (lineCount <= 6 && len[lineCount] < 54)
+            // BUG? more lines overflow the original's array; the port drops them.
+            if (lineCount <= maxLines && len[lineCount] < 54)
                 lines[lineCount][len[lineCount]++] = text[i];
         } else {
             lineCount++;
         }
-        if (text[i] == '&' && lineCount <= 6) {
+        if (text[i] == '&' && lineCount <= maxLines) {
             editCol = len[lineCount];
             editLine = lineCount;
         }
     }
-    if (lineCount > 6)
-        lineCount = 6;
+    if (lineCount > maxLines)
+        lineCount = maxLines;
 
     int16_t height = (int16_t)(lineCount * 9);
     int16_t maxw = 0;
@@ -175,7 +179,7 @@ void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t
 
     if (logIt) {
         // Leading blanks of each line are dropped; empty lines are not logged.
-        const char *logged[7];
+        const char *logged[8];
         int16_t count = 0;
         for (int16_t i = 1; i <= lineCount; i++) {
             logged[i] = lines[i] + strspn(lines[i], " ");

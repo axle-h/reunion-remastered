@@ -676,7 +676,8 @@ University thresholds, target mood and growth (port menu, Game).
   `src/game/fixes.h`).
 - **Droids stay when mines go.** Demolishing a mine (2,000 credits) never
   lowers the droid count, so 9 droids keep mining with 1 mine left. You lose
-  that mine's storage.
+  that mine's storage. The port puts the droid back into the colony's stock
+  (`fixes.demolish_droids`).
 - **Cargo is capped by planet storage.** A ship can't load more of one ore
   than the source planet's storage capacity, and unloading is capped the same
   way (`Cargo_CargoScreen`). The port caps loading by the ship's room only
@@ -924,6 +925,12 @@ The fight is automatic: the only control is RETREAT, which counts as a loss.
   the guide's "all my groups disappeared" bug, which it blamed on the
   defensive ground win **[fixed]**. Keep trade and carrier groups away from
   New Earth when a wave is due.
+- **Garrisons after a space battle.** The planet and its moons count their
+  surviving garrison ships by one id that only moon 1 matches: the planet
+  and the other moons keep a fifth of their garrison whatever survived, and
+  moon 1 also gets their survivors (`SpWar_ApplySpaceLosses`). A won battle
+  destroys them all, so this only matters after a lost battle or a retreat.
+  The port counts each body's own (`fixes.garrison_losses`).
 - No race builds units. All enemy forces are preset; garrisons grow only when
   survivors return home. The guide's "the AI out-builds you" is wrong
   **[fixed]**.

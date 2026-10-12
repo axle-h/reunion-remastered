@@ -92,6 +92,11 @@ bool ui_wait_buildings_active(const char *kind, int n, int hours);
 // line. Not for Mines (a click on one opens the droid screen).
 int32_t ui_building_info(const char *kind, const char *label);
 
+// Demolishes a finished `kind` on the surface shown (moving the window with
+// the radar to find one): Destroy, then a click on it. True when it was
+// paid for (2,000 credits).
+bool ui_demolish(const char *kind);
+
 // Droids working on the body shown (the droid figures on screen 4 and the
 // "n Miner Droid" line on screen 8), droids in stock for it (the big digits
 // on screen 4) and places for droids (finished Mines and Miner stations: the

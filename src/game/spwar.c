@@ -6,6 +6,7 @@
 
 #include "game/anim.h"
 #include "game/blit.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/le.h"
 #include "game/gfxpath.h"
@@ -111,9 +112,9 @@ static void set_side(const TRace *r)
                              : (uint8_t *)&ds.SpWar_AttackerShipCount;
 }
 
-// The store ships of the body that is current (CurBody) join the fleet of its
-// owner, if the owner is a race at war with the player's fleet.
-static void add_store_ships(void)
+// The store ships of the body that is current (CurBody, moon m) join the
+// fleet of its owner, if the owner is a race at war with the player's fleet.
+static void add_store_ships(int16_t m)
 {
     const TBody *body = ds.Game_CurBody;
     if ((int8_t)body->Owner < 2)
@@ -123,12 +124,14 @@ static void add_store_ships(void)
     if (!race_side(&ds.Races_Races[body->Owner - 2], &list, &count))
         return;
     set_side(&ds.Races_Races[body->Owner - 2]);
+    // The original gives them all C9h; ApplySpaceLosses counts them by
+    // 200 + moon. Port fix (game/fixes.h): that id.
+    uint8_t id = fixes.garrison_losses ? (uint8_t)(200 + m) : 0xC9;
     for (int16_t j = 1; j <= 4; j++) {
         int16_t n = (int16_t)body->Stores[j - 1];
         for (int16_t a = 1; n > 0 && a <= n; a++) {
             if ((uint16_t)*count < 500) {
-                // BUG? the id is always C9h; ApplySpaceLosses looks for 200 + moon.
-                add_ship(list, count, 0xC9, (uint8_t)j, (uint16_t)ds.SpWar_ClassB[j - 1],
+                add_ship(list, count, id, (uint8_t)j, (uint16_t)ds.SpWar_ClassB[j - 1],
                          (uint16_t)ds.SpWar_ClassA[j - 1], true);
             }
         }
@@ -230,7 +233,7 @@ void SpWar_InitSpaceFleets(void)
     uint8_t moons = moon_count();
     for (int16_t m = 0;; m++) {
         select_moon(m);
-        add_store_ships();
+        add_store_ships(m);
         if (m == moons)
             break;
     }
@@ -670,13 +673,17 @@ void SpWar_ApplySpaceLosses(void)
         if (!race_side(race, &list, &count))
             continue;
         set_side(race);
+        // The original leaves LossPtr where the last force loop left it (or
+        // at nothing). Port fix (game/fixes.h): the side of this owner.
+        if (fixes.garrison_losses)
+            ds.SpWar_LossPtr = race->Status == 2 ? (uint8_t *)ds.SpWar_DefenderLosses
+                                                 : (uint8_t *)ds.SpWar_AttackerLosses;
         for (int16_t j = 1; j <= 4; j++) {
             int32_t alive = count_alive(list, *count, m + 200, j);
             int32_t orig = body->Stores[j - 1];
             int32_t now = alive + (orig - alive) / 5;
-            // BUG? LossPtr still points where the last force loop left it
-            // (or at nothing), not at the side of this owner. Nil made the
-            // original add to the interrupt table at 0000:0000; the port drops it.
+            // Nil made the original add to the interrupt table at 0000:0000;
+            // the port drops it.
             if (ds.SpWar_LossPtr != nullptr) {
                 uint8_t *loss = ds.SpWar_LossPtr + (j - 1) * 4;
                 wr32le(loss, rd32le(loss) + orig - now);

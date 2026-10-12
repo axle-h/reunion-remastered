@@ -50,9 +50,10 @@ restart and quit. Its settings are kept in `reunion.ini`.
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to
 `screenshots/`.
 
-The port fixes a few things in the original that can make the game
-unwinnable (`src/game/fixes.h`); each can be switched off in
-the port menu (Fixes), or all of them at once.
+The port fixes bugs in the original, from ones that can make the game
+unwinnable to ones that unbalance colonies and battles
+(`src/game/fixes.h`); each can be switched off in the port menu (Fixes), or
+all of them at once.
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

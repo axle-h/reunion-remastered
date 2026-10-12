@@ -62,11 +62,13 @@ The port is complete and the game can be won in it.
   first start imports the player's copy (a folder, a ZIP or the CD's ISO;
   the floppy and CD editions) into the player's folder, checked against
   the list of files the port loads.
-- **Bug fixing has started:** 12 bugs of the original that can make the
-  game unwinnable or break the economy are fixed behind switches
-  (`src/game/fixes.h`). Of the 34 bugs found in the port while playing it, 33
-  are fixed and one turned out to be the original's behaviour; their
-  write-ups are in git history (`docs/port-bugs.md`, deleted 2026-10-12).
+- **Bugs of the original:** 17 are fixed behind switches
+  (`src/game/fixes.h`): those that can make the game unwinnable or break
+  the economy, and those that unbalance colonies and battles or lose
+  information. The rest are harmless or left as they are (3 below). Of
+  the 34 bugs found in the port while playing it, 33 are fixed and one
+  turned out to be the original's behaviour; their write-ups are in git
+  history (`docs/port-bugs.md`, deleted 2026-10-12).
 - **Tests:** all 87 ctest tests pass on the release build, the full
   playthrough (`test_play_game`), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -121,8 +123,8 @@ found, so another seed may hit it again (docs/playthrough.md,
 ### 3. Bugs of the original still open
 
 All are marked `// BUG?` in the code (`grep -rn 'BUG?' src/`). The port
-reproduces them. For each one that changes play, decide whether it gets a
-switch in `src/game/fixes.h`, next to the existing ones.
+reproduces them. None left changes play (checked 2026-10-12); a new one
+that does gets a switch in `src/game/fixes.h`, next to the existing ones.
 
 **The CD's `REUNION.PRG` may fix some.** It was rebuilt on 1994-08-15 and is
 said to fix stability problems (docs/versions.md). Its functions are the
@@ -132,55 +134,62 @@ relocations and DS offsets masked out (a 16-byte-window match already pairs
 most code up), list the routines whose logic changed, and give real fixes a
 switch here.
 
-**Change play (candidates for a fix switch):** none of these can make the
-game unwinnable or stop the economy (checked 2026-10-12); they shift the
-balance of battles and colonies.
+**Left as they are:** `adlib.c`: KSL bits swapped, key-off never reaches
+the OPL, slide up without carry. This is how the original's music sounds.
 
-| Where | What |
-|---|---|
-| `spwar.c` `add_store_ships` | Every garrison ship from a body's stores gets id C9h, but `ApplySpaceLosses` counts survivors by 200 + moon. Garrison losses after a space battle are booked against the wrong body |
-| `spwar.c` `SpWar_ApplySpaceLosses` | Garrison losses are added to whichever side `LossPtr` was left pointing at. When it was nil, the original wrote to 0000:0000 (the interrupt table); the port skips that write |
-| `intel.c` `Intel_ClaimBodyForRace` (owners 8 and 12) | Every pass writes `Stores[1]`, so these races' bodies only get a garrison in the first slot (the last of the eight draws) |
-| `sim.c` `Sim_UpdateColonySetups` | After a removal, the entry moved into its slot waits until the next hour |
-| `sim.c`, mines (docs/walkthrough.md) | Demolishing a mine never lowers the droid count (in the player's favour) |
+**Harmless, or already handled by the port:**
 
-**Visible but cosmetic:**
-
-| Where | What |
-|---|---|
-| `sound.c` `PlayWarSnd` / `PlayGrSnd` | Share one "last loaded" key, so ground sound *n* right after war sound *n* replays the war sample |
-| `gfxpath.c` `AddToolbarIcon` | Clears slot `slot` 13 − `slot` times instead of the slots after it |
-| `shipinfo.c` "Change mode" | On list 0 it plays the error sound and still switches to list 1 |
-| `intel.c` spy reports | The "Information on" line is built and then overwritten (three places) |
-| `planetinfo.c` alien planet info | Race record bytes 13h..1Ah are read as "has this resource" flags |
-| `research.c` selection frame | Draws without hiding the mouse cursor |
-| `surface.c` build | A full building table plays the 'x' sound and skips the 'buildin' branch |
-| `command.c` room animation | Calls `StartMainAnim` where `StartGrAnim` is meant |
-| `message.c` | A box with more than 6 lines overflows its line array (the port drops the extra text). The log count can go negative |
-| `pub.c`, `alientalk.c` | Their line-clearing loops reuse the previous text's line count |
-| `blit.c` fill | An odd count fills count + 2 bytes |
-| `credits.c`, `cutscene.c` | A white palette is set up and never used |
-| `planetinfo.c` `PlanetInfo_SetupSystemViewHotspots` | The sun's hotspot sets orbit record 8's map flag from `Bodies[sys][-1]` |
-| `adlib.c` | KSL bits swapped, key-off never reaches the OPL, slide up without carry. This is how the original's music sounds; leave it |
-
-**Harmless, or already handled by the port:** `textfile.c` `BeginInput`
-(255-character limit into 60 bytes; edited strings are at most 19);
-`gfx.c` text wider than 255 (never happens); `main_program.c` clearing a
-fifth `DevSkill` (it is `ProductionRate`, set just after); `advisor.c`
-uninitialised first pass (the port zeroes it); `surface.c`
-`RegisterBuildingAnims` marking at uninitialised coordinates (the port
-skips it); the unreachable money cheat (`26eb`, the port has its own); the
-GUS and AdLib detection and timer bugs (the port replaces the drivers;
-see 1);
-the copy protection (removed, `src/game/protect.h`);
-`main_program.c` `ClaimBodyForRace` after a lost ground battle (arguments
-in the wrong order: it clears 65 bytes straddling Antares' last body and
-gives them to the player, but enemies only ever land on New Earth, whose
-loss ends the game in `Command_ShowDeathEnding`'s Halt; checked
-2026-10-12); `grwar.c` `GrWar_FindPath` testing (a,b) for (c,d) (both
-callers pass the same cell twice); `launch.c` reading `Owner` as a signed
-char (owners are at most 12); `vec3d.c` model 24's division by a
-centroid's x (`V24.VEC`'s objects 1-8 have x = ±105 or ±120).
+- `textfile.c` `BeginInput`: a 255-character limit into 60 bytes (edited
+  strings are at most 19).
+- `gfx.c`: text wider than 255 (never happens).
+- `main_program.c`: clearing a fifth `DevSkill` (it is `ProductionRate`,
+  set just after).
+- `advisor.c`: an uninitialised first pass (the port zeroes it).
+- `surface.c` `RegisterBuildingAnims`: marking at uninitialised
+  coordinates (the port skips it).
+- The unreachable money cheat (`26eb`; the port has its own), the GUS and
+  AdLib detection and timer bugs (the port replaces the drivers; see 1) and
+  the copy protection (removed, `src/game/protect.h`).
+- `main_program.c` `ClaimBodyForRace` after a lost ground battle: the
+  arguments are in the wrong order, so it clears 65 bytes straddling
+  Antares' last body and gives them to the player, but enemies only ever
+  land on New Earth, whose loss ends the game in
+  `Command_ShowDeathEnding`'s Halt.
+- `intel.c` `Intel_ClaimBodyForRace` writes only `Stores[1]` for owners 8
+  and 12: no caller passes them (the story passes 3, and the call above
+  only runs when New Earth falls).
+- `grwar.c` `GrWar_FindPath` tests (a,b) for (c,d): both callers pass the
+  same cell twice.
+- `launch.c` reads `Owner` as a signed char: owners are at most 12.
+- `vec3d.c`: model 24 divides by a centroid's x, and `V24.VEC`'s objects
+  1-8 have x = ±105 or ±120.
+- `sound.c` `PlayWarSnd` / `PlayGrSnd` share one cache key: both battles
+  reset it on entry (`Sound_AllocWarSndBuf`), and each plays only its own
+  kind.
+- `gfxpath.c` `AddToolbarIcon` clears the wrong slot: toolbars are filled
+  without gaps, so the slots after the first free one are already empty.
+- `shipinfo.c` "Change mode" on list 0 plays the error sound: the "change"
+  sound cuts it off at once.
+- `planetinfo.c` `DrawStoresList` reads race bytes 13h..1Ah as flags: they
+  are the race's weapon flags, read the same way by the spy reports (see
+  4), and alien mode opens only for owners above 1.
+- `research.c` `ResetSelectionFrame` doesn't hide the cursor: at worst two
+  pixels of a frame keep the other frame colour until redrawn.
+- `command.c` calls `StartMainAnim` for the ground battle: it reads the war
+  table too, so the animation plays as meant; only the unused room delay
+  draws a random number.
+- `message.c`: no text makes a box of more than 6 lines (`MESSAGE.TXT` and
+  the built messages; the garrison spy report has 7 with
+  `fixes.spy_reports`, which lets boxes take 7), and the log count could
+  go negative only for a box of 8 lines (the log holds 15).
+- `pub.c`, `alientalk.c` clear too few line entries: the hover is capped at
+  the menu's line count, so they are never read.
+- `blit.c` fills 2 extra bytes for an odd count: every caller passes an
+  even one.
+- `credits.c`, `cutscene.c` set up a white palette that is never used.
+- `planetinfo.c` `SetupSystemViewHotspots` sets orbit record 8's flag from
+  `Bodies[sys][-1]`: that flag is drawn only for an eighth moon, and the
+  planet view sets its moons' flags before drawing them.
 
 ### 4. Reverse-engineering loose ends
 
@@ -189,7 +198,8 @@ These matter only for reading the code; nothing depends on them:
 - record fields that are still `_xx` fillers or marked `?` in
   `src/game/dseg.h`: `TGroup`'s travel and cargo fields, and bytes of
   `TBody`, `TProduct`, `TBuilding` and `TRace` (`TRace.Status` 0/2/4/6,
-  what `TBody.Stores[7..8]` hold);
+  what `TBody.Stores[7..8]` hold; `TRace.KnownSystems` is the race's
+  weapon flags, ship classes then ground units);
 - DS bytes nobody references, `_pad_XXXX` in `src/game/dseg.h`: the
   1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
   typed constants.

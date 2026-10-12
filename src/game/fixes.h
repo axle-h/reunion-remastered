@@ -52,6 +52,30 @@ typedef struct Fixes {
     // sets it to 0), and then no such body mines. The fix gives each one
     // a Miner station's 10,000 t.
     bool station_storage;
+    // After a space battle each body's garrison counts its survivors by
+    // id 200 + moon, but every garrison ship was given id C9h: the planet
+    // and moons 2.. keep a fifth whatever survived, moon 1 gains the others'
+    // survivors. The losses are booked on the side of the last race force
+    // handled, or nowhere. The fix gives each body's ships its own id and
+    // books the losses on the side of the body's owner.
+    bool garrison_losses;
+    // When a new colony's starter buildings are all placed, its entry is
+    // removed and the next one moves into its slot, which the loop then
+    // skips for that hour. The fix counts that one down in the same hour.
+    bool colony_setups;
+    // Demolishing a Mine or Miner station leaves its droid working. The
+    // fix takes a droid that has lost its place off the body, back into the
+    // colony's stock, as a meteorite's hit takes one.
+    bool demolish_droids;
+    // With 1,000 buildings in the game a new one is refused with a sound,
+    // but still paid for (and a Building still adds its people). The fix
+    // refuses it before anything is paid.
+    bool building_limit;
+    // Spy reports on a race's armies, garrisons and weapons build the line
+    // "Information on: <race>" and then overwrite it, so they never say
+    // which race they are about. The fix keeps it (a garrison report then
+    // has 7 lines, and message boxes take up to 7).
+    bool spy_reports;
 } Fixes;
 
 extern Fixes fixes;

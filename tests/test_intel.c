@@ -51,6 +51,60 @@ static int rnd(int32_t seed, uint16_t range, int base)
     return System_Random(range) + base;
 }
 
+// Line i of the message log (leading blanks dropped).
+static const char *log_line(int i)
+{
+    static char line[64];
+    const uint8_t *e = ds.Message_Log + (i - 1) * 0x35 + 2;
+    SDL_snprintf(line, sizeof line, "%.*s", (int)e[0], (const char *)e + 1);
+    return line;
+}
+
+// The message log's lines joined by '|'.
+static const char *log_text(void)
+{
+    static char text[1024];
+    text[0] = '\0';
+    for (int i = 1; i <= ds.Message_LogCount; i++) {
+        SDL_strlcat(text, log_line(i), sizeof text);
+        SDL_strlcat(text, "|", sizeof text);
+    }
+    return text;
+}
+
+// Fix (game/fixes.h): the reports on armies (kind 2), garrisons (3) and
+// weapons (4) start with "Information on: <race>", as the colony report (1)
+// does; off, the line is lost. The garrison report then has 7 lines, and
+// the box shows all of them (its last line lists ground units 3 and 4).
+static void test_spy_reports(void)
+{
+    char info[64], name[32];
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        fixes.spy_reports = fix;
+        Intel_ClaimBodyForRace(7, 3, 2, 0);
+        Intel_Force(7, 1)->Mission = 1;
+        Intel_Force(7, 1)->Active = 1;
+        Intel_Race(7)->ForceCount = 1;
+        pstr_get(name, sizeof name, &Intel_Race(7)->Name);
+        SDL_snprintf(info, sizeof info, "Information on: %s", name);
+        for (int kind = 1; kind <= 4; kind++) {
+            ds.Message_LogCount = 0;
+            Intel_ShowRaceIntel(7, (int16_t)kind);
+            const char *log = log_text();
+            printf("spy report %d (fix %d): %s\n", kind, fix, log);
+            CHECK((SDL_strstr(log, info) == log) == (fix || kind == 1));
+            if (kind == 3) {
+                // The last report, Lyrae 7's, whole.
+                int first = ds.Message_LogCount - (fix ? 6 : 5);
+                CHECK(SDL_strcmp(log_line(first), fix ? info : "Their garrison troops are on") == 0);
+                CHECK(SDL_strstr(log_line(ds.Message_LogCount), "Missile") != nullptr);
+            }
+        }
+    }
+    fixes.spy_reports = true;
+}
+
 int main(int argc, char *argv[])
 {
     dseg_clear();
@@ -349,6 +403,8 @@ int main(int argc, char *argv[])
     Intel_Force(7, 1)->Active = 1;
     Intel_Race(7)->ForceCount = 1;
     Intel_ShowRaceIntel(7, 2);
+
+    test_spy_reports();
 
     // Intel_Init installs the group hook.
     Intel_Init();

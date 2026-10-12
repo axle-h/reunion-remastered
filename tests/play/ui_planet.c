@@ -16,6 +16,7 @@ enum : int {
     MAP_COLS = 14, MAP_ROWS = 9,
     OUTLINE_FREE = 0x0A,             // Surface_DrawMapView: cursor footprint on free ground
     MODE_PLACING = 2,                // Surface_Mode while Build blinks
+    MODE_DESTROYING = 6,             // Surface_Mode while Destroy blinks
 };
 
 // --- Reading the screen ---------------------------------------------------------
@@ -579,6 +580,42 @@ UiBuildResult ui_build(const char *kind)
     }
     play_log("build %s: no room", kind);
     return UI_BUILD_NO_ROOM;
+}
+
+static bool destroy_blinks(void *unused)
+{
+    (void)unused;
+    return ds.Surface_Mode == MODE_DESTROYING;
+}
+
+// A finished building of kind `k` in the window.
+static bool find_kind(int k, int *x, int *y);
+
+bool ui_demolish(const char *kind)
+{
+    int k = kind_index(kind);
+    if (ui_screen() != 20 || k == 0)
+        play_fail("ui_demolish: not on a surface, or no kind '%s'", kind);
+    see_surface();
+    int x, y;
+    bool found = false;
+    for (int step = 0; step < (int)SDL_arraysize(radar_moves) && !found; step++) {
+        if (step > 0)
+            radar_move(step);
+        found = find_kind(k, &x, &y);
+    }
+    if (!found)
+        return false;
+    ui_settle();
+    int32_t credits = ds.Game_Credits;
+    ui_hotspot("Destroy");
+    if (!ui_wait_until(destroy_blinks, nullptr, 50))
+        play_fail("ui_demolish: Destroy did not start blinking");
+    ui_click(cell_px(x), cell_py(y));
+    play_wait(10);
+    ui_settle();
+    play_log("demolish %s at (%d,%d): %d -> %d credits", kind, x, y, credits, ds.Game_Credits);
+    return ds.Game_Credits < credits;
 }
 
 // --- Droids (screen 4) ------------------------------------------------------------

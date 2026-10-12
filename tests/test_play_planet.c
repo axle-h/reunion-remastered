@@ -5,7 +5,9 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
+#include "platform/config.h"
 #include "platform/fs.h"
 #include "play/play.h"
 #include "play/ui.h"
@@ -191,6 +193,77 @@ static void drivers(void *unused)
     play_quit();
 }
 
+// Fixes on the surface (game/fixes.h), run with the two switches on and
+// then off: demolishing a Mine (demolish_droids) and building with 1,000
+// buildings in the game (building_limit). Test setup fills the building
+// table, so this run is no proof.
+static struct {
+    int droids_before, droids_after, stock_before, stock_after;
+    bool demolished;
+    int32_t credits_before, credits_after;
+    int buildings;
+    UiBuildResult build;
+} fx;
+
+// Copies of New Earth's command centre on top of it, up to 1,000 buildings.
+static void fill_buildings(void *unused)
+{
+    (void)unused;
+    for (int i = ds.Game_BuildingCount + 1; i <= 1000; i++)
+        ds.Game_Buildings[i - 1] = ds.Game_Buildings[0];
+    ds.Game_BuildingCount = 1000;
+}
+
+static void fix_drivers(void *unused)
+{
+    (void)unused;
+    ui_new_game();
+    ui_hire("BUILDERS", "William Forbs");
+    ui_planet_main();
+    fx.droids_before = ui_droids();
+    fx.stock_before = ui_droid_stock();
+    fx.demolished = ui_demolish("Mine");
+    fx.droids_after = ui_droids();
+    fx.stock_after = ui_droid_stock();
+    play_dump("demolished");
+
+    play_test_setup(fill_buildings, nullptr);
+    fx.credits_before = ds.Game_Credits;
+    fx.build = ui_build("Mine");
+    fx.credits_after = ds.Game_Credits;
+    fx.buildings = ds.Game_BuildingCount;
+    play_dump("building-limit");
+    play_quit();
+}
+
+static void check_fixes(bool on)
+{
+    config_set_fix("demolish_droids", on);
+    config_set_fix("building_limit", on);
+    fx = (typeof(fx)){};
+    PlayResult f = play_run(12345, fix_drivers, nullptr, nullptr);
+    printf("fixes %s: exit %d after %llu frames%s%s\n", on ? "on" : "off", f.exit_code,
+           (unsigned long long)f.frames, f.failed ? ", FAILED: " : "", f.failure);
+    printf("  demolished %d, droids %d -> %d, stock %d -> %d; build %d, credits %d -> %d, %d buildings\n",
+           fx.demolished, fx.droids_before, fx.droids_after, fx.stock_before, fx.stock_after, fx.build,
+           fx.credits_before, fx.credits_after, fx.buildings);
+    CHECK(!f.failed);
+    CHECK(fx.demolished);
+    CHECK(fx.droids_before == 2);
+    // On, the droid without a mine goes back into stock; off, it keeps working.
+    CHECK(fx.droids_after == (on ? 1 : 2));
+    CHECK(fx.stock_after == fx.stock_before + (on ? 1 : 0));
+    // On, the full table refuses the Mine before it is paid for; off, it
+    // is paid for and never built.
+    CHECK(fx.buildings == 1000);
+    if (on)
+        CHECK(fx.build != UI_BUILD_OK && fx.credits_after == fx.credits_before);
+    else
+        CHECK(fx.build == UI_BUILD_OK && fx.credits_after == fx.credits_before - MINE_COST);
+    config_set_fix("demolish_droids", true);
+    config_set_fix("building_limit", true);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -249,6 +322,9 @@ int main(int argc, char *argv[])
     CHECK(drv.colony);
     CHECK(drv.under_colonization);
     CHECK(SDL_strstr(drv.colony_box, "colony started") != nullptr);
+
+    check_fixes(true);
+    check_fixes(false);
 
     SDL_Quit();
     return ok ? 0 : 1;
