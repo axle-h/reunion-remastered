@@ -132,8 +132,7 @@ Every setting is kept in `reunion.ini` in the SDL pref directory
 (`~/.local/share/Reunion/Reunion/` on Linux; `src/platform/config.c`),
 rewritten on every change. Scripted runs and tests never read or write it,
 and without it the game behaves as before the menu: music from
-`SAVE\SETUP.SPD`, every fix on. `REUNION_ORIGINAL` still takes precedence
-over the file.
+`SAVE\SETUP.SPD`, every fix on.
 
 The platform layer knows nothing of the game. Display and volumes apply at
 once, and so does the music (below). Everything else that touches game
@@ -182,7 +181,7 @@ next frame, since the menu may have been opened in the middle of anything:
     `test_colonystats` checks it against the real update.
 - **Fixes.** One switch per fix in `game/fixes.h`, listed in `Fixes_List`
   (a new fix needs a line there; `test_options` checks), plus all on / all
-  off. With `REUNION_ORIGINAL=1` they show off and can't be changed.
+  off.
 - **Restart** goes back to the title screen without the cut-scenes (in a
   cut-scene, on to the game), through the same unwinding as a restart
   request of the original. **Quit** closes the game as closing the window

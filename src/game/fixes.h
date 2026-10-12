@@ -1,7 +1,6 @@
 // Fixes to the original game (docs/bugs.md, "Fixed in the port"). Each fix is
 // a switch so the original behaviour stays reproducible: all are on unless
-// the port menu's config (platform/config.h) turns one off; REUNION_ORIGINAL=1
-// turns them all off.
+// the port menu's config (platform/config.h) turns one off.
 #pragma once
 
 typedef struct Fixes {
@@ -65,10 +64,5 @@ enum : int {
     JADE_FOUND_BY_DAY = 1,
 };
 
-// Each fix as the config says (on by default), or all off if the
-// environment says REUNION_ORIGINAL=1.
+// Each fix as the config says (on by default).
 void Fixes_Init(void);
-// REUNION_ORIGINAL=1 is set.
-bool Fixes_Locked(void);
-// All fixes off (original behaviour).
-void Fixes_Original(void);

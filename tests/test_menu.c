@@ -1,6 +1,6 @@
 // menu: the port menu's model driven by key events, without a window:
 // sections and rows, changes to the config, requests to the game, the
-// fixes' rows, locked fixes, and Restart / Quit.
+// fixes' rows, and Restart / Quit.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -156,18 +156,8 @@ int main(void)
     press(SDLK_ESCAPE);
     CHECK(!menu_is_open());
 
-    // Locked fixes: shown off, unchangeable.
-    hooks.fixes_locked = true;
-    menu_set_hooks(&hooks);
-    menu_open();
-    go_to(SEC_FIXES);
-    CHECK(row_is(2, "[ ] Jade found in time"));
-    press(SDLK_DOWN);
-    press(SDLK_DOWN);
-    press(SDLK_RETURN);
-    CHECK(config_fix("find_jade") && changes[MENU_CHANGED_FIXES] == 3);
-
     // Restart and Quit close the menu with their request.
+    menu_open();
     go_to(SEC_RESTART);
     press(SDLK_RETURN);
     CHECK(!menu_is_open() && input_restart_requested() && !input_quit_requested());

@@ -213,7 +213,7 @@ Build this **on the current model**, before anything moves.
      `tools/soak.sh`), every 500 retraces;
    - each cut-scene (`--cutscene=credits|intro|victory`), every 100
      retraces;
-   - fixes off (`REUNION_ORIGINAL=1`) for at least the proof and one soak
+   - fixes off (the port menu's All off) for at least the proof and one soak
      seed.
 
    A ctest compares a fresh run with the goldens and reports the first frame

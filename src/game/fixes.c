@@ -45,23 +45,8 @@ const FixInfo Fixes_List[] = {
 
 const int Fixes_Count = (int)SDL_arraysize(Fixes_List);
 
-bool Fixes_Locked(void)
-{
-    const char *env = SDL_getenv("REUNION_ORIGINAL");
-    return env && *env && *env != '0';
-}
-
 void Fixes_Init(void)
 {
-    if (Fixes_Locked()) {
-        Fixes_Original();
-        return;
-    }
     for (int i = 0; i < Fixes_Count; i++)
         *Fixes_List[i].value = config_fix(Fixes_List[i].key);
-}
-
-void Fixes_Original(void)
-{
-    fixes = (Fixes){0};
 }

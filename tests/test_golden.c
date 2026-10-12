@@ -20,6 +20,7 @@
 #include <stdio.h>
 
 #include "cutscene/cutscene.h"
+#include "game/fixes.h"
 #include "game/saveload.h"
 #include "game/state.h"
 #include "platform/autopilot.h"
@@ -40,7 +41,7 @@ typedef struct {
     const char *name;
     const char *script;     // autopilot script; "@file" is relative to the source dir
     int interval;           // retraces between samples
-    bool original;          // fixes off (REUNION_ORIGINAL=1)
+    bool original;          // every fix off (the port menu's All off)
     const char *cutscene;   // plays this cut-scene instead of the game
     const char *load;       // loads tests/golden/saves/<load>.sav ...
     int load_at;            // ... at this frame
@@ -183,7 +184,9 @@ static void clear_dir(const char *dir)
 static void run_case(const GoldenCase *c)
 {
     cur = c;
-    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "REUNION_ORIGINAL", c->original ? "1" : "0", true);
+    // The run applies the config's fixes when it boots (play.c).
+    for (int i = 0; i < Fixes_Count; i++)
+        config_set_fix(Fixes_List[i].key, !c->original);
     // The golden files describe the game without the colony stats, which
     // add a hotspot to the planet info screen.
     config.colony_stats = false;

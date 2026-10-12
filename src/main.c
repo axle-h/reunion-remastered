@@ -158,7 +158,6 @@ static void setup_config(void)
         .add_ore = OPTIONS_ADD_ORE,
         .fixes = fixes,
         .fix_count = n,
-        .fixes_locked = Fixes_Locked(),
     });
 }
 

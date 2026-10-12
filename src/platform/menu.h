@@ -33,7 +33,6 @@ typedef struct MenuHooks {
     int add_money, add_ore;  // the add cheats' amounts, for their labels
     const MenuFix *fixes;
     int fix_count;
-    bool fixes_locked;       // REUNION_ORIGINAL: shown off, not changeable
 } MenuHooks;
 
 void menu_set_hooks(const MenuHooks *hooks);

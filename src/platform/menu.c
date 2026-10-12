@@ -207,16 +207,12 @@ static void build_rows(void)
         r->on = config.colony_stats;
         break;
     case SEC_FIXES:
-        r = add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
-        r->enabled = !hooks.fixes_locked;
-        r = add(ROW_ACTION, R_FIXES_OFF, "All off (original)", "The original game, bugs and all.");
-        r->enabled = !hooks.fixes_locked;
+        add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
+        add(ROW_ACTION, R_FIXES_OFF, "All off (original)", "The original game, bugs and all.");
         for (int i = 0; i < hooks.fix_count && row_count < MAX_ROWS; i++) {
             const MenuFix *f = &hooks.fixes[i];
-            r = add(ROW_TOGGLE, R_FIX + i, f->label,
-                    hooks.fixes_locked ? "Off: REUNION_ORIGINAL is set." : f->help);
-            r->on = !hooks.fixes_locked && config_fix(f->key);
-            r->enabled = !hooks.fixes_locked;
+            r = add(ROW_TOGGLE, R_FIX + i, f->label, f->help);
+            r->on = config_fix(f->key);
         }
         break;
     case SEC_RESTART:

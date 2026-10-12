@@ -32,7 +32,7 @@ Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
 
 The port fixes a few things in the original that can make the game
 unwinnable (docs/bugs.md, "Fixed in the port"); each can be switched off in
-the port menu, and `REUNION_ORIGINAL=1` plays without any of them.
+the port menu (Fixes), or all of them at once.
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

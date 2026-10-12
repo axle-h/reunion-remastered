@@ -1142,7 +1142,7 @@ every interrupt.
 **S1. Map on Amnesty.** The original's mining reads the selected system's
 bodies only (`Sim_MineBody`). The port mines every system
 (`fixes.mine_all_systems`, docs/bugs.md), so this order only matters with
-`REUNION_ORIGINAL=1`; the policy keeps it. After any action that selected another system (screens 7,
+that fix off; the policy keeps it. After any action that selected another system (screens 7,
 13, 16, 17, 18, 22, battles), call `select_amnesty()` before idling. Allowed
 exceptions: M11 (Phoenix 1 held until arrival), screen-17 watches of a group
 in transit.

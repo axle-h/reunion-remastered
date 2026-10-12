@@ -46,7 +46,7 @@ static void check_fixes(void)
             CHECK(f->value != Fixes_List[j].value && SDL_strcmp(f->key, Fixes_List[j].key) != 0);
     }
 
-    // On without a config; the config turns one off; REUNION_ORIGINAL all.
+    // On without a config; the config turns one off.
     Fixes_Init();
     for (int i = 0; i < Fixes_Count; i++)
         CHECK(*Fixes_List[i].value);
@@ -60,12 +60,6 @@ static void check_fixes(void)
     CHECK(!fixes.mine_all_systems);
     Options_Frame();
     CHECK(fixes.mine_all_systems && !fixes.find_jade);
-    SDL_setenv_unsafe("REUNION_ORIGINAL", "1", 1);
-    CHECK(Fixes_Locked());
-    Fixes_Init();
-    for (int i = 0; i < Fixes_Count; i++)
-        CHECK(!*Fixes_List[i].value);
-    SDL_unsetenv_unsafe("REUNION_ORIGINAL");
     config_reset();
     Fixes_Init();
 }
