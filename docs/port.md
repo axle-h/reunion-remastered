@@ -12,8 +12,8 @@ field in the original's order.
   by name; the original's DS offsets are only in the comments and the field
   table.
 - Records come from `ghidra/types.pas` with the Pascal layout (packed, no
-  alignment): they are the game's data formats, loaded from the executable,
-  saved and kept in heap blocks. Pascal arrays become 0-based C arrays: the
+  alignment): they are the game's data formats, the typed constants, saved
+  and kept in heap blocks. Pascal arrays become 0-based C arrays: the
   comment gives the Pascal bounds, and the C index is the Pascal index minus
   the lower bound (`Galaxy::SunNames[3]` → `ds.Galaxy_SunNames[2]`).
 - `boolean` is `uint8_t`, since the original may store any byte value.
@@ -29,20 +29,28 @@ field in the original's order.
   bytes. Only pointer fields differ in size from the original. Bytes nobody
   named are `_pad_XXXX` arrays.
 
-`dseg_init()` (`src/game/dseg.c`) does what the original's startup does: it
-copies the typed constants, DS `0000–759d`, from the load image of the
-player's `GRWAR\REUNION.PRG` and leaves the rest zeroed. The data segment
-starts at file offset `header paragraphs * 16 + 3A81h * 16`. The copy goes
-field by field through the field table (`src/game/dsfields.c`, generated
-too: every field's original offset, its offset in `DSeg`, its size and
-whether it holds pointers), and the far pointers into DS that DOS
-relocated (the galaxy and menu tables) become host pointers.
-`dseg_orig(offset)` gives the port's byte for an original DS offset.
+`dseg_init()` (`src/game/dseg.c`) does what the original's startup does:
+DS gets the typed constants, DS `0000–759d`, and the rest is zero. The
+values are `ds_initial` in `src/game/dsinit.c`, a C initializer by field
+name that the generator reads once from the load image of
+`GRWAR\REUNION.PRG` (the data segment starts at file offset
+`header paragraphs * 16 + 3A81h * 16`). The far pointers into DS that DOS
+relocates (the galaxy and menu tables) are host pointers there
+(`&ds.Galaxy_AmnestyBodies[0]`), and the bytes nobody named are in the
+`_pad_XXXX` arrays, so every byte matches the original's. The game needs
+no executable at run time, only the data files.
+
+The field table (`src/game/dsfields.c`, generated too) lists every field's
+original offset, its offset in `DSeg`, its size and whether it holds
+pointers. `dseg_orig(offset)` uses it to give the port's byte for an
+original DS offset.
 
 ### Regenerating
 
-`dseg.h` is generated; don't edit it. After adding names or types to
-`symbols.txt` or `types.pas`, run:
+`dseg.h`, `dsfields.c` and `dsinit.c` are generated; don't edit them. After
+adding names or types to `symbols.txt` or `types.pas`, run (`dsinit.c` needs
+`vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG`, or `--exe`; without it the file
+is left as it is):
 
 ```sh
 python3 -I tools/gen_dseg.py

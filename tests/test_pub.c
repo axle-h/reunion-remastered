@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // ((year * 20 + month) * 40 + day) * 30 + hour
     CHECK(Pub_DateToHours(0, 0, 0, 5) == 5);

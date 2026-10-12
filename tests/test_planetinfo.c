@@ -42,10 +42,7 @@ static void reset(void)
 {
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("dseg_init failed\n");
-        exit(77);
-    }
+    dseg_init();
     system_init();
     // The charset lives in the game data block, which this test doesn't
     // load; blank glyphs instead.

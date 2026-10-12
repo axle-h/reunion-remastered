@@ -19,10 +19,7 @@ int main(int argc, char **argv)
         printf("no game data\n");
         return 77;
     }
-    if (!dseg_init()) {
-        printf("dseg_init failed\n");
-        return 77;
-    }
+    dseg_init();
     system_init();
     static TGroup groups[2][32];
     ds.Game_Groups = groups;

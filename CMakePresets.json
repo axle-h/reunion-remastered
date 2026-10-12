@@ -16,11 +16,11 @@
     },
     {
       "name": "asan",
-      "displayName": "Debug with AddressSanitizer + UBSan (needs libasan, libubsan)",
+      "displayName": "Debug with AddressSanitizer + UBSan, UB fatal (needs libasan, libubsan)",
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize=alignment -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
       }
     },

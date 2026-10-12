@@ -228,10 +228,11 @@ int main(int argc, char *argv[])
 {
     dseg_clear();
     vid_clear();
-    if (argc < 2 || !fs_init(argv[1]) || !dseg_init()) {
+    if (argc < 2 || !fs_init(argv[1])) {
         printf("no game data\n");
         return 77;
     }
+    dseg_init();
     system_init();
     // The charset lives in the game data block, which this test doesn't
     // load; blank glyphs instead.

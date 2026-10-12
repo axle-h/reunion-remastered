@@ -20,7 +20,7 @@ static void reset(void)
 {
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
 }
 
@@ -28,10 +28,11 @@ int main(int argc, char *argv[])
 {
     dseg_clear();
     vid_clear();
-    if (argc < 2 || !fs_init(argv[1]) || !dseg_init()) {
+    if (argc < 2 || !fs_init(argv[1])) {
         printf("no game data\n");
         return 77;
     }
+    dseg_init();
 
     // Initial EXE state: scheme A not armed, scheme B not armed and unanswered.
     reset();

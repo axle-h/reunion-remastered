@@ -275,10 +275,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("no REUNION.PRG, skipping\n");
-        return 77;
-    }
+    dseg_init();
     system_init();
     // The charset lives in the game data block, which this test doesn't
     // load; blank glyphs instead.

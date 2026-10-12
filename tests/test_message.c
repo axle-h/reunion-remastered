@@ -51,7 +51,7 @@ static void reset(void)
 {
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     Ems_Init();
     Message_Init();

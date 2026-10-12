@@ -47,8 +47,7 @@ static int run(const char *script)
     if (setjmp(out) == 0) {
         dseg_clear();
         vid_clear();
-        if (!dseg_init())
-            return -3;
+        dseg_init();
         system_init();
         Game_InitUnits();
         Game_Main();

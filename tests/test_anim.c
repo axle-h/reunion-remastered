@@ -63,7 +63,7 @@ static void setup(void)
 {
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     // The record Anim::Record points to (InitRoomAnim allocates it).
     ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));

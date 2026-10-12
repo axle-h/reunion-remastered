@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // Storage units per ship type, from the typed constants.
     CHECK(ds.Cargo_UnitSpace[0] == 500 && ds.Cargo_UnitSpace[1] == 2000);

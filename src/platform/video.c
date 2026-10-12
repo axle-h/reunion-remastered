@@ -93,6 +93,19 @@ void vid12_planar_write(int offset, uint8_t color, uint8_t bitmask, uint8_t plan
     }
 }
 
+#ifdef __SANITIZE_ADDRESS__
+// Read by LeakSanitizer at exit. Mesa's Gallium driver allocates a block
+// once (in a pthread_once) when SDL's offscreen driver initialises EGL, and
+// keeps the only pointer to it in its static data. SDL unloads the driver
+// at exit, so LSan reports the block. It is not the game's, and not a real
+// leak: with dlclose a no-op the report goes away.
+const char *__lsan_default_suppressions(void);
+const char *__lsan_default_suppressions(void)
+{
+    return "leak:SDL_EGL_InitializeOffscreen\n";
+}
+#endif
+
 bool vid_init(const char *title)
 {
     if (!SDL_CreateWindowAndRenderer(title, config.window_width, config.window_height,

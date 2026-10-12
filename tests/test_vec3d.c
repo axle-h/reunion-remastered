@@ -195,7 +195,7 @@ static void prepare(void)
 static void model(void)
 {
     reset();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     VecLoad_Init();
     ds.VecLoad_Buffer = System_GetSegment();  // GetMem(0xAF00)  // as Shop::ShopScreen

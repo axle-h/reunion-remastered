@@ -133,10 +133,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("no REUNION.PRG, skipping the data tests\n");
-        return ok ? 77 : 1;
-    }
+    dseg_init();
     system_init();
     starfield();
     hotspots();

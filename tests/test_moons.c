@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     Ems_Init();
     Message_Init();

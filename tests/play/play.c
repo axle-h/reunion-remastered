@@ -215,12 +215,11 @@ static PlayResult boot_and_run(const char *script)
     }
     if (setjmp(game_out) == 0) {
         vid_clear();
-        if (dseg_init()) {
-            system_init();
-            Game_InitUnits();
-            Options_Init();
-            Game_Main();
-        }
+        dseg_init();
+        system_init();
+        Game_InitUnits();
+        Options_Init();
+        Game_Main();
     }
     const char *dump = SDL_getenv("PLAY_STATE_DUMP");
     if (dump && *dump) {

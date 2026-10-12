@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // Product list: the inventions that are done, in order; coming from the research screen preselects.
     for (int i = 0; i < 35; i++)

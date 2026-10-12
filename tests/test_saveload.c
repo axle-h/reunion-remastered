@@ -27,10 +27,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("no game data, skipping\n");
-        return 77;
-    }
+    dseg_init();
     system_init();
     Ems_Init();
     ds.Message_Log = System_GetMem(0x31B);

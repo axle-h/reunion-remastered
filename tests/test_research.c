@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // Only the skills the developer lacks count.
     TProduct *p = &ds.Research_Products[4];

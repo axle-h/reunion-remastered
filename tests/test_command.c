@@ -29,7 +29,7 @@ static void reset(void)
     dseg_clear();
     vid_clear();
     SDL_memset(vid_palette, 0, sizeof vid_palette);
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;

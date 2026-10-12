@@ -102,15 +102,13 @@ static const char *find_data_dir(int argc, char *argv[])
 
 // 1000:01a1 up to Main's body: video memory, DS, the heap and the unit
 // initialisers, in the original order.
-static bool boot(void)
+static void boot(void)
 {
     vid_clear();
-    if (!dseg_init())
-        return false;
+    dseg_init();
     system_init();
     Game_InitUnits();
     Options_Init();
-    return true;
 }
 
 // The port menu's link to the game: requests go to the main loop. The music
@@ -202,14 +200,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char *exe = nullptr;
+    char *assets = nullptr;
     if (fs_init(data_dir))
-        exe = fs_resolve("GRWAR\\REUNION.PRG");
-    if (!exe) {
+        assets = fs_resolve("GRAFIKA");
+    if (!assets) {
         char msg[1200];
         SDL_snprintf(msg, sizeof msg,
                      "The original game data was not found in\n%s\n\n"
-                     "Pass the directory holding GRWAR\\REUNION.PRG, GRAFIKA, ... as the first "
+                     "Pass the directory holding GRAFIKA, GRWAR, PICS, ... as the first "
                      "argument or set REUNION_DATA.",
                      data_dir);
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
@@ -218,7 +216,7 @@ int main(int argc, char *argv[])
         SDL_Quit();
         return 1;
     }
-    SDL_free(exe);
+    SDL_free(assets);
 
     // start.exe: CREDITS.PRG and INTRO.PRG, then the game (the cut-scenes
     // return false if the window was closed).
@@ -245,19 +243,10 @@ int main(int argc, char *argv[])
         system_exit_handler = on_halt;
         timing_set_quit_handler(on_quit);
         timing_set_restart_handler(on_restart);
-        // volatile: read after longjmp.
-        volatile bool booted = false;
         if (setjmp(exit_jump) == 0) {
-            booted = boot();
-            if (booted)
-                Game_Main();
-            exit_code = booted ? 0 : 1;
-        }
-        if (!booted && exit_code == 1) {
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Reunion",
-                                     "GRWAR\\REUNION.PRG could not be read.", nullptr);
-            result = 1;
-            break;
+            boot();
+            Game_Main();
+            exit_code = 0;
         }
         if (replay) {
             // The state as the game left it, before any restart or VICTORY.
@@ -276,7 +265,7 @@ int main(int argc, char *argv[])
         }
         // Soak tests (random autopilot) keep playing after the player quits.
         uint32_t seed;
-        if (exit_code == 0 && booted && autopilot_random_seed(&seed)) {
+        if (exit_code == 0 && autopilot_random_seed(&seed)) {
             SDL_Log("Autopilot: the game quit at frame %llu, restarting",
                     (unsigned long long)timing_frames());
             exit_code = EXIT_RESTART;

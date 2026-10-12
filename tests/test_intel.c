@@ -30,7 +30,7 @@ static void reset(void)
 {
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     Ems_Init();
     Message_Init();
@@ -55,10 +55,11 @@ int main(int argc, char *argv[])
 {
     dseg_clear();
     vid_clear();
-    if (argc < 2 || !fs_init(argv[1]) || !dseg_init()) {
+    if (argc < 2 || !fs_init(argv[1])) {
         printf("no game data\n");
         return 77;
     }
+    dseg_init();
     reset();
 
     // Record addressing: Races[2] at 6BCE, forces 27 bytes apart starting 0Ch into the record.

@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // Command::StaffPicked = advisor kind. Hints are (who, product) pairs.
     int16_t *kind = &ds.Command_StaffPicked;

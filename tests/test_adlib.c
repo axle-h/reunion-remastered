@@ -49,10 +49,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("no REUNION.PRG, skipping\n");
-        return 77;
-    }
+    dseg_init();
     system_init();
     const uint32_t heap_start = system_heap_used();
     SDL_setenv_unsafe("SDL_AUDIO_DRIVER", "dummy", 1);

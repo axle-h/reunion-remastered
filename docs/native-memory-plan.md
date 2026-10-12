@@ -42,9 +42,11 @@ Where the work differed from the plan below:
   window), the port shows colour 0. Reproducing the original's leftovers
   would need the Borland heap back. One proof golden sample was updated
   for it.
-- **Kept:** loading the initial data from the player's `REUNION.PRG` (the
-  open question below stays open), and the original's DS offsets in
-  comments and the field table, as the link to the disassembly.
+- **Kept:** the original's DS offsets in comments and the field table, as
+  the link to the disassembly.
+- **After the plan:** the initial data moved into C source
+  (`src/game/dsinit.c`, generated from `REUNION.PRG`), so the game needs no
+  executable at run time (the open question below).
 
 The rest of this file is the plan as written.
 
@@ -411,3 +413,6 @@ changes.
   initial data? Today the port needs the user's executable anyway. Moving
   the tables into C source would mean shipping data derived from the game,
   so check against the licence note in PLAN.md first.
+  **Answered (2026-10-12):** no; Alex prefers needing only the data files.
+  The tables are in `src/game/dsinit.c`, like the cut-scenes' tables and
+  the AdLib player's image before them.

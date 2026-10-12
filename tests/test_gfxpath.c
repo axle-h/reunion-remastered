@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     // The icon scratch buffer is allocated by the toolbar's set-up in Main.
     ds.GfxPath_IconScratch = System_GetMem(0x3C0);

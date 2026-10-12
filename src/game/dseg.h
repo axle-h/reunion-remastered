@@ -10,7 +10,7 @@
 #endif
 
 #define DSEG_SIZE 0xA544 // the original's size
-#define DSEG_INIT_SIZE 0x759E // typed constants, loaded by dseg_init()
+#define DSEG_INIT_SIZE 0x759E // the typed constants (game/dsinit.c)
 
 // No padding: records are the game's data formats (loaded, saved, kept
 // in heap blocks), and DSeg keeps the original's globals in order with
@@ -1541,9 +1541,11 @@ typedef struct DSeg {
 // The data segment (game/dseg.c).
 extern DSeg ds;
 
-// Fills DS 0000..DSEG_INIT_SIZE-1 from GRWAR\REUNION.PRG and zeroes the
-// rest, like the original at startup. Needs fs_init().
-bool dseg_init(void);
+// Gives DS its initial values: the typed constants, the rest zero, as
+// the original at startup.
+void dseg_init(void);
+// The values dseg_init gives DS (game/dsinit.c).
+extern const DSeg ds_initial;
 // Zeroes DS (dseg_init does so first).
 void dseg_clear(void);
 // The byte at offset orig of the original's DS, where the port keeps it

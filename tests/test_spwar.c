@@ -20,7 +20,7 @@ static void reset(void)
 {
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
@@ -164,10 +164,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    if (!dseg_init()) {
-        printf("no game data, skipping\n");
-        return 77;
-    }
+    dseg_init();
     test_step();
     test_losses();
     fs_shutdown();

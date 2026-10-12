@@ -3,10 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include "game/dsfields.h"
-#include "platform/fs.h"
-
-// File segment of DS in REUNION.PRG (Ghidra's 4a81 minus its 1000h load base).
-enum : uint32_t { DS_FILE_SEG = 0x3A81 };
 
 DSeg ds;
 
@@ -64,86 +60,7 @@ uint8_t *dseg_orig(uint16_t orig)
     return b.at + b.rest;
 }
 
-// Copies one field (or record field) of the load image; pointers are left to
-// the relocations.
-static void copy_field(const DsField *f, uint8_t *dst, const uint8_t *src)
+void dseg_init(void)
 {
-    if (f->flags & DSF_HOST)
-        return;
-    const DsRecord *r = f->rec >= 0 ? &ds_records[f->rec] : nullptr;
-    if (!r || r->size == r->port_size) {
-        SDL_memcpy(dst, src, (size_t)f->elem * f->count);
-        return;
-    }
-    for (uint32_t e = 0; e < f->count; e++)
-        for (int i = 0; i < r->nfields; i++)
-            copy_field(&r->fields[i], dst + e * r->port_size + r->fields[i].at,
-                       src + e * r->size + r->fields[i].ofs);
-}
-
-// DOS adds the load segment to every word listed in the MZ relocation table.
-// In DS those are the segments of far pointers: the galaxy and menu tables
-// into DS, which become host pointers, and Scale's row procedures into
-// code, which nothing in the port calls (kept as far values in Ghidra's
-// numbering, segment + 1000h).
-static bool apply_relocations(const uint8_t *exe, size_t size, const uint8_t *image)
-{
-    size_t count = exe[6] | exe[7] << 8;
-    size_t table = exe[0x18] | exe[0x19] << 8;
-    if (table + count * 4 > size)
-        return false;
-    for (size_t i = 0; i < count; i++) {
-        const uint8_t *e = exe + table + i * 4;
-        uint32_t linear = (uint32_t)(e[2] | e[3] << 8) * 16 + (e[0] | e[1] << 8);
-        uint32_t base = DS_FILE_SEG * 16;
-        if (linear < base + 2 || linear + 2 > base + DSEG_INIT_SIZE)
-            continue;
-        uint16_t at = (uint16_t)(linear - base - 2);  // the far pointer's offset word
-        uint16_t off = (uint16_t)(image[at] | image[at + 1] << 8);
-        uint16_t seg = (uint16_t)(image[at + 2] | image[at + 3] << 8);
-        DsByte where;
-        if (!locate(at, &where))
-            continue;
-        if (where.field->flags & DSF_HOST) {
-            uint8_t *target = seg == DS_FILE_SEG ? dseg_orig(off) : nullptr;
-            SDL_memcpy(where.at + where.rest / 4 * sizeof(void *), &target, sizeof(void *));
-        } else {
-            uint32_t far = (uint32_t)(seg + 0x1000) << 16 | off;
-            SDL_memcpy(where.at + where.rest, &far, 4);
-        }
-    }
-    return true;
-}
-
-bool dseg_init(void)
-{
-    // The rest of the segment is zero, as after System's ClearBss.
-    dseg_clear();
-    size_t size;
-    uint8_t *exe = fs_load("GRWAR\\REUNION.PRG", &size);
-    if (!exe)
-        return false;
-
-    // Typed constants are part of the load image, which starts after the
-    // MZ header (its size in paragraphs is at offset 8). They are copied
-    // field by field into the port's layout.
-    bool ok = size >= 0x1C && exe[0] == 'M' && exe[1] == 'Z';
-    if (ok) {
-        size_t start = (size_t)(exe[8] | exe[9] << 8) * 16 + DS_FILE_SEG * 16;
-        ok = start + DSEG_INIT_SIZE <= size;
-        if (ok) {
-            const uint8_t *image = exe + start;
-            for (int i = 0; i < ds_field_count && ds_fields[i].ofs < DSEG_INIT_SIZE; i++) {
-                const DsField *f = &ds_fields[i];
-                // The typed constants end where the next field begins.
-                if (f->ofs + (uint32_t)f->elem * f->count > DSEG_INIT_SIZE)
-                    SDL_memcpy((uint8_t *)&ds + f->at, image + f->ofs, DSEG_INIT_SIZE - f->ofs);
-                else
-                    copy_field(f, (uint8_t *)&ds + f->at, image + f->ofs);
-            }
-            ok = apply_relocations(exe, size, image);
-        }
-    }
-    SDL_free(exe);
-    return ok;
+    ds = ds_initial;
 }

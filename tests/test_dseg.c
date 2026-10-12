@@ -1,4 +1,4 @@
-// dseg: the data segment mirror, initialised from GRWAR\REUNION.PRG.
+// dseg: the data segment mirror and its initial values (game/dsinit.c).
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    check(dseg_init(), "dseg_init");
+    dseg_init();
 
     check(pstr_is(&ds.Galaxy_SunNames[0].Name, "Mercury"), "SunNames[1]");
     // Far pointers in the typed constants are relocated like DOS does, here

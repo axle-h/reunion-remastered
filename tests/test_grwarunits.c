@@ -17,10 +17,11 @@ int main(int argc, char *argv[])
 {
     dseg_clear();
     vid_clear();
-    if (argc < 2 || !fs_init(argv[1]) || !dseg_init()) {
+    if (argc < 2 || !fs_init(argv[1])) {
         printf("no game data\n");
         return 77;
     }
+    dseg_init();
     system_init();
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
     System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);

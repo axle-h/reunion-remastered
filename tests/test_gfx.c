@@ -45,7 +45,7 @@ static void reset(void)
 static void reset_data(void)
 {
     reset();
-    CHECK(dseg_init());
+    dseg_init();
     system_init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;

@@ -212,4 +212,7 @@ so "original behaviour" stays reproducible.
 ## Open decisions
 - **Licence / publication:** the game is still under copyright. Keep the repo
   private or publish code only (no assets, no raw decompiler dumps) until
-  that's decided.
+  that's decided. The source holds data taken from the executables
+  (`src/game/dsinit.c`, the game's typed constants and texts; the cut-scene
+  tables; the AdLib player's image in `src/game/adlib.c`), which publishing
+  code only would have to leave out and regenerate on the player's side.

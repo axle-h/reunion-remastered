@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     }
     dseg_clear();
     vid_clear();
-    CHECK(dseg_init());
+    dseg_init();
 
     // Pilots cost 4500 / 25000 / 120000.
     CHECK(ds.Staff_Price[0][0] == 4500 && ds.Staff_Price[0][1] == 25000 && ds.Staff_Price[0][2] == 120000);

@@ -3,18 +3,21 @@
 
     gen_dseg.py [--symbols ghidra/symbols.txt] [--types ghidra/types.pas]
                 [-o src/game/dseg.h] [--fields src/game/dsfields.c]
+                [--init src/game/dsinit.c] [--exe .../GRWAR/REUNION.PRG]
 
 Reads the record types from types.pas and the data-segment symbols
 (`4a81:XXXX Unit::Name: type // comment`) from symbols.txt and writes
 `DSeg`, a packed struct with every named variable at its original offset,
-plus static_asserts for all record and DSeg offsets, and the field table
-that walks DS by name (src/game/dsfields.c, for game/state.c). Entries
+plus static_asserts for the records' offsets, the field table
+that walks DS by name (src/game/dsfields.c, for game/state.c), and DS's
+initial values read from the executable (src/game/dsinit.c). Entries
 that can't be typed or placed are reported and left out; the run itself
 never fails on them. See docs/port.md.
 """
 
 import argparse
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -366,7 +369,7 @@ def generate(types, kept, dropped):
         "#endif",
         "",
         f"#define DSEG_SIZE 0x{DS_SIZE:04X} // the original's size",
-        f"#define DSEG_INIT_SIZE 0x{DS_INIT_SIZE:04X} // typed constants, loaded by dseg_init()",
+        f"#define DSEG_INIT_SIZE 0x{DS_INIT_SIZE:04X} // the typed constants (game/dsinit.c)",
         "",
         "// No padding: records are the game's data formats (loaded, saved, kept",
         "// in heap blocks), and DSeg keeps the original's globals in order with",
@@ -430,9 +433,11 @@ def generate(types, kept, dropped):
         "// The data segment (game/dseg.c).",
         "extern DSeg ds;",
         "",
-        "// Fills DS 0000..DSEG_INIT_SIZE-1 from GRWAR\\REUNION.PRG and zeroes the",
-        "// rest, like the original at startup. Needs fs_init().",
-        "bool dseg_init(void);",
+        "// Gives DS its initial values: the typed constants, the rest zero, as",
+        "// the original at startup.",
+        "void dseg_init(void);",
+        "// The values dseg_init gives DS (game/dsinit.c).",
+        "extern const DSeg ds_initial;",
         "// Zeroes DS (dseg_init does so first).",
         "void dseg_clear(void);",
         "// The byte at offset orig of the original's DS, where the port keeps it",
@@ -512,6 +517,309 @@ def generate_fields(types, kept):
     return "\n".join(out)
 
 
+DS_FILE_SEG = DS_SEG - 0x1000  # DS's segment in the load image
+SCALAR_BASES = {base for base, _ in SCALARS.values()} - {"Real48", "Extended80"}
+
+
+def ds_layout(kept):
+    """DSeg's members in order, padding included: (cname, CType, ofs)."""
+    out, pos = [], 0
+    for s in kept:
+        if s.ofs > pos:
+            out.append((f"_pad_{pos:04X}", CType("uint8_t", s.ofs - pos, [(0, s.ofs - pos - 1)]), pos))
+        out.append((s.cname, s.ctype or CType("uint8_t", 1), s.ofs))
+        pos = s.ofs + s.size
+    if pos < DS_SIZE:
+        out.append((f"_pad_{pos:04X}", CType("uint8_t", DS_SIZE - pos, [(0, DS_SIZE - pos - 1)]), pos))
+    return out
+
+
+def elem_of(ct):
+    """The element type of an array type (ct itself for a scalar)."""
+    count = 1
+    for lo, hi in ct.dims:
+        count *= hi - lo + 1
+    return CType(ct.base, ct.size // count, [], ct.note, ct.pointer, ct.target, ct.code), \
+        [hi - lo + 1 for lo, hi in ct.dims]
+
+
+class InitWriter:
+    """src/game/dsinit.c: DS's initial values (the typed constants of the
+    load image, relocated as DOS does) as a C initializer."""
+
+    WIDTH = 100
+
+    def __init__(self, types, kept, exe):
+        self.types = types
+        self.layout = ds_layout(kept)
+        if exe[:2] != b"MZ":
+            raise SystemExit("not an MZ executable")
+        u16 = lambda b, o: b[o] | b[o + 1] << 8
+        start = u16(exe, 8) * 16 + DS_FILE_SEG * 16
+        image = bytearray(exe[start:start + DS_INIT_SIZE])
+        if len(image) != DS_INIT_SIZE:
+            raise SystemExit("executable too short")
+        # Past the typed constants DS starts zeroed (System's ClearBss).
+        image += bytes(DS_SIZE - DS_INIT_SIZE)
+        # DOS adds the load segment to every word in the relocation table.
+        # In DS those are far pointers' segments: pointers into DS become
+        # host pointers (other host pointers nil), far values elsewhere keep
+        # Ghidra's numbering (segment + 1000h).
+        self.host = {}
+        table = u16(exe, 0x18)
+        base = DS_FILE_SEG * 16
+        patched = bytearray(image)
+        for i in range(u16(exe, 6)):
+            e = table + i * 4
+            linear = u16(exe, e + 2) * 16 + u16(exe, e)
+            if linear < base + 2 or linear + 2 > base + DS_INIT_SIZE:
+                continue
+            at = linear - base - 2
+            off, seg = u16(image, at), u16(image, at + 2)
+            where = self.locate(at)
+            if where and where[1].host:
+                self.host[at] = (self.pointer_to(off, where[1].target) if seg == DS_FILE_SEG
+                                 and where[1].target else None)
+            else:
+                patched[at:at + 2] = off.to_bytes(2, "little")
+                patched[at + 2:at + 4] = ((seg + 0x1000) & 0xFFFF).to_bytes(2, "little")
+        self.image = bytes(patched)
+
+    # --- addresses -------------------------------------------------------
+
+    def locate(self, off, fields=None, prefix="ds."):
+        """The scalar holding DS byte off: (C lvalue, its CType, byte in it)."""
+        for cname, ct, fofs in fields if fields is not None else self.layout:
+            if not fofs <= off < fofs + ct.size:
+                continue
+            elem, dims = elem_of(ct)
+            e, rest = divmod(off - fofs, elem.size)
+            idx = ""
+            for n in reversed(dims):
+                e, i = divmod(e, n)
+                idx = f"[{i}]" + idx
+            expr = prefix + cname + idx
+            rec = self.types.records.get(elem.base.lower())
+            if rec and not elem.host:
+                return self.locate(rest, rec[2], expr + ".")
+            return expr, elem, rest
+        return None
+
+    def pointer_to(self, off, target, fields=None, prefix="ds."):
+        """A C address constant of type target (base, inner dimensions) for
+        the byte at DS offset off: the element that starts there where its
+        type fits, else a cast. None where the port keeps a host pointer (as
+        dseg_orig)."""
+        base, inner = target
+        for cname, ct, fofs in fields if fields is not None else self.layout:
+            if not fofs <= off < fofs + ct.size:
+                continue
+            elem, dims = elem_of(ct)
+            if elem.host:
+                return None
+            e, rest = divmod(off - fofs, elem.size)
+            idx = []
+            for n in reversed(dims):
+                e, i = divmod(e, n)
+                idx.insert(0, i)
+            if rest == 0 and elem.base == base:
+                k = len(inner)
+                if k == 0:
+                    return f"&{prefix}{cname}" + "".join(f"[{i}]" for i in idx)
+                if dims[len(dims) - k:] == inner and not any(idx[len(idx) - k:]):
+                    return f"&{prefix}{cname}" + "".join(f"[{i}]" for i in idx[:len(idx) - k])
+            expr = prefix + cname + "".join(f"[{i}]" for i in idx)
+            rec = self.types.records.get(elem.base.lower())
+            if rec and rest:
+                return self.pointer_to(rest, target, rec[2], expr + ".")
+            cast = f"{base} (*)" + "".join(f"[{n}]" for n in inner) if inner else f"{base} *"
+            if not rest:
+                return f"({cast})&{expr}"
+            if base == "uint8_t" and not inner:
+                return f"(uint8_t *)&{expr} + {rest}"
+            return f"({cast})((uint8_t *)&{expr} + {rest})"
+        return None
+
+    # --- values ----------------------------------------------------------
+
+    def value(self, ct, ofs):
+        """Initializer for a ct at DS offset ofs: a string, a list of
+        member initializers (braced), or None for all zero."""
+        elem, dims = elem_of(ct)
+        if dims:
+            return self.array(elem, dims, ofs)
+        return self.scalar(elem, ofs)
+
+    def array(self, elem, dims, ofs):
+        if len(dims) == 1 and elem.base == "char" and not elem.host:
+            return self.chars(ofs, dims[0])
+        step = elem.size
+        for n in dims[1:]:
+            step *= n
+        items = []
+        for i in range(dims[0]):
+            v = self.array(elem, dims[1:], ofs + i * step) if len(dims) > 1 else self.scalar(elem, ofs + i * step)
+            items.append(v)
+        while items and items[-1] is None:
+            items.pop()
+        if not items:
+            return None
+        return [("", v if v is not None else self.zero(elem, len(dims) > 1)) for v in items]
+
+    @staticmethod
+    def zero(ct, aggregate):
+        if aggregate or ct.base not in SCALAR_BASES and not ct.host:
+            return [("", "0")]
+        return "nullptr" if ct.host else "0"
+
+    def scalar(self, ct, ofs):
+        data = self.image[ofs:ofs + ct.size]
+        if ct.host:
+            return self.host.get(ofs)
+        if not any(data):
+            return None
+        rec = self.types.records.get(ct.base.lower())
+        if rec:
+            items = [(f".{f} = ", v) for f, fct, fofs in rec[2]
+                     if (v := self.value(fct, ofs + fofs)) is not None]
+            return items or None
+        if ct.base == "PString" or ct.base.startswith("PStr"):
+            n = ct.size - 1
+            chars = self.chars(ofs + 1, n)
+            return [("", str(data[0]))] + ([("", chars)] if chars is not None else [])
+        if ct.base in ("Real48", "Extended80"):
+            text = "{" + ", ".join(f"0x{b:02X}" for b in data) + "}"
+            if ct.base == "Real48":
+                return [("", text + f" /* {real48(data):g} */")]
+            return [("", text)]
+        if ct.base == "char":
+            return char_literal(data[0])
+        if ct.base == "float":
+            return float_literal(struct.unpack("<f", data)[0]) + "f"
+        if ct.base == "double":
+            return float_literal(struct.unpack("<d", data)[0])
+        signed = ct.base.startswith("int")
+        v = int.from_bytes(data, "little", signed=signed)
+        if ct.pointer:  # a far pointer value (farptr, procedure)
+            return f"0x{v:08X}"
+        if v == -(1 << (8 * ct.size - 1)):
+            return f"({v + 1} - 1)"  # INT_MIN isn't a literal
+        return str(v)
+
+    def chars(self, ofs, n):
+        """A char[n] at ofs: a string literal while it has room for the
+        terminator, else character constants."""
+        data = self.image[ofs:ofs + n]
+        end = len(data.rstrip(b"\0"))
+        if end == 0:
+            return None
+        if end < n:
+            return string_literal(data[:end])
+        return [("", char_literal(b)) for b in data]
+
+    # --- output ----------------------------------------------------------
+
+    def fmt(self, v, indent, lead):
+        """Lines for v, its members at indent + 4; the first line continues
+        one that already has lead columns."""
+        if isinstance(v, str):
+            return [v]
+        flat = self.flat(v)
+        if flat is not None and lead + len(flat) + 1 <= self.WIDTH:
+            return [flat]
+        pad = " " * (indent + 4)
+        lines, row = ["{"], ""
+        for prefix, item in v:
+            if not prefix and isinstance(item, str) and "/*" not in item and not item.startswith('"'):
+                # Numbers and characters: as many as fit on a line.
+                if row and len(pad) + len(row) + len(item) + 1 > self.WIDTH:
+                    lines.append(pad + row.rstrip())
+                    row = ""
+                row += item + ", "
+                continue
+            if row:
+                lines.append(pad + row.rstrip())
+                row = ""
+            sub = self.fmt(item, indent + 4, len(pad) + len(prefix))
+            lines.append(pad + prefix + sub[0])
+            lines += sub[1:]
+            lines[-1] += ","
+        if row:
+            lines.append(pad + row.rstrip())
+        lines.append(" " * indent + "}")
+        return lines
+
+    def flat(self, v):
+        if isinstance(v, str):
+            return v
+        parts = [self.flat(item) for _, item in v]
+        if any(p is None or "\n" in p for p in parts):
+            return None
+        return "{" + ", ".join(prefix + p for (prefix, _), p in zip(v, parts)) + "}"
+
+    def generate(self):
+        out = [
+            "// The data segment's initial values: the typed constants of",
+            "// REUNION.PRG's load image (DS 0000..DSEG_INIT_SIZE-1), with the far",
+            "// pointers DOS relocates as host pointers into DS. Everything else",
+            "// starts zero, as after System's ClearBss.",
+            "// generated by tools/gen_dseg.py, do not edit (see docs/port.md).",
+            "#include \"game/dseg.h\"",
+            "",
+            "const DSeg ds_initial = {",
+        ]
+        for cname, ct, ofs in self.layout:
+            if ofs >= DS_INIT_SIZE:
+                break
+            v = self.value(ct, ofs)
+            if v is None:
+                continue
+            prefix = f".{cname} = "
+            lines = self.fmt(v, 4, 4 + len(prefix))
+            out.append(f"    // {DS_SEG:04x}:{ofs:04x}")
+            out.append("    " + prefix + lines[0])
+            out += lines[1:]
+            out[-1] += ","
+        out.append("};")
+        out.append("")
+        return "\n".join(out)
+
+
+def real48(b):
+    """The value of a 6-byte Real (b[0] exponent, bias 129; sign in b[5])."""
+    if b[0] == 0:
+        return 0.0
+    mant = int.from_bytes(b[1:6], "little") & ((1 << 39) - 1)
+    v = (1 + mant / (1 << 39)) * 2.0 ** (b[0] - 129)
+    return -v if b[5] & 0x80 else v
+
+
+def char_literal(b):
+    if b == 0x27 or b == 0x5C:
+        return f"'\\{chr(b)}'"
+    if 0x20 <= b < 0x7F:
+        return f"'{chr(b)}'"
+    return f"'\\x{b:02X}'"
+
+
+def string_literal(data):
+    out = '"'
+    for b in data:
+        if b in (0x22, 0x5C):
+            out += "\\" + chr(b)
+        elif 0x20 <= b < 0x7F:
+            out += chr(b)
+        else:
+            out += f"\\{b:03o}"
+    return out + '"'
+
+
+def float_literal(x):
+    if x != x or x in (float("inf"), float("-inf")):
+        raise SystemExit(f"non-finite float {x} in the typed constants")
+    return x.hex()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--symbols", type=Path, default=ROOT / "ghidra/symbols.txt")
@@ -519,6 +827,10 @@ def main():
     ap.add_argument("-o", "--output", type=Path, default=ROOT / "src/game/dseg.h")
     ap.add_argument("--fields", type=Path, default=ROOT / "src/game/dsfields.c",
                     help="field table for walking DS by name (game/dsfields.h)")
+    ap.add_argument("--init", type=Path, default=ROOT / "src/game/dsinit.c",
+                    help="DS's initial values, read from --exe")
+    ap.add_argument("--exe", type=Path, default=ROOT / "vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG",
+                    help="the original executable (only read for --init)")
     args = ap.parse_args()
 
     warnings = []
@@ -532,6 +844,10 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(generate(types, kept, dropped), encoding="utf-8")
     args.fields.write_text(generate_fields(types, kept), encoding="utf-8")
+    if args.exe.exists():
+        args.init.write_text(InitWriter(types, kept, args.exe.read_bytes()).generate(), encoding="utf-8")
+    else:
+        warn(f"{args.exe} not found, {args.init} not written")
     for w in warnings:
         print("warning:", w, file=sys.stderr)
     print(f"{args.output}: {len(types.order)} records, {len(kept)} fields, "
