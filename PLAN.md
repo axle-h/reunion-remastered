@@ -78,41 +78,13 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(mostly done, see 1 below).
+(mostly done, see 6 below).
 
 ## Remaining work
 
 In rough priority order.
 
-### 1. Verification gaps
-
-- **The port's saves in the original.** The DOS saves load in the port
-  (`golden_load_DOS_*`); the other way round is untested. Load a port save
-  (e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
-  hand and play on. A save holds only data records (no pointers), so a
-  difference would be a value the original never writes.
-- **Whole-game side-by-side.** The differential tests compared single
-  routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
-  Nothing has compared a longer run (timing per game hour, a battle) with
-  the original from the same save.
-- **Original crashes on modern machines.** The suspects are all in the
-  DOS sound drivers and timer, which the port replaces, so there is
-  nothing to fix on the port's side; reproducing a crash in DOSBox-X would
-  only confirm the cause:
-  - the UltraSound module player (`43d5`) reprograms the PIT to about
-    1 kHz with its own INT 08h handler, which never chains to the BIOS's,
-    so the BIOS tick, INT 1Ch and the DOS clock stop while it plays;
-  - UltraSound detection scans 200h–2A0h, but the player hard-codes base
-    220h (where a Sound Blaster usually sits; DOSBox's UltraSound default
-    is 240h), and a failed detection still writes to ports 0–7 (the DMA
-    controller) and 20h (the PIC);
-  - AdLib detection (`428e`) waits for VGA retrace edges on each candidate
-    port and hangs where port 3DAh doesn't toggle;
-  - the Sound Blaster driver is a raw real-mode blob (`GRWAR\ALFA1.PIC`),
-    and the game spins on its status word, hanging if the driver never
-    clears it.
-
-### 2. Playthrough robustness
+### 1. Playthrough robustness
 
 Seeds 1-6 win. Seed 3 used to lose at M16 because New Earth stopped at 5
 Derricks (E21) and the Detoxin for the Space station never gathered; since
@@ -120,7 +92,7 @@ Derricks (E21) and the Detoxin for the Space station never gathered; since
 found, so another seed may hit it again (docs/playthrough.md,
 "Robustness").
 
-### 3. Bugs of the original still open
+### 2. Bugs of the original still open
 
 All are marked `// BUG?` in the code (`grep -rn 'BUG?' src/`). The port
 reproduces them. None left changes play (checked 2026-10-12); a new one
@@ -148,7 +120,7 @@ the OPL, slide up without carry. This is how the original's music sounds.
 - `surface.c` `RegisterBuildingAnims`: marking at uninitialised
   coordinates (the port skips it).
 - The unreachable money cheat (`26eb`; the port has its own), the GUS and
-  AdLib detection and timer bugs (the port replaces the drivers; see 1) and
+  AdLib detection and timer bugs (the port replaces the drivers) and
   the copy protection (removed, `src/game/protect.h`).
 - `main_program.c` `ClaimBodyForRace` after a lost ground battle: the
   arguments are in the wrong order, so it clears 65 bytes straddling
@@ -172,7 +144,7 @@ the OPL, slide up without carry. This is how the original's music sounds.
   sound cuts it off at once.
 - `planetinfo.c` `DrawStoresList` reads race bytes 13h..1Ah as flags: they
   are the race's weapon flags, read the same way by the spy reports (see
-  4), and alien mode opens only for owners above 1.
+  3), and alien mode opens only for owners above 1.
 - `research.c` `ResetSelectionFrame` doesn't hide the cursor: at worst two
   pixels of a frame keep the other frame colour until redrawn.
 - `command.c` calls `StartMainAnim` for the ground battle: it reads the war
@@ -191,7 +163,7 @@ the OPL, slide up without carry. This is how the original's music sounds.
   `Bodies[sys][-1]`: that flag is drawn only for an eighth moon, and the
   planet view sets its moons' flags before drawing them.
 
-### 4. Reverse-engineering loose ends
+### 3. Reverse-engineering loose ends
 
 These matter only for reading the code; nothing depends on them:
 
@@ -204,7 +176,7 @@ These matter only for reading the code; nothing depends on them:
   1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
   typed constants.
 
-### 5. Licence and publication
+### 4. Licence and publication
 
 The game is still under copyright. Decided (2026-10-12): release builds
 ship without the art and carry the data taken from the executables
@@ -214,7 +186,7 @@ supplies the rest (the import, README). Still open: whether to publish the repos
 Until then keep it private, or publish only the code (no assets, no raw
 decompiler dumps).
 
-### 6. Improvements
+### 5. Improvements
 
 Changes to the game's design rather than its bugs: quality of life first,
 then mechanics that don't do what the game seems to mean. Each one is a
@@ -227,8 +199,8 @@ each improvement gets its own test with it on.
 
 **Saves.** An improvement keeps its state in fields the original already
 has where it can, so the save stays in the DOS format and still loads in
-the original, which then plays it by its own rules. Trade routes (6.3) and
-the building table past 1,000 (6.5) have no room there, so they break
+the original, which then plays it by its own rules. Trade routes (5.3) and
+the building table past 1,000 (5.5) have no room there, so they break
 with the DOS format:
 
 - **When.** A save is written in the port's own format while
@@ -259,7 +231,7 @@ with the DOS format:
   both off; save and load in the port format restores everything; an
   unknown version is refused; the DOS-save tests are unchanged.
 
-#### 6.1 More Miner stations on a mining-only body
+#### 5.1 More Miner stations on a mining-only body
 
 A body with only a Miner station is barely worth the station. It mines
 with one "droid" (`TBody._0A` = 1) in 30% of hours (`Sim_MineBody`), so
@@ -302,7 +274,7 @@ Switch `more_stations`:
   adds them unplaced if not). Then update docs/walkthrough.md's Storage and
   Mining notes.
 
-#### 6.2 Build the same building again
+#### 5.2 Build the same building again
 
 Placing many copies of one building (the guide builds 20, then 60
 Derricks on New Earth) means going back to the build menu for each one.
@@ -313,7 +285,7 @@ places as today and ends the mode. The repeat stops by itself when money
 runs out or the spot is taken (`Surface_UpdateModeForCell` drops to mode
 1 as now). Check first what a right click does on the surface today.
 
-#### 6.3 Trade routes
+#### 5.3 Trade routes
 
 Ore is hauled home by hand, group by group, for the whole game. Switch
 `trade_routes`: a trade group can be given a route and then flies it on
@@ -330,7 +302,7 @@ its own.
   screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
   Start and Stop. The groups list marks a group on a route. Decide
   whether the editor is a game screen in the original's style or a port
-  panel like the F1 menu (simpler, and the keyboard work in 6.4 gets it
+  panel like the F1 menu (simpler, and the keyboard work in 5.4 gets it
   for free).
 - **Rules stay the game's:** the group needs a hired pilot whose tier
   reaches every stop, a Galleon to leave a system, and travel takes the
@@ -351,7 +323,7 @@ its own.
   home early; New Earth full; each stop condition; save and load keep the
   route.
 
-#### 6.4 Playing with the keyboard only
+#### 5.4 Playing with the keyboard only
 
 The original is played with the mouse; the keyboard is used only for
 typing names. Switch `keyboard_play`: every screen can be played with
@@ -370,7 +342,7 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 6.5 No building limit
+#### 5.5 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -398,7 +370,7 @@ Switch `no_building_limit`:
 - **Test.** Build past 1,000, save, load, and check every building and the
   count came back; with the switch off, the 1,001st is refused.
 
-#### 6.6 Smaller candidates
+#### 5.6 Smaller candidates
 
 Each needs a short spec before work starts.
 
@@ -408,3 +380,17 @@ Each needs a short spec before work starts.
 | A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still |
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
+
+### 6. Checks against the DOS game
+
+Both need DOSBox-X driven by a script, too much work for now.
+
+- **The port's saves in the original.** The DOS saves load in the port
+  (`golden_load_DOS_*`); the other way round is untested. Load a port save
+  (e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
+  hand and play on. A save holds only data records (no pointers), so a
+  difference would be a value the original never writes.
+- **Whole-game side-by-side.** The differential tests compared single
+  routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
+  Nothing has compared a longer run (timing per game hour, a battle) with
+  the original from the same save.
