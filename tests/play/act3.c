@@ -197,20 +197,30 @@ void act3_m07_tank_deal(void)
 // midnight (sim.c:781-805, run at hour 0 before the groups move): each
 // hidden planet rolls 1 in 5 a day, the first that hits is found (Phoenix 4
 // is the other one). Galleon 1 shuttles between Phoenix 3 and Phoenix 5,
-// sent off again between the goals of a pass (a flight takes ~3 h with
+// sent off again between the goals of a pass (a flight takes 3-5 h with
 // Jack, a pass of the goals ~3 days of clicks); from 18:00 on the status
 // bar's clock it is kept in flight until the clock turns to 0:00 (sent
 // off again on each landing, its group screen shown, the clock running).
 // Sent off only when found in orbit, it was in flight at one midnight in
 // three or four, and found nothing in 30 days in a run resumed at E16.
+// Sent off on landing in the evening, it landed again before midnight; it
+// now waits in orbit until 21:00, so the flight spans 0:00.
 typedef struct {
     int64_t midnight;
 } MidnightWait;
+
+enum { SHUTTLE_LAST_LAUNCH = 21 };
 
 static bool landed_or_midnight(void *arg)
 {
     const MidnightWait *w = arg;
     return ui_group_status("Galleon 1") == SHIP_ORBIT || pol_now() >= w->midnight;
+}
+
+static bool last_launch(void *unused)
+{
+    (void)unused;
+    return pol_now() % POL_DAY >= SHUTTLE_LAST_LAUNCH;
 }
 
 static void shuttle(void)
@@ -221,6 +231,10 @@ static void shuttle(void)
     MidnightWait w = {(pol_now() / POL_DAY + 1) * POL_DAY};
     bool evening = pol_now() % POL_DAY >= 18;
     do {
+        if (evening && ui_group_status("Galleon 1") != SHIP_FLYING && !last_launch(nullptr)) {
+            ui_open_group("Galleon 1", 22);
+            ui_wait_hours(last_launch, nullptr, SHUTTLE_LAST_LAUNCH - 18);
+        }
         if (ui_group_status("Galleon 1") != SHIP_FLYING)
             galleon_fly(&(Place){nullptr, at_phoenix_5() ? "Phoenix 3" : "Phoenix 5", nullptr});
         if (evening) {

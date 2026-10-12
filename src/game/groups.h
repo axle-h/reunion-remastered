@@ -59,6 +59,10 @@ bool Groups_IsGroupEmpty(int16_t list, int16_t group);
 bool Groups_IsGroupEmptyOfCargo(int16_t list, int16_t group);
 // 2b8d:1c9f: index of the planet force at that location, 0 if none (the last match wins)
 int16_t Groups_FindPlanetForce(int16_t system, int16_t planet, int16_t moon);
+// Port addition: the storage (thousands of tonnes per ore) of the body,
+// Groups^[1][FindPlanetForce]^.Storage as the original reads it. Without a
+// planet force that is the fleet's group 32 (fixes.station_storage).
+int16_t Groups_PlanetStorage(int16_t system, int16_t planet, int16_t moon);
 // 2b8d:1d09
 void Groups_InitPlanetForce(void);
 // 2b8d:1d6f

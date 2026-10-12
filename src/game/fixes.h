@@ -46,6 +46,12 @@ typedef struct Fixes {
     // colony's storage space, even when the ship has more room. The fix
     // caps it at the ship's room only.
     bool cargo_planet_cap;
+    // A body with only a Miner station has no planet force, and its storage
+    // is read from Groups^[1][0], which is the fleet's group 32. A power
+    // balance of any body without a planet force overwrites it (a conquest
+    // sets it to 0), and then no such body mines. The fix gives each one
+    // a Miner station's 10,000 t.
+    bool station_storage;
 } Fixes;
 
 extern Fixes fixes;

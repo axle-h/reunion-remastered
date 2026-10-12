@@ -9,6 +9,7 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/intel.h"
 #include "game/message.h"
 #include "game/sim.h"
 #include "game/system.h"
@@ -258,6 +259,8 @@ static void test_mine_all_systems(void)
 
     ds.Game_CurSystem = 1;
     fixes.mine_all_systems = false;
+    // Off, the bodies without a planet force read Groups^[1][0] (0 here).
+    fixes.station_storage = false;
     Sim_MineAllBodies();
     CHECK(b->Stores[1] == 0);
 
@@ -270,6 +273,7 @@ static void test_mine_all_systems(void)
     Sim_MineAllBodies();
     CHECK(b->Stores[1] == 2 * (50 * 2 / 10));
     fixes.mine_all_systems = true;
+    fixes.station_storage = true;
 }
 
 // The first Amnesty planet with a moon.
@@ -373,6 +377,36 @@ static void test_meteorite_droids(void)
     fixes.meteorite_droids = true;
 }
 
+// Fix (game/fixes.h): a body with only a Miner station mines into 10,000 t
+// of storage. With the fix off it reads the fleet's group 32, which a
+// conquest (the new colony's command centre is placed before its planet
+// force exists) sets to 0, and mining there stops.
+static void test_station_storage(void)
+{
+    for (int fix = 0; fix <= 1; fix++) {
+        reset();
+        TBody *b = &ds.Galaxy_AmnestyBodies[2];  // Amnesty 3, as Satellite_ColonizeBody leaves it
+        b->Owner = 1;
+        b->Colony = 0;
+        b->_0A = 1;
+        b->Deposits[1] = 50;  // ore 2
+        b->Stores[1] = 0;
+        Groups_At(1, 0)->Storage = 10;
+        ds.Game_CurSystem = 1;
+        fixes.station_storage = fix;
+        for (int i = 0; i < 100; i++)
+            Sim_MineAllBodies();
+        int32_t before = b->Stores[1];
+        CHECK(before > 0);
+        Intel_ClaimBodyForPlayer(3, 3, 0);  // Mirach 3 conquered
+        CHECK(Groups_At(1, 0)->Storage == 0);
+        for (int i = 0; i < 100; i++)
+            Sim_MineAllBodies();
+        CHECK(fix ? b->Stores[1] > before : b->Stores[1] == before);
+    }
+    fixes.station_storage = true;
+}
+
 static void test_golden(void)
 {
     reset();
@@ -417,6 +451,7 @@ int main(int argc, char *argv[])
     test_derricks_on_moons();
     test_build_on_moons();
     test_meteorite_droids();
+    test_station_storage();
     test_golden();
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

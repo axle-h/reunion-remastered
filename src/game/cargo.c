@@ -212,7 +212,7 @@ void Cargo_InitCargoScreen(void)
     Surface_CountBuildingsByKind(g->System, g->Planet, g->Moon);
     int16_t pf = Groups_FindPlanetForce(g->System, g->Planet, g->Moon);
     TGroup *pforce = group_at(1, pf);
-    ds.Cargo_PlanetCap = (int32_t)(uint16_t)pforce->Storage * 1000;
+    ds.Cargo_PlanetCap = (int32_t)(uint16_t)Groups_PlanetStorage(g->System, g->Planet, g->Moon) * 1000;
     for (int i = 1; i <= 13; i++) {
         int8_t prod = ds.Cargo_Items[i - 1];
         if (prod > 0) {

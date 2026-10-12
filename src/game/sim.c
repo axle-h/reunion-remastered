@@ -873,8 +873,7 @@ void Sim_UpdateBuildings(void)
             TBody *bd = fixes.derricks_on_moons || *cur_moon() != 0
                             ? body_at(bl->System, bl->Planet, bl->Moon)
                             : body(bl->System, bl->Planet);
-            int16_t force = Groups_FindPlanetForce(bl->System, bl->Planet, bl->Moon);
-            int32_t cap = lmul((uint16_t)Groups_At(1, force)->Storage, 1000);
+            int32_t cap = lmul((uint16_t)Groups_PlanetStorage(bl->System, bl->Planet, bl->Moon), 1000);
             if (bl->System == 1 && bl->Planet == 5 && bl->Moon == 0) {
                 if (ds.Game_HomeStock[0] < cap && System_Random(100) < 0x23)
                     ds.Game_HomeStock[0] += bd->Deposits[0] / 10;
@@ -923,8 +922,7 @@ static void Sim_MineBody(int16_t system, int16_t planet, int16_t moon, int16_t b
     TBody *b = body(fixes.mine_all_systems ? system : ds.Game_CurSystem, bodyIdx);
     if (!(b->Owner == 1 && (b->Colony != 0 || b->_0A != 0)))
         return;
-    int16_t force = Groups_FindPlanetForce(system, planet, moon);
-    int32_t cap = lmul((uint16_t)Groups_At(1, force)->Storage, 1000);
+    int32_t cap = lmul((uint16_t)Groups_PlanetStorage(system, planet, moon), 1000);
     // Ores 2..6; without a colony only the droids (_0A) mine, 30% of the time.
     if (system == 1 && planet == 5 && moon == 0) {
         for (int16_t j = 2; j <= 6; j++) {

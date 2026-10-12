@@ -83,6 +83,11 @@ static const GoldenCase cases[] = {
      .load = "L01_pilot", .load_at = 1000},
     {.name = "load_X01", .script = "seed:1;" NEW_GAME LOAD_PLAY, .interval = 100,
      .load = "X01_rigel1", .load_at = 1000},
+    // The two saves of a DOSBox install, written by the original game.
+    {.name = "load_DOS_1", .script = "seed:1;" NEW_GAME LOAD_PLAY, .interval = 100,
+     .load = "DOS_1", .load_at = 1000},
+    {.name = "load_DOS_2", .script = "seed:1;" NEW_GAME LOAD_PLAY, .interval = 100,
+     .load = "DOS_2", .load_at = 1000},
     // Release builds only (CMakeLists.txt): the playthrough's proof.
     {.name = "proof", .script = "@tests/play/proof_12345.txt", .interval = 10000},
     {.name = "proof_original", .script = "@tests/play/proof_12345.txt", .interval = 10000,

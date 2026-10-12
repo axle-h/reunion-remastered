@@ -52,8 +52,8 @@ The port is complete and the game can be won in it.
   off) catch any change in behaviour.
 - **Playable start to finish:** the playthrough fixture wins a new game
   with seed 12345 using only clicks, keys and what is on screen (Halt(10),
-  2930-02-26). Its recording replays to the same end in the plain binary.
-  Six of seven seeds win (docs/playthrough.md).
+  2930-02-29). Its recording replays to the same end in the plain binary.
+  Seeds 1-6 win too (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
   music, display, skip intro, colony stats, fix switches, import, restart,
   quit), `reunion.ini`, screenshots, headless autopilot, `--replay` and soak
@@ -62,13 +62,15 @@ The port is complete and the game can be won in it.
   first start imports the player's copy (a folder, a ZIP or the CD's ISO;
   the floppy and CD editions) into the player's folder, checked against
   the list of files the port loads.
-- **Bug fixing has started:** 11 bugs of the original that can make the
+- **Bug fixing has started:** 12 bugs of the original that can make the
   game unwinnable or break the economy are fixed behind switches
   (`src/game/fixes.h`). Of the 34 bugs found in the port while playing it, 33
   are fixed and one turned out to be the original's behaviour; their
   write-ups are in git history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 85 ctest tests pass on the release build, the full
-  playthrough (`test_play_game`) and the golden proof included.
+- **Tests:** all 87 ctest tests pass on the release build, the full
+  playthrough (`test_play_game`), the golden proof and the two DOS saves
+  (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
+  included.
 
 Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
@@ -82,12 +84,11 @@ In rough priority order.
 
 ### 1. Verification gaps
 
-- **Saves from the DOS game.** Loading original saves works (checked on
-  2026-10-12 with a scratch harness: docs/versions.md, "Saves"), but no test
-  covers it. Copy `~/dos/c/REUNION/SAVE/SPIDYSAV.1` and `.2` into
-  `tests/golden/saves/` and check that they load and save back unchanged
-  (as `test_golden`'s `load_save` does). Still to do: load the port's saves
-  in DOSBox-X.
+- **The port's saves in the original.** The DOS saves load in the port
+  (`golden_load_DOS_*`); the other way round is untested. Load a port save
+  (e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
+  hand and play on. A save holds only data records (no pointers), so a
+  difference would be a value the original never writes.
 - **Whole-game side-by-side.** The differential tests compared single
   routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
   Nothing has compared a longer run (timing per game hour, a battle) with
@@ -111,9 +112,11 @@ In rough priority order.
 
 ### 2. Playthrough robustness
 
-Seed 3 loses at M16: New Earth stops at 5 Derricks (seed 12345 has 20), so
-the Detoxin for the Space station never gathers in time. Why step E21 built
-no more Derricks is not known yet (docs/playthrough.md, "Robustness").
+Seeds 1-6 win. Seed 3 used to lose at M16 because New Earth stopped at 5
+Derricks (E21) and the Detoxin for the Space station never gathered; since
+`fixes.station_storage` it builds 18 and wins. Why it stalled was never
+found, so another seed may hit it again (docs/playthrough.md,
+"Robustness").
 
 ### 3. Bugs of the original still open
 
@@ -129,20 +132,17 @@ relocations and DS offsets masked out (a 16-byte-window match already pairs
 most code up), list the routines whose logic changed, and give real fixes a
 switch here.
 
-**Change play (candidates for a fix switch):**
+**Change play (candidates for a fix switch):** none of these can make the
+game unwinnable or stop the economy (checked 2026-10-12); they shift the
+balance of battles and colonies.
 
 | Where | What |
 |---|---|
-| `main_program.c`, after a ground battle | When an enemy wins a ground battle at one of your colonies, `ClaimBodyForRace` gets its arguments in the wrong order: (system, planet, moon, race) instead of (owner, system, planet, moon). The colony is purged but not taken over. Instead, the body at (planet, moon, race) is cleared and handed to owner = the system number. In system 1 that owner is the player |
 | `spwar.c` `add_store_ships` | Every garrison ship from a body's stores gets id C9h, but `ApplySpaceLosses` counts survivors by 200 + moon. Garrison losses after a space battle are booked against the wrong body |
 | `spwar.c` `SpWar_ApplySpaceLosses` | Garrison losses are added to whichever side `LossPtr` was left pointing at. When it was nil, the original wrote to 0000:0000 (the interrupt table); the port skips that write |
 | `intel.c` `Intel_ClaimBodyForRace` (owners 8 and 12) | Every pass writes `Stores[1]`, so these races' bodies only get a garrison in the first slot (the last of the eight draws) |
-| `planetinfo.c` `PlanetInfo_SetupSystemViewHotspots` | The sun's hotspot sets orbit record 8's flag from `Bodies[sys][-1]` |
-| `launch.c`, GROUND WAR | The race state is indexed with `Owner` read as a signed char |
 | `sim.c` `Sim_UpdateColonySetups` | After a removal, the entry moved into its slot waits until the next hour |
-| `grwar.c` `GrWar_FindPath` | Tests cell (a,b) instead of (c,d), so (c,d) is marked only when (a,b) is out of range |
-| `vec3d.c` model 24 | Run-time error 200 if one of the centroids has x = 0. Check the shipped models; if none has, this is harmless |
-| `sim.c`, mines (docs/walkthrough.md) | Demolishing a mine never lowers the droid count. Bodies with only a miner station share one spare storage record |
+| `sim.c`, mines (docs/walkthrough.md) | Demolishing a mine never lowers the droid count (in the player's favour) |
 
 **Visible but cosmetic:**
 
@@ -160,6 +160,7 @@ switch here.
 | `pub.c`, `alientalk.c` | Their line-clearing loops reuse the previous text's line count |
 | `blit.c` fill | An odd count fills count + 2 bytes |
 | `credits.c`, `cutscene.c` | A white palette is set up and never used |
+| `planetinfo.c` `PlanetInfo_SetupSystemViewHotspots` | The sun's hotspot sets orbit record 8's map flag from `Bodies[sys][-1]` |
 | `adlib.c` | KSL bits swapped, key-off never reaches the OPL, slide up without carry. This is how the original's music sounds; leave it |
 
 **Harmless, or already handled by the port:** `textfile.c` `BeginInput`
@@ -171,7 +172,15 @@ uninitialised first pass (the port zeroes it); `surface.c`
 skips it); the unreachable money cheat (`26eb`, the port has its own); the
 GUS and AdLib detection and timer bugs (the port replaces the drivers;
 see 1);
-the copy protection (removed, `src/game/protect.h`).
+the copy protection (removed, `src/game/protect.h`);
+`main_program.c` `ClaimBodyForRace` after a lost ground battle (arguments
+in the wrong order: it clears 65 bytes straddling Antares' last body and
+gives them to the player, but enemies only ever land on New Earth, whose
+loss ends the game in `Command_ShowDeathEnding`'s Halt; checked
+2026-10-12); `grwar.c` `GrWar_FindPath` testing (a,b) for (c,d) (both
+callers pass the same cell twice); `launch.c` reading `Owner` as a signed
+char (owners are at most 12); `vec3d.c` model 24's division by a
+centroid's x (`V24.VEC`'s objects 1-8 have x = ±105 or ±120).
 
 ### 4. Quality of life
 

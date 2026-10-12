@@ -39,23 +39,23 @@ must also end in exit code 10.
 ### Result: seed 12345
 
 `tests/test_play_game.c` plays one game from "new game" with seed 12345
-through the 76 steps of acts 1-5 and wins: Halt(10) after 3,466,588
-retraces, on 2930-02-26 04:00 (game date), state hash
-`62cd0d75f97b5fc9`. The recording, 3.2 MB of plain autopilot script, is
+through the 76 steps of acts 1-5 and wins: Halt(10) after 3,485,181
+retraces, on 2930-02-29 21:00 (game date), state hash
+`00ac6e5323ddafde`. The recording, 3.2 MB of plain autopilot script, is
 [tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
 replays it in-process and `reunion --replay` ends the same way, with exit
 status 10:
 
 ```sh
 build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
-# replay: exit 10 after 3466588 frames, hash 62cd0d75f97b5fc9   (exit status 10)
+# replay: exit 10 after 3485181 frames, hash 00ac6e5323ddafde   (exit status 10)
 ```
 
 Milestones: Jade found 2927-08-25, Jaanosian contact 2928-03-02, the
-Galleon invented 2928-07-23, Mirach 3 taken (the Morgruls eliminated)
-2929-03-28, the League's surrender 2929-09-23, Earth 2930-02-26. The Earth
-invasion: in space lost 45H 22SF, destroyed 64H 64SF 7D 5C; on the ground
-lost 10T 21Air 35ML, destroyed 30Tr 90T 50Air 30ML.
+Galleon invented 2928-07-27, Mirach 3 taken (the Morgruls eliminated)
+2929-04-02, the League's surrender 2929-09-25, Earth 2930-02-29. The Earth
+invasion: in space lost 45H 30SF, destroyed 64H 64SF 7D 5C; on the ground
+lost 10T 20Air 30ML, destroyed 30Tr 90T 50Air 30ML.
 
 The "as run" dates and losses in the policy below are from earlier
 recordings of the same seed, made before the fixes to the original's bugs
@@ -72,20 +72,20 @@ a debug one, so ctest runs it only in non-Debug builds
 The same policy, unchanged per seed, from "new game" with `PLAY_SEED`
 (release build, one recording each):
 
-| Seed | Result | Where and why |
-|---|---|---|
-| 1 | won 2930-01-27 | |
-| 2 | won 2930-02-23 | |
-| 3 | lost at M16 | Detoxin: New Earth stopped at 5 Derricks (seed 12345: 20) and gained ~270 t a day; the army's lines took it as it came, and the Space station (60,000 t) was never bought within M16's 60 days. The army goal keeps the station's ores from its lines while M16 waits, but the Detoxin gathers too slowly (18,000 t after 60 days). Why E21 built no more Derricks is open (PLAN.md). |
-| 4 | won 2930-03-09 | |
-| 5 | won 2930-02-29 | |
-| 6 | won 2930-02-23 | |
+| Seed | Result |
+|---|---|
+| 1 | won 2930-02-21 |
+| 2 | won 2930-03-07 |
+| 3 | won 2930-02-29 |
+| 4 | won 2930-02-23 |
+| 5 | won 2930-03-03 |
+| 6 | won 2930-02-02 |
 
-Seeds 2, 4, 5 and 6 were last run before two policy fixes (`ui_invade`
-checks that the zoom names the planet it aimed at; the army goal keeps the
-Space station's ores while M16 waits), 1 and 3 after them, and all of them
-before the latest fixes to the original's bugs. Seed 12345's recording is
-unchanged by both policy fixes.
+All six were run on 2026-10-12, with every fix on and the M5 shuttle as
+described above. Seed 3 lost at M16 in earlier runs: New Earth stopped at 5
+Derricks (E21) and the Detoxin for the Space station never gathered. Since
+the station storage fix (`fixes.station_storage`) it builds 18 and wins.
+Why it stalled is not known (PLAN.md).
 
 ## The fixture
 
@@ -303,7 +303,9 @@ unlock is the act's gate.
   midnight; each hidden planet rolls 1 in 5 a day and the first that hits
   is found (Phoenix 4 is the other). Launched only when found in orbit, the
   Galleon was in flight at one midnight in three or four and found nothing
-  in 30 days in one run; from 18:00 it is now kept in flight until 0:00.
+  in 30 days in one run. From 18:00 it is now kept in flight until 0:00,
+  and an evening flight starts no earlier than 21:00: a 3-5 h flight
+  started on landing came down again before midnight.
 - **M6, M7. Phelonians, Battle tank.** Phoenix 5 is status −3 too: only
   the Informer finds it (−500), and his Phelonian item is replaced once
   Antares is explored, so M6 must precede L5. The Phelonian deal halves
@@ -347,7 +349,8 @@ unlock is the act's gate.
 - **M16. Space station, Destroyers.** One station is enough: each
   product's queue is capped at the stations owned, but units build one at
   a time anyway, so the army goal queues the next Destroyer when one is
-  done. Detoxin was no gate with 20 Derricks (seed 3, with 5, fails here).
+  done. Detoxin was no gate with 20 Derricks (a run with 5 failed here;
+  see "Robustness").
 - **M17.** The spy satellite on Mirach 3 gave "alien activity" after 6
   days and the colony box after 8.
 - **M18. Invade Mirach 3** with Strike (Home Guard renamed: waves 1–3 are

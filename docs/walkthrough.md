@@ -681,9 +681,13 @@ University thresholds, target mood and growth (port menu, Game).
   than the source planet's storage capacity, and unloading is capped the same
   way (`Cargo_CargoScreen`). The port caps loading by the ship's room only
   (`fixes.cargo_planet_cap`).
-- **Miner-station-only bodies** share one spare storage record. If it gets
-  zeroed or reused, mining and pickup there both stop (`Sim_MineBody`); this
-  is probably the guide's "station storage full" bug. Prefer real colonies.
+- **Miner-station-only bodies stop mining.** They have no planet force, so
+  their storage is read from fleet group 32's record, which starts at 0 and
+  is overwritten whenever a body without a planet force has its power
+  balanced (conquering a planet sets it to 0). While it is 0, mining and
+  pickup at every such body stop; this is probably the guide's "station
+  storage full" bug. The port gives each one a Miner station's 10,000 t
+  (`fixes.station_storage`).
 - **Losing a space battle at New Earth deletes your trade and carrier
   groups** there (see War).
 

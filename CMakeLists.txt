@@ -128,7 +128,7 @@ if(BUILD_TESTING)
             # proof runs only where test_play_game does.
             target_compile_definitions(${name} PRIVATE REUNION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
             set(cases boot soak1 soak2 soak3 soak4 soak5 soak1_original credits intro victory
-                load_J01 load_M01 load_L01 load_X01)
+                load_J01 load_M01 load_L01 load_X01 load_DOS_1 load_DOS_2)
             if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
                 list(APPEND cases proof proof_original)
             endif()

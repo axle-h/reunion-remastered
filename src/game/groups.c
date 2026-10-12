@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 
 #include "game/blit.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/le.h"
@@ -640,6 +641,14 @@ int16_t Groups_FindPlanetForce(int16_t system, int16_t planet, int16_t moon)
             found = i;
     }
     return found;
+}
+
+int16_t Groups_PlanetStorage(int16_t system, int16_t planet, int16_t moon)
+{
+    int16_t force = Groups_FindPlanetForce(system, planet, moon);
+    if (force == 0 && fixes.station_storage)
+        return 10;  // a Miner station's, as building kind 19h gives
+    return Groups_At(1, force)->Storage;
 }
 
 // 2b8d:1d09

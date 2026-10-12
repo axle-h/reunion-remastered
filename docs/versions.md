@@ -65,7 +65,8 @@ only its first 200 rows (`command.c`).
 Save files are the same 41,670-byte format in both releases and every
 language. The port loads both DOSBox saves (`~/dos/c/REUNION/SAVE`, written by
 the floppy executable) and the CD's Italian save, plays on from them, and
-writes them back byte for byte.
+writes them back byte for byte. The DOSBox saves are golden test cases
+(`tests/golden/saves/DOS_1.sav`, `DOS_2.sav`).
 
 ## Files the game never loads
 
