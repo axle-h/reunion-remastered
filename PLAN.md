@@ -182,11 +182,7 @@ callers pass the same cell twice); `launch.c` reading `Owner` as a signed
 char (owners are at most 12); `vec3d.c` model 24's division by a
 centroid's x (`V24.VEC`'s objects 1-8 have x = ±105 or ±120).
 
-### 4. Quality of life
-
-Remappable keys, and saving anywhere.
-
-### 5. Reverse-engineering loose ends
+### 4. Reverse-engineering loose ends
 
 These matter only for reading the code; nothing depends on them:
 
@@ -198,7 +194,7 @@ These matter only for reading the code; nothing depends on them:
   1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
   typed constants.
 
-### 6. Licence and publication
+### 5. Licence and publication
 
 The game is still under copyright. Decided (2026-10-12): release builds
 ship without the art and carry the data taken from the executables
@@ -207,3 +203,138 @@ tables; the AdLib player's image in `src/game/adlib.c`). The player
 supplies the rest (the import, README). Still open: whether to publish the repository itself.
 Until then keep it private, or publish only the code (no assets, no raw
 decompiler dumps).
+
+### 6. Improvements
+
+Changes to the game's design rather than its bugs: quality of life first,
+then mechanics that don't do what the game seems to mean. Each one is a
+switch like the fixes, in its own struct (`src/game/improvements.h`, an
+Improvements section in the port menu, `[improvements]` in `reunion.ini`),
+on by default. The Fixes section's "All off (original)" turns them off
+too. The golden hashes, the playthrough and the DOS-save tests run with
+every improvement off, so the proof of the original's behaviour stands;
+each improvement gets its own test with it on. Saves keep the DOS format:
+an improvement keeps its state in fields the original already has, so a
+save still loads in the original, which then plays it by its own rules.
+
+#### 6.1 More Miner stations on a mining-only body
+
+A body with only a Miner station is barely worth the station. It mines
+with one "droid" (`TBody._0A` = 1) in 30% of hours (`Sim_MineBody`), so
+deposit / 10 × 0.3 t per hour per ore: 2.1 t/h of Kalium on Gallilei (K7),
+where a colony's 9 mines on the same deposit make 63 t/h. Its 10,000 t
+would take about 200 days to fill.
+
+Switch `more_stations`:
+
+- **Adding.** A body the player owns with no colony and 1-4 stations
+  gets an "Add Miner station" action in the body menu when a trade group
+  there carries one (the same check as the first station's icon in
+  `Satellite_SetupGroupScreenMenu`). It takes one station from the group
+  (`Satellite_TakeTradeShips`), adds 1 to `_0A` and places a Miner station
+  building (19h) as the first one does (`Satellite_HandleBodyActions`). At
+  5 the action goes away. A Galleon carries 5 stations, so one trip can
+  fill a body.
+- **Storage.** 10,000 t per ore per station, so 50,000 t at 5
+  (`Groups_PlanetStorage` without a planet force returns 10 × `_0A`
+  instead of `fixes.station_storage`'s 10; the improvement uses that path
+  whatever the fix's switch says).
+- **Output.** Each station mines as one droid does, deposit × stations /
+  10 t per hour per ore. **Recommendation: drop the 30% roll** for
+  station-only bodies while the switch is on. With the roll, 5 stations
+  on K7 give 10.5 t/h, still a sixth of a colony; without it they give
+  35 t/h, about half a full colony for ~48,500 credits of stations and
+  no colony to run. (Dropping the roll changes the random stream, which is
+  why the golden runs pin the improvement off.)
+- **Display.** Planet info shows "*n* Miner stations" for such a body
+  instead of "*n* Miner Droid"; the droids screen's output column already
+  uses `_0A`.
+- **Later.** Founding a colony on the body keeps the station buildings,
+  each a mine slot with 10,000 t, as the single station is today. Check
+  what the colony founding does with `_0A` (the stations would become that
+  many droids). A body taken by an enemy loses its stations, as today.
+- **Test.** Add stations up to 5 and check the sixth is refused, the
+  storage is 10,000 t per station and the output is deposit × n / 10 every
+  hour; with the switch off nothing changes. Check that 5 station buildings
+  fit on the smallest mining-only surface (`fixes.autoplace_when_full`
+  adds them unplaced if not). Then update docs/walkthrough.md's Storage and
+  Mining notes.
+
+#### 6.2 Build the same building again
+
+Placing many copies of one building (the guide builds 20, then 60
+Derricks on New Earth) means going back to the build menu for each one.
+Switch `repeat_build`: placing a building with the **right** button
+places it as the left button does, then keeps the build mode (2) with the
+same kind selected, so the next right click places another. A left click
+places as today and ends the mode. The repeat stops by itself when money
+runs out or the spot is taken (`Surface_UpdateModeForCell` drops to mode
+1 as now). Check first what a right click does on the surface today.
+
+#### 6.3 Trade routes
+
+Ore is hauled home by hand, group by group, for the whole game. Switch
+`trade_routes`: a trade group can be given a route and then flies it on
+its own.
+
+- **A route** is a list of up to 6 pickup stops (bodies the player owns)
+  and a drop-off, New Earth. A loop: fly to each stop in order and load
+  every ore there that fits; then fly to New Earth and unload all of it;
+  start again. If the group is full at any stop, it goes straight to New
+  Earth, unloads and starts again from the first stop. A stop with
+  nothing to load is passed by.
+- **The UI.** A "Route" button on a trade group's screen opens a route
+  editor: the stop list with Add (picks a body as the destination
+  screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
+  Start and Stop. The groups list marks a group on a route. Decide
+  whether the editor is a game screen in the original's style or a port
+  panel like the F1 menu (simpler, and the keyboard work in 6.4 gets it
+  for free).
+- **Rules stay the game's:** the group needs a hired pilot whose tier
+  reaches every stop, a Galleon to leave a system, and travel takes the
+  usual time. Loading and unloading use the cargo screen's own booking
+  (`Cargo_CargoScreen`, `Cargo_ShipCapacity`) rather than clicks, and
+  unloading stops at New Earth's storage: what doesn't fit stays aboard
+  and the route goes on.
+- **It stops** when the player gives the group any other order, the
+  group is disbanded or loses a battle, a stop is lost to an enemy, or
+  the pilot can no longer reach a stop; a message line says which and
+  why.
+- **Where it lives.** Routes are stepped where groups arrive
+  (`Sim_ProcessTravellingGroups`). The DOS records have no room for them,
+  so they go in a file beside the save (`save/spidysav.<n>.routes`) that
+  the original never reads; it must follow the groups when the list
+  shifts after a disband.
+- **Test.** A route of two stops runs several loops; a full group goes
+  home early; New Earth full; each stop condition; save and load keep the
+  route.
+
+#### 6.4 Playing with the keyboard only
+
+The original is played with the mouse; the keyboard is used only for
+typing names. Switch `keyboard_play`: every screen can be played with
+keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
+
+- **Hotspots.** Every screen registers its clickable areas
+  (`Mouse_SetHotspot`, up to 66, with a caption). Tab and Shift+Tab move
+  between them (in screen order, top to bottom), with a frame drawn
+  around the current one and its caption shown; Enter is a left click and
+  Space a right click on it.
+- **Grids and maps.** Where a click lands on a cell rather than a hotspot
+  (the surface map, the star map, the cargo rows, the battle map), the
+  arrow keys move the cursor one cell and Enter/Space click there.
+- **Shortcuts** for the main screens and for leaving one (Escape), and
+  for the game date (speed), shown in the port menu's help.
+- **Test.** Drive a screen of each kind (a menu, the surface, the star
+  map, a battle) with key events alone.
+
+#### 6.5 Smaller candidates
+
+Each needs a short spec before work starts.
+
+| Idea | Why |
+|---|---|
+| Autosave before every battle and alien conversation, into a slot of its own | The walkthrough's standing order is to save before each, as results are random. The original has 12 slots; the autosave must not take one of the player's |
+| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still |
+| Saving anywhere | |
+| Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
