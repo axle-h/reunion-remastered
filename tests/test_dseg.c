@@ -1,8 +1,10 @@
-// dseg: the data segment mirror and its initial values (game/dsinit.c).
+// dseg: the data segment mirror, its field table (game/dsfields.c) and its
+// initial values (game/dsinit.c).
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
 #include "game/dseg.h"
+#include "game/dsfields.h"
 #include "platform/fs.h"
 #include "platform/video.h"
 
@@ -22,8 +24,45 @@ static bool pstr_is(const void *pstr, const char *want)
     return p[0] == SDL_strlen(want) && SDL_memcmp(p + 1, want, p[0]) == 0;
 }
 
+// Bytes a field takes in the port's DSeg (or record).
+static uint32_t port_bytes(const DsField *f)
+{
+    if (f->flags & DSF_HOST)
+        return (uint32_t)sizeof(void *) * f->count;
+    if (f->rec >= 0)
+        return (uint32_t)ds_records[f->rec].port_size * f->count;
+    return (uint32_t)f->elem * f->count;
+}
+
+// The fields cover the original's bytes and the port's struct back to back,
+// with nothing missing: dsfields.c is kept by hand alongside dseg.h, and
+// game/state.c serialises only what the table lists.
+static bool fields_cover(const DsField *f, int n, uint32_t size, uint32_t port_size)
+{
+    uint32_t ofs = 0, at = 0;
+    for (int i = 0; i < n; i++) {
+        if (f[i].ofs != ofs || f[i].at != at) {
+            printf("field %s: at %04X/%04X, expected %04X/%04X\n", f[i].name, f[i].ofs,
+                   f[i].at, (unsigned)ofs, (unsigned)at);
+            return false;
+        }
+        ofs += (uint32_t)f[i].elem * f[i].count;
+        at += port_bytes(&f[i]);
+    }
+    return ofs == size && at == port_size;
+}
+
 int main(int argc, char *argv[])
 {
+    check(fields_cover(ds_fields, ds_field_count, DSEG_SIZE, sizeof(DSeg)), "DS field table");
+    for (int r = 0; r < ds_record_count; r++) {
+        const DsRecord *rec = &ds_records[r];
+        if (!fields_cover(rec->fields, rec->nfields, rec->size, rec->port_size))
+            check(false, rec->name);
+    }
+    if (!ok)
+        return 1;
+
     if (argc < 2 || !fs_init(argv[1])) {
         printf("no game data, skipping\n");
         return 77;

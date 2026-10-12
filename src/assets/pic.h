@@ -1,4 +1,4 @@
-// .PIC images ("SpidyGfx"): see docs/formats/pic.md.
+// .PIC images ("SpidyGfx").
 #pragma once
 
 #include <stddef.h>

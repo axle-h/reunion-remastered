@@ -1,5 +1,5 @@
-// Playthrough drivers for ships, groups, cargo and travel (thread B3), each
-// used the way Act 1 of docs/playthrough-policy.md needs them. Needs the
+// Playthrough drivers for ships, groups, cargo and travel, each used the
+// way act 1 of the policy (docs/playthrough.md) needs them. Needs the
 // game data.
 //
 // 1. Proof run (seed 12345, input only, replayed): from a new game, hire
@@ -65,7 +65,7 @@ static bool stores_reach(void *n)
 }
 
 // Buys until `n` are in stock, retrying once a game day when credits or ore
-// cut the order (policy §0 short-money fallback). Waits on the shop screen.
+// cut the order (the policy buys what credits allow). Waits on the shop screen.
 static void buy_stock(const char *name, int n, int hours)
 {
     int64_t end = ui_clock_hours() + hours;
@@ -100,7 +100,7 @@ static bool log_has(void *text)
     return ui_log_has(text);
 }
 
-// The idle screen of the policy (§0): messages, clock running.
+// The idle screen of the policy: messages, clock running.
 static void idle_screen(void)
 {
     ui_open_screen("MESSAGES", SCR_MESSAGES);

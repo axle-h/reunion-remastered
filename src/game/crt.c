@@ -20,7 +20,7 @@ char Crt_ReadKey(void)
     return (char)k;
 }
 
-// Crt.Delay (not named in symbols.txt)
+// Crt.Delay
 void Crt_Delay(uint16_t ms)
 {
     // 70.086 Hz -> 14.27 ms per frame.

@@ -1,5 +1,5 @@
-// Act 1 of the whole-game policy (docs/playthrough-policy.md §1 "Act 1:
-// Economy", steps E1-E23): from a new game to Jade revealed and Trade 1
+// Act 1 of the whole-game policy (docs/playthrough.md, "Act 1: Economy",
+// steps E1-E23): from a new game to Jade revealed and Trade 1
 // standing by in orbit at New Earth. Each act1_eNN function is one step of
 // the plan in tests/test_play_game.c, run after the checkpoint of the same
 // name. Steps marked ‖ in the policy start background goals (policy.h

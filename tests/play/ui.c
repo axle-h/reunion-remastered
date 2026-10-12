@@ -21,7 +21,7 @@ enum : int {
     HOLD_LIMIT = 100,       // retraces a press waits for the game's poll
     CLICK_TRIES = 5,
     SCREEN_TIMEOUT = 3000,
-    HOUR_RETRACES = 101,    // running retraces per game hour (screens.md §5)
+    HOUR_RETRACES = 101,    // running retraces per game hour (main_program.c)
     AIM_MARGIN = 3,         // pixels kept from lower hotspots (orbits move on)
     AIM_TRIES = 100,
     AIM_STEP = 10,

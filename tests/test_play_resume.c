@@ -1,4 +1,4 @@
-// Playthrough fixture infrastructure (docs/playthrough.md, thread A):
+// Playthrough fixture infrastructure (docs/playthrough.md):
 // checkpoints and play_resume, the write barrier, and the recording replayed
 // in-process and by `reunion --replay` (REUNION_BIN, set by CMake). Needs
 // the game data.

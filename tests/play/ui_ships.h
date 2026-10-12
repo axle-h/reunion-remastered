@@ -1,4 +1,4 @@
-// UI drivers for ships, groups, cargo and travel (thread B3): ship info
+// UI drivers for ships, groups, cargo and travel: ship info
 // (screen 16), new group (21), group equipment (22), the group's control
 // panel (17), cargo transfer (13), the destination map (18) and the star map
 // (7). Groups are named by what the ship-info list shows; bodies and systems

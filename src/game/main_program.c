@@ -378,7 +378,11 @@ static bool wait_retrace(void)
 
 uint64_t Game_EventWaitFrames;
 
-// Phase A: frames until a press, a release or a screen switch.
+// Phase A: frames until a press, a release or a screen switch. Each end of
+// the wait is one pass of the screen's handler with HotspotHit set. A button
+// (hit_pushable) ends it once, on the press; any other hotspot ends it on the
+// press, on every frame the button stays down over it, and once more on the
+// release over it, so a click held n frames runs such a handler n + 1 times.
 static bool wait_for_event(void)
 {
     do {
@@ -391,8 +395,9 @@ static bool wait_for_event(void)
         if (ds.Game_Ticks > 100)
             advance_hour(false);
         Mouse_Poll();
-        // The original calls Cheat::Apply (26eb:0000) here when
-        // Cheat_Requested is set, which nothing does.
+        // The original calls Cheat::Apply (26eb:0000: +10000 credits, or a
+        // bigger cheat once) here when Cheat_Requested is set, which nothing
+        // does, so the port leaves it out.
         Options_Frame();  // port addition: the port menu's changes, frozen cheats
         if (!wait_retrace())
             return false;

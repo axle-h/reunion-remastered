@@ -1,5 +1,5 @@
-// VICTORY.PRG: the end sequence after the game is won (docs/cutscenes.md
-// section 5). Main block 1000:0161. Keys are ignored.
+// VICTORY.PRG: the end sequence after the game is won. Main block
+// 1000:0161. Keys are ignored.
 #include <SDL3/SDL.h>
 
 #include "cutscene/cs.h"

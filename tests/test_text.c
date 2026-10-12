@@ -1,4 +1,4 @@
-// text: obfuscated line files and .RAW tables, checked against tools/text.py.
+// text: obfuscated line files and .RAW tables, checked against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

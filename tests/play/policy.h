@@ -1,5 +1,5 @@
 // The whole-game playthrough policy's shared machinery
-// (docs/playthrough-policy.md §0, §2, §3): money and ore gates, the waits
+// (docs/playthrough.md, "The policy"): money and ore gates, the waits
 // that run the standing orders, background goals, the interrupt dispatch and
 // the dates of visible events. The steps of each act (act1.h, ...) build on
 // it; tests/test_play_game.c lists them.
@@ -21,12 +21,11 @@
 #include <stdint.h>
 
 enum : int {
-    POL_HOUR = 101,  // retraces per game hour while the clock runs (screens.md §5)
+    POL_HOUR = 101,  // retraces per game hour while the clock runs (main_program.c)
     POL_DAY = 24,    // hours
 };
 
-// Act 1's money order (playthrough-policy.md, end of Act 1, "As run"),
-// highest first: when credits are short, a goal may spend only what the
+// Act 1's money order, highest first: when credits are short, a goal may spend only what the
 // goals before it that are waiting for money leave over.
 // - S4 (a generator when New Earth's power runs short) right after the
 //   first hires: unpowered leisure buildings cost attitude, S3 then lowers
@@ -38,17 +37,17 @@ enum : int {
 //   then S2's lead (it pays for itself within days).
 // - S12 (university for the others) after the survey; the colonies in the
 //   order Apollo, Penelope, Mir, each colony's core (S2, power, Vehicle
-//   plant, Spaceport) before the next founding (economy model; §5 R8).
-// Act 2 adds (playthrough-policy.md, end of Act 2): the army for wave 1
+//   plant, Spaceport) before the next founding.
+// Act 2 adds: the army for wave 1
 // (J8) and its commander (J7) right after S4; the Galleon (J13) and the
 // course it and the Hyperspace drive need (J12) after the shortages; the
 // droids and ships that bring the colonies' ore (S6, S7) after S2's lead;
 // Russel (J11) after Mir.
-// Act 3 adds (playthrough-policy.md, end of Act 3): the army for the waves
+// Act 3 adds: the army for the waves
 // and Mirach (M8, its lines kept busy) right after J8; Dempsey's courses
 // (M10) with J12's; the spy satellite and its carrier (M14), the space
 // station (M16) after the Galleon.
-// Act 4 adds (playthrough-policy.md, end of Act 4): the new staff, their
+// Act 4 adds: the new staff, their
 // courses and the pub's tips (L1-L4) right after the army; the Antares
 // colony and its carrier (L5) and the spy satellites (L8) after the space
 // station.
@@ -105,11 +104,11 @@ bool pol_seen_about(const char *what, const char *body, int64_t since);
 // Boxes seen so far (a counter that a wait compares to notice a new one).
 int pol_boxes(void);
 // Notes an event the policy saw that is no box, as if a box said `text`:
-// pol_service notes each talk ("talk 2", by the number of §3B) and battle
+// pol_service notes each talk ("talk 2", by the talk number of ui_talk.h) and battle
 // ("space battle won, lost H1 ...", "ground battle lost, ...").
 void pol_note(const char *text);
 
-// --- Money and ores (§0 "Money and ore gates") ---
+// --- Money and ores ---
 
 // Reserve R: 20,000 in act 1, 50,000 from act 2 on.
 void pol_set_reserve(int32_t reserve);
@@ -136,7 +135,7 @@ enum : int { ORE_D, ORE_E, ORE_K, ORE_L, ORE_R, ORE_T, ORES };
 bool pol_ores(const char *item, int32_t ores[ORES]);
 // Each ore in `have` covers `need`.
 bool pol_ores_cover(const int32_t have[ORES], const int32_t need[ORES]);
-// Buys up to `n` more of `item` (§0 short-money fallback: what credits allow
+// Buys up to `n` more of `item` (short money: what credits allow
 // at `pri`, k = min(n, (credits - R - claims) / unit price)). Returns how many
 // were queued (0 if none could be).
 int pol_buy(PolPriority pri, const char *item, int n, int32_t unit_price);
@@ -191,7 +190,7 @@ bool pol_goal_pending(const char *name);
 
 // Idles on the message log (screen 11, map on Amnesty, clock running) until
 // pred(arg) holds, running the standing orders and the goals at least once a
-// game day and after every box, and handling alien talks and battles (§3).
+// game day and after every box, and handling alien talks and battles.
 // pred must be cheap and read no other screen (boxes seen, the date, the
 // credits). Returns false after `hours` game hours.
 bool pol_wait(bool (*pred)(void *arg), void *arg, int hours);
@@ -203,7 +202,7 @@ void pol_wait_for(const char *what, bool (*pred)(void *arg), void *arg, int hour
 void pol_poll_for(const char *what, bool (*check)(void *arg), void *arg, int hours, int every);
 // Runs the standing orders and goals now.
 void pol_orders(void);
-// Handles a talk, battle or ending screen shown (§3 A, B).
+// Handles a talk, battle or ending screen shown.
 void pol_service(void);
 // Runs the driver sequence fn(arg) and returns true, or false if a talk,
 // battle or ending screen came up meanwhile: the sequence is left at its

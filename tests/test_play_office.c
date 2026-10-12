@@ -1,6 +1,6 @@
 // Playthrough drivers for research, production and messages
-// (docs/playthrough.md thread B): a policy plays the start of act 1
-// (docs/playthrough-policy.md E1, E2, E4, E7) through clicks only: hires the
+// (docs/playthrough.md): a policy plays the start of act 1 (E1, E2, E4,
+// E7) through clicks only: hires the
 // builder and the developer, researches Satellite, starts Miner droid, waits
 // for New Earth's ores and buys two satellites, servicing the message boxes
 // that pop up meanwhile. Every decision reads the screen. The recorded input
@@ -20,7 +20,7 @@ static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
 enum : int {
-    HOUR = 101,  // retraces per game hour while the clock runs (screens.md §5)
+    HOUR = 101,  // retraces per game hour while the clock runs (main_program.c)
     SATELLITE_TIMEOUT = 20 * HOUR,  // policy E4: 140 / exp 20 = 7 h, timeout 20 h
     ORE_TIMEOUT = 200,              // policy E7, in game hours
 };

@@ -1,5 +1,4 @@
-// UI drivers for the dialogue screens (docs/playthrough-policy.md §0 "UI
-// operations", §3 A, B, D): alien talks (screen 34), the pub (23) and its
+// UI drivers for the dialogue screens: alien talks (screen 34), the pub (23) and its
 // questions (25), and the advisor (24) for university courses. Story scenes
 // (33) are interrupts: ui_message.h.
 //
@@ -29,7 +28,7 @@ typedef struct {
 // Screen 34 is up with its question panel.
 bool ui_talk_shown(void);
 // The alien whose portrait the talk screen shows (alien\alien<n> by race), as
-// the race number of docs/playthrough-policy.md §3B (talk 2 = Jaanosians...).
+// the talk number (talk 2 = Jaanosian meeting 1, ...; ui_talk.c).
 int ui_talk_alien(void);
 // The question rows drawn in the talk panel. False while a reply is shown in
 // their place, or off screen 34.
@@ -62,7 +61,7 @@ const char *ui_last_reply(void);
 void ui_alien_talk_path(const char *const path[]);
 #define ui_alien_talk(...) ui_alien_talk_path((const char *const[]){__VA_ARGS__, nullptr})
 // Waits for the talk screen, recognises the talk by the alien shown and its
-// first question, and plays the policy's path (playthrough-policy.md §3B).
+// first question, and plays the policy's path (ui_talk.c).
 // Returns the talk (race) number. Fails on a talk the policy has no path for.
 int ui_alien_talk_policy(void);
 // From the command centre or the pub: asks `person` (pub caption) the

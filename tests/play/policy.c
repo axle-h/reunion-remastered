@@ -169,7 +169,7 @@ void pol_note(const char *text)
     SDL_strlcpy(pol.events[i].text, text, sizeof pol.events[i].text);
     pol.boxes++;
     // MSG 6: a Jaanosian meeting without the Communicator, or the deadline
-    // without contact (§3 C): the run can't be won any more.
+    // without contact: the run can't be won any more.
     if (SDL_strcasestr(text, "received a message from deep space")) {
         pol.fatal = true;
         SDL_strlcpy(pol.fatal_text, text, sizeof pol.fatal_text);
@@ -452,7 +452,7 @@ void pol_research(const char *name, int hours)
 }
 
 // S11: the research queue (act 1 part; later acts' products follow in the
-// order of playthrough-policy.md S11). Names as the research icons caption
+// order of S11, docs/playthrough.md). Names as the research icons caption
 // them (the product names in the game's data; an unknown name would only
 // lose its rank: S11 then starts it as "anything").
 static const char *const research_order[] = {

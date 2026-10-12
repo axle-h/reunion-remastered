@@ -62,7 +62,7 @@ static const Product PRODUCT[PRODUCTS] = {
 // "Weapons and loadouts"; a weapon not yet researched is left out), in the
 // order the grid gets them, one row per ArmyForce unit. No Troopers: 90
 // tanks are the measured Mirach force, aircraft the League's and launchers
-// Earth's (playthrough-battles.md §6).
+// Earth's (docs/playthrough.md, "Force sizes").
 enum { WEAPONS = 3 };
 static const struct {
     int unit;
@@ -95,8 +95,8 @@ static int army_groups(const char *names[GROUPS])
 }
 
 // The force each group is filled up to, by tier: every group gets its
-// tier-1 force before any gets more. Act 3 (§1 M8, M12, M18): one tier.
-// Act 4 (§1 L7, L13; measured with Destroyers without Plasma, which comes
+// tier-1 force before any gets more. Act 3 (M8, M12, M18): one tier.
+// Act 4 (L7, L13; measured with Destroyers without Plasma, which comes
 // in act 5): Strike first to the Orionis 3 and Lyrae 5 force (40H 40SF 6D
 // won 20/20 in space, 30T 20Air 20/20 on the ground; 40T 10Air lost 3/20 at
 // Orionis), then to Lyrae 7's (50H 50SF 8D, 30T 30Air: 20/20 with the
@@ -105,7 +105,7 @@ static int army_groups(const char *names[GROUPS])
 // away (S9).
 static ArmyForce tier_target(const char *group, int tier)
 {
-    // Act 5 (§1 X3, X6; one tier, no battle before Earth): Strike with
+    // Act 5 (X3, X6; one tier, no battle before Earth): Strike with
     // more ships than the guide's 50H 50SF 10D 10C (Earth's fleet: 10/10,
     // but the strike loses 40H 40SF and up to 8D; 60H 60SF 12D lost ~1D),
     // and 40T 20Air 40ML on the ground (20/20, lost 10T 20Air 30ML; 30ML
@@ -123,13 +123,13 @@ static ArmyForce tier_target(const char *group, int tier)
     }
     int k = step_no();
     // M8: 24 Hunters, 16 Starfighters and the ground reserve for wave 2;
-    // the tank line runs on towards M18's 90 from the deal on (§5 R8).
+    // the tank line runs on towards M18's 90 from the deal on.
     if (k < 10)
         return (ArmyForce){{24, 16, 0, 90}};
     // M12: 30 Hunters, 24 Starfighters, 30 tanks for wave 3.
     if (k < 13)
         return (ArmyForce){{30, 24, 0, 90}};
-    // M18: 90 tanks for Mirach 3 (playthrough-battles.md §6) and, as the
+    // M18: 90 tanks for Mirach 3 ("Force sizes") and, as the
     // tank line sets the date, more ships than the measured 20H 30SF 5D:
     // the waves' survivors went home there (55 ships against 20H 20SF 3D
     // measured; 30H 30SF 5D and the Kalls' 15H 10SF won but lost 31H 19SF
@@ -148,7 +148,7 @@ ArmyForce army_target(const char *group)
 }
 
 // Weapons per unit of a row by the step running: the tanks' twins from M10
-// on (M8 gives the twins to the ships first, §1 M8).
+// on (M8 gives the twins to the ships first).
 static int loadout_per(int row, int w)
 {
     int p = LOADOUT[row].weapon[w].product;
@@ -408,7 +408,7 @@ static void equip_groups(ArmyView *v)
     }
 }
 
-// The army (§1 M8): every line its units need kept busy towards the
+// The army (M8): every line its units need kept busy towards the
 // targets, and the groups filled from the stores.
 static bool goal_army(void)
 {

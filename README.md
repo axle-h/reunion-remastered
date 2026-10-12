@@ -33,7 +33,7 @@ Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
 `screenshots` directory there.
 
 The port fixes a few things in the original that can make the game
-unwinnable (docs/bugs.md, "Fixed in the port"); each can be switched off in
+unwinnable (`src/game/fixes.h`); each can be switched off in
 the port menu (Fixes), or all of them at once.
 
 On the planet info screen of one of your colonies, clicking the POP row
@@ -63,8 +63,15 @@ ended (docs/playthrough.md).
 `trap` preset (UBSan, trapping) and reports crashes and hangs with gdb
 backtraces.
 
-## Reverse engineering
+## Documentation
 
-- [ghidra/README.md](ghidra/README.md): rebuilding the Ghidra project and the
-  `symbols.txt` format
-- [docs/segments.md](docs/segments.md): what each code segment does
+- [PLAN.md](PLAN.md): status, remaining work and open bugs
+- [docs/port.md](docs/port.md): how the port is put together (addresses,
+  the data segment, memory, start-up, deliberate deviations, port
+  additions). The code's header comments document each part, file formats
+  included (`src/assets/*.h`)
+- [docs/walkthrough.md](docs/walkthrough.md): the game itself, as a player's
+  reference
+- [docs/text.md](docs/text.md): what the game's text files hold
+- [docs/playthrough.md](docs/playthrough.md): the fixture that plays the
+  game to the end

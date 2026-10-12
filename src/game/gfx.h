@@ -61,7 +61,7 @@ void Gfx_LoadFile(const char *name, uint8_t **buf, uint16_t *size);
 // 405f:095a / 09ce / 09f3 / 0a57: ICON\ICON.ALL through the shared file
 // variable. ReadChunk appends the next chunk at buf + Gfx_ReadPos and puts
 // its length in *len (the original takes buf as a var parameter and only
-// reads it). (symbols.txt has the two parameter names swapped.)
+// reads it).
 void Gfx_IconAllOpenSize(uint16_t *size);
 void Gfx_IconAllOpen(void);
 void Gfx_IconAllReadChunk(uint8_t *buf, uint16_t *len);
@@ -73,7 +73,7 @@ void Gfx_ReadChunk(uint8_t **buf, uint16_t *size);
 void Gfx_CloseDataFile(void);
 
 // 405f:0bef: decodes <name>.pic into dest + y * stride + x as one linear
-// stream of rows lines (see docs/formats/pic.md), adding colourOffset to each
+// stream of rows lines (assets/pic.h), adding colourOffset to each
 // pixel; rows is clipped to the picture height. With fade, pal[colourOffset +
 // fadeFirst..colourOffset + fadeLast] fades to black in the DAC while
 // decoding. Afterwards file colours firstColour..lastColour go to

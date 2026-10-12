@@ -1,5 +1,4 @@
-// WAR\ANIM\ANIM.DEF: scripts for the space battle background props;
-// see docs/formats/animdef.md.
+// WAR\ANIM\ANIM.DEF: scripts for the space battle background props.
 #pragma once
 
 #include <stddef.h>

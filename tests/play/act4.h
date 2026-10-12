@@ -1,4 +1,4 @@
-// Act 4 of the whole-game policy (docs/playthrough-policy.md §1 "Act 4: The
+// Act 4 of the whole-game policy (docs/playthrough.md, "Act 4: The
 // League", steps L1-L13): from Mirach 3 taken to the League's surrender,
 // with the new staff, the Antares colony and the Erans, the League tip and
 // the Eran's job, the Lisonian wave at New Earth, Aircraft, and the

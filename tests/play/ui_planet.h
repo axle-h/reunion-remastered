@@ -1,5 +1,5 @@
-// UI drivers and observers for the planet screens (docs/playthrough.md,
-// thread B1): planet surface (20), planet info (8), droids (4), colonisation
+// UI drivers and observers for the planet screens (docs/playthrough.md):
+// planet surface (20), planet info (8), droids (4), colonisation
 // (28), the body actions in the toolbars of 8/20/17, the colony list (37)
 // and picking a body on the galactic map (7).
 //

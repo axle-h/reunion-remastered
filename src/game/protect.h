@@ -1,5 +1,4 @@
-// What is left of the copy protection (docs/protection.md): the random
-// numbers it drew.
+// What is left of the copy protection: the random numbers it drew.
 //
 // The original has two schemes: "the word at the bottom of page N" of the
 // manual (unit Protect, 24eb, with checks in Credits, AlienTalk, PlanetInfo
@@ -12,8 +11,9 @@
 // the original's path for a player who types the right date. For "page N"
 // the shipped game differs: its prompt is dead code, so it never gets an
 // answer and takes the "unanswered" branch instead (it scribbles over
-// memory once; docs/protection.md). Each routine says which of the
-// original's it stands for.
+// memory once), so once "page N" arms (FrameCount > 30000, a 1-in-200 draw
+// per frame) the port's random numbers are no longer the shipped game's.
+// Each routine says which of the original's it stands for.
 #pragma once
 
 // At boot: neither scheme armed (the original's initial values).

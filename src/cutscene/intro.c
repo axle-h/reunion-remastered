@@ -1,5 +1,5 @@
 // INTRO.PRG: the story intro, eleven MOD blocks of mode 12h stills, mode 13h
-// pictures and anims (docs/cutscenes.md section 4). Main block 1000:0285.
+// pictures and anims. Main block 1000:0285.
 // A key skips the rest of the current block (some blocks share the skip
 // flag, so a key in INTRO1 also skips INTRO2-4); ESC ends the program.
 #include <SDL3/SDL.h>

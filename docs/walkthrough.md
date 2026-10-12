@@ -4,21 +4,19 @@ A condensed version of Hugo Guimarães' *"Merit's Galactic Reunion" Ultimate
 Guide* (v1.0, 2018), written for an agent
 that has to play the game through to the end. The guide's opinions, review,
 spelling-error list and conclusion are gone. Numbers and triggers were checked
-against `REUNION.PRG` (data tables at the DS offsets in
-[tables-evidence.md](tables-evidence.md)) and the port in `src/game/`. Each
-claim is marked:
+against the game's data and code (the port, `src/game/`). Each claim is
+marked:
 
-- **[src]**: confirmed in the code or data. A `file:line` reference is given
-  where it helps.
+- **[src]**: confirmed in the code or data. The function is named where it
+  helps.
 - **[fixed]**: the guide was wrong; the value shown comes from the code.
 - **[guide]**: from the guide and not checked, usually because it depends on
   play rather than on a constant.
 
 Units: money in credits, ore in tonnes, time in game hours. 1 game hour =
-101 frames at 70 Hz (≈1.44 s real time); months have 30 days
-([screens.md](screens.md) §5).
+101 frames at 70 Hz (≈1.44 s real time); months have 30 days.
 
-Contents: [Walkthrough](#walkthrough), [Story events](#story-events), [Staff mechanics](#staff-mechanics), [Space Local (the pub)](#space-local-the-pub), [Colonies](#colonies), [War](#war), [Reference tables](#reference-tables), [What was dropped from the guide](#what-was-dropped-from-the-guide).
+Contents: [Walkthrough](#walkthrough), [Story events](#story-events), [Staff mechanics](#staff-mechanics), [Space Local (the pub)](#space-local-the-pub), [Colonies](#colonies), [War](#war), [Reference tables](#reference-tables).
 
 ## Walkthrough
 
@@ -180,8 +178,8 @@ Standing orders for the whole game:
 
 ## Story events
 
-The game is a fixed chain of timed and triggered events (`Sim_ProcessStoryTimers`,
-`sim.c:1377-1568`; dialogue outcomes in `main_program.c:1520-1580`). All
+The game is a fixed chain of timed and triggered events
+(`Sim_ProcessStoryTimers`; dialogue outcomes in `alien_talk_answer`). All
 **[src]** unless marked.
 
 Hours are game hours. "Researchable" means the product's state becomes "can
@@ -204,7 +202,8 @@ not on loan to the Jaanosians).
 
 1. **Satellite lost.**
    - A satellite launched from stock survives only on New Earth or its moons
-     (Apollo); anywhere else it is always destroyed (`satellite.c:51-58`).
+     (Apollo); anywhere else it is always destroyed
+     (`Satellite_DeployStockSatellite`).
    - The first loss makes Satellite carrier researchable about 15–35 hours
      later.
    - Carrier-deployed satellites are fine. A normal satellite deployed on an
@@ -223,7 +222,8 @@ not on loan to the Jaanosians).
    - Jade is hidden until New Earth's observatory finds it (1/50 per day).
      In about 1 game in 150 that doesn't happen before the deadline and the
      game can't be won. The port finds Jade on 2928-04-01 if it is still
-     hidden (docs/bugs.md); the port menu's Fixes turn that off.
+     hidden (`fixes.find_jade`, `src/game/fixes.h`); the port menu's Fixes
+     turn that off.
    - First contact replaces the deadline with contact + ~2,590–2,808 h, so
      meeting them later pushes the whole war later.
    - First contact makes Communicator researchable (20–39 h).
@@ -284,7 +284,8 @@ not on loan to the Jaanosians).
       the selected planet (`Sim_ProcessTravellingGroups`). In the original
       any group arriving anywhere triggers it while Phoenix 1 is selected;
       the port needs a group arriving at Phoenix 1, whatever is selected
-      (`fixes.drifting_ship`). Phoenix 1 is hidden until found. This makes **Pirate ship** researchable. It happens once.
+      (`fixes.drifting_ship`). Phoenix 1 is hidden until found. This makes
+      **Pirate ship** researchable. It happens once.
     - **Answer "Tell me, what are your plans?"** This cancels the alliance
       clock and sends Kall force 2 (15 Hunters, 10 Starfighters, 10 Troopers,
       35 Tanks) to Mirach 3 to fight alongside you.
@@ -374,7 +375,7 @@ not on loan to the Jaanosians).
 
 - **Army group.** The Invade button needs an **Army** group at the planet.
 - **Intel level.** The planet's intel level must be at least 40
-  (`launch.c:133`).
+  (`Launch_MapScreen`).
   - On alien worlds only a **Spy satellite** raises it, by 2–6 per day.
   - It stops at 31 until you have met the owning race.
   - So: deploy a spy satellite, make contact, then wait until it reaches 40.
@@ -386,13 +387,14 @@ not on loan to the Jaanosians).
 
 All **[src]** unless marked.
 
-- **Hiring.** You can only replace a commander with a better one; a cheaper
-  or equal candidate is refused (`hire.c:39`). A replaced commander keeps
-  their experience and skills if rehired (`hire.c:112-115`).
+- **Hiring.** You can only replace a commander with a better one; a cheaper or
+  equal candidate is refused (`Hire_CheckHire`). A replaced commander keeps
+  their experience and skills if rehired (`Hire_HireScreen`).
 - **Experience.** Every hired commander starts at their level (10/20/40) and
   gains +1 with a 1% chance per game hour, up to their ability cap (30/70/90).
-  Battles give no experience (`sim.c:1323-1328`).
-- **University** (advisor screen, `advisor.c:79-125`, `sim.c:1332-1361`).
+  Battles give no experience (`Sim_GrowStaffExperience`).
+- **University** (advisor screen, `Advisor_AdvisorScreen`,
+  `Sim_GrowStaffExperience`).
   - Cost: (Random(10) + current experience) × 1,000.
   - Away for 50–69 hours. Only one commander can be away at a time.
   - Returns with +105–108 experience, i.e. at the cap after one course.
@@ -407,32 +409,32 @@ All **[src]** unless marked.
     force is beaten). Klaatoo's cap is 9 everywhere.
   - Destroying the University does not stop courses.
 - **Research.** A product takes DevTime / developer experience hours
-  (`sim.c:306-315`). If the developer is short of the required skills, research
-  stops at about 100 / (shortfall + 1) % complete, where *shortfall* is the
-  sum of missing skill points (one missing point stops it at 50%). Research
-  also stops while the developer is at university or on loan to the
-  Jaanosians (`sim.c:304`).
+  (`Sim_ProgressResearch`). If the developer is short of the required skills,
+  research stops at about 100 / (shortfall + 1) % complete, where *shortfall*
+  is the sum of missing skill points (one missing point stops it at 50%).
+  Research also stops while the developer is at university or on loan to the
+  Jaanosians (`Sim_ProgressResearch`).
   - **Dempsey tops out at 7 in every skill.** Anti-radiation shield, Solar
     plant, Plasma gun and Mental radar need Physics 8 or more, so you need
     **Klaatoo** (250,000) to finish the game. Mental radar (8/5/8/9) is
     mandatory (it reveals Rigel 2).
-- **Builder tier** (`colonize.c:52`, `main_program.c:747`).
+- **Builder tier** (`Colonize_ColonizeScreen`, `surface_build_button`).
   - Arwen Nielson cannot found any colony.
   - Elanor Brady can found colonies only in Amnesty and Phoenix.
   - William Forbs can found colonies anywhere.
   - Stadium, Ion cannon and Anti-radiation shield need Elanor or better.
     Energy shield needs William.
   - Construction per hour = (4000 + body factor + experience × 100) / 1500,
-    halved for Arwen and doubled for William (`sim.c:844`).
-- **Pilot tier** (`launch.c:290-294`).
+    halved for Arwen and doubled for William (`Sim_UpdateBuildings`).
+- **Pilot tier** (`Launch_DestinationScreen`).
   - Bruce Jordan cannot send groups out of the current system.
   - Jack Benson can fly between Amnesty, Phoenix and Mirach only.
   - Julie-Anne Roxford can fly anywhere. She is needed for Antares, Orionis,
     Lyrae, Rigel and Sun.
   - Satellite-carrier groups need no pilot.
   - Travel time is inversely proportional to pilot experience + 1
-    (`sim.c:1006-1013`).
-- **Fighter (war commander)** (`launch.c:208-225`, `spwar.c:223-226`).
+    (`Sim_ProcessTravellingGroups`).
+- **Fighter (war commander)** (`Launch_MapScreen`, `SpWar_InitSpaceFleets`).
   - One must be hired to launch a space attack.
   - Ground battles need Kyle Douglas or MACH ("Your fighter not skilled to
     lead a ground battle").
@@ -440,14 +442,14 @@ All **[src]** unless marked.
     fighter hired.
 - **Pausing.** The clock stops on the advisor dialogue, the disk screen, pub
   conversations and the battle, destination, new-group, colonise and
-  alien-contact screens (`advisor.c:46`, [screens.md](screens.md) §3). The
-  pub room itself does not stop it.
+  alien-contact screens (`Advisor_AdvisorScreen`; the screen list is in
+  `src/game/main_program.h`). The pub room itself does not stop it.
 
 ## Space Local (the pub)
 
-Ten people (`Pub::People`, DS:013A). The Bartender, Informer and Spy-Hunter
+Ten people (`Pub_People`). The Bartender, Informer and Spy-Hunter
 are there from the start; the rest appear on story events. All **[src]**
-(`main_program.c:951-1136`, `pub.c`, `sim.c:192-230`) unless marked.
+(`pub_dialog_enter`, `pub.c`, `Sim_ProcessPubTimers`) unless marked.
 
 - **Bartender.** News is free and changes with the story.
   - When the spy is present: ask "Who is that suspicious character?", then
@@ -455,8 +457,8 @@ are there from the start; the rest appear on story events. All **[src]**
     answers "I'll speak to him", which makes the spy hireable.
   - **League tip (5,000)** is offered once Orionis or Lyrae is opened. It is
     withdrawn for good when the League's first attack force launches, 200–249
-    hours after first contact with any League race (`intel.c:87-90`). The Eran
-    job is impossible without it. **Buy it as soon as it appears.**
+    hours after first contact with any League race (`Intel_FirstContact`). The
+    Eran job is impossible without it. **Buy it as soon as it appears.**
 - **Informer.** Each item costs 500 and depends on the story state:
   - Beware of the Morgruls.
   - Morgruls massing near you (after the Jaanosian base falls).
@@ -467,8 +469,8 @@ are there from the start; the rest appear on story events. All **[src]**
     unlocks the Pirate Leader.
 - **Spy-Hunter.** Ask "anything unusual?"; while the spy is present and not
   hired he offers to kill him. Killing the spy does **not** block the game:
-  Mirach is then discovered automatically 200 hours later (`sim.c:1528-1530`)
-  **[fixed]**.
+  Mirach is then discovered automatically 200 hours later
+  (`Sim_ProcessStoryTimers`) **[fixed]**.
 - **Spy** (shown as "Stranger").
   - Appears when you beat the *third* Morgrul force (the game calls it the
     second invasion), not after the second wave **[fixed]**.
@@ -517,12 +519,12 @@ are there from the start; the rest appear on story events. All **[src]**
     Aircraft becomes researchable (6/7/5/1) and the Undorling joins the pub.
     Choosing the Lisonians gives no technology.
   - Either way the separated race counts as beaten for the League-defeat check
-    (`main_program.c:1318-1326`). Aircraft and Ion cannon come from nowhere
+    (`ground_battle_won_story`). Aircraft and Ion cannon come from nowhere
     else.
 - **Undorling.** Information only.
-- **Treasonable.** Appears when an army group reaches Earth or you win a
-  space battle in the Sun system (`sim.c:1097`), not after a delay. Pay
-  100,000–200,000 (the amount doesn't matter), then answer "I know a
+- **Treasonable.** Appears when an army group reaches Earth or you win a space
+  battle in the Sun system (`Sim_ProcessTravellingGroups`), not after a delay.
+  Pay 100,000–200,000 (the amount doesn't matter), then answer "I know a
   bounty-hunter" or "I'll look around" to unlock the Bounty-Hunter's job.
 - **Bounty-Hunter.** Appears after the Syonian meeting. His job (100,000)
   needs the Treasonable's request. It is not a no-op **[fixed]**: 100–199
@@ -532,7 +534,7 @@ are there from the start; the rest appear on story events. All **[src]**
 
 ## Colonies
 
-All **[src]** (`sim.c:440-621` daily update, `surface.c`, `cargo.c`,
+All **[src]** (`Sim_ProcessBodyEvents` daily update, `surface.c`, `cargo.c`,
 `droids.c`, `colonize.c`, `planetinfo.c`) unless marked.
 
 ### Starting position
@@ -671,16 +673,17 @@ University thresholds, target mood and growth (port menu, Game).
   every other system's mines (New Earth's included) stop while you view
   another system. **Leave the map on Amnesty while waiting.** The port mines
   every system whatever the map shows (`fixes.mine_all_systems`,
-  [bugs.md](bugs.md)).
+  `src/game/fixes.h`).
 - **Droids stay when mines go.** Demolishing a mine (2,000 credits) never
   lowers the droid count, so 9 droids keep mining with 1 mine left. You lose
   that mine's storage.
 - **Cargo is capped by planet storage.** A ship can't load more of one ore
   than the source planet's storage capacity, and unloading is capped the same
-  way (`cargo.c:101-145`).
+  way (`Cargo_CargoScreen`). The port caps loading by the ship's room only
+  (`fixes.cargo_planet_cap`).
 - **Miner-station-only bodies** share one spare storage record. If it gets
-  zeroed or reused, mining and pickup there both stop (`sim.c:927`); this is
-  probably the guide's "station storage full" bug. Prefer real colonies.
+  zeroed or reused, mining and pickup there both stop (`Sim_MineBody`); this
+  is probably the guide's "station storage full" bug. Prefer real colonies.
 - **Losing a space battle at New Earth deletes your trade and carrier
   groups** there (see War).
 
@@ -775,13 +778,13 @@ Corrections to the guide's tables **[fixed]**:
 ## War
 
 All **[src]** (`spwar.c`, `grwar.c`, `grwarunits.c`, `launch.c`, `intel.c`,
-`sim.c:1189-1314`) unless marked.
+`Sim_CheckEnemyAttacks`) unless marked.
 
 ### Groups and travel
 
 - **Group types.** Army, Trade, Pirate, Satellite carrier, plus the
   immovable planet forces.
-- **Leaving a star system** (`launch.c:282-286`):
+- **Leaving a star system** (`Launch_DestinationScreen`):
   - Army and Pirate groups need a Destroyer or Cruiser in the group.
   - Trade groups need a Galleon.
   - Carrier groups need Hyperspace drive *or* Galleon researched.
@@ -795,20 +798,26 @@ All **[src]** (`spwar.c`, `grwar.c`, `grwarunits.c`, `launch.c`, `intel.c`,
   - A droid takes 500 t. Trade groups can also carry ground units and
     weapons.
 - **Satellite carrier**: one satellite of any kind per carrier
-  (`groups.c:248`).
+  (`Groups_GroupsScreen`).
 - **Space station**: Destroyers and Cruisers appear in the shop only once
   Space station is researched. Each order is capped at one big ship per
-  station you own (`shop.c:145,281-286`), so more stations means more
+  station you own (`Shop_ShopScreen`), so more stations means more
   parallel builds.
 - **Attacking.**
-  - A space attack needs a hired war commander.
-  - An invasion (ground battle) needs Kyle Douglas or MACH
-    (`launch.c:221-227`).
+  - A space attack (ATTACK on an alien fleet in the star-map zoom) needs a
+    hired war commander. It is a space battle only.
+  - An invasion (GROUND WAR in the star-map zoom, with your Army group
+    selected at a body that is not allied and whose intel level is at
+    least 40, shown by " Your satellite found ... colony at ...") needs
+    Kyle Douglas or MACH (`Launch_MapScreen`). A won space battle leads
+    to the ground battle; a lost one ends it.
   - Either attack makes the target race hostile.
+  - Defending, it is the other way round: a lost space battle leads to a
+    ground battle at the colony, a won one ends it.
 
 ### Weapons and loadouts
 
-Full loadouts, from the group slot layouts (DS:08D8/0A14):
+Full loadouts, from the group slot layouts:
 
 | Unit | Full loadout | Space damage per hit / ground attack |
 |---|---|---|
@@ -827,15 +836,22 @@ the whole slot. **Equip everything fully.**
 
 ### Space battle
 
+The fight is automatic: the only control is RETREAT, which counts as a loss.
+
 - Hit points: Hunter 800, Starfighter 2,000, Destroyer 5,000, Cruiser 12,000.
-- Each ship picks a random living enemy and hits 11% of the time.
+- Every 4th frame each ship picks a random living enemy and hits 11% of the
+  time. Up to 500 ships per side.
 - Small ships do 1/3 damage to Destroyers and Cruisers. The guide said big
   ships are immune; they are not, just very hard to kill with small ships
-  **[fixed]**.
-- Small ship against small ship also has an instant-kill roll (2–7%).
+  **[fixed]**. Only Destroyers and Cruisers decide battles between big ships.
+- Small ship against small ship also has an instant-kill roll: Hunter on
+  Hunter 4%, Hunter on Starfighter 2%, Starfighter on Hunter 7%, Starfighter
+  on Starfighter 4%. Big ships have none.
 - Cheap Hunters soak up random fire. Your damage is multiplied by the war
-  commander's (experience + 200) / 220, or by 2/3 if none is hired. Enemies
-  get no modifier.
+  commander's (experience + 200) / 220, or by 2/3 if none is hired: Kyle
+  Douglas is hired at experience 20 (×1.00) and grows to 70 (×1.23), MACH
+  starts at 40 and grows to 90 (×1.32). Enemies get no modifier; a fully
+  equipped ship of yours does the same damage as the enemy's of its class.
 - One fifth of the destroyed ships survive, on both sides. Surviving enemies
   go home. Retreat counts as a loss.
 - **Your side**: Army, Pirate and planet-force groups landed or in orbit at
@@ -845,21 +861,50 @@ the whole slot. **Equip everything fully.**
 
 ### Ground battle
 
+- **Forces.** Your side is the ground units of your groups at the battle
+  body (planet and moon must match: an Army group's ground row comes along
+  on an invasion) or, defending, the colony's planet force, plus allied
+  forces there. The enemy has every hostile force at the body plus the
+  body's ground stores.
 - **Slots.** Up to 20 slots per side. Each slot holds 30 Troopers, 30 Tanks,
   10 Aircraft or 5 Missile launchers, so 100 Missile launchers is the useful
-  maximum. Unassigned units stay in reserve and survive.
-- **Behaviour.** Every unit fires at any enemy in range whatever its order.
-  Your units start standing still; enemy units advance on you.
+  maximum. Unassigned units stay in reserve and survive. The assignment
+  screen pre-fills the slots by type (troopers, tanks, aircraft,
+  launchers); "Remove unit" returns a slot to the pool, the number adds
+  (left button) or takes off (right button) one unit, and the ADD icons
+  add a slot of that type.
+- **Formation.** The field is 16 × 9 tiles. Slot order is the formation:
+  slots 1–9 stand in the rearmost column (x = 2), 10–18 in the next, 19–20
+  in the next, one row each, centred. The enemy stands from x = 13 leftwards.
+  Launchers at the rear and aircraft in front work best.
+- **Behaviour.** Every unit fires at any enemy in range whatever its order
+  (the highest-numbered one in range). Your units start standing still;
+  orders are Move to a tile or Attack a stack. Every enemy stack goes for
+  your nearest stack and stops as soon as it is in range.
 - **Ranges.** Trooper adjacent only; Tank ≤2 (Manhattan); Aircraft ≤2 in any
-  direction; Missile launcher shells at 2–4 tiles. A Missile launcher next to
-  an enemy is almost harmless.
+  direction, so it hits from the diagonal (2, 2) where a tank can't answer;
+  Missile launcher shells at 2–4 tiles. A Missile launcher next to an enemy
+  is almost harmless.
 - **Damage per hit.** Units in the stack × average attack × target weakness
-  ÷ 500, clamped to 1–15. Weakness: Trooper 40, Tank 20, Aircraft 5,
-  Missile launcher 10.
+  ÷ 500, clamped to 1–15. Attack per unit: Trooper 2, Tank 13, Aircraft 28.
+  Weakness: Trooper 40, Tank 20, Aircraft 5, Missile launcher 10. A
+  launcher shell does units × 45 × weakness ÷ 180 on the target's tile.
   - A 10-Aircraft stack kills about 11 Tanks per hit; a 30-Tank stack kills
     about 3 Aircraft.
   - Troopers are nearly useless.
   - Missile launchers outrange everything.
+- **Timing.** Frames between shots: Trooper 30, Tank 20, Aircraft 10,
+  Launcher 60. Speed: one pixel per 7 (Trooper), 6 (Tank), 4 (Aircraft) or
+  10 (Launcher) frames, so a tank crosses a tile in 112 frames.
+- **Stun.** A stack that is hit plays its hit animation for about 10 frames
+  and can't fire meanwhile. An aircraft stack fires every ~11 frames, so it
+  keeps its target stunned for good: 30 tanks facing 5 aircraft on the
+  diagonal die without a shot. Every hit counts at least 1, so troopers
+  stun too. This is why aircraft decide ground battles, and why tanks alone
+  lose to tanks plus troopers.
+- **Chance.** The random generator only decides which side moves first in a
+  round and ties, so the same forces fight almost the same way every time;
+  small changes in numbers or formation can turn it round.
 - **Result.** You win when every enemy slot is empty and lose when yours are
   (or on retreat). The base never fights.
 
@@ -869,12 +914,12 @@ the whole slot. **Equip everything fully.**
 - A space battle always happens; with no warships there you lose it at once.
   - Win it: no ground battle.
   - Lose it: ground battle. Losing *that* at New Earth is game over.
-- **Losing a space battle at New Earth disbands every group landed or in
-  orbit there.** Army and pirate units merge into the planet force; trade and
-  carrier groups are lost with their cargo (`intel.c:181-196`). This is the
-  guide's "all my groups disappeared" bug, which it blamed on the defensive
-  ground win **[fixed]**. Keep trade and carrier groups away from New Earth
-  when a wave is due.
+- **Losing a space battle at New Earth disbands every group landed or in orbit
+  there.** Army and pirate units merge into the planet force; trade and
+  carrier groups are lost with their cargo (`Intel_SpaceBattleLost`). This is
+  the guide's "all my groups disappeared" bug, which it blamed on the
+  defensive ground win **[fixed]**. Keep trade and carrier groups away from
+  New Earth when a wave is due.
 - No race builds units. All enemy forces are preset; garrisons grow only when
   survivors return home. The guide's "the AI out-builds you" is wrong
   **[fixed]**.
@@ -882,7 +927,7 @@ the whole slot. **Equip everything fully.**
   attacking.
 - Ion cannon and Energy shield have **no combat effect**: the base slot never
   fires, and the shield is only listed on the planet-info screen
-  (`main_program.c:1400-1405`, `planetinfo.c:405,447`). Skip them.
+  (`PlanetInfo_DrawPlanetInfoText`). Skip them.
 
 Enemy waves (H Hunter, SF Starfighter, D Destroyer, C Cruiser, Tr Trooper,
 T Tank, Air Aircraft, ML Missile launcher). The guide's figures were the
@@ -920,7 +965,7 @@ force 2 is 10 Troopers and 35 Tanks), and the Syonians.
 
 ### Products (research and purchase)
 
-From `Research::Products` (DS:5DAC) **[src]**. *Time* is build time in hours
+From `Research_Products` **[src]**. *Time* is build time in hours
 (the table stores tenths of an hour). *Skills* is the Math/Physics/Electronics/
 A.I. level a developer needs to research the product. Ores are in the order
 Detoxin, Energon, Kremir, Lepitium, Raenium, Texon. Items marked *built* are
@@ -973,7 +1018,7 @@ they need a Space station.
 
 ### Buildings
 
-From `Surface::Buildings` (DS:6592) **[src]**. *Energy* is consumption in kWh;
+From `Surface_Buildings` **[src]**. *Energy* is consumption in kWh;
 *Output* is the nominal energy output of generators (see the colony section
 for what actually happens). *Needs* is the product that must be researched
 first.
@@ -1008,7 +1053,7 @@ first.
 
 ### Commanders (advisors)
 
-From `Staff::*` (DS:579C–5843) **[src]**. Four categories, three choices
+From the `Staff_*` tables **[src]**. Four categories, three choices
 each. *Ability* is the 30/70/90 rating; *level* is the "scholarly level".
 
 | Category | Cheap | Average | Best |
@@ -1022,7 +1067,7 @@ The guide gave the pilots' training levels as 10/70/90; those are their
 abilities, and the levels are 10/20/40 like the other categories **[fixed]**.
 
 Developer skills (Math/Physics/Electronics/A.I.) by university grade, from
-`Staff::DevSkills` (DS:57F0) **[src]**:
+`Staff_DevSkills` **[src]**:
 
 | Grade | Sapphire Fox | Thomas Dempsey | Klaatoo |
 |---|---|---|---|
@@ -1033,10 +1078,3 @@ Developer skills (Math/Physics/Electronics/A.I.) by university grade, from
 | 4–6 | 4/4/4/4 | 7/7/7/7 | 9/9/9/9 |
 
 Fox's grade 3→4 drop (5→4 in Electronics) is in the data.
-
-## What was dropped from the guide
-
-- The legal notice, review, author's history and conclusion.
-- The spelling-error list.
-- The balance opinions about farms, radar and the spaceport. The facts behind
-  them are in the colony section.

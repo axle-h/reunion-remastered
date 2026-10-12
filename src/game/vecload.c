@@ -292,7 +292,7 @@ void VecLoad_SetWirePalette(void)
 // Projected points, projected normals, normals[1..17], vertices[1..17] and
 // edges[1..17], in this order. The sphere of V34.VEC (object 5) and V35.VEC
 // (object 1) has more edges and faces than its blocks hold, and the reads run
-// on into the next object's blocks, unused in both files (docs/formats/vec.md).
+// on into the next object's blocks, unused in both files.
 // The original's heap put the 17 blocks back to back; the port allocates
 // each set of 17 as one block, so the overrun lands in the same place.
 static void alloc_common(void)

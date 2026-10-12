@@ -1,5 +1,5 @@
-// Act 5 of the whole-game policy (docs/playthrough-policy.md §1 "Act 5:
-// Earth", steps X1-X9): from the League's surrender to the Earth ground
+// Act 5 of the whole-game policy (docs/playthrough.md, "Act 5: Earth",
+// steps X1-X9): from the League's surrender to the Earth ground
 // win, with Rigel 1 and its research (Plasma gun, Missile launcher, Mental
 // radar), the Syonians on Rigel 2, the Sun system and a spy satellite on
 // Earth, the Cruisers and launchers (army.c), the contact and the invasion

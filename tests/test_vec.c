@@ -1,4 +1,4 @@
-// vec: all 35 models against tools/vec.py (counts and CRC32 of the parsed data).
+// vec: all 35 models against a reference decoder (counts and CRC32 of the parsed data).
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

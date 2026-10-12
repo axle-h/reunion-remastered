@@ -35,7 +35,7 @@
 #define REUNION_DEFAULT_DATA_DIR "."
 #endif
 
-// Exit codes of REUNION.PRG that start.exe acts on (docs/cutscenes.md).
+// Exit codes of REUNION.PRG that start.exe acts on (cutscene/cutscene.h).
 enum : int {
     EXIT_VICTORY = 10,  // start.exe runs VICTORY.PRG
     EXIT_RESTART = 15,  // start.exe runs the game again

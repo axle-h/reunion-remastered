@@ -273,7 +273,7 @@ static void load_pic(void)
     CHECK(SDL_memcmp(vid_screen, want, (size_t)w * rows) == 0);
     CHECK(SDL_memcmp(ds.Gfx_Palette, want_pal, sizeof want_pal) == 0);
     // The fade took the old colours to black in the DAC: picture colours
-    // 0..BEh at +40h, so the toolbar's 0..3Fh stay (docs/port-bugs.md 6).
+    // 0..BEh at +40h, so the toolbar's 0..3Fh stay.
     CHECK(vid_palette[0x3F][0] == 33 && vid_palette[0x40][0] == 0 && vid_palette[0xFE][0] == 0
           && vid_palette[0xFF][0] == 33);
     // Shown over 5 retraces (the port's stand-in for the decoding time):

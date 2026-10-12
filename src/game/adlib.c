@@ -8,8 +8,9 @@
 
 // The player keeps all its state in its own code segment (428e:0743..08B7).
 // That area is mirrored byte for byte, initialised from REUNION.PRG, because
-// two routines index past their tables (a note above 96 reads beyond
-// FreqTable; key-off writes 156h bytes too high) and land in the following
+// two routines index past their tables (a note above 97 reads beyond
+// FreqTable, which FAILURE's order 4 does; key-off writes 156h bytes too
+// high) and land in the following
 // bytes, which belong to segment 431a. Those are included up to 431a:0140, as
 // stored in the file (far-call segments not relocated).
 #pragma pack(push, 1)

@@ -1,4 +1,4 @@
-// Battle drivers (tests/play/ui_battle.c, docs/playthrough-battles.md): the
+// Battle drivers (tests/play/ui_battle.c, docs/playthrough.md, "Battles"): the
 // game is put into a battle situation with play_test_setup, the way its own
 // code starts battles, and the battle is then fought by clicks only.
 //
@@ -155,7 +155,7 @@ static const Scenario scenarios[] = {
     // M18: Mirach 3 (Morgruls; waves 1-3 spent) with 20H 30SF 5D, 60 tanks.
     {"mirach", .invasion = true, .race = 3, .system = 3, .planet = 3, .system_name = "Mirach",
      .planet_name = "Mirach 3", .spent = 3, .own = {{20, 30, 5}, {0, 60}}},
-    // ... with the 90 tanks docs/playthrough-battles.md recommends.
+    // ... with the 90 tanks docs/playthrough.md ("Force sizes") recommends.
     {"mirach-90", .invasion = true, .race = 3, .system = 3, .planet = 3, .system_name = "Mirach",
      .planet_name = "Mirach 3", .spent = 3, .own = {{20, 30, 5}, {0, 90}}},
     {"mirach-ground", .invasion = true, .race = 3, .system = 3, .planet = 3, .system_name = "Mirach",

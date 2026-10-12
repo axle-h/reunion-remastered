@@ -1,4 +1,4 @@
-// smp: sample rate and PCM of a few sound effects, checked against tools/smp.py.
+// smp: sample rate and PCM of a few sound effects, checked against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

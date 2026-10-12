@@ -1,5 +1,5 @@
 // ani: frame counts, sizes and decoded pixels (delta and keyed drawing)
-// checked against tools/ani.py.
+// checked against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

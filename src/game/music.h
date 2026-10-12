@@ -19,9 +19,9 @@ void Music_InitMusicDevices(void);
 // the new hardware. Before Music_InitMusicDevices it does nothing (that
 // reads the config itself).
 void Music_SwitchDevice(void);
-// Port deviation (docs/port-bugs.md #1): while held, CHOISE.SPD plays without
-// the "choose your hero" voice, on whatever hardware the music switches to;
-// letting go restarts the module with the voice.
+// Port deviation (docs/port.md, "Deliberate deviations"): while held,
+// CHOISE.SPD plays without the "choose your hero" voice, on whatever hardware
+// the music switches to; letting go restarts the module with the voice.
 void Music_HoldHeroVoice(bool hold);
 // 424a:0137: starts the track selected by ds.Game_MusicTrack.
 void Music_ApplyMusicTrack(void);

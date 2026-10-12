@@ -1,6 +1,5 @@
 // Unit VecLoad (3d38): loads VECTORS\Vn.VEC models and draws the rotating
-// solid view (3D research screen) and the wireframe hologram, through Vec3D
-// (docs/formats/vec.md).
+// solid view (3D research screen) and the wireframe hologram, through Vec3D.
 //
 // State: the VecLoad_* and Vec3D_* fields of DS (game/dseg.h), arrays
 // indexed by object slot 1..17. VecLoad_Buffer, the 320-wide off-screen
@@ -31,7 +30,7 @@ void VecLoad_DrawWireObject(int16_t idx);
 void VecLoad_DrawWireScene(void);
 // 3d38:04f9: palette entry 41h = (0, 38h, 0), written to the DAC with 40h.
 void VecLoad_SetWirePalette(void);
-// 3d38:051c / 05d8: heap blocks for 17 objects (see docs/formats/vec.md).
+// 3d38:051c / 05d8: heap blocks for 17 objects.
 void VecLoad_AllocVecBuffers(void);
 void VecLoad_FreeVecBuffers(void);
 // 3d38:0696 (nested in LoadVec): reads the next object of the open file

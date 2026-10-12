@@ -327,7 +327,7 @@ void ui_alien_talk_path(const char *const path[])
         play_fail("no command centre after the talk");
 }
 
-// docs/playthrough-policy.md §3B: the policy's path per talk.
+// The policy's path per talk.
 static const struct {
     int race;
     const char *path[8];

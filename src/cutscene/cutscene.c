@@ -1,6 +1,6 @@
 // The units shared by the cut-scene programs, and the runner that stands in
 // for start.exe launching one of them. Per-program scripts are in credits.c,
-// intro.c and victory.c; docs/cutscenes.md describes the programs.
+// intro.c and victory.c.
 //
 // Port decisions (all three programs could run with a GUS or a Sound Blaster
 // player, which differ in timing; the port follows the GUS configuration):

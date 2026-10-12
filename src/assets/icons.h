@@ -1,4 +1,4 @@
-// ICON\ICON.ALL: 68 icons of 40x24 pixels; see docs/formats/icons.md.
+// ICON\ICON.ALL: 68 icons of 40x24 pixels.
 #pragma once
 
 #include <stddef.h>

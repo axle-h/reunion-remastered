@@ -268,7 +268,7 @@ void act4_l03_informer(void)
     // The Morgrul in the pub (there since Mirach) masks the bartender's
     // League tip (main_program.c, the bartender's menu) until the Informer
     // explains him (500): the pub then captions him "Pirate Leader". His
-    // cargo raids are optional (§5 R11): not taken.
+    // cargo raids are optional: not taken.
     if (in_pub("Pirate Leader"))
         return;
     pol_wait_money("L3: the Informer", PRI_L1, 500, 10 * POL_DAY);
@@ -536,9 +536,10 @@ void act4_l06_erans(void)
     // Erans (sim.c:1138-1144): MSG 45, talk 9 ("Yes ! My people will welcome
     // you."): the Eran in the pub, MSG 46. The supernova comes 560-569 h
     // after the talk and deletes everything in Antares: every group leaves
-    // at once and none goes back (R13).
+    // at once and none goes back.
     if (pol_seen("talk 9") < 0) {
-        // R7: no arrival while a wave is announced.
+        // No arrival while a wave is announced (a same-hour attack would
+        // replace the talk).
         pol_wait_for("L6: no wave due", no_wave_due, nullptr, 150);
         fly_to("Galleon 1", "Antares", "Antares 3", nullptr);
         if (!pol_try(wait_arrival, "Galleon 1"))

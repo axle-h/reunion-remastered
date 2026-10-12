@@ -1,5 +1,5 @@
 // saveload: LoadInit from the game data, a 41,670-byte save with the layout of
-// docs/formats/save.md, and a save/load round trip.
+// game/saveload.c, and a save/load round trip.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>

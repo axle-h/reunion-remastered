@@ -1,4 +1,4 @@
-// icons: ICON\ICON.ALL against tools/icons.py.
+// icons: ICON\ICON.ALL against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

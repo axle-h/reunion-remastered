@@ -8,8 +8,9 @@
 //          as pairs (op A, op B) at +0/+2/+4/+6/+9, C0h value at +8,
 //          high nibble of +11 = fixed offset added to the A0h value
 //   +633h  patterns of 64 rows x 9 channels x 2 bytes (480h bytes):
-//          byte 0: note 1..96 (FreqTable), 7Fh key off, 80h = byte 1 is an
-//          instrument (no effect then), 0 = none; byte 1: effect (see adlib.c)
+//          byte 0: note 1..97 (FreqTable[note - 1]; entry 0 is silent),
+//          7Fh key off, 80h = byte 1 is an instrument (no effect then),
+//          0 = none; byte 1: effect (see adlib.c)
 #pragma once
 
 #include <stddef.h>

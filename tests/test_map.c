@@ -1,4 +1,4 @@
-// map: dimensions and cells of planet maps, checked against tools/map.py.
+// map: dimensions and cells of planet maps, checked against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

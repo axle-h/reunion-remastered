@@ -1,6 +1,8 @@
 // Unit SaveLoad (1a3e): saved games, the new-game file and the disk/options
-// screen. The save format is docs/formats/save.md: 41,670 bytes of raw memory
-// blocks in a fixed order.
+// screen. A save is 41,670 bytes of raw memory blocks in a fixed order
+// (saveload.c, the block list), with no magic, version or checksum. SAVE\INIT
+// holds only BuildingCount and the Buildings table (the new game's 23
+// buildings; the slots past them are stale bytes, never read).
 //
 // Where the port keeps files: saves are written to
 // SDL_GetPrefPath("Amnesty Design", "Reunion") + "save/spidysav.<n>"; loading

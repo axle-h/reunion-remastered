@@ -49,8 +49,7 @@ void PlanetInfo_UpdateOrbitPositions(void);
 
 // 357b:3253
 void PlanetInfo_SelectCurBody(void);
-// 357b:32f1: (symbols.txt names the parameters the wrong way round; the
-// code compares the first one with CurSystem.)
+// 357b:32f1: the first parameter is compared with CurSystem.
 bool PlanetInfo_IsCurrentBody(int16_t sys, int16_t planet, int16_t moon);
 // The body names, into dst (cap bytes).
 // 357b:332c: name of the planet (moon = 0) or the moon.

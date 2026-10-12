@@ -1,4 +1,4 @@
-// animdef: WAR\ANIM\ANIM.DEF against tools/animdef.py.
+// animdef: WAR\ANIM\ANIM.DEF against a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

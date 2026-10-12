@@ -7,212 +7,170 @@ Approach: decompile the DOS executable with Ghidra and rewrite it, unit by unit,
 in C23 on top of SDL3, built with CMake. The port loads the original game data
 from the user's own copy; we never ship the assets.
 
+This file is the only plan: what is done, what is left, and every known bug
+that is still open. Reference material is in `docs/` (see the README).
+
 ## Decisions
 
 | Topic | Choice | Why |
 |---|---|---|
 | Language | C23 | Fixed-underlying-type enums (`enum : uint8_t`) mirror Pascal byte enums/records exactly; `static_assert`, `bool`, `nullptr`, `constexpr`, binary literals without headers or workarounds. GCC 14+ / Clang 18+. On Windows build with clang-cl or MinGW, as MSVC's C23 support is incomplete |
 | Platform | SDL3 | SDL2 is maintenance-only (Fedora already ships SDL2 as `sdl2-compat` on top of SDL3). SDL3's audio streams make feeding our own mixer simple, and its logical presentation does integer-scaled 320×200 out of the box |
-| Music | libxmp | Plays the ProTracker MODs as-is |
+| Music | libxmp (modules), Nuked OPL (AdLib) | The UltraSound music is ProTracker modules played as-is; the Sound Blaster music is the original's AdLib player ported (`src/game/adlib.h`) |
 | Build | CMake (≥ 3.25) with presets | Uses system SDL3/libxmp if found, otherwise fetches them with `FetchContent` |
-| VCS | git | `vendor/` and the Ghidra database are git-ignored |
-| Memory | Native C after porting | The faithful real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations (docs/port.md, "Memory"). The rest of the Borland run time (Pascal strings, `Real48`, the heap API, `ExitProc`, Ems) went next; only game data keeps Pascal strings (docs/port.md, "The data segment") |
-| Verification | Differential tests while porting, then golden state hashes | Unicorn ran the original's routines on the port's real-mode memory until every unit matched; native C memory retired them (docs/difftest.md, tag `last-real-mode`). Golden hashes of the layout-independent state and the playthrough's proof guard behaviour since |
+| VCS | git | `vendor/` (the game data) is git-ignored |
+| Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
+| Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since |
 
-## What we're working from
+## Source
 
-Source binary: `vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG` (English CD release).
+`vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG` (English CD release): Borland
+Pascal 7.0, real mode, no packing or overlays, ~240 KB of code in 54
+segments (813 functions), plus
+`INTRO.PRG`, `CREDITS.PRG` and `VICTORY.PRG`, chained by `start.exe`.
+How the port cites the original's addresses: docs/port.md, "Addresses".
+The file formats are described in the loaders, `src/assets/*.h`.
 
-| Fact | Detail |
+## Where we stand (2026-10-12)
+
+The port is complete and the game can be won in it.
+
+- **Ported:** every unit of `REUNION.PRG` and the three cut-scene programs,
+  about 37,000 lines of C in `src/`. The game needs only the data files, no
+  executable. Real-mode memory, EMS and the Borland run time are gone.
+- **Matches the original:** every unit matched the original routine for
+  routine under the differential tests before they were retired. Since
+  then, golden state hashes (`tests/golden/`, every fix on and every fix
+  off) catch any change in behaviour.
+- **Playable start to finish:** the playthrough fixture wins a new game
+  with seed 12345 using only clicks, keys and what is on screen (Halt(10),
+  2930-02-26). Its recording replays to the same end in the plain binary.
+  Six of seven seeds win (docs/playthrough.md).
+- **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
+  music, display, skip intro, colony stats, fix switches, restart, quit),
+  `reunion.ini`, screenshots, headless autopilot, `--replay` and soak runs.
+- **Bug fixing has started:** 11 bugs of the original that can make the
+  game unwinnable or break the economy are fixed behind switches
+  (`src/game/fixes.h`). Of the 34 bugs found in the port while playing it, 33
+  are fixed and one turned out to be the original's behaviour; their
+  write-ups are in git history (`docs/port-bugs.md`, deleted 2026-10-12).
+- **Tests:** all 83 ctest tests pass on the release build, the full
+  playthrough (`test_play_game`) and the golden proof included.
+
+Milestones from the original plan: Ghidra database named (done; the
+Ghidra project and the Python asset tools were retired 2026-10-12), assets
+viewable (done, `tools/`), title screen (done), every screen playable (done),
+full game playable start to finish (done), verified against the original
+(mostly done, see 1 below).
+
+## Remaining work
+
+In rough priority order.
+
+### 1. Verification gaps
+
+- **Saves from the DOS game.** `test_saveload` only round-trips the port's
+  own saves. Load a few `spidysav.*` written by the original under
+  DOSBox-X, and load the port's saves there.
+- **Whole-game side-by-side.** The differential tests compared single
+  routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
+  Nothing has compared a longer run (timing per game hour, a battle) with
+  the original from the same save.
+- **Original crashes on modern machines.** The suspects are all in the
+  DOS sound drivers and timer, which the port replaces, so there is
+  nothing to fix on the port's side; reproducing a crash in DOSBox-X would
+  only confirm the cause:
+  - the UltraSound module player (`43d5`) reprograms the PIT to about
+    1 kHz with its own INT 08h handler, which never chains to the BIOS's,
+    so the BIOS tick, INT 1Ch and the DOS clock stop while it plays;
+  - UltraSound detection scans 200h–2A0h, but the player hard-codes base
+    220h (where a Sound Blaster usually sits; DOSBox's UltraSound default
+    is 240h), and a failed detection still writes to ports 0–7 (the DMA
+    controller) and 20h (the PIC);
+  - AdLib detection (`428e`) waits for VGA retrace edges on each candidate
+    port and hangs where port 3DAh doesn't toggle;
+  - the Sound Blaster driver is a raw real-mode blob (`GRWAR\ALFA1.PIC`),
+    and the game spins on its status word, hanging if the driver never
+    clears it.
+
+### 2. Playthrough robustness
+
+Seed 3 loses at M16: New Earth stops at 5 Derricks (seed 12345 has 20), so
+the Detoxin for the Space station never gathers in time. Why step E21 built
+no more Derricks is not known yet (docs/playthrough.md, "Robustness").
+
+### 3. Bugs of the original still open
+
+All are marked `// BUG?` in the code (`grep -rn 'BUG?' src/`). The port
+reproduces them. For each one that changes play, decide whether it gets a
+switch in `src/game/fixes.h`, next to the existing ones.
+
+**Change play (candidates for a fix switch):**
+
+| Where | What |
 |---|---|
-| Compiler | Borland Pascal 7.0, real mode, `{$G+}` (ENTER/LEAVE frames), no stack checks |
-| Packing | None. Plain MZ, 4,785 relocations, no overlays, no DOS extender |
-| Size | ~240 KB code in 54 segments, 30 KB data segment (`3a81`) + BSS/stack |
-| Functions | Ghidra finds 813; all decompile, 18 with warnings |
-| Hand-written asm | Concentrated in the low-level units (blitters `47da`, sound `43d5`, `428e`) |
-| Other programs | `INTRO.PRG`, `CREDITS.PRG`, `VICTORY.PRG` (~60 KB each), chained by `start.exe` |
+| `main_program.c`, after a ground battle | When an enemy wins a ground battle at one of your colonies, `ClaimBodyForRace` gets its arguments in the wrong order: (system, planet, moon, race) instead of (owner, system, planet, moon). The colony is purged but not taken over. Instead, the body at (planet, moon, race) is cleared and handed to owner = the system number. In system 1 that owner is the player |
+| `spwar.c` `add_store_ships` | Every garrison ship from a body's stores gets id C9h, but `ApplySpaceLosses` counts survivors by 200 + moon. Garrison losses after a space battle are booked against the wrong body |
+| `spwar.c` `SpWar_ApplySpaceLosses` | Garrison losses are added to whichever side `LossPtr` was left pointing at. When it was nil, the original wrote to 0000:0000 (the interrupt table); the port skips that write |
+| `intel.c` `Intel_ClaimBodyForRace` (owners 8 and 12) | Every pass writes `Stores[1]`, so these races' bodies only get a garrison in the first slot (the last of the eight draws) |
+| `planetinfo.c` `PlanetInfo_SetupSystemViewHotspots` | The sun's hotspot sets orbit record 8's flag from `Bodies[sys][-1]` |
+| `launch.c`, GROUND WAR | The race state is indexed with `Owner` read as a signed char |
+| `sim.c` `Sim_UpdateColonySetups` | After a removal, the entry moved into its slot waits until the next hour |
+| `grwar.c` `GrWar_FindPath` | Tests cell (a,b) instead of (c,d), so (c,d) is marked only when (a,b) is out of range |
+| `vec3d.c` model 24 | Run-time error 200 if one of the centroids has x = 0. Check the shipped models; if none has, this is harmless |
+| `sim.c`, mines (docs/walkthrough.md) | Demolishing a mine never lowers the droid count. Bodies with only a miner station share one spare storage record |
 
-The Amiga release is the original but is hand-written 68k assembly on packed
-disks; we use it only as a reference (e.g. for asset formats and behaviour).
+**Visible but cosmetic:**
 
-### Segment map
-
-See [docs/segments.md](docs/segments.md) for every segment's role. Segment
-numbers everywhere use Ghidra's numbering (file segment + `1000h`).
-
-| Seg | Role |
+| Where | What |
 |---|---|
-| `1000` | Main program (one 14.5 KB procedure) |
-| `1b8a` | Time/turn simulation |
-| `2ef2` | Planet surface |
-| `3abd` | Command centre |
-| `405f` | Graphics core (palette, vsync, `.pic` loader); 619 call sites |
-| `43d5` | Sound driver (GUS ports hard-coded) and PIT timer |
-| `4758` / `47da` | Mouse / blitters |
-| `4857` / `48b9` / `48c7` | Borland `Crt` / `Dos` / `System` |
-| `4a81` | Data segment (DS) |
+| `sound.c` `PlayWarSnd` / `PlayGrSnd` | Share one "last loaded" key, so ground sound *n* right after war sound *n* replays the war sample |
+| `gfxpath.c` `AddToolbarIcon` | Clears slot `slot` 13 − `slot` times instead of the slots after it |
+| `shipinfo.c` "Change mode" | On list 0 it plays the error sound and still switches to list 1 |
+| `intel.c` spy reports | The "Information on" line is built and then overwritten (three places) |
+| `planetinfo.c` alien planet info | Race record bytes 13h..1Ah are read as "has this resource" flags |
+| `research.c` selection frame | Draws without hiding the mouse cursor |
+| `surface.c` build | A full building table plays the 'x' sound and skips the 'buildin' branch |
+| `command.c` room animation | Calls `StartMainAnim` where `StartGrAnim` is meant |
+| `message.c` | A box with more than 6 lines overflows its line array (the port drops the extra text). The log count can go negative |
+| `pub.c`, `alientalk.c` | Their line-clearing loops reuse the previous text's line count |
+| `blit.c` fill | An odd count fills count + 2 bytes |
+| `credits.c`, `cutscene.c` | A white palette is set up and never used |
+| `adlib.c` | KSL bits swapped, key-off never reaches the OPL, slide up without carry. This is how the original's music sounds; leave it |
 
-### Asset formats
+**Harmless, or already handled by the port:** `textfile.c` `BeginInput`
+(255-character limit into 60 bytes; edited strings are at most 19);
+`gfx.c` text wider than 255 (never happens); `main_program.c` clearing a
+fifth `DevSkill` (it is `ProductionRate`, set just after); `advisor.c`
+uninitialised first pass (the port zeroes it); `surface.c`
+`RegisterBuildingAnims` marking at uninitialised coordinates (the port
+skips it); the unreachable money cheat (`26eb`, the port has its own); the
+GUS and AdLib detection and timer bugs (the port replaces the drivers;
+see 1);
+the copy protection (removed, `src/game/protect.h`).
 
-| Files | Format | Status |
-|---|---|---|
-| `*.PIC` | `SpidyGfx` header, width/height, custom compression | Reverse |
-| `*.ANI` | `SpidyAnim` header | Reverse |
-| `ANIM/*.SPD` | Named animation/script data (`atv1`…) | Reverse |
-| `*.MOD` | ProTracker `M.K.` | Standard (libxmp) |
-| `SOUND*/*.SMP` | 6-byte header + 8-bit unsigned PCM | Confirm header |
-| `VECTORS/*.VEC` | Vector/3D models | Reverse |
-| `MAP/*.MAP` | 40×30 grid (`0x28 0x1e` header) | Reverse |
-| `TEXT/*.AT/.LOC/.SP` | Encrypted/obfuscated text | Reverse |
-| `ICON/ICON.ALL`, `WAR/*.DEF` | Unknown | Reverse |
-| `SAVE/*` | Settings (`SETUP.SPD`), saves (`spidysav.*`) | Reverse |
+### 4. Quality of life
 
-Copy protection: a manual-word check ("word at the bottom of page…") plus a
-password prompt. Both are bypassed in the port.
+Remappable keys, and saving anywhere.
 
-## Phases
+### 5. Reverse-engineering loose ends
 
-### Phase 0: project setup
-- Repository layout:
-  ```
-  PLAN.md
-  CMakeLists.txt
-  CMakePresets.json
-  docs/            format notes, segment map, findings
-  ghidra/          headless scripts (Java), exported symbol/type lists (text)
-  tools/           asset viewers/converters (Python)
-  src/             the port (C23)
-  vendor/          original game data — never committed
-  ```
-- Git repository with `.gitignore` covering `vendor/`, build output and the
-  Ghidra project database. *(done)*
-- CMake skeleton: an SDL3 window showing a 320×200 framebuffer, so the
-  toolchain is proven before any game code lands. *(done: palette test card,
-  4:3 aspect, Alt+Enter fullscreen)*
-- Ghidra project is disposable and git-ignored. Everything we learn goes into
-  `ghidra/symbols.txt`, which `ghidra/rebuild.sh` applies to a fresh import, so
-  it can be diffed, reviewed and re-applied. *(done, see ghidra/README.md)*
+These matter only for reading the code; nothing depends on them:
 
-### Phase 1: Ghidra groundwork
-The goal is a database where most functions have names, prototypes and types.
-1. **System runtime first.** *(done)* All 113 routines in `48c7` and the
-   `System` variables are named and prototyped in `ghidra/symbols.txt` (heap,
-   text/file I/O, strings, sets, longint and 6-byte Real maths, `Random`,
-   `Move`, `FillChar`…).
-2. **Calling convention.** *(done)* A small Ghidra language extension
-   (`ghidra/lang/`) adds Borland Pascal conventions (callee pops, only
-   BP/SP/SS/DS preserved) and fixes a SLEIGH issue that made every `PUSH CS`
-   after a far call resolve to the wrong segment. Prototypes in
-   `symbols.txt` use Pascal syntax and get exact stack/register storage.
-3. **Inline constants.** *(done)* `MarkConstants.java` finds the 694 string
-   constants stored in code segments from their `PUSH CS` references and
-   marks them as Pascal strings; they decompile as named string references.
-4. **Data segment.** *(in progress)* DS is set throughout the code, so all
-   1,355 referenced globals resolve and have cross-references. The layout is
-   mapped in `docs/globals.md`. About 180 globals and tables are named with 24
-   record types (`ghidra/types.pas`): game state, screens, groups,
-   buildings, galaxy, products, races, staff. Next: the remaining record
-   fields and naming functions unit by unit.
-5. **Unit map.** *(first pass done)* `docs/segments.md`.
-6. **Export script** that writes names entered in the Ghidra GUI back to
-   `symbols.txt`, so GUI work isn't lost on rebuild.
-7. **Function naming.** *(done)* All ~800 functions are named; 1,171
-   symbols apply with every prototype checked against the routine's `RET n`.
-   Agent proposals are merged with `ghidra/merge_proposals.py`.
+- record fields that are still `_xx` fillers or marked `?` in
+  `src/game/dseg.h`: `TGroup`'s travel and cargo fields, and bytes of
+  `TBody`, `TProduct`, `TBuilding` and `TRace` (`TRace.Status` 0/2/4/6,
+  what `TBody.Stores[7..8]` hold);
+- DS bytes nobody references, `_pad_XXXX` in `src/game/dseg.h`: the
+  1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
+  typed constants.
 
-### Phase 2: asset tools (in parallel with Phase 1)
-Python tools in `tools/` that decode each format to PNG/WAV/JSON. They:
-- confirm our understanding of the loaders found in Phase 1,
-- give early, visible progress,
-- become the reference the C loaders are tested against.
+### 6. Licence and publication (open decision)
 
-Order: `PIC` + palette → `ANI` → `SMP` → text decryption → `MAP` → `VEC` → `SPD` → saves *(all done: `tools/*.py`, one doc per format in docs/formats/; `.SPD` are ProTracker modules, `ICON.ALL` and `ANIM.DEF` also decoded)*.
-
-### Phase 3: platform layer (`src/platform/`)
-*(in place: video, timing (70 Hz retrace), input (mouse callback + Crt keys),
-audio (SDL3 + libxmp), fs (DOS paths); C loaders for every format in
-`src/assets/`; 13 tests.)*
-
-Replace everything that touched DOS hardware:
-- **Video:** 320×200 8-bit framebuffer + 256-colour palette, presented via
-  SDL with integer/aspect-correct scaling. Palette fades handled in software.
-- **Timing:** a fixed logic tick matching the original PIT rate, decoupled from
-  render rate. Vsync waits become "wait for next tick".
-- **Input:** keyboard and mouse events mapped to what the game polls (`Crt`
-  `ReadKey`/`KeyPressed`, mouse state).
-- **Audio:** SDL audio stream; MOD playback via libxmp; SMP effects mixed in.
-- **Files:** case-insensitive lookup, `\` → `/`, game data path configurable,
-  saves written to a user directory.
-- **RTL shims:** Pascal strings, `Random`/`RandSeed` reproduced exactly
-  (Borland LCG: `seed = seed * 134775813 + 1`) so behaviour matches the original.
-
-### Phase 4: port the game
-*(all units ported, ~21k lines of C in src/game/, 50 tests; AdLib music and
-soak testing in progress. Earlier groundwork: data-segment mirror generated from symbols.txt and loaded from the
-original EXE; emulated real-mode memory so far pointers worked, until the
-port moved to native C memory and dropped the rest of the Borland run
-time; see docs/port.md.)*
-
-- Work leaf-first: graphics/blitters → loaders → text/UI → subsystems
-  (research, production, trade, fleets, combat, diplomacy) → main loop.
-- Start faithful, clean up afterwards. First pass keeps the original data
-  layout (a struct mirroring DS offsets, with `static_assert`s) so the port can
-  be checked against memory dumps. Refactor into idiomatic C only once a
-  subsystem matches.
-- Hand-written asm routines are rewritten from their behaviour, not translated
-  instruction-by-instruction.
-- `docs/progress.md` tracks every segment: *unknown → named → ported → verified*.
-
-### Phase 5: intro, credits, victory
-The three separate programs, ported last as cutscene modules inside the same
-binary.
-See docs/cutscenes.md. Needs: VGA mode 12h (640x480, 16 colours) in the video
-layer alongside 13h; cues driven by the MOD player's order/row position (so the
-audio layer must report it); the launcher's flow (credits, intro, game; game
-exit code 10 shows the victory sequence, 15 restarts).
-
-### Phase 6: verification
-- **Side-by-side runs** in DOSBox-X (installed) vs the port from identical
-  saves; compare screens and key state.
-- **Differential tests** (done, then retired; docs/difftest.md): the
-  original's routines under Unicorn on the port's memory. They replaced the
-  planned DOSBox-X memory diffs, which were never used and went with the
-  real-mode memory model.
-- **Save compatibility**: load original saves in the port and vice versa.
-- **Asset tests**: C loaders vs Python tool output.
-
-### Phase 7: bug fixes and improvements
-Only after the port matches the original. Each fix behind a clear commit/flag
-so "original behaviour" stays reproducible.
-- The known bugs are crashes on newer systems, most likely in the sound
-  drivers and timer handling: `43d5` writes to Gravis Ultrasound registers at
-  hard-coded ports (322h–327h) and reprograms the PIT. Phase 3 replaces all of
-  that code, so these should disappear with the port. Confirm by reproducing
-  the crashes in DOSBox-X and checking they don't occur in the port.
-  Concrete suspects (docs/sound-original.md): the GUS player hard-codes base
-  220h while detection scans other bases; a failed GUS detection still writes
-  to ports 0–2 (DMA controller); the 1 kHz timer ISR never chains to INT 08h,
-  freezing the BIOS clock; AdLib detection waits on VGA retrace and can hang;
-  the Sound Blaster wait loops never time out.
-- The classic Borland Pascal "Runtime error 200" on fast CPUs is **not** the
-  cause: the `Crt` delay-calibration code is absent from all binaries.
-- Timing bugs from CPU-speed dependence, if any turn up.
-- Quality of life: windowed/fullscreen, remappable keys, save anywhere, etc.
-
-## Milestones
-1. Ghidra DB with System RTL named and unit map drafted. *(done)*
-2. All `PIC`/`ANI` assets viewable as PNG.
-3. SDL shell boots and shows the title screen using original loaders. *(done)*
-4. Main menu → new game → first planet screen playable. *(boots into a new
-   game; every screen opens; 250k frames run without a crash; soak testing in
-   progress)*
-5. Full game loop playable start to finish.
-6. Verified against original; bug-fix phase begins.
-
-## Open decisions
-- **Licence / publication:** the game is still under copyright. Keep the repo
-  private or publish code only (no assets, no raw decompiler dumps) until
-  that's decided. The source holds data taken from the executables
-  (`src/game/dsinit.c`, the game's typed constants and texts; the cut-scene
-  tables; the AdLib player's image in `src/game/adlib.c`), which publishing
-  code only would have to leave out and regenerate on the player's side.
+The game is still under copyright. Keep the repository private, or
+publish only the code (no assets, no raw decompiler dumps), until this is
+decided. The source holds data taken from the executables
+(`src/game/dsinit.c`, the game's typed constants and texts; the cut-scene
+tables; the AdLib player's image in `src/game/adlib.c`). A code-only
+release would have to leave these out and regenerate them on the player's
+side.

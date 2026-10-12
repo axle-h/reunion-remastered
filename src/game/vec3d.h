@@ -1,4 +1,4 @@
-// Unit Vec3D (3e17): the vector-model renderer (docs/formats/vec.md):
+// Unit Vec3D (3e17): the vector-model renderer (models: assets/vec.h):
 // orthographic projection with a cosine table, per-object normals and
 // centroids, flat-shaded polygon fill and wireframe edges.
 //
@@ -39,9 +39,9 @@ void Vec3D_FillSpans(uint8_t *bufSeg, int16_t firstY, int16_t lastY, int16_t col
 // 3e17:1438: table[y] = x along the edge (Bresenham). A horizontal edge
 // writes nothing; a vertical one fills its whole y range.
 void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t *table);
-// 3e17:1500: rotates count points from src into dst (whole degrees a, b, c;
-// see docs/formats/vec.md), scaling the signed low bytes by the low byte of
-// scale. mode 2 swaps the first two matrix rows.
+// 3e17:1500: rotates count points from src into dst (whole degrees a, b, c),
+// scaling the signed low bytes by the low byte of scale. mode 2 swaps the
+// first two matrix rows.
 void Vec3D_Project(int16_t a, int16_t b, int16_t c, uint8_t *src, uint8_t *dst, int16_t scale,
                    int16_t count, int16_t mode);
 // 3e17:18db: cos500[i] = Round(Cos(i * pi / 180) * 500).

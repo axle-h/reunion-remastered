@@ -1,4 +1,4 @@
-// Act 2 of the whole-game policy (docs/playthrough-policy.md §1 "Act 2:
+// Act 2 of the whole-game policy (docs/playthrough.md, "Act 2:
 // Jaanosians", steps J1-J13): from Jade revealed to the Galleon, with the
 // Jaanosian meetings, the army for Morgrul wave 1 and the standing orders
 // act 2 adds (S6 ore hauling, S7 droid delivery, S8 wave evacuation in

@@ -287,7 +287,7 @@ static bool rigel2_on_map(void *unused)
 void act5_x04_rigel2(void)
 {
     // The Psy radar finds Rigel 2 1/10 per day once Mental radar is done
-    // (sim.c, R12); the rename prompt is accepted as it comes. A non-carrier
+    // (sim.c); the rename prompt is accepted as it comes. A non-carrier
     // group arriving there meets the Syonians: MSG 29 and talk 10 ("Thank
     // you for your confidence in us..."), which lists the Sun system and
     // puts the Bounty-Hunter in the pub (main_program.c).
@@ -428,7 +428,7 @@ void act5_x07_contact(void)
 
 void act5_x08_bounty_hunter(void)
 {
-    // Optional (§5 R8 cuts it first): his job only thins Earth's garrison
+    // Optional: his job only thins Earth's garrison
     // 100-199 h later, and the force of X7 won Earth 10/10 without it.
     play_log("X8: the Bounty-Hunter is not hired");
 }
@@ -465,7 +465,7 @@ void act5_x09_earth(void)
     // unit assignment and the ground battle (pol_service). The ground win on
     // Earth is the victory: screen 36, Halt(10). A lost battle sends Strike's
     // survivors home (intel.c): rebuild to the full force and go again
-    // (§1 X9 Fail), Home Guard holding New Earth against wave 1.
+    // (X9), Home Guard holding New Earth against wave 1.
     for (int attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) {
             play_log("X9: attempt %d", attempt + 1);

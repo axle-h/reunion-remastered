@@ -1,4 +1,5 @@
-// UI drivers and observers for the battle screens (docs/playthrough-battles.md):
+// UI drivers and observers for the battle screens (docs/playthrough.md,
+// "Battles"; the mechanics are in docs/walkthrough.md, "War"):
 // space battle (29), unit assignment (19), ground battle (32), and the
 // GROUND WAR order on the star map that starts an own invasion.
 //

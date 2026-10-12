@@ -1,4 +1,7 @@
-// .ANI animations ("SpidyAnim"): delta-RLE frames, see docs/formats/ani.md.
+// .ANI animations ("SpidyAnim"): delta-RLE frames back to back to the end of
+// the file, each a word n, "SpidyAnim", word width, word height and n bytes
+// of pixel stream. The file holds no frame count, palette or timing: the
+// game's tables give those. Every shipped literal is in 00h..7Fh.
 #pragma once
 
 #include <stddef.h>

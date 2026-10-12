@@ -1,4 +1,4 @@
-// Act 3 of the whole-game policy (docs/playthrough-policy.md §1 "Act 3:
+// Act 3 of the whole-game policy (docs/playthrough.md, "Act 3:
 // Morgruls", steps M1-M18): from the Galleon to the Morgrul home world
 // taken, with Morgrul waves 2 and 3, the Kalls, Phelonians and the drifting
 // ship in Phoenix, the Spy and Explorer 1 in Mirach. Each act3_mNN function

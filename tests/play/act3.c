@@ -239,8 +239,8 @@ static bool phoenix_1_found(void *unused)
 
 void act3_m05_phoenix1(void)
 {
-    // Before MSG 17 (the Phoenix S.O.S.), so selecting Phoenix 1 is harmless
-    // (§5 R5); after it the drifting ship's trigger is armed.
+    // Before MSG 17 (the Phoenix S.O.S.), so selecting Phoenix 1 is harmless;
+    // after it the drifting ship's trigger is armed.
     if (seen_or_logged("S.O.S. signal has been decoded"))
         play_fail("M5: the Phoenix S.O.S. came first");
     pol_between_goals(shuttle);
@@ -352,7 +352,7 @@ void act3_m10_course(void)
 
 // --- M11: the drifting ship ------------------------------------------------------
 
-// S-K (§4): the star map zoomed on Phoenix 5 lists the Kalls' fleet 2
+// S-K: the star map zoomed on Phoenix 5 lists the Kalls' fleet 2
 // there (allied forces are listed, planetinfo.c SetupSystemViewHotspots)
 // once their alliance timer moved it (sim.c:1516-1521).
 static bool kall_fleet_at_phoenix_5(void *unused)
@@ -415,7 +415,7 @@ void act3_m11_drifting_ship(void)
         return;
     pol_wait_for("M11: MSG 17, the Phoenix S.O.S.", sos_seen, nullptr, 1000);
     pol_poll_for("M11: the Kalls' fleet 2 at Phoenix 5", kall_fleet_at_phoenix_5, nullptr, 1500, 24);
-    // R7: no first arrival while a wave is announced (its attack would
+    // No first arrival while a wave is announced (its attack would
     // replace the talk).
     pol_wait_for("M11: no wave due", no_wave_due, nullptr, 150);
     // Launched to Phoenix 1, the group's screens keep Phoenix 1 selected
@@ -476,7 +476,7 @@ static void ask_spy(void *unused)
 
 void act3_m13_spy(void)
 {
-    // The Spy takes 30,000 (unchecked, R6) and names Mirach: it joins the
+    // The Spy takes 30,000 (unchecked) and names Mirach: it joins the
     // star map's system list, no box (main_program.c:1024-1033).
     if (mirach_listed())
         return;

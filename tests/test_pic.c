@@ -1,4 +1,4 @@
-// pic: decoding against values produced by tools/pic.py.
+// pic: decoding against values produced by a reference decoder.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 

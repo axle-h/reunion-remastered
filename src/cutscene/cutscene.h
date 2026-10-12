@@ -1,6 +1,11 @@
 // The cut-scene programs CREDITS.PRG, INTRO.PRG and VICTORY.PRG, which
-// start.exe ran around the game (docs/cutscenes.md): credits and intro before
-// REUNION.PRG, victory when it exits with code 10.
+// start.exe ran around the game:
+//
+//   Exec('grwar\credits.prg'); Exec('grwar\intro.prg');
+//   repeat Exec('grwar\reunion.prg', 'sxca') until DosExitCode <> 15;
+//   if DosExitCode = 10 then Exec('grwar\victory.prg');
+//
+// The cut-scenes' own exit codes are ignored. src/main.c does the same.
 #pragma once
 
 typedef enum : int {

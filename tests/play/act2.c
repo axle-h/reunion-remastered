@@ -26,7 +26,8 @@ enum : int {
     SATELLITE_PRICE = 780,
     CARRIER_PRICE = 1530,
     RUSSEL_COST = 167000,  // Nuclear Gen., Builder Plant, Mine, Building and the colony
-    // J8 (playthrough-battles.md §6: 12 Hunters won wave 1 10/10, 8 only 7/10).
+    // J8 (docs/playthrough.md, "Force sizes": 12 Hunters won wave 1 10/10, 8
+    // only 7/10).
     ARMY_HUNTERS = 12,
     ARMY_LASERS = 24,
     // Trade 1's ships: 500 t and 1 droid per Transfer ship, 2,000 t and 4
@@ -411,8 +412,8 @@ void act2_j01_contact(void)
     // after it), and the Jaanosians' deadline (MSG 6) is 6,000-6,399 h after
     // the start, 2928-04-23 at the earliest (main_program.c:240): the
     // contact waits for the economy until 2928-03-01, the player's choice by
-    // the date on the status bar (economy model: not before ~02-15).
-    // Until then nothing is paid unchecked (talk 3 is the first, R6): act
+    // the date on the status bar (not before ~02-15).
+    // Until then nothing is paid unchecked (talk 3 is the first): act
     // 1's reserve.
     UiDate when = {2928, 3, 1, 0};
     int64_t at = ui_date_hours(&when);
@@ -461,7 +462,7 @@ void act2_j05_meeting2(void)
 }
 
 // J6 waits for the S.O.S. and, from 700 h on (the contact + ~2,100 h, ~500 h
-// before the earliest S.O.S.), saves for J7 and J8 (economy model §6).
+// before the earliest S.O.S.), saves for J7 and J8.
 typedef struct {
     int64_t save_from;
 } SosWait;

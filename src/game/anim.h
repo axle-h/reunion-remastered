@@ -1,4 +1,4 @@
-// Unit Anim (3c64): loading and drawing .ANI animations (docs/formats/ani.md)
+// Unit Anim (3c64): loading and drawing .ANI animations (assets/ani.h)
 // and one shaped screen copy.
 //
 // The loaded animation lives in the record Anim_Record points to
@@ -6,7 +6,8 @@
 // blocks: 9-byte magic, width, height, stream) and their 140 sizes. Only one animation is loaded at a time; the loaders do nothing
 // while the flag is set. Frame counts come from the tables at DS:555B (SA,
 // 5-byte records), DS:55D7 (MAIN, 7-byte) and DS:5651 (GRANIM, 5-byte),
-// indexed by the file number.
+// indexed by the file number. The MAIN table gives MAIN13 41 frames (the
+// file has 68), and entry 7 has no MAIN7.ANI.
 #pragma once
 
 #include <stdint.h>

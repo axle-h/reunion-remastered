@@ -225,7 +225,7 @@ static void open_colony(const Colony *c, int screen)
         ui_open_body(c->planet, c->moon, screen);
 }
 
-// S2 and the colony boxes of §3 C for colony `c`: the building it needs
+// S2 and the colony warning boxes for colony `c`: the building it needs
 // next for housing, food and health (nullptr if none), from its planet info
 // (population) and surface (building counts).
 static const char *s2_need(const Colony *c, int32_t *cost, bool *urgent)
@@ -302,9 +302,8 @@ static bool goal_s2_new_earth(void)
 
 // The core of a colony after its founding (E18): S2's needs first, then a
 // Vehicle plant and a Spaceport, one building a pass (S4 adds power). From
-// act 2 on (playthrough-policy.md E18 "As run") S3 sets its tax, and its
-// Mines (their droids come by trade group, S7) and leisure buildings
-// follow the core.
+// act 2 on S3 sets its tax, and its Mines (their droids come by trade
+// group, S7) and leisure buildings follow the core.
 static const struct {
     const char *kind;
     int32_t cost;

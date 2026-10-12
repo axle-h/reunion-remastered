@@ -1,5 +1,5 @@
 // CREDITS.PRG: the Grandslam logo, the title and the credits roll over the
-// alien face (docs/cutscenes.md section 3). Main block 1000:0389. Any key
+// alien face. Main block 1000:0389. Any key
 // while waiting for a cue ends the program.
 #include <SDL3/SDL.h>
 

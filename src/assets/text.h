@@ -1,5 +1,5 @@
 // TEXT\ files: obfuscated line files and fixed-slot .RAW string tables
-// (see docs/formats/text.md).
+// (docs/text.md lists them).
 #pragma once
 
 #include <stddef.h>

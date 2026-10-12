@@ -1,8 +1,8 @@
-// The skeleton shared by the three cut-scene programs (docs/cutscenes.md):
+// The skeleton shared by the three cut-scene programs:
 // the same picture/palette/anim/cue units are linked into CREDITS, INTRO and
 // VICTORY, only the scene script and a few details differ. Addresses are
-// Ghidra addresses in each program's own import (DS = 1e62 INTRO, 1ce7
-// CREDITS, 1d3c VICTORY); see ghidra/{intro,credits,victory}.symbols.txt.
+// in each program's own load image, numbered as in REUNION.PRG (file
+// segment + 1000h; DS = 1e62 INTRO, 1ce7 CREDITS, 1d3c VICTORY).
 //
 // The scripts pass cues as (row, order) like the original calls. Positions
 // are the GUS player's: both 1-based (order n+1 and row r+1 while row r of

@@ -2,8 +2,8 @@
 // buttons by label, hotspots by caption, both of which the game shows as the
 // hint line under the mouse) and click it like a player would.
 //
-// The shared machinery is in two modules (docs/playthrough.md
-// "Architecture"): this one acts (waits, clicks, the toolbar, hotspots, the
+// The shared machinery is in two modules (docs/playthrough.md,
+// "The fixture"): this one acts (waits, clicks, the toolbar, hotspots, the
 // clock, navigation) and ui_message.h reads the screen and handles the
 // interrupts. Per-screen drivers build on both.
 //
@@ -13,7 +13,7 @@
 // before a click is closed instead of stalling it. Use play_wait_until only
 // to watch a box or a hover yourself.
 //
-// Clicks and the main loop (docs/screens.md §2): a press on a hotspot runs
+// Clicks and the main loop (src/game/main_program.c): a press on a hotspot runs
 // the screen's handler at once. On a toolbar button or a hotspot flagged as
 // a button (THotspot.Repeat_) that is all; on any other hotspot the handler
 // runs again on every retrace the button stays down over it (auto-repeat:
@@ -37,7 +37,8 @@ typedef enum {
 
 // --- Waits (all service interrupts) ---
 
-// The screen shown (Game::CurrentScreen; docs/screens.md §3).
+// The screen shown (Game_CurrentScreen; the screen list is in
+// src/game/main_program.h).
 int ui_screen(void);
 // Waits until pred(arg) holds, checking once per retrace after servicing
 // interrupts, for at most `timeout` retraces. Returns whether it holds.
@@ -100,7 +101,7 @@ void ui_click_hotspot(int j, UiClick how);
 
 // --- Clock ---
 
-// Clicks the clock button (one game hour per click; screens.md §5) until
+// Clicks the clock button (one game hour per click) until
 // pred(arg) holds, for at most `hours` hours. Only on screens whose clock
 // runs. Returns the hours it took, -1 if pred still fails.
 int ui_fast_forward(bool (*pred)(void *arg), void *arg, int hours);

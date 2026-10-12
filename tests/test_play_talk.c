@@ -1,7 +1,6 @@
-// Dialogue drivers (tests/play/ui_talk.h, docs/playthrough.md thread B4):
-// alien talks 2-10 along the policy's paths (docs/playthrough-policy.md
-// §3B), story scenes, a pub conversation and a university course, each from
-// a new game with seed 12345. Talks and scenes come late in a game, so those
+// Dialogue drivers (tests/play/ui_talk.h, docs/playthrough.md): alien talks
+// 2-10 along the policy's paths (ui_talk.c), story scenes, a pub
+// conversation and a university course, each from a new game with seed 12345. Talks and scenes come late in a game, so those
 // runs start them with the game's own entry (AlienTalk_StartAlienTalk /
 // StartAlienScene, as the story timers do) through play_test_setup; the pub
 // and the university are reached by play, and the university run is

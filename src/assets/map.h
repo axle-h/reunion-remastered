@@ -1,4 +1,6 @@
-// .MAP planet-surface terrain grids (tile indices; see docs/formats/map.md).
+// .MAP planet-surface terrain grids, MAP\MAP<surface type>_<variant>.MAP:
+// byte width, byte height, then width * height tile indices, row-major (no
+// header beyond that). Shipped maps run from 20x20 to 86x60.
 #pragma once
 
 #include <stddef.h>

@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
     CHECK(run("40:click:160,60;120:click:80,100;900:click:72,16;1100:quit") == -1);
     CHECK(ds.Game_CurrentScreen == 3);
 
-    // Command centre -> planet surface (docs/port-bugs.md 6): the toolbar stays
+    // Command centre -> planet surface: the toolbar stays
     // lit throughout (LoadPic fades picture colours 0..BEh at +40h, not DAC
     // 0..BEh), and the old picture fades out over several retraces instead of
     // cutting to black, then the new one fades in.

@@ -1,6 +1,6 @@
-// The data segment's fields by name (generated into dsfields.c by
-// tools/gen_dseg.py from ghidra/symbols.txt and ghidra/types.pas), for code
-// that walks the game's state field by field (game/state.c).
+// The data segment's fields by name (dsfields.c, one entry per field of
+// DSeg and of each record in game/dseg.h), for code that walks the game's
+// state field by field (game/state.c).
 #pragma once
 
 #include <stdint.h>

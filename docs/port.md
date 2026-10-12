@@ -1,86 +1,55 @@
 # Porting notes
 
+## Addresses
+
+Comments cite the original's code as `seg:off`, numbered as Ghidra loads
+`REUNION.PRG`: file segment + 1000h, so the data segment is `4a81` and
+`1b8a:0705` is file segment `0b8a`. The cut-scene programs are numbered the
+same way in their own load images (`src/cutscene/cs.h`).
+
 ## The data segment (`src/game/dseg.h`)
 
-The original's globals are one C global, `DSeg ds`, generated from the
-symbols: DS `0000–a543` of `REUNION.PRG` (Ghidra segment `4a81`), field by
-field in the original's order.
+The original's globals are one C global, `DSeg ds`: DS `0000–a543` of
+`REUNION.PRG`, field by field in the original's order, named `Unit_Name`
+(`ds.Game_Credits`; Borland's own get `System_`). The game code reaches
+every global by name; the original's offsets are only in comments and the
+field table.
 
-- Every variable named in `ghidra/symbols.txt` is a field, called
-  `Unit_Name` (`Game::Credits` → `ds.Game_Credits`). Names without a unit
-  are Borland's own and get `System_`. The game code reaches every global
-  by name; the original's DS offsets are only in the comments and the field
-  table.
-- Records come from `ghidra/types.pas` with the Pascal layout (packed, no
-  alignment): they are the game's data formats, the typed constants, saved
-  and kept in heap blocks. Pascal arrays become 0-based C arrays: the
-  comment gives the Pascal bounds, and the C index is the Pascal index minus
-  the lower bound (`Galaxy::SunNames[3]` → `ds.Galaxy_SunNames[2]`).
+- Records keep the Pascal layout, packed: they are the game's data formats,
+  saved and kept in heap blocks. Pascal arrays become 0-based C arrays; the
+  comment gives the Pascal bounds (`[3..9]`), and the C index is the Pascal
+  index minus the lower bound.
 - `boolean` is `uint8_t`, since the original may store any byte value.
-  Strings are `PStrN` / `PString` (length byte + chars): they are game
-  data, saved and hashed byte for byte. Game code uses C strings and
-  converts at the boundary with `pstr_get` / `pstr_set`
-  (`src/game/system.h`), which keep exactly the bytes the original's
-  `StrStore` leaves; a NUL inside a Pascal string (read past a table) is
-  carried as `PSTR_NUL`. The text routines take C strings, except the line
-  editor, which edits game data in place. `real` would be the 6-byte
-  `Real48`, but no DS field or record has one; the game's few Real
+  Strings are `PStrN` / `PString` (length byte + chars), saved and hashed
+  byte for byte. Game code uses C strings and converts at the boundary
+  with `pstr_get` / `pstr_set` (`src/game/system.h`). The game's few Real
   computations (the cosine table, model normals, taxes) are integer or
-  `double` code checked to give the original's results. `pointer` and `^T`
-  are host pointers (`uint8_t *`, `T *`); procedural types
-  (`TProc = procedure;` in `types.pas`) are C function pointers. `farptr`
-  marks the few real-mode far pointer values nothing uses any more (the
-  Borland heap's variables, interrupt vectors).
-- `DSeg` keeps the original's globals in order with no padding: in a dozen
-  places the original reads or writes past an array into the next globals
-  (alien-talk lines into `Surface::Mode`, race 0/1 records before
-  `Races::Races`, index 0 of 1-based tables), and those stay the same
-  bytes. Only pointer fields differ in size from the original. Bytes nobody
-  named are `_pad_XXXX` arrays.
+  `double` code checked to give the original's results.
+- `DSeg` has no padding: in a dozen places the original reads or writes
+  past an array into the next globals (alien-talk lines into
+  `Surface_Mode`, race 0/1 records before `Races_Races`, index 0 of 1-based
+  tables), and those stay the same bytes. Only pointer fields differ in
+  size from the original. Bytes nobody named are `_pad_XXXX` arrays.
 - Packed means many words and longwords sit at odd addresses. Code reaches
-  them through the packed struct itself (`ds.X`, `rec->X`, a pointer to a
-  packed record) or, at a byte offset, with `rd16le`/`wr16le`/`rd32le`/
-  `wr32le` (`src/game/le.h`), never through an `int16_t *` or `int32_t *`.
-  The `asan` and `trap` presets check alignment, so a new misaligned access
-  fails their runs.
+  them through the packed struct (`ds.X`, `rec->X`) or, at a byte offset,
+  with `rd16le`/`wr16le`/`rd32le`/`wr32le` (`src/game/le.h`), never through
+  an `int16_t *` or `int32_t *`. The `asan` and `trap` presets check
+  alignment.
 
 `dseg_init()` (`src/game/dseg.c`) does what the original's startup does:
-DS gets the typed constants, DS `0000–759d`, and the rest is zero. The
-values are `ds_initial` in `src/game/dsinit.c`, a C initializer by field
-name that the generator reads once from the load image of
-`GRWAR\REUNION.PRG` (the data segment starts at file offset
-`header paragraphs * 16 + 3A81h * 16`). The far pointers into DS that DOS
-relocates (the galaxy and menu tables) are host pointers there
-(`&ds.Galaxy_AmnestyBodies[0]`), and the bytes nobody named are in the
-`_pad_XXXX` arrays, so every byte matches the original's. The game needs
-no executable at run time, only the data files.
+DS gets the typed constants (`ds_initial`, `src/game/dsinit.c`, DS
+`0000–759d`, read once from the executable) and the rest is zero. The
+far pointers DOS relocated are host pointers there, so the game needs no
+executable at run time, only the data files.
 
-The field table (`src/game/dsfields.c`, generated too) lists every field's
-original offset, its offset in `DSeg`, its size and whether it holds
-pointers. `dseg_orig(offset)` uses it to give the port's byte for an
-original DS offset.
-
-### Regenerating
-
-`dseg.h`, `dsfields.c` and `dsinit.c` are generated; don't edit them. After
-adding names or types to `symbols.txt` or `types.pas`, run (`dsinit.c` needs
-`vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG`, or `--exe`; without it the file
-is left as it is):
-
-```sh
-python3 -I tools/gen_dseg.py
-```
-
-The generator never stops on bad entries. It prints a warning and:
-
-- keeps a symbol whose type it can't parse as an untyped label;
-- comments out a symbol that overlaps a bigger (or typed) one;
-- skips a record it can't lay out (unknown field type, variant records);
-- warns when a record's size or a field's offset disagrees with the
-  `{ N bytes }` / `{ +XX }` comments in `types.pas`.
-
-Renaming a symbol renames its field, so code using the old name stops
-compiling; that's intended.
+The field table (`src/game/dsfields.c`) lists every field's original
+offset, its offset in `DSeg`, its size and whether it holds pointers;
+`game/state.c` walks it to serialise the state. `dseg.h`, `dsfields.c`
+and `dsinit.c` were generated from the Ghidra symbols while the port was
+written; they are ordinary source now, so a field added or renamed in
+`dseg.h` needs the same change in `dsfields.c` (and `dsinit.c` for a typed
+constant). `test_state` and the golden hashes catch a field missing from
+the table.
 
 ## Memory
 
@@ -107,15 +76,24 @@ the star table and change the game's random numbers.
 There is no EMS: the game data and toolbar blocks (`Game_InitGameData`,
 `GfxPath_Init`) stay on the heap, as on a DOS machine without an EMM, so they
 never need mapping, and unit Ems is folded into its callers. Their
-`TEmsBlock` variables keep the original's state 1 (a heap copy). The original's other run-time helpers (`Move`, `FillChar`, unit
-Dos) are plain C library calls or gone. The AdLib tune
-buffer, which only the port's own player reads, is a C array (docs/audio.md).
+`TEmsBlock` variables keep the original's state 1 (a heap copy). The
+original's other run-time helpers (`Move`, `FillChar`, unit Dos) are plain
+C library calls or gone. The AdLib tune buffer, which only the port's own
+player reads, is a C array (`src/game/adlibmusic.c`), so the heap is the
+same whatever music the game started with.
 
 The game's state can be serialised in a form that doesn't depend on any of
 this (`src/game/state.h`: DS field by field without pointers, the blocks
 behind them, the screen and the palette); golden hashes of it
 (`tests/test_golden.c`, `tests/golden/`) and the playthrough's hashes
 check that changes keep the behaviour.
+
+Before the move, while the port still kept the original's real-mode
+address space, differential tests ran the original's routines under
+[Unicorn](https://www.unicorn-engine.org/) (an x86 emulator) on the port's
+memory and compared everything they left behind, until every unit matched.
+They can't run on native memory and were removed; the tag `last-real-mode`
+has them and their harness (`tests/diff/`).
 
 ## Start-up and leaving the game
 
@@ -148,73 +126,52 @@ Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
 All game state is in DS, heap blocks and video memory, which the next boot
 rebuilds, so nothing left on the abandoned C stack matters.
 
-## Port menu (port addition)
+## Deliberate deviations
 
-F1 opens a menu drawn over the game (`src/platform/menu.c`): Cheats, Sound,
-Video, Game, Fixes, Restart and Quit. Scripted runs keep F1 as an ordinary
-key, so they never open it. `timing_wait_retrace` runs the menu when F1 was
-pressed, so the game is held wherever it was waiting for the retrace; the
-menu pumps its own events and draws with SDL's 8x8 debug font in a 320x240
-space over the presented frame (`vid_set_overlay`). On closing it drops the
-keys and buttons it saw, so none reach the game.
+Besides the fixes (`src/game/fixes.h`) and the port menu, the port departs from
+the original in a few places, each commented in the code:
 
-Every setting is kept in `reunion.ini` in the SDL pref directory
-(`~/.local/share/Reunion/Reunion/` on Linux; `src/platform/config.c`),
-rewritten on every change. Scripted runs and tests never read or write it,
-and without it the game behaves as before the menu: music from
-`SAVE\SETUP.SPD`, every fix on.
+- **The hero voice.** The original starts `ANIM\CHOISE.SPD` at the start
+  menu (`321d:016c`), so its "choose your hero" voice (sample 6) plays
+  before New game is clicked. The port plays the module there with that
+  sample muted and restarts it with the voice on the hero-select screen
+  (`Music_HoldHeroVoice`, `src/game/music.c`; `tests/test_audio_mute.c`).
+- **LoadPic's fade-out** waits for a retrace every 8 of its 40 steps
+  (`LOADPIC_FADE_STEPS_PER_RETRACE`, `src/game/gfx.c`), standing in for
+  the decoding time that paced the original.
+- **Busy waits on hardware** (a sound effect finishing, the mouse) call
+  `timing_idle_poll`, so they see retraces and scripted runs, whose audio
+  follows the frame clock, can't spin for ever.
+- **Writes the port has no memory for** are dropped where the code says so:
+  a nil `LossPtr` in `SpWar_ApplySpaceLosses` (the original wrote to
+  0000:0000), and a footprint at uninitialised coordinates in
+  `Surface_RegisterBuildingAnims`.
+- **No copy protection** (`src/game/protect.h`).
 
-The platform layer knows nothing of the game. Display and volumes apply at
-once, and so does the music (below). Everything else that touches game
-state is only asked for (`MenuHooks.changed` → `Options_Request`,
-`src/game/options.c`) and carried out by `Options_Frame` at the main loop's
-next frame, since the menu may have been opened in the middle of anything:
+## Port additions
 
-- **Cheats.** Freeze money / freeze ore hold `Game_Credits` / New Earth's six
-  ore stocks (`Game_HomeStock`, what production draws on; colonies' stores
-  are left alone). Every frame of the main loop puts them back, so purchases
-  cost nothing. A freeze is only a floor: income, and ore mined or unloaded
-  at New Earth, raise the value held, so taxes and a trade group's cargo
-  aren't lost. The value held is taken
-  when a freeze is switched on and again at boot and after a load, so a
-  freeze outlasting a game holds the new game's stock. Unfreezing leaves the
-  stock where it is. Add 100000 credits / add 10000 ore each raise the stock
-  (and the frozen value) once per click, during a game only. Saves carry no
-  cheat state: they are byte-for-byte the original format.
-- **Sound.** Music None, Sound Blaster or UltraSound, the cards of the
-  original setup program. Sound Blaster plays the AdLib (FM) tunes in the
-  game, UltraSound the `ANIM\*.SPD` modules. The change is made at once,
-  wherever the menu was opened (`menu_changed` in `src/main.c`). In the
-  game, title screen included, it stops the music and starts the last track
-  again on the new hardware (`Music_SwitchDevice`); the start menu keeps
-  CHOISE.SPD's hero voice held back on any hardware (`Music_HoldHeroVoice`,
-  [port-bugs.md](port-bugs.md) #1). The AdLib tune buffer is not on the
-  heap (see Memory), so any switch works the same whatever
-  the game started with. The cut-scenes only have modules, which the
-  original played on both cards (on a Sound Blaster through its own software
-  mixer): None silences them (`cutscene_music_changed`), the other two sound
-  alike, as the menu's help line says. Effects on/off and both volumes are
-  the mixer's own gains on top of the game's (`audio_set_user_volumes`):
-  muted effects still play silently, so the game's waits for them are
-  unchanged.
-- **Video.** Window (in 320x240 steps that fit the display, or the size the
-  window was dragged to), full screen at a chosen display mode, or desktop
-  full screen. Alt+Enter toggles between the window and the last full-screen
-  choice.
-- **Game.** Skip intro, and the port's additions to the game's screens,
-  on by default. The game reads `config` when it draws, so no request is
-  needed. Golden runs (`tests/test_golden.c`) switch them off, since they
-  add hotspots to the state stream.
-  - **Colony stats** (`src/game/colonystats.c`): the POP row of your
-    colony's planet info screen becomes hotspot 4, "COLONY STATS", which
-    shows an overlay (`PlanetInfo_AlienMode` 4) with what the next daily
-    colony update will decide. `ColonyStats_Compute` repeats
-    `Sim_ProcessBodyEvents` without its chances and writes no state.
-    `test_colonystats` checks it against the real update.
-- **Fixes.** One switch per fix in `game/fixes.h`, listed in `Fixes_List`
-  (a new fix needs a line there; `test_options` checks), plus all on / all
-  off.
-- **Restart** goes back to the title screen without the cut-scenes (in a
-  cut-scene, on to the game), through the same unwinding as a restart
-  request of the original. **Quit** closes the game as closing the window
-  does.
+- **Port menu** (F1, `src/platform/menu.h`): cheats, music card, effects
+  and volumes, display, skip intro, colony stats, the fix switches,
+  restart and quit. The game waits inside `timing_wait_retrace` while it
+  is open. The platform layer knows nothing of the game: display and
+  volumes apply at once, the music switch is made at once by `src/main.c`,
+  and everything that touches game state is carried out by
+  `Options_Frame` at the main loop's next frame (`src/game/options.h`,
+  which also describes the cheats). Scripted runs keep F1 as an ordinary
+  key.
+- **Settings** (`src/platform/config.h`): `reunion.ini` in the SDL pref
+  directory (`~/.local/share/Reunion/Reunion/` on Linux). Tests and
+  scripted runs never read or write it, and without it the game behaves
+  like the original with every fix on. Saves carry no port state: they
+  are byte for byte the original's format.
+- **Music cards.** None, Sound Blaster (the AdLib FM tunes, through the
+  original's player on Nuked OPL3) or UltraSound (the `ANIM\*.SPD`
+  ProTracker modules, through libxmp), switchable at any time
+  (`Music_SwitchDevice`). The cut-scenes only have modules, which the
+  original played on both cards.
+- **Colony stats** (`src/game/colonystats.h`), switched in the menu's Game
+  section like the other additions to the game's screens. Golden runs
+  switch these off, since they add hotspots to the state stream.
+- **Headless runs**: autopilot scripts, `--replay` and soak runs
+  (`src/platform/autopilot.h`, README), and the playthrough fixture
+  (docs/playthrough.md).

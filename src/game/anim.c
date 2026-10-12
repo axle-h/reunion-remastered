@@ -122,7 +122,7 @@ void Anim_DrawAnimFrame(uint16_t frame, uint8_t *dest, bool *ok)
 
 // 3c64:057c: width and height are the words at block offsets 9 and 11; the
 // 16-bit pixel counter starts at width * height and decoding stops when an
-// opcode brings it to exactly 0 (see docs/formats/ani.md).
+// opcode brings it to exactly 0.
 void Anim_DecodeAnimFrame(const uint8_t *frame, uint8_t *dest, uint8_t colourOffset)
 {
     uint16_t width = (uint16_t)(frame[10] << 8) + frame[9];

@@ -1,6 +1,5 @@
-// Planet drivers (docs/playthrough.md, thread B1): from a new game a policy
-// plays the first planet steps of act 1 (docs/playthrough-policy.md E1-E3,
-// E5, E6) through clicks only, checks them on what the screens show, and the
+// Planet drivers (docs/playthrough.md): from a new game a policy plays the
+// first planet steps of act 1 (E1-E3, E5, E6) through clicks only, checks them on what the screens show, and the
 // recorded input replays to the same end. Needs the game data.
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -17,7 +16,7 @@ static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
 enum : int {
-    RESERVE = 20000,   // act 1 reserve R (playthrough-policy.md §0)
+    RESERVE = 20000,   // act 1 reserve (docs/playthrough.md, "Conventions")
     MINE_COST = 6000,  // "Cost" in the building info
     DERRICK_COST = 7000,
     E6_HOURS = 10 * 24,
@@ -89,7 +88,7 @@ static void act1(void *unused)
     seen.droids_after = ui_droids();
 
     // E6: 4 Derricks; short money: build what the credits allow, the rest
-    // as the tax brings it in (playthrough-policy.md §0).
+    // as the tax brings it in.
     seen.derricks_wanted = ui_buildings("Derrick").total + 4;
     int hours_left = E6_HOURS;
     while (ui_buildings("Derrick").total < seen.derricks_wanted) {

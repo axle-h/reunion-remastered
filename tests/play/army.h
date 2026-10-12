@@ -1,4 +1,4 @@
-// The army of the whole-game policy (docs/playthrough-policy.md M2, M8, M12,
+// The army of the whole-game policy (docs/playthrough.md: M2, M8, M12,
 // M16, M18, L7, L11, L13; S9, S10): one background goal, "M8_army", keeps
 // every production line the target force needs busy (each product queued
 // about three days deep) and fills the army groups, docked at New Earth,

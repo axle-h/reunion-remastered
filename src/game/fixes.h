@@ -1,4 +1,4 @@
-// Fixes to the original game (docs/bugs.md, "Fixed in the port"). Each fix is
+// Fixes to the original game's bugs (the open ones are in PLAN.md). Each fix is
 // a switch so the original behaviour stays reproducible: all are on unless
 // the port menu's config (platform/config.h) turns one off.
 #pragma once

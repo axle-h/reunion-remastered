@@ -1,5 +1,5 @@
-// The whole-game playthrough (docs/playthrough.md, thread F): a new game
-// (seed 12345) played by the policy of docs/playthrough-policy.md through
+// The whole-game playthrough (docs/playthrough.md): a new game (seed
+// 12345) played by the policy through
 // clicks and keys only, one step per checkpoint, so PLAY_RESUME=<step>
 // replays the last recording to that step and plays on from there. The
 // recording then replays to the same end in-process and with `reunion

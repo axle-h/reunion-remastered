@@ -5,19 +5,12 @@
 /build/
 /out/
 
-# Ghidra project databases (we commit exported text instead)
-*.gpr
-*.rep/
-*.lock
-*.lock~
-
-# Tool output
-/tools/out/
-__pycache__/
+# Test output when tests run from the repository root
+/play_*.txt
+/golden-saves-*/
 
 # Editors / OS
 .vscode/
 .idea/
 *.swp
 .DS_Store
-/ghidra/project/

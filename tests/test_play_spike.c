@@ -1,4 +1,4 @@
-// Playthrough fixture spike (docs/playthrough.md, thread 0): a policy starts
+// Playthrough fixture spike (docs/playthrough.md): a policy starts
 // a new game and hires William Forbs through clicks only; the recorded input
 // then replays without the policy to the same end state. Needs the game data.
 #include <SDL3/SDL.h>

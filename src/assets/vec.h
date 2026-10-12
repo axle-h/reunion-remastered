@@ -1,4 +1,4 @@
-// .VEC vector models (VECTORS\Vn.VEC); see docs/formats/vec.md.
+// .VEC vector models (VECTORS\Vn.VEC).
 // Parsing only: values are kept exactly as stored in the file.
 #pragma once
 

@@ -13,8 +13,8 @@ static char last_track[256];
 // Music_InitMusicDevices has chosen the hardware since Music_Init; until
 // then a switch is left to it.
 static bool devices_chosen;
-// Port deviation (docs/port-bugs.md #1): the start menu holds back the "choose
-// your hero" voice, sample 6 of CHOISE.SPD.
+// Port deviation (docs/port.md, "Deliberate deviations"): the start menu
+// holds back the "choose your hero" voice, sample 6 of CHOISE.SPD.
 static bool hero_voice_held;
 
 // 424a:0095

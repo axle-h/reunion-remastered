@@ -1,5 +1,5 @@
-// What the screen shows, and the interrupts every playthrough policy meets
-// (docs/playthrough-policy.md §3): the screen text reader the observers use,
+// What the screen shows, and the interrupts every playthrough policy meets:
+// the screen text reader the observers use,
 // the status bar, message boxes that pop up anywhere, the planet rename
 // prompt, story scenes (screen 33) and the research hologram on the command
 // centre. ui.c's waits and clicks call ui_handle_interrupts while they wait,

@@ -84,7 +84,7 @@ static FILE *open_slot(int16_t slot, bool write)
     return f;
 }
 
-// --- The block list (docs/formats/save.md) ----------------------------------
+// --- The block list -----------------------------------------------------------
 
 typedef struct SaveBlock {
     uint16_t off;   // the field, or the pointer field whose block is saved (ptr)

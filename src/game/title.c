@@ -72,7 +72,8 @@ void Title_StartMenu(void)
 
     Gfx_BlankPalette(pal, 0, 0xFF);
     Music_PlayTrack("choise");
-    // Port deviation (docs/port-bugs.md #1): no "choose your hero" voice yet.
+    // Port deviation (docs/port.md, "Deliberate deviations"): no "choose your
+    // hero" voice yet.
     Music_HoldHeroVoice(true);
     Gfx_LoadPic("grafika\\options", gfx_screen(), 1, 200, 0, 0, 0x140, false, pal,
                 0, 0xFF, 0, 0, 0xFF);
@@ -139,7 +140,8 @@ void Title_InitTitleAndMainMenu(void)
         Gfx_LoadPic("grafika\\choise", gfx_screen(), 1, 200, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0xFF, 0, 0, 0xFF);
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
-        // Port deviation (docs/port-bugs.md #1): the voice plays from here.
+        // Port deviation (docs/port.md, "Deliberate deviations"): the voice
+        // plays from here.
         Music_HoldHeroVoice(false);
         Title_HeroSelect();
     }
