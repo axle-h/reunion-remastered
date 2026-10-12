@@ -230,7 +230,7 @@ void Sound_Init(void)
         ds.Sound_DeviceType = setup[0];
         // Bytes 1..6 are the SB port/IRQ/DMA words; no use without the driver.
     } else {
-        ds.Sound_DeviceType = 1; // no setup file: behave like a GUS
+        ds.Sound_DeviceType = 2;  // as the floppy's file (sound.h)
     }
     SDL_free(setup);
 

@@ -85,6 +85,16 @@ int main(int argc, char *argv[])
     Music_PlayTrack("main1");
     CHECK(!audio_music_playing());
 
+    // Without SAVE\SETUP.SPD (an imported game) the effects play as with
+    // the floppy's file, on a Sound Blaster.
+    audio_shutdown();
+    SDL_CreateDirectory("test_sound.nosetup");
+    CHECK(fs_init("test_sound.nosetup"));
+    ds.Sound_DeviceType = 0;
+    Sound_Init();
+    CHECK(ds.Sound_DeviceType == 2 && ds.Sound_Enabled && ds.Game_SoundFx == 2);
+    SDL_RemovePath("test_sound.nosetup");
+
     audio_shutdown();
     printf(ok ? "ok\n" : "FAILED\n");
     return ok ? 0 : 1;

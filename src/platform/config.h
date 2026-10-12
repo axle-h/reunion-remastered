@@ -1,5 +1,5 @@
-// The port's settings (port menu, F1): an INI file in the SDL pref path,
-// reunion.ini, read at start-up and rewritten on every change. Nothing is
+// The port's settings (port menu, F1): reunion.ini in the player's folder
+// (platform/playerdir.h), read at start-up and rewritten on every change. Nothing is
 // read or written until config_set_path, so tests and scripted runs keep the
 // built-in defaults, which are the behaviour without a config file.
 #pragma once
@@ -54,7 +54,7 @@ extern Config config;
 // defaults). From then on config_save writes there. Settings that only the
 // file can change from SETUP.SPD's choice (the music) get the app's default.
 void config_load(const char *path);
-// The default path: SDL_GetPrefPath("Reunion", "Reunion") + "reunion.ini".
+// The default path: reunion.ini in the player's folder.
 // Free with SDL_free; nullptr if SDL has no pref path.
 char *config_default_path(void);
 // Writes the file if config_load set one. False on a write error.

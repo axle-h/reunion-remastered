@@ -91,6 +91,14 @@ void Gfx_ShowGrafikaPic(const char *name);
 void Gfx_SetVideoMode13(void);
 void Gfx_SetTextMode(void);
 
+// Port addition: the layout of the font sheet (GRAFIKA\CHARSET1.PIC) in
+// Gfx_Charset, set at boot from the edition. The CD's sheet has the
+// floppy's 78 glyphs 40 to a row, 8 pixels apart, where the floppy's has
+// 20 to a row, 16 apart (docs/versions.md); the text drawn is the same.
+void gfx_set_cd_charset(bool cd);
+// Where glyph g starts in Gfx_Charset, in the layout set.
+uint16_t gfx_glyph_offset(uint8_t g);
+
 // 405f:1056: 6x8 glyphs from Gfx_Charset, padded with blanks to width
 // cells; each pixel is written as glyph pixel + colour.
 void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour);

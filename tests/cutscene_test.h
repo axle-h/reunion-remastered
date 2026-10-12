@@ -86,8 +86,11 @@ static int cst_lit_percent(const char *name, int frame, int *width)
 // relative to the load image) at `base` + 7n, against the port's copy.
 static void cst_check_counts(const CsProgram *prog, const char *exe, int ds, int base)
 {
+    // Not a game file (platform/gamedata.h), so not through fs_load.
     size_t size = 0;
-    uint8_t *data = fs_load(exe, &size);
+    char *host = fs_resolve(exe);
+    uint8_t *data = host ? SDL_LoadFile(host, &size) : nullptr;
+    SDL_free(host);
     CHECK(data && size > 0x40);
     if (!data)
         return;

@@ -36,9 +36,9 @@
     },
     {
       "name": "release",
-      "displayName": "Release",
+      "displayName": "Release (no built-in data directory: the game imports the player's copy)",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "REUNION_EMBED_DATA_DIR": "OFF" }
     }
   ],
   "buildPresets": [

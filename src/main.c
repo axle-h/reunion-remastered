@@ -26,14 +26,14 @@
 #include "platform/autopilot.h"
 #include "platform/config.h"
 #include "platform/fs.h"
+#include "platform/gamedata.h"
+#include "platform/import.h"
+#include "platform/importscreen.h"
 #include "platform/input.h"
 #include "platform/menu.h"
+#include "platform/playerdir.h"
 #include "platform/timing.h"
 #include "platform/video.h"
-
-#ifndef REUNION_DEFAULT_DATA_DIR
-#define REUNION_DEFAULT_DATA_DIR "."
-#endif
 
 // Exit codes of REUNION.PRG that start.exe acts on (cutscene/cutscene.h).
 enum : int {
@@ -64,7 +64,7 @@ static int exit_code;
 }
 
 // Command line: [--cutscene=credits|intro|victory] [--replay=SCRIPT]
-// [DATA_DIR].
+// [--import=PATH] [DATA_DIR].
 // The port menu's Skip intro skips the credits and intro before the game, and
 // so does an autopilot script (its frame numbers count from the game's
 // start).
@@ -76,34 +76,88 @@ static const char *only_cutscene;
 // hash HASH" as the fixture reports its runs, and exits with the halt code
 // (0 for a quit, 1 if the script can't be read or the game never ends).
 static const char *replay;
+// --import=PATH imports the player's copy at PATH into the player's folder
+// (platform/import.h), prints the result and exits: 0 if it was imported.
+static const char *import_path;
+static const char *data_arg;
 
 // A replay that goes on this many frames past the script's last event
 // without halting has failed (100,000 retraces: about 40 game days).
 enum : uint64_t { REPLAY_MARGIN = 100000 };
 
-static const char *find_data_dir(int argc, char *argv[])
+static void parse_args(int argc, char *argv[])
 {
-    const char *dir = nullptr;
     for (int i = 1; i < argc; i++) {
         if (SDL_strncmp(argv[i], "--cutscene=", 11) == 0)
             only_cutscene = argv[i] + 11;
         else if (SDL_strncmp(argv[i], "--replay=", 9) == 0)
             replay = argv[i] + 9;
-        else if (!dir)
-            dir = argv[i];
+        else if (SDL_strncmp(argv[i], "--import=", 9) == 0)
+            import_path = argv[i] + 9;
+        else if (!data_arg)
+            data_arg = argv[i];
     }
-    if (dir)
-        return dir;
+}
+
+// Sets the fs root to `dir` if it holds the game (its GRAFIKA folder).
+static bool use_data(const char *dir)
+{
+    char *grafika = dir && fs_init(dir) ? fs_resolve("GRAFIKA") : nullptr;
+    SDL_free(grafika);
+    return grafika != nullptr;
+}
+
+// The game data: DATA_DIR, else $REUNION_DATA, else the import in the
+// player's folder, else the REUNION_DATA_DIR built in (not in release
+// builds). False if none of them holds the game.
+static bool find_data(void)
+{
+    if (data_arg) {
+        if (use_data(data_arg))
+            return true;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No game data in %s", data_arg);
+    }
     const char *env = SDL_getenv("REUNION_DATA");
-    if (env && *env)
-        return env;
-    return REUNION_DEFAULT_DATA_DIR;
+    if (env && *env) {
+        if (use_data(env))
+            return true;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No game data in REUNION_DATA (%s)", env);
+    }
+    char *imported = playerdir() ? import_data_dir(playerdir(), nullptr) : nullptr;
+    bool found = use_data(imported);
+    SDL_free(imported);
+#ifdef REUNION_DEFAULT_DATA_DIR
+    found = found || use_data(REUNION_DEFAULT_DATA_DIR);
+#endif
+    return found;
+}
+
+// --import=PATH, without a window.
+static int import_only(void)
+{
+    const char *dir = playerdir();
+    if (!dir) {
+        fprintf(stderr, "No folder for the player's files: %s\n", SDL_GetError());
+        return 1;
+    }
+    playerdir_migrate();  // so the DOS game's saves see every slot in use
+    ImportReport report;
+    bool ok = import_game(import_path, dir, gamedata_files, gamedata_file_count, &report, nullptr);
+    char *text = importscreen_describe(&report, 0);
+    printf("%s\n", text ? text : "");
+    if (ok)
+        printf("The game data is in %sdata\n", dir);
+    SDL_free(text);
+    import_report_free(&report);
+    return ok ? 0 : 1;
 }
 
 // 1000:01a1 up to Main's body: video memory, DS, the heap and the unit
-// initialisers, in the original order.
+// initialisers, in the original order. Before them the port picks the font
+// sheet's layout for the edition of the data (game/gfx.h).
 static void boot(void)
 {
+    gfx_set_cd_charset(gamedata_edition() == EDITION_CD);
     vid_clear();
     dseg_init();
     system_init();
@@ -135,6 +189,7 @@ static void menu_changed(MenuChange change)
 static void setup_config(void)
 {
     if (!replay && !autopilot_init()) {
+        playerdir_migrate();
         char *path = config_default_path();
         config_load(path);
         SDL_free(path);
@@ -178,7 +233,9 @@ static bool start_replay(void)
 
 int main(int argc, char *argv[])
 {
-    const char *data_dir = find_data_dir(argc, argv);
+    parse_args(argc, argv);
+    if (import_path)
+        return import_only();
     setup_config();
     // Headless unless SDL_VIDEO_DRIVER says otherwise (the replay is then
     // shown fast-forward).
@@ -199,23 +256,26 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char *assets = nullptr;
-    if (fs_init(data_dir))
-        assets = fs_resolve("GRAFIKA");
-    if (!assets) {
-        char msg[1200];
-        SDL_snprintf(msg, sizeof msg,
-                     "The original game data was not found in\n%s\n\n"
-                     "Pass the directory holding GRAFIKA, GRWAR, PICS, ... as the first "
-                     "argument or set REUNION_DATA.",
-                     data_dir);
+    // No game data: a player chooses their copy; scripted runs fail.
+    bool found = find_data();
+    if (!found && vid_visible() && !replay && !autopilot_active()) {
+        if (!importscreen_run(false)) {
+            vid_shutdown();
+            SDL_Quit();
+            return 0;
+        }
+        found = find_data();
+    }
+    if (!found) {
+        const char *msg = "The game data of the DOS game was not found. Import your copy with "
+                          "--import=PATH (a folder, a ZIP or the CD's ISO), or pass the folder "
+                          "holding GRAFIKA, GRWAR, PICS, ... as the first argument or in "
+                          "REUNION_DATA.";
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Reunion", msg, nullptr);
         vid_shutdown();
         SDL_Quit();
         return 1;
     }
-    SDL_free(assets);
 
     // start.exe: CREDITS.PRG and INTRO.PRG, then the game (the cut-scenes
     // return false if the window was closed).

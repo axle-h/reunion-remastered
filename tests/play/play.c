@@ -16,6 +16,7 @@
 #include "game/system.h"
 #include "platform/audio.h"
 #include "platform/autopilot.h"
+#include "platform/gamedata.h"
 #include "platform/input.h"
 #include "platform/timing.h"
 #include "platform/video.h"
@@ -214,6 +215,7 @@ static PlayResult boot_and_run(const char *script)
         trace = fopen(path, "w");
     }
     if (setjmp(game_out) == 0) {
+        gfx_set_cd_charset(gamedata_edition() == EDITION_CD);  // as main.c's boot
         vid_clear();
         dseg_init();
         system_init();

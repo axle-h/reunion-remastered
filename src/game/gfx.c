@@ -559,11 +559,28 @@ static bool text_under_cursor(int16_t x, int16_t y, int16_t width)
            && (uint16_t)ds.Mouse_Y < (uint16_t)(y + 8);
 }
 
-// Draws glyph g (cell in the 20-per-row charset sheet) at screen offset ofs.
+static bool cd_charset;
+
+void gfx_set_cd_charset(bool cd)
+{
+    cd_charset = cd;
+}
+
+// Past the 78 glyphs the CD's sheet keeps the floppy's addresses: they fall
+// on its blank fourth row, as the floppy's glyph 78 (a character not in the
+// charset) is blank.
+uint16_t gfx_glyph_offset(uint8_t g)
+{
+    if (cd_charset && g < 78)
+        return (uint16_t)((g / 40) * 0xA00 + (g % 40) * 8 + 0x80);
+    return (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
+}
+
+// Draws glyph g (cell in the charset sheet) at screen offset ofs.
 static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
 {
     uint8_t *screen = gfx_screen();
-    uint16_t src = (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
+    uint16_t src = gfx_glyph_offset(g);
     for (uint16_t r = 0; r < 8; r++) {
         for (uint16_t c = 0; c < 6; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);
@@ -692,7 +709,7 @@ static void type_glyph(int16_t x, int16_t y, uint16_t cell, uint8_t g, uint8_t c
 {
     uint8_t *screen = gfx_screen();
     uint16_t base = (uint16_t)(y * 320 + x + (cell - 1) * 6);
-    uint16_t src = (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
+    uint16_t src = gfx_glyph_offset(g);
     for (uint16_t r = 0; r <= 7; r++) {
         for (uint16_t c = 0; c <= 5; c++) {
             uint16_t o = (uint16_t)(r * 320 + c);

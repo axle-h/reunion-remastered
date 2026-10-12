@@ -97,9 +97,12 @@ has them and their harness (`tests/diff/`).
 
 ## Start-up and leaving the game
 
-`src/main.c` runs `fs_init`, `vid_clear`, `dseg_init`, `system_init`, the unit
-initialisers in Main's order (`Game_InitUnits`) and then `Game_Main`, the main
-program body (`src/game/main_program.c`). The original never returns from
+`src/main.c` finds the game data (README, "Running"), showing the import
+screen when there is none, and plays the cut-scenes. Each boot then picks
+the font sheet's layout for the data's edition (`gfx_set_cd_charset`), and
+runs `vid_clear`, `dseg_init`, `system_init`, the unit initialisers in
+Main's order (`Game_InitUnits`) and `Game_Main`, the main program body
+(`src/game/main_program.c`). The original never returns from
 Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
 `longjmp` back to `main()` instead:
 
@@ -147,23 +150,40 @@ the original in a few places, each commented in the code:
   0000:0000), and a footprint at uninitialised coordinates in
   `Surface_RegisterBuildingAnims`.
 - **No copy protection** (`src/game/protect.h`).
+- **Without `SAVE\SETUP.SPD`** `Sound_Init` takes the floppy's Sound
+  Blaster, where the original takes a GUS. The import leaves the file out,
+  since the CD's switches the sound off.
 
 ## Port additions
 
 - **Port menu** (F1, `src/platform/menu.h`): cheats, music card, effects
   and volumes, display, skip intro, colony stats, Detoxin rate, the fix
-  switches, restart and quit. The game waits inside `timing_wait_retrace`
-  while it is open. The platform layer knows nothing of the game:
-  display and volumes apply at once, the music switch is made at once by
-  `src/main.c`, and everything that touches game state is carried out by
-  `Options_Frame` at the main loop's next frame (`src/game/options.h`,
-  which also describes the cheats). Scripted runs keep F1 as an ordinary
-  key.
-- **Settings** (`src/platform/config.h`): `reunion.ini` in the SDL pref
-  directory (`~/.local/share/Reunion/Reunion/` on Linux). Tests and
+  switches, and System: import game data, restart and quit. The game
+  waits inside `timing_wait_retrace` while it is open. The platform layer
+  knows nothing of the game: display and volumes apply at once, the music
+  switch is made at once by `src/main.c`, and everything that touches
+  game state is carried out by `Options_Frame` at the main loop's next
+  frame (`src/game/options.h`, which also describes the cheats). Scripted
+  runs keep F1 as an ordinary key.
+- **The player's folder** (`src/platform/playerdir.h`), the SDL pref
+  directory (`~/.local/share/Reunion/Reunion/` on Linux): `reunion.ini`,
+  `save/`, `screenshots/` and the imported game in `data/`. Saves written
+  by earlier builds to `SDL_GetPrefPath("Amnesty Design", "Reunion")` move
+  there at the first start.
+- **Settings** (`src/platform/config.h`): `reunion.ini`. Tests and
   scripted runs never read or write it, and without it the game behaves
   like the original with every fix on. Saves carry no port state: they
   are byte for byte the original's format.
+- **Importing the game data** (`src/platform/import.h`): the player's copy
+  (a folder, a ZIP or an ISO image, `src/platform/source.h`) is checked
+  against the list of files the port loads (`src/platform/gamedata.h`)
+  and copied to `data/`, with the DOS game's saves. The import screen
+  (`src/platform/importscreen.h`) asks for it when no game data is found,
+  and the port menu's System section imports another copy. Debug builds
+  warn when the game loads a file that isn't on the list.
+- **Editions.** The English floppy release, and REUNION.ENG of the European
+  CD, whose font sheet is laid out differently (docs/versions.md):
+  `gfx_set_cd_charset` (`src/game/gfx.h`) picks the layout.
 - **Music cards.** None, Sound Blaster (the AdLib FM tunes, through the
   original's player on Nuked OPL3) or UltraSound (the `ANIM\*.SPD`
   ProTracker modules, through libxmp), switchable at any time

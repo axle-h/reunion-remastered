@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "platform/config.h"
+#include "platform/playerdir.h"
 
 // Both modes were shown on a 4:3 monitor (13h pixels are 20% taller than wide).
 enum : int { DISPLAY_HEIGHT = VID_WIDTH * 3 / 4 };
@@ -310,14 +311,12 @@ bool vid_save_image(const char *path)
 
 void vid_screenshot(void)
 {
-    char *pref = SDL_GetPrefPath("Reunion", "Reunion");
-    if (!pref) {
+    char *dir = playerdir_path("screenshots");
+    if (!dir) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Screenshot: %s", SDL_GetError());
         return;
     }
-    char dir[1024], path[1100];
-    SDL_snprintf(dir, sizeof dir, "%sscreenshots", pref);
-    SDL_free(pref);
+    char path[1100];
     SDL_CreateDirectory(dir);
     SDL_Time now = 0;
     SDL_GetCurrentTime(&now);
@@ -325,6 +324,7 @@ void vid_screenshot(void)
     SDL_TimeToDateTime(now, &dt, true);
     SDL_snprintf(path, sizeof path, "%s/reunion-%04d%02d%02d-%02d%02d%02d-%03d.bmp", dir, dt.year,
                  dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.nanosecond / 1000000);
+    SDL_free(dir);
     if (vid_save_image(path))
         SDL_Log("Screenshot saved to %s", path);
 }

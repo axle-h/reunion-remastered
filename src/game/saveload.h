@@ -4,10 +4,9 @@
 // holds only BuildingCount and the Buildings table (the new game's 23
 // buildings; the slots past them are stale bytes, never read).
 //
-// Where the port keeps files: saves are written to
-// SDL_GetPrefPath("Amnesty Design", "Reunion") + "save/spidysav.<n>"; loading
-// looks there first and falls back to the game data's SAVE\ (so original saves
-// work). save\init always comes from the game data.
+// Where the port keeps files: saves are save/spidysav.<n> in the player's
+// folder (platform/playerdir.h), where the import puts the DOS game's saves
+// too. save\init comes from the game data.
 #pragma once
 
 #include <stdint.h>
@@ -17,7 +16,7 @@
 enum : uint32_t { SAVELOAD_FILE_SIZE = 41670 };
 
 // Port addition (test hook): directory for the player's saves, with or without
-// a trailing slash. nullptr restores the default (the SDL pref path).
+// a trailing slash. nullptr restores the default (the player's folder).
 void SaveLoad_SetSaveDir(const char *dir);
 
 // Port addition: SaveLoadGame without the redraw of date and credits. Returns

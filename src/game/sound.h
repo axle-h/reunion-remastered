@@ -9,7 +9,8 @@
 
 // 431a:09c1: reads SAVE\SETUP.SPD (device type + 3 words), opens the audio
 // device and sets ds.Sound_Enabled / ds.Game_SoundFx. A missing setup file
-// selects device type 1 (the only type that needs no extra hardware here).
+// selects device type 2, the floppy's Sound Blaster (the original took 1, a
+// GUS); an imported game has none (platform/import.h).
 void Sound_Init(void);
 // True once Sound_Init opened an audio device (stands in for GUS/SB detection).
 bool Sound_DeviceOpen(void);

@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "game/dseg.h"
+#include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/mouse.h"
 #include "platform/video.h"
@@ -46,10 +47,10 @@ static const uint8_t *screen(void)
     return &vid_screen[0][0];
 }
 
-// Glyph g's pixel (r, c) in grafika\charset1 (gfx.c draw_glyph).
+// Glyph g's pixel (r, c) in grafika\charset1, in either edition's layout.
 static uint8_t glyph_pixel(const uint8_t *cs, int g, int r, int c)
 {
-    return cs[(uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80 + r * SCREEN_W + c)];
+    return cs[(uint16_t)(gfx_glyph_offset((uint8_t)g) + r * SCREEN_W + c)];
 }
 
 // The mouse cursor is drawn into video memory (mouse.c); its pixels hide

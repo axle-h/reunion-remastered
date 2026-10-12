@@ -15,6 +15,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 #include "platform/fs.h"
+#include "platform/playerdir.h"
 
 enum { SLOT_SIZE = 0x16, SLOT_COUNT = 12 };
 
@@ -45,43 +46,22 @@ static const char *player_dir(void)
 {
     if (!save_dir_set) {
         save_dir_set = true;
-        char *pref = SDL_GetPrefPath("Amnesty Design", "Reunion");
-        if (pref) {
-            SDL_asprintf(&save_dir, "%ssave/", pref);
+        save_dir = playerdir_path("save/");
+        if (save_dir)
             SDL_CreateDirectory(save_dir);
-            SDL_free(pref);
-        }
     }
     return save_dir;
 }
 
-// Opens save\spidysav.<slot>. Writing goes to the player's directory; reading
-// tries it first, then the game data directory.
+// Opens save\spidysav.<slot> in the player's directory.
 static FILE *open_slot(int16_t slot, bool write)
 {
-    char name[32];
-    SDL_snprintf(name, sizeof name, "spidysav.%d", slot);
     const char *dir = player_dir();
-    if (write) {
-        if (!dir)
-            return nullptr;
-        char path[1024];
-        SDL_snprintf(path, sizeof path, "%s%s", dir, name);
-        return fopen(path, "wb");
-    }
-    if (dir) {
-        char path[1024];
-        SDL_snprintf(path, sizeof path, "%s%s", dir, name);
-        FILE *f = fopen(path, "rb");
-        if (f)
-            return f;
-    }
-    char dos[48];
-    SDL_snprintf(dos, sizeof dos, "SAVE\\%s", name);
-    char *host = fs_resolve(dos);
-    FILE *f = host ? fopen(host, "rb") : nullptr;
-    SDL_free(host);
-    return f;
+    if (!dir)
+        return nullptr;
+    char path[1024];
+    SDL_snprintf(path, sizeof path, "%sspidysav.%d", dir, slot);
+    return fopen(path, write ? "wb" : "rb");
 }
 
 // --- The block list -----------------------------------------------------------

@@ -141,8 +141,12 @@ int main(int argc, char *argv[])
     sprite();
     size_t size = 0;
     uint8_t *exe = nullptr;
-    if (argc >= 2 && fs_init(argv[1]))
-        exe = fs_load("GRWAR\\REUNION.PRG", &size);
+    if (argc >= 2 && fs_init(argv[1])) {
+        // Not a game file (platform/gamedata.h), so not through fs_load.
+        char *host = fs_resolve("GRWAR\\REUNION.PRG");
+        exe = host ? SDL_LoadFile(host, &size) : nullptr;
+        SDL_free(host);
+    }
     if (!exe) {
         printf("no game data, skipping the row pattern tests\n");
         return ok ? 77 : 1;

@@ -10,9 +10,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Original game data, used by the tests (and as the default data directory).
+# Original game data, used by the tests and, unless REUNION_EMBED_DATA_DIR is
+# off (the release preset), by the game when it has no other copy.
 set(REUNION_DATA_DIR "${CMAKE_SOURCE_DIR}/vendor/Reunion_DOS_EN" CACHE PATH
     "Directory holding the original DOS game data")
+option(REUNION_EMBED_DATA_DIR "Compile REUNION_DATA_DIR into the game as its last fallback" ON)
 
 # --- Dependencies -----------------------------------------------------------
 # Use the system package when it is new enough, otherwise build it from source.
@@ -66,6 +68,19 @@ FetchContent_MakeAvailable(nukedopl3)
 add_library(nukedopl3 STATIC "${nukedopl3_SOURCE_DIR}/opl3.c")
 target_include_directories(nukedopl3 PUBLIC "${nukedopl3_SOURCE_DIR}")
 
+# ZIP archives and CRC-32 for importing the player's copy
+# (src/platform/import.h). miniz, MIT (LICENSE in the fetched source); the
+# release archive is the single-file version.
+FetchContent_Declare(miniz
+    URL https://github.com/richgel999/miniz/releases/download/3.1.2/miniz-3.1.2.zip
+    URL_HASH SHA256=f0446d863f9c19926ad9483c523fdc42e42b8d4a6a431d27e09d49c79a140d9a
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+FetchContent_MakeAvailable(miniz)
+add_library(miniz STATIC "${miniz_SOURCE_DIR}/miniz.c")
+target_include_directories(miniz PUBLIC "${miniz_SOURCE_DIR}")
+target_compile_definitions(miniz PUBLIC MINIZ_NO_ZLIB_COMPATIBLE_NAMES)
+set_target_properties(miniz PROPERTIES C_STANDARD 99 C_EXTENSIONS ON)
+
 # --- Game -------------------------------------------------------------------
 # Everything except main.c goes into a library shared by the game and the
 # tests. New source files are picked up automatically (re-run CMake).
@@ -76,7 +91,7 @@ list(REMOVE_ITEM REUNION_SOURCES "${CMAKE_SOURCE_DIR}/src/main.c")
 # are then reliably replaced by the real routines.
 add_library(reunion_core OBJECT ${REUNION_SOURCES})
 target_include_directories(reunion_core PUBLIC src)
-target_link_libraries(reunion_core PUBLIC SDL3::SDL3 PRIVATE ${REUNION_XMP} nukedopl3)
+target_link_libraries(reunion_core PUBLIC SDL3::SDL3 miniz PRIVATE ${REUNION_XMP} nukedopl3)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(reunion_core PUBLIC -Wall -Wextra -Wpedantic)
@@ -84,7 +99,9 @@ endif()
 
 add_executable(reunion src/main.c)
 target_link_libraries(reunion PRIVATE reunion_core)
-target_compile_definitions(reunion PRIVATE REUNION_DEFAULT_DATA_DIR="${REUNION_DATA_DIR}")
+if(REUNION_EMBED_DATA_DIR)
+    target_compile_definitions(reunion PRIVATE REUNION_DEFAULT_DATA_DIR="${REUNION_DATA_DIR}")
+endif()
 
 # --- Tests ------------------------------------------------------------------
 # Each tests/test_*.c is a standalone program; exit code 77 means "skipped"

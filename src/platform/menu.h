@@ -1,6 +1,7 @@
 // The port menu (F1): settings drawn over the game, which waits inside
 // timing_wait_retrace while it is open. Sections: Cheats, Sound, Video,
-// Game, Fixes, Restart, Quit. Every change goes to the config file at once.
+// Game, Fixes and System (import game data, restart, quit). Every change
+// goes to the config file at once.
 //
 // The menu knows nothing of the game. Settings of the platform layer
 // (volumes, display) apply at once; for the rest it calls hooks.changed and
@@ -38,7 +39,8 @@ typedef struct MenuHooks {
 void menu_set_hooks(const MenuHooks *hooks);
 
 // Shows the menu until it is closed (F1, Esc, Restart, Quit or closing the
-// window), then drops the input it saw.
+// window), then drops the input it saw. Import game data runs the import
+// screen (platform/importscreen.h) from it.
 void menu_run(void);
 
 // Draws the menu over the frame in render output pixels (menu_run makes it

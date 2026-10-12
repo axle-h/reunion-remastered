@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "platform/playerdir.h"
+
 static constexpr Config DEFAULTS = {
     .music = CONFIG_MUSIC_SETUP,
     .effects = true,
@@ -35,13 +37,7 @@ void config_reset(void)
 
 char *config_default_path(void)
 {
-    char *pref = SDL_GetPrefPath("Reunion", "Reunion");
-    if (!pref)
-        return nullptr;
-    char *out = nullptr;
-    SDL_asprintf(&out, "%sreunion.ini", pref);
-    SDL_free(pref);
-    return out;
+    return playerdir_path("reunion.ini");
 }
 
 static int fix_index(const char *key)

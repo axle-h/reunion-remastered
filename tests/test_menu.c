@@ -1,6 +1,6 @@
 // menu: the port menu's model driven by key events, without a window:
 // sections and rows, changes to the config, requests to the game, the
-// fixes' rows, and Restart / Quit.
+// fixes' rows, and the System section's Restart / Quit.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -11,7 +11,7 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_FIXES, SEC_RESTART, SEC_QUIT };
+enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_FIXES, SEC_SYSTEM };
 
 static int changes[8];
 static bool running;
@@ -152,7 +152,14 @@ int main(void)
 
     // Tab moves between sections and keeps the focus on the rows.
     press(SDLK_TAB);
-    CHECK(menu_section() == SEC_RESTART && menu_focus() == 0);
+    CHECK(menu_section() == SEC_SYSTEM && menu_focus() == 0);
+    CHECK(menu_row_count() == 3 && row_is(0, "> Import game data...") && row_is(1, "> Restart now")
+          && row_is(2, "> Quit now"));
+    press(SDLK_TAB);
+    CHECK(menu_section() == SEC_CHEATS);
+    menu_handle_event(&(SDL_Event){.key = {.type = SDL_EVENT_KEY_DOWN, .key = SDLK_TAB,
+                                           .mod = SDL_KMOD_SHIFT, .down = true}});
+    CHECK(menu_section() == SEC_SYSTEM);
     SDL_Event shift_tab = {.key = {.type = SDL_EVENT_KEY_DOWN, .key = SDLK_TAB, .mod = SDL_KMOD_SHIFT, .down = true}};
     menu_handle_event(&shift_tab);
     CHECK(menu_section() == SEC_FIXES);
@@ -163,12 +170,15 @@ int main(void)
 
     // Restart and Quit close the menu with their request.
     menu_open();
-    go_to(SEC_RESTART);
+    go_to(SEC_SYSTEM);
+    press(SDLK_DOWN);
     press(SDLK_RETURN);
     CHECK(!menu_is_open() && input_restart_requested() && !input_quit_requested());
     input_reset();
     menu_open();
-    go_to(SEC_QUIT);
+    go_to(SEC_SYSTEM);
+    press(SDLK_DOWN);
+    press(SDLK_DOWN);
     press(SDLK_RETURN);
     CHECK(!menu_is_open() && input_quit_requested() && !input_restart_requested());
     input_reset();

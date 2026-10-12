@@ -4,22 +4,18 @@
 
 #include "platform/audio.h"
 #include "platform/config.h"
+#include "platform/importscreen.h"
 #include "platform/input.h"
+#include "platform/panel.h"
 #include "platform/video.h"
 
-// Layout, in a 320x240 space scaled to the window (8x8 debug font).
+// Layout, in the panel's 320x240 space (platform/panel.h).
 enum : int {
-    VW = 320,
-    VH = 240,
-    CHAR = 8,
-    PANEL_X = 8,
-    PANEL_Y = 8,
-    PANEL_W = 304,
-    PANEL_H = 224,
+    CHAR = PANEL_CHAR,
     TAB_X = 16,
     TAB_W = 76,
     TAB_H = 14,
-    TOP_Y = 32,
+    TOP_Y = PANEL_TOP,
     SPLIT_X = 98,
     ROW_X = 106,
     ROW_W = 192,
@@ -37,13 +33,12 @@ typedef enum : int {
     SEC_VIDEO,
     SEC_GAME,
     SEC_FIXES,
-    SEC_RESTART,
-    SEC_QUIT,
+    SEC_SYSTEM,
     SECTIONS,
 } Section;
 
 static const char *const SECTION_NAMES[SECTIONS] = {"Cheats", "Sound", "Video", "Game",
-                                                    "Fixes", "Restart", "Quit"};
+                                                    "Fixes", "System"};
 
 typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION } RowKind;
 
@@ -63,6 +58,7 @@ typedef enum : int {
     R_DETOXIN_RATE,
     R_FIXES_ON,
     R_FIXES_OFF,
+    R_IMPORT,
     R_RESTART,
     R_QUIT,
     R_FIX,  // + the fix's index
@@ -219,10 +215,10 @@ static void build_rows(void)
             r->on = config_fix(f->key);
         }
         break;
-    case SEC_RESTART:
+    case SEC_SYSTEM:
+        add(ROW_ACTION, R_IMPORT, "Import game data...",
+            "Replace the game data with another copy: a folder, a ZIP or the CD's ISO.");
         add(ROW_ACTION, R_RESTART, "Restart now", "Back to the title screen. Unsaved progress is lost.");
-        break;
-    case SEC_QUIT:
         add(ROW_ACTION, R_QUIT, "Quit now", "Unsaved progress is lost.");
         break;
     default:
@@ -347,6 +343,12 @@ static void act(const Row *r, int dir)
     case R_DETOXIN_RATE:
         config.detoxin_rate = !config.detoxin_rate;
         break;
+    case R_IMPORT:
+        importscreen_run(true);
+        vid_set_overlay(menu_draw);
+        if (input_quit_requested())
+            close_menu();
+        return;
     case R_RESTART:
         input_request_restart();
         close_menu();
@@ -462,42 +464,9 @@ static void key(SDL_Keycode k, SDL_Keymod mod)
 
 // --- Drawing and the mouse ----------------------------------------------------
 
-// Scale and offset of the 320x240 space in render output pixels.
-static float scale = 1, origin_x, origin_y;
-
-static void layout(SDL_Renderer *r)
-{
-    int w = VW, h = VH;
-    if (r)
-        SDL_GetCurrentRenderOutputSize(r, &w, &h);
-    float s = SDL_min((float)w / VW, (float)h / VH);
-    scale = s >= 1 ? SDL_floorf(s) : s;  // whole pixels keep the font sharp
-    origin_x = SDL_floorf((w / scale - VW) / 2);
-    origin_y = SDL_floorf((h / scale - VH) / 2);
-}
-
-// The mouse in the 320x240 space.
-static void to_menu(float wx, float wy, float *x, float *y)
-{
-    SDL_Window *win = vid_window();
-    int ww = 1, wh = 1, pw = 1, ph = 1;
-    if (win) {
-        SDL_GetWindowSize(win, &ww, &wh);
-        SDL_GetWindowSizeInPixels(win, &pw, &ph);
-    }
-    layout(vid_renderer());
-    *x = wx * pw / SDL_max(ww, 1) / scale - origin_x;
-    *y = wy * ph / SDL_max(wh, 1) / scale - origin_y;
-}
-
-static bool inside(float x, float y, float rx, float ry, float rw, float rh)
-{
-    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
-}
-
 static int row_at(float x, float y)
 {
-    if (!inside(x, y, ROW_X - 2, TOP_Y, ROW_W + 4, VISIBLE_ROWS * ROW_H))
+    if (!panel_inside(x, y, ROW_X - 2, TOP_Y, ROW_W + 4, VISIBLE_ROWS * ROW_H))
         return -1;
     int i = (int)((y - TOP_Y) / ROW_H) + scroll[section];
     return i < row_count ? i : -1;
@@ -505,7 +474,7 @@ static int row_at(float x, float y)
 
 static int tab_at(float x, float y)
 {
-    if (!inside(x, y, TAB_X - 2, TOP_Y, TAB_W, SECTIONS * TAB_H))
+    if (!panel_inside(x, y, TAB_X - 2, TOP_Y, TAB_W, SECTIONS * TAB_H))
         return -1;
     return (int)((y - TOP_Y) / TAB_H);
 }
@@ -519,9 +488,9 @@ static void mouse(const SDL_Event *e)
         return;
     }
     if (e->type == SDL_EVENT_MOUSE_MOTION)
-        to_menu(e->motion.x, e->motion.y, &x, &y);
+        panel_mouse(e->motion.x, e->motion.y, &x, &y);
     else
-        to_menu(e->button.x, e->button.y, &x, &y);
+        panel_mouse(e->button.x, e->button.y, &x, &y);
     build_rows();
     int row = row_at(x, y), tab = tab_at(x, y);
     if (e->type == SDL_EVENT_MOUSE_MOTION) {
@@ -549,7 +518,7 @@ static void mouse(const SDL_Event *e)
             dir = x >= value_x - CHAR / 2 && x < value_x + CHAR * 3 / 2 ? -1 : 1;
         }
         act(r, dir);
-    } else if (!inside(x, y, PANEL_X, PANEL_Y, PANEL_W, PANEL_H)) {
+    } else if (!panel_inside(x, y, PANEL_X, PANEL_Y, PANEL_W, PANEL_H)) {
         close_menu();
     }
 }
@@ -581,127 +550,78 @@ void menu_handle_event(const SDL_Event *e)
         focus = row_count - 1;
 }
 
-static void color(SDL_Renderer *r, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
-{
-    SDL_SetRenderDrawColor(r, red, green, blue, alpha);
-}
-
-static void fill(SDL_Renderer *r, float x, float y, float w, float h)
-{
-    SDL_FRect rect = {origin_x + x, origin_y + y, w, h};
-    SDL_RenderFillRect(r, &rect);
-}
-
-static void text(SDL_Renderer *r, float x, float y, const char *s)
-{
-    SDL_RenderDebugText(r, origin_x + x, origin_y + y, s);
-}
-
-// Word-wraps `s` into lines of HELP_COLS characters.
 static void help(SDL_Renderer *r, const char *s)
 {
-    float y = HELP_Y;
-    while (*s && y < PANEL_Y + PANEL_H - CHAR) {
-        int n = (int)SDL_strlen(s);
-        if (n > HELP_COLS) {
-            n = HELP_COLS;
-            while (n > 0 && s[n] != ' ')
-                n--;
-            if (n == 0)
-                n = HELP_COLS;
-        }
-        char line[HELP_COLS + 1];
-        SDL_strlcpy(line, s, (size_t)n + 1);
-        text(r, TAB_X, y, line);
-        s += n;
-        while (*s == ' ')
-            s++;
-        y += 10;
-    }
+    panel_wrap(r, TAB_X, HELP_Y, HELP_COLS, 10, PANEL_Y + PANEL_H - 1, s);
 }
 
 static void draw_row(SDL_Renderer *r, const Row *row, float y, bool focused)
 {
     if (focused) {
-        color(r, 50, 70, 130, 255);
-        fill(r, ROW_X - 2, y - 3, ROW_W + 4, ROW_H);
+        panel_color(r, 50, 70, 130, 255);
+        panel_fill(r, ROW_X - 2, y - 3, ROW_W + 4, ROW_H);
     }
     if (!row->enabled)
-        color(r, 110, 110, 125, 255);
+        panel_color(r, 110, 110, 125, 255);
     else if (focused)
-        color(r, 255, 255, 255, 255);
+        panel_color(r, 255, 255, 255, 255);
     else
-        color(r, 215, 215, 228, 255);
+        panel_color(r, 215, 215, 228, 255);
     char buf[64];
     switch (row->kind) {
     case ROW_TOGGLE:
         SDL_snprintf(buf, sizeof buf, "[%c] %s", row->on ? 'x' : ' ', row->label);
-        text(r, ROW_X, y, buf);
+        panel_text(r, ROW_X, y, buf);
         break;
     case ROW_ACTION:
         SDL_snprintf(buf, sizeof buf, "> %s", row->label);
-        text(r, ROW_X, y, buf);
+        panel_text(r, ROW_X, y, buf);
         break;
     case ROW_CHOICE:
-        text(r, ROW_X, y, row->label);
+        panel_text(r, ROW_X, y, row->label);
         SDL_snprintf(buf, sizeof buf, "<%s>", row->value);
-        text(r, ROW_X + ROW_W - (float)SDL_strlen(buf) * CHAR, y, buf);
+        panel_text(r, ROW_X + ROW_W - (float)SDL_strlen(buf) * CHAR, y, buf);
         break;
     }
 }
 
 void menu_draw(SDL_Renderer *r)
 {
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-    color(r, 0, 0, 0, 150);
-    SDL_RenderFillRect(r, nullptr);
-
-    layout(r);
-    SDL_SetRenderScale(r, scale, scale);
-    color(r, 100, 120, 180, 255);
-    fill(r, PANEL_X - 1, PANEL_Y - 1, PANEL_W + 2, PANEL_H + 2);
-    color(r, 14, 18, 36, 225);
-    fill(r, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
-
-    color(r, 255, 215, 120, 255);
-    text(r, TAB_X, PANEL_Y + 7, "REUNION");
-    color(r, 140, 150, 180, 255);
-    text(r, PANEL_X + PANEL_W - 8 - 11 * CHAR, PANEL_Y + 7, "F1: return");
-    color(r, 60, 72, 110, 255);
-    fill(r, PANEL_X + 4, TOP_Y - 8, PANEL_W - 8, 1);
-    fill(r, SPLIT_X, TOP_Y - 4, 1, VISIBLE_ROWS * ROW_H + 2);
-    fill(r, PANEL_X + 4, HELP_Y - 7, PANEL_W - 8, 1);
+    panel_begin(r, "REUNION", "F1: return");
+    panel_color(r, 60, 72, 110, 255);
+    panel_fill(r, SPLIT_X, TOP_Y - 4, 1, VISIBLE_ROWS * ROW_H + 2);
+    panel_fill(r, PANEL_X + 4, HELP_Y - 7, PANEL_W - 8, 1);
 
     for (int i = 0; i < SECTIONS; i++) {
         float y = TOP_Y + i * TAB_H;
         if (i == section) {
-            color(r, focus < 0 ? 50 : 34, focus < 0 ? 70 : 46, focus < 0 ? 130 : 86, 255);
-            fill(r, TAB_X - 4, y - 3, TAB_W, TAB_H - 1);
-            color(r, 255, 255, 255, 255);
+            panel_color(r, focus < 0 ? 50 : 34, focus < 0 ? 70 : 46, focus < 0 ? 130 : 86, 255);
+            panel_fill(r, TAB_X - 4, y - 3, TAB_W, TAB_H - 1);
+            panel_color(r, 255, 255, 255, 255);
         } else {
-            color(r, 175, 185, 210, 255);
+            panel_color(r, 175, 185, 210, 255);
         }
-        text(r, TAB_X, y, SECTION_NAMES[i]);
+        panel_text(r, TAB_X, y, SECTION_NAMES[i]);
     }
 
     build_rows();
     int first = scroll[section];
     for (int i = first; i < row_count && i < first + VISIBLE_ROWS; i++)
         draw_row(r, &rows[i], TOP_Y + (i - first) * ROW_H, i == focus);
-    color(r, 140, 150, 180, 255);
+    panel_color(r, 140, 150, 180, 255);
     if (first > 0)
-        text(r, ROW_X + ROW_W - CHAR, TOP_Y - 12, "^");
+        panel_text(r, ROW_X + ROW_W - CHAR, TOP_Y - 12, "^");
     if (first + VISIBLE_ROWS < row_count)
-        text(r, ROW_X + ROW_W - CHAR, TOP_Y + VISIBLE_ROWS * ROW_H - 4, "v");
+        panel_text(r, ROW_X + ROW_W - CHAR, TOP_Y + VISIBLE_ROWS * ROW_H - 4, "v");
 
-    color(r, 170, 190, 225, 255);
+    panel_color(r, 170, 190, 225, 255);
     if (status[0])
         help(r, status);
     else if (focus >= 0 && focus < row_count && rows[focus].help)
         help(r, rows[focus].help);
     else if (focus < 0)
         help(r, "Up/Down: section. Right/Enter: settings. Tab: next section.");
-    SDL_SetRenderScale(r, 1, 1);
+    panel_end(r);
 }
 
 void menu_run(void)

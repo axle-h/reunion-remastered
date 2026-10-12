@@ -87,8 +87,8 @@ bool vid_visible(void);
 // size) as an 8-bit indexed image: PNG if `path` ends in ".png", else BMP.
 bool vid_save_image(const char *path);
 
-// Developer screenshot (F12): saves the frame as a BMP in
-// SDL_GetPrefPath("Reunion", "Reunion")/screenshots/.
+// Developer screenshot (F12): saves the frame as a BMP in screenshots/ in
+// the player's folder.
 void vid_screenshot(void);
 
 // For mapping window coordinates to the 320x200 game space (input.c).

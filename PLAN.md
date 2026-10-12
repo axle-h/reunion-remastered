@@ -10,6 +10,10 @@ from the user's own copy; we never ship the assets.
 This file is the only plan: what is done, what is left, and every known bug
 that is still open. Reference material is in `docs/` (see the README).
 
+Keep it lean. When you finish an item, delete it here (git history keeps
+it), move any lasting choice into Decisions, and update "Where we stand" in
+a line. Don't leave "done" notes, finished checklists or write-ups behind.
+
 ## Decisions
 
 | Topic | Choice | Why |
@@ -21,10 +25,14 @@ that is still open. Reference material is in `docs/` (see the README).
 | VCS | git | `vendor/` (the game data) is git-ignored |
 | Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
 | Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since |
+| Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The first launch imports the player's copy (README, "Running") |
+| Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/`. The settings were already there; saves of earlier builds move in from `"Amnesty Design"` |
+| Editions | English floppy and the English folder of the CD; strict | The port is the floppy's `REUNION.PRG`. The CD's English data differs only in its font sheet (docs/versions.md). An import accepts only files whose checksums are known. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The CD's other three languages are a possible later addition |
 
 ## Source
 
-`vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG` (English CD release): Borland
+`vendor/Reunion_DOS_EN/GRWAR/REUNION.PRG` (English floppy release; the CD's
+differs, see docs/versions.md): Borland
 Pascal 7.0, real mode, no packing or overlays, ~240 KB of code in 54
 segments (813 functions), plus
 `INTRO.PRG`, `CREDITS.PRG` and `VICTORY.PRG`, chained by `start.exe`.
@@ -47,14 +55,19 @@ The port is complete and the game can be won in it.
   2930-02-26). Its recording replays to the same end in the plain binary.
   Six of seven seeds win (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
-  music, display, skip intro, colony stats, fix switches, restart, quit),
-  `reunion.ini`, screenshots, headless autopilot, `--replay` and soak runs.
+  music, display, skip intro, colony stats, fix switches, import, restart,
+  quit), `reunion.ini`, screenshots, headless autopilot, `--replay` and soak
+  runs.
+- **Ships without the game data:** release builds have none built in. The
+  first start imports the player's copy (a folder, a ZIP or the CD's ISO;
+  the floppy and CD editions) into the player's folder, checked against
+  the list of files the port loads.
 - **Bug fixing has started:** 11 bugs of the original that can make the
   game unwinnable or break the economy are fixed behind switches
   (`src/game/fixes.h`). Of the 34 bugs found in the port while playing it, 33
   are fixed and one turned out to be the original's behaviour; their
   write-ups are in git history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 83 ctest tests pass on the release build, the full
+- **Tests:** all 86 ctest tests pass on the release build, the full
   playthrough (`test_play_game`) and the golden proof included.
 
 Milestones from the original plan: Ghidra database named (done; the
@@ -69,9 +82,12 @@ In rough priority order.
 
 ### 1. Verification gaps
 
-- **Saves from the DOS game.** `test_saveload` only round-trips the port's
-  own saves. Load a few `spidysav.*` written by the original under
-  DOSBox-X, and load the port's saves there.
+- **Saves from the DOS game.** Loading original saves works (checked on
+  2026-10-12 with a scratch harness: docs/versions.md, "Saves"), but no test
+  covers it. Copy `~/dos/c/REUNION/SAVE/SPIDYSAV.1` and `.2` into
+  `tests/golden/saves/` and check that they load and save back unchanged
+  (as `test_golden`'s `load_save` does). Still to do: load the port's saves
+  in DOSBox-X.
 - **Whole-game side-by-side.** The differential tests compared single
   routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
   Nothing has compared a longer run (timing per game hour, a battle) with
@@ -104,6 +120,14 @@ no more Derricks is not known yet (docs/playthrough.md, "Robustness").
 All are marked `// BUG?` in the code (`grep -rn 'BUG?' src/`). The port
 reproduces them. For each one that changes play, decide whether it gets a
 switch in `src/game/fixes.h`, next to the existing ones.
+
+**The CD's `REUNION.PRG` may fix some.** It was rebuilt on 1994-08-15 and is
+said to fix stability problems (docs/versions.md). Its functions are the
+same as the floppy's, but its data segment moved, so a plain diff shows
+almost half the bytes changed. Compare it function by function, with
+relocations and DS offsets masked out (a 16-byte-window match already pairs
+most code up), list the routines whose logic changed, and give real fixes a
+switch here.
 
 **Change play (candidates for a fix switch):**
 
@@ -165,12 +189,12 @@ These matter only for reading the code; nothing depends on them:
   1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
   typed constants.
 
-### 6. Licence and publication (open decision)
+### 6. Licence and publication
 
-The game is still under copyright. Keep the repository private, or
-publish only the code (no assets, no raw decompiler dumps), until this is
-decided. The source holds data taken from the executables
+The game is still under copyright. Decided (2026-10-12): release builds
+ship without the art and carry the data taken from the executables
 (`src/game/dsinit.c`, the game's typed constants and texts; the cut-scene
-tables; the AdLib player's image in `src/game/adlib.c`). A code-only
-release would have to leave these out and regenerate them on the player's
-side.
+tables; the AdLib player's image in `src/game/adlib.c`). The player
+supplies the rest (the import, README). Still open: whether to publish the repository itself.
+Until then keep it private, or publish only the code (no assets, no raw
+decompiler dumps).
