@@ -13,7 +13,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Routines of units that are not ported yet (stubs in stubs.c).
+// Routines missing from their units' headers.
 void PlanetInfo_SelectCurBody(void);                                             // 357b:3253
 void Message_ShowMessageLine(int16_t lineNo);                                    // 34b0:011a
 void Message_ShowMessageNoLog(const uint8_t *text);                              // 34b0:0197

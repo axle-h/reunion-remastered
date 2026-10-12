@@ -1,6 +1,6 @@
 // Unit AlienTalk (2e4b): the alien visit cutscenes (screen 21h) and the
-// conversation screen (22h) with its question menu, plus the scheme A
-// verifier (see protect.h).
+// conversation screen (22h) with its question menu. Its copy protection
+// check (2e4b:09d3) is gone; see protect.h.
 //
 // Conversation state: the AlienTalk_* fields of DS (game/dseg.h). Texts:
 // TEXT\KERDES<race>.AT (questions) and VALASZ<race>.AT.
@@ -31,5 +31,3 @@ void AlienTalk_BuildQuestionMenu(void);
 void AlienTalk_DrawQuestionMenu(void);
 // 2e4b:092e
 void AlienTalk_HandleTalkMouse(void);
-// 2e4b:09d3: scheme A verifier (called from the main loop).
-void AlienTalk_VerifyManualAnswer(void);

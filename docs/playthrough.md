@@ -44,15 +44,19 @@ fails (status 1).
 `tests/test_play_game.c` plays one game from "new game" with seed 12345
 through the 76 steps of acts 1-5 and wins: Halt(10) after 3,466,588
 retraces, on 2930-02-26 04:00 (game date), state hash
-`06c903c221ede3c0`. The recording, 3.2 MB of plain autopilot script, is
+`62cd0d75f97b5fc9`. The recording, 3.2 MB of plain autopilot script, is
 [tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
 replays it in-process and `reunion --replay` ends the same way, with exit
 status 10:
 
 ```sh
 build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
-# replay: exit 10 after 3466588 frames, hash 06c903c221ede3c0   (exit status 10)
+# replay: exit 10 after 3466588 frames, hash 62cd0d75f97b5fc9   (exit status 10)
 ```
+
+The state hashes in the recording changed on 2026-10-12, when the copy
+protection's variables left the state fingerprint (the protection is gone;
+`src/game/protect.c`); its clicks, keys and frames did not.
 
 The recording was made again on 2026-10-11: the fixes to game logic that
 followed the player's selection changed the run, and the first recording

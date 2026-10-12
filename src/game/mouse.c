@@ -7,7 +7,7 @@
 #if __has_include("game/blit.h")
 #include "game/blit.h"
 #else
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 void Blit_DrawCursorImage(uint16_t screenOfs, int16_t width, int16_t rows, uint16_t imageOfs);
 void Blit_SaveCursorBackground(uint16_t screenOfs, int16_t width, int16_t rows);
 void Blit_RestoreCursorBackground(uint16_t screenOfs, int16_t width, int16_t rows);

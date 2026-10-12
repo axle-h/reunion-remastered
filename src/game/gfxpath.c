@@ -10,7 +10,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 void Command_TickAmbientLights(void);   // 3abd:14c5
 void Command_TickPanelDoorAnim(void);   // 3abd:1395
 

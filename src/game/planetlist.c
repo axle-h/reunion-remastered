@@ -6,7 +6,7 @@
 #include "game/mouse.h"
 #include "game/system.h"
 
-// Not ported yet: see stubs.c or planetinfo.h.
+// Routines missing from their units' headers.
 #include "game/planetinfo.h"
 
 static PlanetListEntry *entry_at(int16_t i)

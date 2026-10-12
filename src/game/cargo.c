@@ -5,7 +5,7 @@
 #include "game/mouse.h"
 #include "game/system.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 void Message_ShowMessageNoLog(const uint8_t *text);                                   // 34b0:0197
 int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet,
                                int16_t moon, bool activeOnly);                        // 2ef2:2b1a

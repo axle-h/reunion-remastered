@@ -26,6 +26,11 @@ static const char *const layout_fields[] = {
     "Ems_Status", "Ems_GameData.State", "Ems_GameData.Handle", "Ems_GameData.FrameSeg",
     "Ems_GameData.PageCount", "GfxPath_ToolbarBlock.State", "GfxPath_ToolbarBlock.Handle",
     "GfxPath_ToolbarBlock.FrameSeg", "GfxPath_ToolbarBlock.PageCount",
+    // The copy protection's variables: the port keeps none of its state,
+    // only the random numbers it drew (game/protect.c).
+    "Protect_PageIndex", "Protect_Key1", "Protect_Key2", "Protect2_QuestionIndex",
+    "Protect2_AnswerHash", "Protect2_HashEcho", "Protect2_AnswerKey", "Protect2_KeyEcho",
+    "Protect2_Lives", "Protect2_ScribbleDone",
 };
 
 static bool layout_field(const char *name, const char *sub)

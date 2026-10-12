@@ -15,7 +15,7 @@
 
 #include "game/system.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal);  // 4049:0160
 void GfxPath_FreeToolbarBuffer(void);                                   // 3a1b:09a3
 void Ems_EmsReleaseGameData(void);                                      // 4719:0317

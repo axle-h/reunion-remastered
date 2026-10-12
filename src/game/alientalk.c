@@ -8,7 +8,6 @@
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/mouse.h"
-#include "game/protect.h"
 #include "game/sound.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -320,19 +319,3 @@ void AlienTalk_HandleTalkMouse(void)
         AlienTalk_DrawQuestionMenu();
 }
 
-// 2e4b:09d3
-void AlienTalk_VerifyManualAnswer(void)
-{
-    if (ds.Protect_PageIndex == PROTECT_PAGE_UNARMED || ds.Protect_PageIndex < 1 || ds.Protect_PageIndex > 21)
-        return;
-    // REMOVED CHECK: the original compares Key2 with PageCodes[PageIndex]; a
-    // wrong answer resets the hash (759Ah) and Key2 := 1F5Fh so the player is
-    // asked again. The port treats the page as answered correctly.
-    Protect_PassManualCheck();
-    if (ds.Protect_Key2 * 5 > 0x9CDB) {
-        if (ds.Protect_Key2 == ds.Protect_PageCodes[ds.Protect_PageIndex - 1]) {
-            ds.Protect_Key1 = System_Random(7) + 0x479;
-            ds.Surface_BuildingTypes[21]._12[1] = 0;
-        }
-    }
-}

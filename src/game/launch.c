@@ -5,7 +5,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Routines of units that are not ported yet (stubs in stubs.c).
+// Routines missing from their units' headers.
 void GfxPath_SetToolbarAndShow(int16_t screen);  // 3a1b:0019
 void GfxPath_SetToolbar(int16_t screen);         // 3a1b:0030
 void GfxPath_AddToolbarIcon(int16_t id);         // 3a1b:0366

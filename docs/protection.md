@@ -1,6 +1,25 @@
 # Copy protection
 
-How the original's copy-protection checks work, from the disassembly. The port removes them.
+How the original's copy-protection checks work, from the disassembly.
+
+The port removes both schemes: no prompts, no checks, no penalties, none of
+their state (the variables stay in `DSeg`, untouched, and out of the state
+fingerprint). Both draw from `Random`, though, so `src/game/protect.c` still
+makes the draws of a player who answers correctly, at the same moments, as
+the port did when it answered for the player; the game's random numbers
+did not change. Every expected answer (PageCodes 1..20, WordCodes 1..14) is
+above the "unanswered" value, so a correct answer always takes the success
+branches described below.
+
+One correction to the notes below: scheme A *is* armed in the shipped EXE.
+`357b:3d77` (PlanetInfo::RandomizeProtectPage, called by the main loop on a
+1-in-200 draw per frame once FrameCount > 30000) stores `Random(20) + 1`
+into PageIndex's low word while Key2 is unanswered. Only CheckToken's prompt
+is dead code, so an armed page is never asked; the hourly verifiers then see
+Key2 unanswered and (264a:034a) scribble over memory once, and
+RandomizeProtectPage keeps picking pages. The port's draws follow a correct
+answer instead, so after scheme A arms its random numbers are not the
+shipped game's.
 
 ```
 ===== intel.txt: segments 29b9 (Intel), 2e4b (AlienTalk), 264a (Credits), 2693 (Protect2), 24eb (Protect) =====

@@ -1,13 +1,13 @@
 # Recorded by the playthrough fixture (tests/play/).
 seed:12345
-# checkpoint start at frame 0, hash 2ff1dc165678cc77
+# checkpoint start at frame 0, hash 2023e93a916ac955
 40:mouse:160,60,1
 44:mouse:160,60,0
 126:mouse:80,100,1
 130:mouse:80,100,0
 816:mouse:130,46,1
 820:mouse:130,46,0
-# checkpoint E01_hire_builder at frame 852, hash 6864e9d5cfa4c43c
+# checkpoint E01_hire_builder at frame 852, hash 0c4d3e3bfc3e09fc
 925:mouse:178,76,1
 929:mouse:178,76,0
 1007:mouse:120,16,1
@@ -18,7 +18,7 @@ seed:12345
 1090:mouse:264,16,0
 1109:mouse:24,16,1
 1113:mouse:24,16,0
-# checkpoint E02_hire_developer at frame 1168, hash 2f77d63ec8b145be
+# checkpoint E02_hire_developer at frame 1168, hash d4791500b195dc4e
 1177:mouse:178,76,1
 1181:mouse:178,76,0
 1259:mouse:216,16,1
@@ -29,7 +29,7 @@ seed:12345
 1344:mouse:264,16,0
 1364:mouse:24,16,1
 1368:mouse:24,16,0
-# checkpoint E03_tax at frame 1423, hash 7a10405b59ee0dcd
+# checkpoint E03_tax at frame 1423, hash 41ba53fbfc18c844
 1429:mouse:216,16,1
 1433:mouse:216,16,0
 1495:mouse:120,16,1
@@ -40,7 +40,7 @@ seed:12345
 1582:mouse:168,16,0
 1593:mouse:168,16,1
 1597:mouse:168,16,0
-# checkpoint E04_satellite at frame 1602, hash dcd1408156613e67
+# checkpoint E04_satellite at frame 1602, hash b460c30eb84c9d75
 1608:mouse:24,16,1
 1612:mouse:24,16,0
 1673:mouse:72,16,1
@@ -74,7 +74,7 @@ seed:12345
 2893:mouse:72,16,0
 2957:mouse:46,60,1
 2961:mouse:46,60,0
-# checkpoint E05_mine at frame 2995, hash 1223f5db520d594d
+# checkpoint E05_mine at frame 2995, hash e70217eee7f33efa
 3004:mouse:24,16,1
 3008:mouse:24,16,0
 3069:mouse:216,16,1
@@ -92,7 +92,7 @@ seed:12345
 3218:mouse:181,109,0
 3242:mouse:205,124,1
 3246:mouse:205,124,0
-# checkpoint E06_derricks at frame 3251, hash c120f6287ac17046
+# checkpoint E06_derricks at frame 3251, hash f2291076001ced77
 3257:mouse:24,16,1
 3261:mouse:24,16,0
 3322:mouse:72,16,1
@@ -118,7 +118,7 @@ seed:12345
 3726:mouse:245,61,0
 3750:mouse:205,124,1
 3754:mouse:205,124,0
-# checkpoint E07_satellites at frame 3759, hash 6de2adb93fc90531
+# checkpoint E07_satellites at frame 3759, hash 7b20f0478013e04f
 3765:mouse:24,16,1
 3769:mouse:24,16,0
 3830:mouse:24,16,1
@@ -239,7 +239,7 @@ seed:12345
 6258:mouse:168,16,0
 6278:mouse:64,79,1
 6282:mouse:64,79,0
-# checkpoint E08_deploy at frame 6297, hash 1d91cfd7068334f8
+# checkpoint E08_deploy at frame 6297, hash 552be0e6cf6ad866
 6303:mouse:24,16,1
 6307:mouse:24,16,0
 6368:mouse:168,16,1
@@ -273,7 +273,7 @@ seed:12345
 7644:mouse:130,46,0
 7646:mouse:130,46,1
 7650:mouse:130,46,0
-# checkpoint E09_vehicle_plant at frame 7829, hash 63477fec400cd4c6
+# checkpoint E09_vehicle_plant at frame 7829, hash 2ba4ad849393f6e7
 7857:mouse:216,16,1
 7861:mouse:216,16,0
 7923:mouse:24,16,1
@@ -312,7 +312,7 @@ seed:12345
 8878:mouse:24,16,0
 8939:mouse:216,16,1
 8943:mouse:216,16,0
-# checkpoint E10_carrier at frame 8999, hash 1943467bf57b292e
+# checkpoint E10_carrier at frame 8999, hash c82de69be6eec701
 9005:mouse:24,16,1
 9009:mouse:24,16,0
 9070:mouse:72,16,1
@@ -371,7 +371,7 @@ seed:12345
 12012:mouse:130,46,0
 12014:mouse:130,46,1
 12018:mouse:130,46,0
-# checkpoint E11_miner_station at frame 12020, hash 382f50210664cae9
+# checkpoint E11_miner_station at frame 12020, hash cfa6be67f7193010
 12026:mouse:24,16,1
 12030:mouse:24,16,0
 12091:mouse:72,16,1
@@ -585,7 +585,7 @@ seed:12345
 21501:mouse:130,46,0
 21503:mouse:130,46,1
 21507:mouse:130,46,0
-# checkpoint E12_university at frame 21509, hash 595dd3f0b13b894f
+# checkpoint E12_university at frame 21509, hash 3dabd47a0c8f82ab
 21515:mouse:24,16,1
 21519:mouse:24,16,0
 21580:mouse:216,16,1
@@ -630,7 +630,7 @@ seed:12345
 22731:mouse:24,16,0
 22792:mouse:216,16,1
 22796:mouse:216,16,0
-# checkpoint E13_transfer_ship at frame 22852, hash 255cdeb779f76583
+# checkpoint E13_transfer_ship at frame 22852, hash 9a0e187b173b37d2
 22858:mouse:24,16,1
 22862:mouse:24,16,0
 22923:mouse:72,16,1
@@ -966,7 +966,7 @@ seed:12345
 40297:mouse:130,46,0
 40299:mouse:130,46,1
 40303:mouse:130,46,0
-# checkpoint E14_pilot at frame 40305, hash beefc62e50dc9244
+# checkpoint E14_pilot at frame 40305, hash 0120293b82caa43a
 40311:mouse:24,16,1
 40315:mouse:24,16,0
 40376:mouse:216,16,1
@@ -1023,7 +1023,7 @@ seed:12345
 41869:mouse:264,16,0
 41889:mouse:24,16,1
 41893:mouse:24,16,0
-# checkpoint E15_station_on_apollo at frame 41948, hash aac20d08c689655e
+# checkpoint E15_station_on_apollo at frame 41948, hash 080bca10ba96684b
 41954:mouse:168,16,1
 41958:mouse:168,16,0
 42022:mouse:153,72,1
@@ -1656,7 +1656,7 @@ seed:12345
 69446:mouse:72,16,0
 69504:mouse:33,68,2
 69508:mouse:33,68,0
-# checkpoint E16_survey at frame 69898, hash 95c959d854deceec
+# checkpoint E16_survey at frame 69898, hash b2f6c0d02056fb69
 69904:mouse:24,16,1
 69908:mouse:24,16,0
 69969:mouse:304,16,1
@@ -1729,7 +1729,7 @@ seed:12345
 71494:mouse:24,16,0
 71555:mouse:216,16,1
 71559:mouse:216,16,0
-# checkpoint E17_control_centre at frame 71615, hash eb5ee2da4a4a74ca
+# checkpoint E17_control_centre at frame 71615, hash c50ba1c4b9762311
 71621:mouse:24,16,1
 71625:mouse:24,16,0
 71686:mouse:72,16,1
@@ -2474,7 +2474,7 @@ seed:12345
 101381:mouse:24,16,0
 101442:mouse:264,16,1
 101446:mouse:264,16,0
-# checkpoint E18_apollo at frame 101501, hash 6384f636d30ea5f4
+# checkpoint E18_apollo at frame 101501, hash 2a9cfd037b4e9954
 101507:mouse:24,16,1
 101511:mouse:24,16,0
 101572:mouse:216,16,1
@@ -2576,7 +2576,7 @@ seed:12345
 103634:mouse:24,16,0
 103695:mouse:216,16,1
 103699:mouse:216,16,0
-# checkpoint E19_mir at frame 103755, hash d7fd0dbb74a0fbde
+# checkpoint E19_mir at frame 103755, hash 47d9615ae38ebf21
 103761:mouse:24,16,1
 103765:mouse:24,16,0
 103826:mouse:72,16,1
@@ -2659,7 +2659,7 @@ seed:12345
 105955:mouse:72,16,0
 105989:mouse:98,139,1
 105993:mouse:98,139,0
-# checkpoint E20_penelope at frame 106051, hash 8e71fcbaba4f365d
+# checkpoint E20_penelope at frame 106051, hash dfb76f8ad51647dc
 106057:mouse:24,16,1
 106061:mouse:24,16,0
 106122:mouse:216,16,1
@@ -2754,7 +2754,7 @@ seed:12345
 108344:mouse:72,16,0
 108378:mouse:150,87,1
 108382:mouse:150,87,0
-# checkpoint E21_new_earth_mines at frame 108440, hash 0ec79afb23fb4146
+# checkpoint E21_new_earth_mines at frame 108440, hash 05b63fee9993d00b
 108446:mouse:24,16,1
 108450:mouse:24,16,0
 108511:mouse:72,16,1
@@ -2843,15 +2843,15 @@ seed:12345
 110512:mouse:24,16,0
 110573:mouse:216,16,1
 110577:mouse:216,16,0
-# checkpoint E22_jade at frame 110633, hash 57fdd2edbb6524ae
-# checkpoint E23_standby at frame 110633, hash 57fdd2edbb6524ae
+# checkpoint E22_jade at frame 110633, hash f78665fd18622229
+# checkpoint E23_standby at frame 110633, hash f78665fd18622229
 110639:mouse:24,16,1
 110643:mouse:24,16,0
 110704:mouse:120,16,1
 110708:mouse:120,16,0
 110766:mouse:33,68,2
 110770:mouse:33,68,0
-# checkpoint J01_contact at frame 110829, hash 861a06ddb6b1e2de
+# checkpoint J01_contact at frame 110829, hash 387e82eba8dd60be
 110835:mouse:24,16,1
 110839:mouse:24,16,0
 110900:mouse:264,16,1
@@ -16812,7 +16812,7 @@ seed:12345
 673802:mouse:130,46,0
 673804:mouse:130,46,1
 673808:mouse:130,46,0
-# checkpoint J02_communicator at frame 673810, hash 73326be1176e39ce
+# checkpoint J02_communicator at frame 673810, hash ac703d6a59244673
 673816:mouse:24,16,1
 673820:mouse:24,16,0
 673881:mouse:72,16,1
@@ -17167,12 +17167,12 @@ seed:12345
 685107:mouse:130,46,0
 685109:mouse:130,46,1
 685113:mouse:130,46,0
-# checkpoint J03_developer_home at frame 685115, hash 41ba2a2bb1fb16c5
+# checkpoint J03_developer_home at frame 685115, hash 08e2e6f73d3beafd
 685121:mouse:24,16,1
 685125:mouse:24,16,0
 685186:mouse:72,16,1
 685190:mouse:72,16,0
-# checkpoint J04_meeting1 at frame 685245, hash fd9175cd16f7b680
+# checkpoint J04_meeting1 at frame 685245, hash b6cdb6c20731a6d0
 685251:mouse:24,16,1
 685255:mouse:24,16,0
 685316:mouse:216,16,1
@@ -20387,7 +20387,7 @@ seed:12345
 789237:mouse:133,141,0
 789261:mouse:205,124,1
 789265:mouse:205,124,0
-# checkpoint J05_meeting2 at frame 789270, hash ea7a7a1a5e0e04db
+# checkpoint J05_meeting2 at frame 789270, hash 9fe397cc10f6f6fd
 789276:mouse:24,16,1
 789280:mouse:24,16,0
 789341:mouse:264,16,1
@@ -23657,7 +23657,7 @@ seed:12345
 883558:mouse:60,138,0
 883578:mouse:60,192,1
 883582:mouse:60,192,0
-# checkpoint J06_sos at frame 883641, hash 8d6d58fb452847a8
+# checkpoint J06_sos at frame 883641, hash c7a6720422ad138c
 883647:mouse:216,16,1
 883651:mouse:216,16,0
 883713:mouse:24,16,1
@@ -30033,7 +30033,7 @@ seed:12345
 1067247:mouse:24,16,0
 1067308:mouse:72,16,1
 1067312:mouse:72,16,0
-# checkpoint J07_commander at frame 1067370, hash 4ac612bcfb4671e5
+# checkpoint J07_commander at frame 1067370, hash efd5cbb30e838e17
 1067376:mouse:24,16,1
 1067380:mouse:24,16,0
 1067441:mouse:178,76,1
@@ -30046,7 +30046,7 @@ seed:12345
 1067599:mouse:264,16,0
 1067619:mouse:24,16,1
 1067623:mouse:24,16,0
-# checkpoint J08_army at frame 1067678, hash be8a204f23e33ee2
+# checkpoint J08_army at frame 1067678, hash d196e4821cd9fb5e
 1067684:mouse:120,16,1
 1067688:mouse:120,16,0
 1067749:mouse:24,16,1
@@ -31805,8 +31805,8 @@ seed:12345
 1113555:mouse:24,16,0
 1113616:mouse:120,16,1
 1113620:mouse:120,16,0
-# checkpoint J09_base_falls at frame 1113675, hash 568e4c61fb6c0b4a
-# checkpoint J10_radio at frame 1113675, hash 568e4c61fb6c0b4a
+# checkpoint J09_base_falls at frame 1113675, hash 7f0342c0f47cfae0
+# checkpoint J10_radio at frame 1113675, hash 7f0342c0f47cfae0
 1113681:mouse:24,16,1
 1113685:mouse:24,16,0
 1113746:mouse:72,16,1
@@ -32233,7 +32233,7 @@ seed:12345
 1126342:mouse:130,46,0
 1126344:mouse:130,46,1
 1126348:mouse:130,46,0
-# checkpoint J11_russel at frame 1126350, hash 434b049012261580
+# checkpoint J11_russel at frame 1126350, hash 62d82a1a13981bfe
 1126356:mouse:24,16,1
 1126360:mouse:24,16,0
 1126421:mouse:216,16,1
@@ -32567,7 +32567,7 @@ seed:12345
 1135304:mouse:72,16,0
 1135315:mouse:216,16,1
 1135319:mouse:216,16,0
-# checkpoint J12_hyperspace at frame 1135347, hash a78fc2fb158ec0ef
+# checkpoint J12_hyperspace at frame 1135347, hash 40a989ed751bd440
 1135353:mouse:72,16,1
 1135357:mouse:72,16,0
 1135821:mouse:24,16,1
@@ -34070,7 +34070,7 @@ seed:12345
 1183136:mouse:38,103,0
 1183186:mouse:165,97,2
 1183190:mouse:165,97,0
-# checkpoint J13_galleon at frame 1183245, hash 0438f2d31d1141de
+# checkpoint J13_galleon at frame 1183245, hash cd4475caee4dcf7b
 1183251:mouse:24,16,1
 1183255:mouse:24,16,0
 1183316:mouse:72,16,1
@@ -35433,8 +35433,8 @@ seed:12345
 1220396:mouse:119,142,1
 1220397:mouse:130,46,1
 1220401:mouse:130,46,0
-# checkpoint M01_wave1 at frame 1220417, hash 817b8fbdea37565b
-# checkpoint M02_twin_lasers at frame 1220417, hash 817b8fbdea37565b
+# checkpoint M01_wave1 at frame 1220417, hash bfc5d8325a9b26ee
+# checkpoint M02_twin_lasers at frame 1220417, hash bfc5d8325a9b26ee
 1220423:mouse:24,16,1
 1220427:mouse:24,16,0
 1220488:mouse:72,16,1
@@ -35448,7 +35448,7 @@ seed:12345
 1220944:mouse:130,46,0
 1220946:mouse:130,46,1
 1220950:mouse:130,46,0
-# checkpoint M03_phoenix at frame 1220952, hash 6ebf3dc05d2a08bc
+# checkpoint M03_phoenix at frame 1220952, hash e7d10001e112d1f1
 1220958:mouse:24,16,1
 1220962:mouse:24,16,0
 1221023:mouse:168,16,1
@@ -35783,12 +35783,12 @@ seed:12345
 1227372:mouse:197,141,0
 1227396:mouse:205,124,1
 1227400:mouse:205,124,0
-# checkpoint M04_kalls at frame 1227405, hash e15c14939425287a
+# checkpoint M04_kalls at frame 1227405, hash 24aae0617c501913
 1227411:mouse:24,16,1
 1227415:mouse:24,16,0
 1227476:mouse:72,16,1
 1227480:mouse:72,16,0
-# checkpoint M06_phelonians at frame 1227535, hash eaa38dbd44dad1ee
+# checkpoint M06_phelonians at frame 1227535, hash e22d5ed301e1ef5f
 1227573:mouse:130,46,0
 1227575:mouse:130,46,1
 1227579:mouse:130,46,0
@@ -36336,12 +36336,12 @@ seed:12345
 1240976:mouse:261,93,0
 1241000:mouse:205,124,1
 1241004:mouse:205,124,0
-# checkpoint M07_tank_deal at frame 1241009, hash f72bebf34415523a
+# checkpoint M07_tank_deal at frame 1241009, hash 573b466a24c20083
 1241015:mouse:24,16,1
 1241019:mouse:24,16,0
 1241080:mouse:72,16,1
 1241084:mouse:72,16,0
-# checkpoint M05_phoenix1 at frame 1241142, hash 0c72a3f8bef3c29f
+# checkpoint M05_phoenix1 at frame 1241142, hash 71f536975f1f31a1
 1241148:mouse:24,16,1
 1241152:mouse:24,16,0
 1241213:mouse:168,16,1
@@ -39056,7 +39056,7 @@ seed:12345
 1309632:mouse:72,16,0
 1309666:mouse:288,77,1
 1309670:mouse:288,77,0
-# checkpoint M08_wave2_force at frame 1309702, hash 7f8a57c049969d43
+# checkpoint M08_wave2_force at frame 1309702, hash 88f2282046f4ce0f
 1309708:mouse:24,16,1
 1309712:mouse:24,16,0
 1309773:mouse:72,16,1
@@ -44322,13 +44322,13 @@ seed:12345
 1439443:mouse:24,16,0
 1439504:mouse:120,16,1
 1439508:mouse:120,16,0
-# checkpoint M09_wave2 at frame 1439581, hash 5fcf16dd5b9a7810
+# checkpoint M09_wave2 at frame 1439581, hash ea2eb41d63e7260e
 1439587:mouse:24,16,1
 1439591:mouse:24,16,0
 1439652:mouse:72,16,1
 1439656:mouse:72,16,0
-# checkpoint M10_course at frame 1439711, hash e020097fdd916f64
-# checkpoint M11_drifting_ship at frame 1439714, hash b2e4aaa1e33fb222
+# checkpoint M10_course at frame 1439711, hash 1b29cad5749b3c59
+# checkpoint M11_drifting_ship at frame 1439714, hash efadcb89d8270977
 1439720:mouse:24,16,1
 1439724:mouse:24,16,0
 1439785:mouse:264,16,1
@@ -47679,7 +47679,7 @@ seed:12345
 1513794:mouse:130,46,0
 1513861:mouse:216,16,1
 1513865:mouse:216,16,0
-# checkpoint M12_wave3 at frame 1513921, hash 31a244ba317be063
+# checkpoint M12_wave3 at frame 1513921, hash 2cc0dd5e9731cb32
 1513927:mouse:24,16,1
 1513931:mouse:24,16,0
 1513992:mouse:72,16,1
@@ -54192,7 +54192,7 @@ seed:12345
 1657549:mouse:245,61,0
 1657573:mouse:205,124,1
 1657577:mouse:205,124,0
-# checkpoint M13_spy at frame 1657582, hash b2ac46390008d564
+# checkpoint M13_spy at frame 1657582, hash dae8a3035058c7dd
 1657588:mouse:72,16,1
 1657592:mouse:72,16,0
 1657654:mouse:72,16,1
@@ -54243,7 +54243,7 @@ seed:12345
 1658441:mouse:304,16,0
 1658495:mouse:168,16,1
 1658499:mouse:168,16,0
-# checkpoint M14_spy_satellite at frame 1658554, hash a647bc71b89e77ea
+# checkpoint M14_spy_satellite at frame 1658554, hash a41ecf9612784c15
 1658560:mouse:24,16,1
 1658564:mouse:24,16,0
 1658625:mouse:72,16,1
@@ -54839,7 +54839,7 @@ seed:12345
 1669323:mouse:130,46,0
 1669325:mouse:130,46,1
 1669329:mouse:130,46,0
-# checkpoint M15_explorer at frame 1669331, hash 931cb9e1798fbd4a
+# checkpoint M15_explorer at frame 1669331, hash cc2e12f2582fea91
 1669337:mouse:24,16,1
 1669341:mouse:24,16,0
 1669402:mouse:72,16,1
@@ -55728,7 +55728,7 @@ seed:12345
 1685174:mouse:130,46,0
 1685206:mouse:130,46,1
 1685218:mouse:130,46,0
-# checkpoint M16_destroyers at frame 1685238, hash d5bd9a4c6ff84055
+# checkpoint M16_destroyers at frame 1685238, hash 2700964f5b439502
 1685244:mouse:72,16,1
 1685248:mouse:72,16,0
 1685312:mouse:46,124,1
@@ -64191,7 +64191,7 @@ seed:12345
 1864274:mouse:24,16,0
 1864335:mouse:120,16,1
 1864339:mouse:120,16,0
-# checkpoint M17_spy_on_mirach at frame 1864397, hash f723ecba315639bc
+# checkpoint M17_spy_on_mirach at frame 1864397, hash 7e88f637a0a545f8
 1864406:mouse:33,148,1
 1864410:mouse:33,148,0
 1864489:mouse:35,174,1
@@ -65815,7 +65815,7 @@ seed:12345
 1906904:mouse:20,185,0
 1906924:mouse:68,185,1
 1906928:mouse:68,185,0
-# checkpoint M18_mirach at frame 1906942, hash e818444f5729d2b8
+# checkpoint M18_mirach at frame 1906942, hash 8913f707fba0e6c9
 1906948:mouse:24,16,1
 1906952:mouse:24,16,0
 1907013:mouse:72,16,1
@@ -76788,7 +76788,7 @@ seed:12345
 2144436:mouse:130,46,0
 2144468:mouse:130,46,1
 2144480:mouse:130,46,0
-# checkpoint L01_pilot at frame 2144500, hash 61c206058d5b8dcd
+# checkpoint L01_pilot at frame 2144500, hash 43ea456c8e66af9f
 2144509:mouse:178,76,1
 2144513:mouse:178,76,0
 2144591:mouse:72,16,1
@@ -76799,7 +76799,7 @@ seed:12345
 2144664:mouse:264,16,0
 2144684:mouse:24,16,1
 2144688:mouse:24,16,0
-# checkpoint L02_developer at frame 2144743, hash f1b7692081a90f1a
+# checkpoint L02_developer at frame 2144743, hash 9bb653b20b206dfe
 2144752:mouse:178,76,1
 2144756:mouse:178,76,0
 2144834:mouse:216,16,1
@@ -76810,7 +76810,7 @@ seed:12345
 2144919:mouse:264,16,0
 2144939:mouse:24,16,1
 2144943:mouse:24,16,0
-# checkpoint L03_informer at frame 2144998, hash f201c2ea9911ef72
+# checkpoint L03_informer at frame 2144998, hash 674c0627a9348edb
 2145004:mouse:304,16,1
 2145008:mouse:304,16,0
 2145062:mouse:72,16,1
@@ -76827,7 +76827,7 @@ seed:12345
 2145252:mouse:60,147,0
 2145286:mouse:60,192,1
 2145290:mouse:60,192,0
-# checkpoint L04_league_tip at frame 2145346, hash 69ab50578589a954
+# checkpoint L04_league_tip at frame 2145346, hash 59c3b3f5676f58a9
 2145352:mouse:24,16,1
 2145356:mouse:24,16,0
 2145417:mouse:304,16,1
@@ -80490,7 +80490,7 @@ seed:12345
 2205566:mouse:60,138,0
 2205660:mouse:60,192,1
 2205664:mouse:60,192,0
-# checkpoint L05_antares at frame 2205720, hash 6f46f380c5ac68b0
+# checkpoint L05_antares at frame 2205720, hash 6bb9fa5d5e60fbe7
 2205726:mouse:24,16,1
 2205730:mouse:24,16,0
 2205791:mouse:304,16,1
@@ -84289,7 +84289,7 @@ seed:12345
 2272767:mouse:20,185,0
 2272787:mouse:68,185,1
 2272791:mouse:68,185,0
-# checkpoint L06_erans at frame 2272805, hash 86d926ee36292b5e
+# checkpoint L06_erans at frame 2272805, hash 79afc34dcc1c2dfc
 2272811:mouse:24,16,1
 2272815:mouse:24,16,0
 2272876:mouse:120,16,1
@@ -84387,7 +84387,7 @@ seed:12345
 2276027:mouse:24,16,0
 2276088:mouse:216,16,1
 2276092:mouse:216,16,0
-# checkpoint L07_home_guard at frame 2276148, hash 9a50300078375741
+# checkpoint L07_home_guard at frame 2276148, hash e9fa5a381ced256f
 2276154:mouse:24,16,1
 2276158:mouse:24,16,0
 2276219:mouse:120,16,1
@@ -84402,7 +84402,7 @@ seed:12345
 2276501:mouse:24,16,0
 2276562:mouse:120,16,1
 2276566:mouse:120,16,0
-# checkpoint L08_spy_satellites at frame 2276630, hash 5bf609f6d4ea3d1b
+# checkpoint L08_spy_satellites at frame 2276630, hash f00a327a40e5b344
 2276636:mouse:24,16,1
 2276640:mouse:24,16,0
 2276701:mouse:216,16,1
@@ -86544,7 +86544,7 @@ seed:12345
 2320247:mouse:20,185,0
 2320267:mouse:68,185,1
 2320271:mouse:68,185,0
-# checkpoint L09_league_contact at frame 2320285, hash 6d16a933cfaede59
+# checkpoint L09_league_contact at frame 2320285, hash 3d30302d329c55d0
 2320291:mouse:24,16,1
 2320295:mouse:24,16,0
 2320356:mouse:120,16,1
@@ -86644,7 +86644,7 @@ seed:12345
 2323737:mouse:24,16,0
 2323798:mouse:216,16,1
 2323802:mouse:216,16,0
-# checkpoint L10_eran_job at frame 2323858, hash a255dceee002573b
+# checkpoint L10_eran_job at frame 2323858, hash f5d95948eb46389d
 2323864:mouse:24,16,1
 2323868:mouse:24,16,0
 2323929:mouse:304,16,1
@@ -88429,7 +88429,7 @@ seed:12345
 2362658:mouse:20,185,0
 2362678:mouse:68,185,1
 2362682:mouse:68,185,0
-# checkpoint L11_aircraft at frame 2362696, hash 33ae97880789b65d
+# checkpoint L11_aircraft at frame 2362696, hash c06a061662167330
 2362702:mouse:24,16,1
 2362706:mouse:24,16,0
 2362767:mouse:72,16,1
@@ -89009,8 +89009,8 @@ seed:12345
 2374832:mouse:20,185,0
 2374852:mouse:68,185,1
 2374856:mouse:68,185,0
-# checkpoint L12_lisonian_wave at frame 2374870, hash 103a6c963773e280
-# checkpoint L13_league at frame 2374870, hash 103a6c963773e280
+# checkpoint L12_lisonian_wave at frame 2374870, hash 5d2f13a39455fabb
+# checkpoint L13_league at frame 2374870, hash 5d2f13a39455fabb
 2374876:mouse:24,16,1
 2374880:mouse:24,16,0
 2374941:mouse:120,16,1
@@ -112838,7 +112838,7 @@ seed:12345
 2849328:mouse:24,16,0
 2849389:mouse:216,16,1
 2849393:mouse:216,16,0
-# checkpoint X01_rigel1 at frame 2849449, hash 8a4027df521db821
+# checkpoint X01_rigel1 at frame 2849449, hash 550075d8db1ce04c
 2849455:mouse:24,16,1
 2849459:mouse:24,16,0
 2849520:mouse:120,16,1
@@ -112923,7 +112923,7 @@ seed:12345
 2851912:mouse:24,16,0
 2851973:mouse:216,16,1
 2851977:mouse:216,16,0
-# checkpoint X02_research at frame 2852033, hash e1405c8685098904
+# checkpoint X02_research at frame 2852033, hash 23351ab04c9b4622
 2852039:mouse:24,16,1
 2852043:mouse:24,16,0
 2852104:mouse:72,16,1
@@ -116489,7 +116489,7 @@ seed:12345
 2918595:mouse:20,185,0
 2918615:mouse:68,185,1
 2918619:mouse:68,185,0
-# checkpoint X03_cruisers at frame 2918633, hash efbcc1d70ed5c134
+# checkpoint X03_cruisers at frame 2918633, hash 5caf9ead1dd96c48
 2918639:mouse:24,16,1
 2918643:mouse:24,16,0
 2918704:mouse:24,16,1
@@ -116522,7 +116522,7 @@ seed:12345
 2919245:mouse:24,16,0
 2919306:mouse:120,16,1
 2919310:mouse:120,16,0
-# checkpoint X04_rigel2 at frame 2919488, hash af82ca3a74aababa
+# checkpoint X04_rigel2 at frame 2919488, hash 4948b828ea755ea7
 2919494:mouse:24,16,1
 2919498:mouse:24,16,0
 2919559:mouse:168,16,1
@@ -116629,7 +116629,7 @@ seed:12345
 2923834:mouse:24,16,0
 2923895:mouse:216,16,1
 2923899:mouse:216,16,0
-# checkpoint X05_sun at frame 2923955, hash 46c527ec9ae157af
+# checkpoint X05_sun at frame 2923955, hash 9d1b1be04b4c77ee
 2923961:mouse:24,16,1
 2923965:mouse:24,16,0
 2924026:mouse:216,16,1
@@ -122469,7 +122469,7 @@ seed:12345
 3038175:mouse:20,185,0
 3038195:mouse:68,185,1
 3038199:mouse:68,185,0
-# checkpoint X06_home_guard at frame 3038213, hash b76bbbe3b66acc35
+# checkpoint X06_home_guard at frame 3038213, hash 56a48812e50e3d6f
 3038219:mouse:24,16,1
 3038223:mouse:24,16,0
 3038284:mouse:120,16,1
@@ -122490,7 +122490,7 @@ seed:12345
 3038682:mouse:130,46,0
 3038684:mouse:130,46,1
 3038688:mouse:130,46,0
-# checkpoint X07_contact at frame 3038824, hash 6f13fc5d5fa68ae0
+# checkpoint X07_contact at frame 3038824, hash 9734c73ad38eb68f
 3038833:mouse:33,100,2
 3038837:mouse:33,100,0
 3038902:mouse:24,16,1
@@ -141149,8 +141149,8 @@ seed:12345
 3448119:mouse:24,16,0
 3448180:mouse:216,16,1
 3448184:mouse:216,16,0
-# checkpoint X08_bounty_hunter at frame 3448240, hash f573e4b31e8702bd
-# checkpoint X09_earth at frame 3448240, hash f573e4b31e8702bd
+# checkpoint X08_bounty_hunter at frame 3448240, hash 04ca413277622c36
+# checkpoint X09_earth at frame 3448240, hash 04ca413277622c36
 3448246:mouse:24,16,1
 3448250:mouse:24,16,0
 3448311:mouse:120,16,1
@@ -142020,4 +142020,4 @@ seed:12345
 3466575:mouse:130,46,0
 3466577:mouse:130,46,1
 3466581:mouse:130,46,0
-# end: exit 10 after 3466588 frames, hash 06c903c221ede3c0
+# end: exit 10 after 3466588 frames, hash 62cd0d75f97b5fc9

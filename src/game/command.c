@@ -9,7 +9,7 @@
 #include "game/system.h"
 #include "game/vecload.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 int16_t GrWar_PickBattleAnim(void); // 1537:11f2 (what Game::GrWarProc points to)
 
 enum : uint16_t {

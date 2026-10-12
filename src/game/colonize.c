@@ -10,7 +10,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 void Surface_DrawBuildingTiles(int16_t kind, int16_t x, int16_t y); // 2ef2:1b98
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
@@ -201,9 +201,3 @@ void Colonize_DrawColonizeScreen(void)
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }
 
-// 2841:0893
-void Colonize_CheckKey1(void)
-{
-    if (ds.Protect_Key1 == 0x91)
-        Gfx_FatalExit();
-}

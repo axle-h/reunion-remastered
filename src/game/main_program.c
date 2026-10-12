@@ -31,6 +31,7 @@
 #include "game/music.h"
 #include "game/planetinfo.h"
 #include "game/planetlist.h"
+#include "game/protect.h"
 #include "game/pub.h"
 #include "game/rawtext.h"
 #include "game/research.h"
@@ -113,6 +114,7 @@ void Game_InitUnits(void)
     Satellite_Init();
     SaveLoad_Init();
     GrWar_Init();
+    Protect_Reset();  // port: what the original's initial values say
 }
 
 // 1000:0205..0592
@@ -229,7 +231,8 @@ static void startup(void)
 // --- Per-frame work ---------------------------------------------------------------
 
 // One game hour. Phase B (button held) runs ProgressProduction before
-// AlienTalk_VerifyManualAnswer; phase A the other way round.
+// the copy protection's hourly draw (AlienTalk::VerifyManualAnswer);
+// phase A the other way round.
 static void advance_hour(bool held)
 {
     Sim_AdvanceHour();
@@ -237,9 +240,9 @@ static void advance_hour(bool held)
     Sim_ProgressResearch();
     if (held) {
         Sim_ProgressProduction();
-        AlienTalk_VerifyManualAnswer();
+        Protect_ManualCheckHour();
     } else {
-        AlienTalk_VerifyManualAnswer();
+        Protect_ManualCheckHour();
         Sim_ProgressProduction();
     }
     if (ds.Game_Hour == 0)
@@ -350,7 +353,7 @@ static bool wait_for_event(void)
     do {
         if (ds.Game_FrameCount > 30000 && ds.Game_Ticks > 99 && ds.Game_ClockRunning
             && System_Random(200) == 0)
-            PlanetInfo_RandomizeProtectPage();
+            Protect_ArmManualCheck();
         Sound_FreeSampleIfIdle();
         if (ds.Game_ClockRunning)
             ds.Game_Ticks++;

@@ -13,8 +13,6 @@ void Colonize_ColonizeScreen(void);
 void Colonize_SetupColonizeHotspots(void);
 // 2841:062d
 void Colonize_DrawColonizeScreen(void);
-// 2841:0893
-void Colonize_CheckKey1(void);
 
 // The two checks the screen makes before it lets the player pick a starter
 // building (not separate routines in the original).

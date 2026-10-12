@@ -68,6 +68,3 @@ void PlanetInfo_GetBodyLocationName(PString *result, int16_t sys, int16_t planet
 // leaves the planet force's energy supply in its Storage field and the
 // total of kind 16h's output in the body's bytes 4..5.
 void PlanetInfo_BalanceBuildingPower(int16_t sys, int16_t planet, int16_t moon);
-
-// 357b:3d77
-void PlanetInfo_RandomizeProtectPage(void);

@@ -9,7 +9,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 bool Intel_IsRaceActive(int16_t race);  // 29b9:1461
 
 static const uint8_t *ps(const PString *p)

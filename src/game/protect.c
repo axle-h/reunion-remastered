@@ -1,26 +1,62 @@
-// Unit Protect (24eb): see protect.h.
+// What is left of the copy protection: see protect.h.
 #include "game/protect.h"
 
-// 24eb:00a5
-void Protect_CheckToken(void)
+#include "game/system.h"
+
+// Where the original keeps this, its protection variables (Protect_PageIndex
+// and Key2, Protect2_QuestionIndex and AnswerKey) hold it. Every expected
+// answer (PageCodes 1..20, WordCodes 1..14) is above the "unanswered"
+// value, so a correct answer always takes the original's success branches.
+static struct {
+    bool page_armed, page_answered;
+    bool date_armed, date_answered;
+} state;
+
+void Protect_Reset(void)
 {
-    // REMOVED CHECK: the original compares PageIndex with 505FCh div 13 (=
-    // 62ECh, "not armed") and, if the scheme were armed and unanswered, asks
-    // "What is the word at the bottom of page <n>" (title picture 'attentio',
-    // 9 characters), hashes the answer into Key2 and lowers Key1. In this EXE
-    // that body is unreachable, so there is no state to keep.
+    state = (typeof(state)){0};
 }
 
-void Protect_PassManualCheck(void)
+void Protect_ArmManualCheck(void)
 {
-    if (ds.Protect_PageIndex == PROTECT_PAGE_UNARMED)
-        return;
-    int32_t page = ds.Protect_PageIndex;
-    if (page < 1 || page > 21)
-        return;
-    // Key2 is the hash of the typed word + 1F5Fh; PageCodes holds the value a
-    // correct answer produces. Key2 > 1F5Fh means "answered".
-    if (ds.Protect_Key2 > PROTECT_KEY2_UNANSWERED)
-        return;
-    ds.Protect_Key2 = ds.Protect_PageCodes[page - 1];
+    if (!state.page_answered) {
+        System_Random(20);  // the page
+        state.page_armed = true;
+    }
+}
+
+void Protect_ManualCheckHour(void)
+{
+    if (state.page_armed) {
+        state.page_answered = true;
+        System_Random(7);  // lives := Random(7) + 479h
+    }
+}
+
+void Protect_ArmDateQuestion(void)
+{
+    if (!state.date_answered) {
+        System_Random(14);  // the question
+        state.date_armed = true;
+    }
+}
+
+void Protect_AskDateQuestion(void)
+{
+    if (state.date_armed)
+        state.date_answered = true;
+}
+
+void Protect_DateColonyStep(void)
+{
+    if (state.date_armed) {
+        state.date_answered = true;
+        System_Random(7);  // lives := Random(7) + D7Dh
+    }
+}
+
+void Protect_DateDailyCheck(void)
+{
+    if (state.date_armed && state.date_answered)
+        System_Random(7);  // lives := Random(7) + 479h
 }

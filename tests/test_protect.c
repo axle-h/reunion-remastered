@@ -1,147 +1,65 @@
-// protect: the copy protection checks of units Protect, Protect2, Credits and
-// AlienTalk always pass without asking, and leave the state a correct answer
-// leaves (Key1 / Lives refreshed, AnswerKey = WordCodes[question], ...).
+// protect: the copy protection is gone, but its random draws stay, at the
+// moments the original made them for a player who answers correctly.
 #include <stdio.h>
-#include <string.h>
 
-#include "game/alientalk.h"
-#include "game/credits.h"
 #include "game/dseg.h"
 #include "game/protect.h"
-#include "game/protect2.h"
 #include "game/system.h"
-#include "platform/fs.h"
-#include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-static void reset(void)
+// How many Random draws fn made (every draw is one step of the generator).
+static int draws(void (*fn)(void))
 {
-    dseg_clear();
-    vid_clear();
-    dseg_init();
-    system_init();
+    ds.System_RandSeed = 0x1234567;
+    fn();
+    int32_t after = ds.System_RandSeed;
+    ds.System_RandSeed = 0x1234567;
+    int n = 0;
+    while (ds.System_RandSeed != after && n < 10) {
+        System_Random(2);
+        n++;
+    }
+    return n;
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
-    dseg_clear();
-    vid_clear();
-    if (argc < 2 || !fs_init(argv[1])) {
-        printf("no game data\n");
-        return 77;
-    }
     dseg_init();
 
-    // Initial EXE state: scheme A not armed, scheme B not armed and unanswered.
-    reset();
-    CHECK(ds.Protect_PageIndex == 0x62EC);
-    CHECK(ds.Protect_Key1 == 0x94 && ds.Protect_Key2 == 0x1F5F);
-    CHECK(ds.Protect2_QuestionIndex == 0x8615 && ds.Protect2_AnswerKey == 0x3421);
-    CHECK(ds.Protect2_Lives == 0x10A);
+    // "Page N": nothing before it is armed; picking the page draws until the
+    // first hourly check has answered it, then every check draws.
+    Protect_Reset();
+    CHECK(draws(Protect_ManualCheckHour) == 0);
+    CHECK(draws(Protect_ArmManualCheck) == 1);
+    CHECK(draws(Protect_ArmManualCheck) == 1);  // picked again
+    CHECK(draws(Protect_ManualCheckHour) == 1);
+    CHECK(draws(Protect_ManualCheckHour) == 1);
+    CHECK(draws(Protect_ArmManualCheck) == 0);
 
-    // Scheme A while unarmed: every routine is a no-op and draws no random numbers.
-    ds.System_RandSeed = 777;
-    Protect_CheckToken();
-    Credits_EnforceManualCheck();
-    AlienTalk_VerifyManualAnswer();
-    CHECK(ds.System_RandSeed == 777);
-    CHECK(ds.Protect_Key1 == 0x94 && ds.Protect_Key2 == 0x1F5F);
+    // "The date": the same, asked when a building is destroyed or at the
+    // colony step; the daily check draws only once answered.
+    CHECK(draws(Protect_DateDailyCheck) == 0);
+    CHECK(draws(Protect_DateColonyStep) == 0);
+    CHECK(draws(Protect_AskDateQuestion) == 0);
+    CHECK(draws(Protect_ArmDateQuestion) == 1);
+    CHECK(draws(Protect_DateDailyCheck) == 0);
+    CHECK(draws(Protect_ArmDateQuestion) == 1);  // a new question
+    CHECK(draws(Protect_AskDateQuestion) == 0);
+    CHECK(draws(Protect_ArmDateQuestion) == 0);
+    CHECK(draws(Protect_DateDailyCheck) == 1);
+    CHECK(draws(Protect_DateColonyStep) == 1);
 
-    // Scheme A armed for page 5 (RandomizeProtectPage): the check passes by itself.
-    ds.Protect_PageIndex = 5;
-    ds.Surface_BuildingTypes[21]._12[1] = 7;
-    ds.System_RandSeed = 4242;
-    uint16_t expected = (uint16_t)(System_Random(7) + 0x479);
-    ds.System_RandSeed = 4242;
-    Credits_EnforceManualCheck();
-    CHECK(ds.Protect_Key2 == ds.Protect_PageCodes[4]);
-    CHECK(ds.Protect_Key2 > 0x1F5F);
-    CHECK(ds.Protect_Key1 == expected);
-    CHECK(ds.Surface_BuildingTypes[21]._12[1] == 7);  // only 2e4b clears it
-    ds.Protect_Key1 = 0x94;
-    ds.System_RandSeed = 4242;
-    AlienTalk_VerifyManualAnswer();
-    CHECK(ds.Protect_Key1 == expected);
-    CHECK(ds.Surface_BuildingTypes[21]._12[1] == 0);
-    // Key1 never comes near the Halt value 91h again.
-    CHECK(ds.Protect_Key1 != 0x91 && ds.Protect_Key1 >= 0x479);
-    // Out-of-range pages are treated as unarmed.
-    reset();
-    ds.Protect_PageIndex = 99;
-    Credits_EnforceManualCheck();
-    AlienTalk_VerifyManualAnswer();
-    CHECK(ds.Protect_Key1 == 0x94);
+    // Answered at the colony step instead.
+    Protect_Reset();
+    CHECK(draws(Protect_ArmDateQuestion) == 1);
+    CHECK(draws(Protect_DateColonyStep) == 1);
+    CHECK(draws(Protect_DateDailyCheck) == 1);
 
-    // Scheme B: unarmed routines do nothing.
-    reset();
-    ds.System_RandSeed = 99;
-    Protect2_AskDateQuestion();
-    Protect2_EnforceDateCheck();
-    Protect2_VerifyDateAnswer();
-    Protect2_HaltIfDateCheckFailed();
-    CHECK(ds.System_RandSeed == 99);
-    CHECK(ds.Protect2_AnswerKey == 0x3421 && ds.Protect2_Lives == 0x10A);
-
-    // Arming picks Random(14) + 1 while unanswered.
-    ds.System_RandSeed = 31337;
-    int32_t q = System_Random(14) + 1;
-    ds.System_RandSeed = 31337;
-    Protect2_ArmDateQuestion();
-    CHECK(ds.Protect2_QuestionIndex == q && q >= 1 && q <= 14);
-    Protect2_ArmDateQuestion();  // second call re-rolls while still unanswered
-    CHECK(ds.Protect2_QuestionIndex >= 1 && ds.Protect2_QuestionIndex <= 14);
-    ds.Protect2_QuestionIndex = q;
-
-    // The question answers itself: AnswerKey = WordCodes[q], hash = key - 3421h.
-    int32_t key = ds.Protect_WordCodes[q - 1];
-    Protect2_AskDateQuestion();
-    CHECK(ds.Protect2_AnswerKey == key);
-    CHECK(ds.Protect2_AnswerHash == key - 0x3421);
-    CHECK(ds.Protect2_Lives == 0x109);
-    CHECK((uint32_t)ds.Protect2_HashEcho == (uint32_t)(key - 0x3421) + 0xAA9B);
-    CHECK((uint32_t)ds.Protect2_KeyEcho == 0x3421u * 5 + 0x8613);
-    // A second call does not ask again.
-    Protect2_AskDateQuestion();
-    CHECK(ds.Protect2_Lives == 0x109);
-
-    // Daily validation: correct -> Lives refreshed, flag cleared.
-    ds.Surface_BuildingTypes[21]._12[1] = 9;
-    ds.System_RandSeed = 5;
-    int32_t lives = System_Random(7) + 0x479;
-    ds.System_RandSeed = 5;
-    Protect2_VerifyDateAnswer();
-    CHECK(ds.Protect2_Lives == lives);
-    CHECK(ds.Surface_BuildingTypes[21]._12[1] == 0);
-    CHECK(ds.Protect2_AnswerKey == key);
-
-    // Colony step: correct -> Lives := Random(7) + D7Dh.
-    ds.System_RandSeed = 6;
-    lives = System_Random(7) + 0xD7D;
-    ds.System_RandSeed = 6;
-    Protect2_EnforceDateCheck();
-    CHECK(ds.Protect2_Lives == lives);
-    CHECK(ds.Protect2_ScribbleDone == 0);
-
-    // Armed but never asked: the colony step answers instead of scribbling.
-    reset();
-    ds.Protect2_QuestionIndex = 3;
-    // The scribble hit random DS offsets: any block of DS data is a witness.
-    static TBody before[32];
-    memcpy(before, ds.Galaxy_AmnestyBodies, sizeof before);
-    ds.System_RandSeed = 1;
-    Protect2_EnforceDateCheck();
-    CHECK(ds.Protect2_AnswerKey == ds.Protect_WordCodes[2]);
-    CHECK(ds.Protect2_Lives >= 0xD7D && ds.Protect2_Lives <= 0xD7D + 6);
-    CHECK(ds.Protect2_ScribbleDone == 0);
-    CHECK(memcmp(before, ds.Galaxy_AmnestyBodies, sizeof before) == 0);
-
-    // The Halt at Lives == 107h is gone.
-    ds.Protect2_Lives = 0x107;
-    Protect2_HaltIfDateCheckFailed();
-    Protect2_ShowProtectionWarning();
-    CHECK(ds.Protect2_Lives == 0x107);
+    // A boot starts over.
+    Protect_Reset();
+    CHECK(draws(Protect_ManualCheckHour) == 0 && draws(Protect_DateDailyCheck) == 0);
 
     printf(ok ? "protect OK\n" : "protect FAILED\n");
     return ok ? 0 : 1;

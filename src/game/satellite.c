@@ -3,7 +3,7 @@
 #include "game/groups.h"
 #include "game/system.h"
 
-// Routines of units that are not ported yet (stubs in stubs.c).
+// Routines missing from their units' headers.
 void PlanetInfo_SelectCurBody(void);                     // 357b:3253
 void PlanetInfo_DrawPlanetInfoText(void);                // 357b:0359
 void PlanetInfo_DrawStoresList(void);                    // 357b:1671

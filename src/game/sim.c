@@ -21,6 +21,7 @@
 #include "game/message.h"
 #include "game/minmax.h"
 #include "game/planetinfo.h"
+#include "game/protect.h"
 #include "game/research.h"
 #include "game/satellite.h"
 #include "game/shipinfo.h"
@@ -30,14 +31,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 
-// Routines of units that have no header yet (stubs in stubs.c).
-void Protect_CheckToken(void);                                         // 24eb:00a5
-void Protect2_ArmDateQuestion(void);                                   // 2693:0000
-void Protect2_AskDateQuestion(void);                                   // 2693:0085
-void Protect2_EnforceDateCheck(void);                                  // 2693:0342
-void Protect2_VerifyDateAnswer(void);                                  // 2693:04aa
-void Protect2_HaltIfDateCheckFailed(void);                             // 2693:0538
-void Credits_EnforceManualCheck(void);                                 // 264a:034a
+// Routines missing from their units' headers.
 void Command_ShowHologram(int16_t vec);                                // 3abd:04b4
 void AlienTalk_StartAlienScene(int16_t scene);                         // 2e4b:0000
 void AlienTalk_StartAlienTalk(int16_t race);                           // 2e4b:03a5
@@ -174,7 +168,8 @@ void Sim_AdvanceHour(void)
         ds.Game_Month++;
         ds.Game_Day = 1;
     }
-    Protect_CheckToken();
+    // The original calls Protect::CheckToken (24eb:00a5) here, whose prompt
+    // is dead code in the shipped EXE.
     if (ds.Game_Month > 12) {
         ds.Game_Year++;
         ds.Game_Month = 1;
@@ -297,7 +292,7 @@ void Sim_ProcessPubTimers(void)
             }
         }
     }
-    Protect2_HaltIfDateCheckFailed();
+    // (2693:0538: the original halts here after three wrong dates.)
 }
 
 // 1b8a:04d8
@@ -368,7 +363,7 @@ void Sim_ProgressResearch(void)
         if (ds.Game_CurrentScreen == 0x16)
             Groups_DrawGroupPanel(true);
     }
-    Credits_EnforceManualCheck();
+    Protect_ManualCheckHour();
 }
 
 // 1b8a:0705
@@ -882,7 +877,7 @@ void Sim_UpdateBuildings(void)
             }
         }
         if (bl->Health == 0)
-            Protect2_AskDateQuestion();
+            Protect_AskDateQuestion();
         // Kind 5 with Flag set mines ore 1 into the body's store.
         if (bl->Health == 0 && bl->Flag != 0 && bl->Kind == 5) {
             // The original picks planet or moon by the current system's
@@ -906,7 +901,7 @@ void Sim_UpdateBuildings(void)
 void Sim_UpdateColonySetups(void)
 {
     int16_t k = 1;
-    Protect2_EnforceDateCheck();
+    Protect_DateColonyStep();
     // BUG? k also advances after a removal, so the entry moved into slot k
     // waits until the next hour.
     for (; k <= ds.Game_ColonySetupCount; k++) {
@@ -971,7 +966,7 @@ void Sim_MineAllBodies(void)
                 Sim_MineBody(s, p, (int16_t)m, moon_list(s, p)[m]);
         }
     }
-    Protect2_VerifyDateAnswer();
+    Protect_DateDailyCheck();
     if (ds.Game_CurrentScreen == 4)
         Droids_DrawDroidsScreen();
 }
@@ -1075,7 +1070,7 @@ void Sim_ProcessTravellingGroups(void)
                     System_StrConcat(&t, PSTR(" |    They found new planets"));
                     Message_ShowMessage(ps(&t));
                     if (g->System == 5)
-                        Protect2_ArmDateQuestion();
+                        Protect_ArmDateQuestion();
                     *system_status(g->System) = 1;
                     for (int16_t p = 1; p <= 8; p++) {
                         if (*planet_status(g->System, p) == -1) {
@@ -1258,7 +1253,8 @@ void Sim_CheckEnemyAttacks(void)
                       PSTR(" "));
         }
 
-        Colonize_CheckKey1();
+        // (2841:0893: the original halts here after wrong page answers.)
+
         // Forces at their target (Active = 1) with a mission: Timer counts
         // down to the attack.
         forces = rc->ForceCount;

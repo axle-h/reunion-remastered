@@ -10,7 +10,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-// Not ported yet: see stubs.c.
+// Routines missing from their units' headers.
 int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int16_t moon,
                                bool activeOnly); // 2ef2:2b1a
 

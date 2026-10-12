@@ -117,17 +117,6 @@ static void test_bodies(void)
     PlanetInfo_SetupPlanetInfoHotspots();
     CHECK(ds.Mouse_HotspotCount == 1 && Mouse_Hotspot(1)->W == 0x140);
     ds.PlanetInfo_AlienMode = 0;
-
-    ds.Protect_Key2 = 0x1F5F;
-    ds.Protect_PageIndex = 0x7FFF0000;
-    ds.System_RandSeed = 0;
-    PlanetInfo_RandomizeProtectPage();
-    CHECK((ds.Protect_PageIndex >> 16) == 0x7FFF);
-    uint16_t page = (uint16_t)ds.Protect_PageIndex;
-    CHECK(page >= 1 && page <= 20);
-    ds.Protect_Key2 = 0;
-    PlanetInfo_RandomizeProtectPage();
-    CHECK((uint16_t)ds.Protect_PageIndex == page);
 }
 
 static void test_list(void)
@@ -445,9 +434,6 @@ static void test_colonize(void)
     CHECK(pstr_is((const PString *)&Mouse_Hotspot(1)->Caption, "Change people"));
     const TBuildingType *first = &ds.Surface_BuildingTypes[ds.Colony_StarterBuildings[0].Building - 1];
     CHECK(Mouse_Hotspot(4)->Caption.len == first->Name.len);
-
-    ds.Protect_Key1 = 0;
-    Colonize_CheckKey1();  // would exit on 91h
 }
 
 static void test_droids(void)

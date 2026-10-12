@@ -4,7 +4,6 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
-#include "game/protect.h"
 #include "game/system.h"
 
 #define P(lit) ((const uint8_t *)PSTR(lit))
@@ -36,18 +35,3 @@ void Credits_ShowCredits(void)
     Gfx_TypeTextF9(P("            ALL RIGHTS RESERVED"), x, y + 0x87 + 3, 0x28);
 }
 
-// 264a:034a
-void Credits_EnforceManualCheck(void)
-{
-    // Scheme A is only live while PageIndex holds a page number (1..21).
-    if (ds.Protect_PageIndex == PROTECT_PAGE_UNARMED || ds.Protect_PageIndex < 1 || ds.Protect_PageIndex > 21)
-        return;
-    // REMOVED CHECK: if Key2 was never answered the original scribbles 20
-    // random bytes over random DS offsets (once); a wrong answer corrupts 18
-    // Galaxy name entries when Key1 reaches 91h. The port treats the page as
-    // answered correctly: Key2 := PageCodes[PageIndex], then the correct-answer
-    // branch below runs, as it does for a real player.
-    Protect_PassManualCheck();
-    if (ds.Protect_Key2 > PROTECT_KEY2_UNANSWERED && ds.Protect_Key2 == ds.Protect_PageCodes[ds.Protect_PageIndex - 1])
-        ds.Protect_Key1 = System_Random(7) + 0x479;
-}

@@ -11,7 +11,7 @@
 #include "game/system.h"
 #include "game/textfile.h"
 
-// Routines of units that are not ported yet (stubs in stubs.c).
+// Routines missing from their units' headers.
 void PlanetInfo_SelectCurBody(void);                                            // 357b:3253
 void PlanetInfo_GetBodyLocationName(PString *result, int16_t sys, int16_t planet, int16_t moon); // 357b:355e
 void Intel_DisbandGroup(int16_t list, int16_t group);                           // 29b9:0b93
