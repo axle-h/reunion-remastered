@@ -26,7 +26,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
 | Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since |
 | Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The first launch imports the player's copy (README, "Running") |
-| Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/`. The settings were already there; saves of earlier builds move in from `"Amnesty Design"` |
+| Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
 | Editions | English floppy and the English folder of the CD; strict | The port is the floppy's `REUNION.PRG`. The CD's English data differs only in its font sheet (docs/versions.md). An import accepts only files whose checksums are known. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The CD's other three languages are a possible later addition |
 
 ## Source
@@ -67,7 +67,7 @@ The port is complete and the game can be won in it.
   (`src/game/fixes.h`). Of the 34 bugs found in the port while playing it, 33
   are fixed and one turned out to be the original's behaviour; their
   write-ups are in git history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 86 ctest tests pass on the release build, the full
+- **Tests:** all 85 ctest tests pass on the release build, the full
   playthrough (`test_play_game`) and the golden proof included.
 
 Milestones from the original plan: Ghidra database named (done; the

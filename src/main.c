@@ -140,7 +140,6 @@ static int import_only(void)
         fprintf(stderr, "No folder for the player's files: %s\n", SDL_GetError());
         return 1;
     }
-    playerdir_migrate();  // so the DOS game's saves see every slot in use
     ImportReport report;
     bool ok = import_game(import_path, dir, gamedata_files, gamedata_file_count, &report, nullptr);
     char *text = importscreen_describe(&report, 0);
@@ -189,7 +188,6 @@ static void menu_changed(MenuChange change)
 static void setup_config(void)
 {
     if (!replay && !autopilot_init()) {
-        playerdir_migrate();
         char *path = config_default_path();
         config_load(path);
         SDL_free(path);

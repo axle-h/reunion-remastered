@@ -167,9 +167,7 @@ the original in a few places, each commented in the code:
   runs keep F1 as an ordinary key.
 - **The player's folder** (`src/platform/playerdir.h`), the SDL pref
   directory (`~/.local/share/Reunion/Reunion/` on Linux): `reunion.ini`,
-  `save/`, `screenshots/` and the imported game in `data/`. Saves written
-  by earlier builds to `SDL_GetPrefPath("Amnesty Design", "Reunion")` move
-  there at the first start.
+  `save/`, `screenshots/` and the imported game in `data/`.
 - **Settings** (`src/platform/config.h`): `reunion.ini`. Tests and
   scripted runs never read or write it, and without it the game behaves
   like the original with every fix on. Saves carry no port state: they
