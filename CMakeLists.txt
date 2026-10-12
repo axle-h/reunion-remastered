@@ -122,8 +122,8 @@ if(BUILD_TESTING)
             continue()
         endif()
         if(name STREQUAL "test_play_game" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-            # The whole game and its two replays take ~26 minutes in a debug
-            # build and 3-4 in a release one, which also catches what only
+            # The whole game and its two replays take ~5 minutes in a debug
+            # build and ~2 in a release one, which also catches what only
             # goes wrong optimised. Run it from build/release.
             continue()
         endif()

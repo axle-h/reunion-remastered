@@ -68,8 +68,8 @@ eliminated) 2929-03-28, the League's surrender 2929-09-23, Earth
 [playthrough-policy.md](playthrough-policy.md) §1 "As run" are the first
 recording's). The Earth invasion: in space lost 45H 22SF, destroyed 64H
 64SF 7D 5C; on the ground lost 10T 21Air 35ML, destroyed 30Tr 90T 50Air
-30ML. `test_play_game` takes 3-4 minutes in a release build
-(ctest `TIMEOUT` 900 s) and about 26 in a debug one, so ctest runs it only
+30ML. `test_play_game` takes about 2 minutes in a release build
+(ctest `TIMEOUT` 900 s) and about 5 in a debug one, so ctest runs it only
 in non-Debug builds (`ctest --test-dir build/release -R test_play_game`);
 the debug binary still builds for running by hand.
 
@@ -132,8 +132,9 @@ hash).
    game hour on the command centre, so two game years are about 1.7 million
    retraces. A policy that checks a condition every retrace runs about 22,000
    retraces/s (the write barrier is most of it),
-   a sleeping policy or a replay about 200,000: a whole game is about 1.5
-   minutes to play and 10 s to replay. Unpaced autopilot runs (the fixture,
+   a sleeping policy or a replay about 160,000: a whole game is about 1.3
+   minutes to play and 22 s to replay (release build; debug about 2.5
+   minutes and 75 s). Unpaced autopilot runs (the fixture,
    `--replay`, soak runs) advance the audio without synthesising it
    (`audio_advance`: music position, the AdLib timer and which sound effects
    still play move on exactly as when mixing) and present at most 60 frames
