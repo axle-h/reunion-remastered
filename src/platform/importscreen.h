@@ -11,8 +11,9 @@
 
 #include "platform/import.h"
 
-// Runs until the player leaves: at start-up by playing an imported copy
-// or quitting, from the menu by going back. True if a copy was imported.
+// Runs until the player leaves: at start-up when a copy has been imported
+// (the game starts after a five-second countdown) or by quitting, from the
+// menu by going back. True if a copy was imported.
 // Closing the window requests a quit (input_quit_requested).
 bool importscreen_run(bool from_menu);
 

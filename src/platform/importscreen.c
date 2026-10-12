@@ -17,12 +17,13 @@ enum : int {
     BUTTON_X = 24,
     BUTTON_W = 272,
     BUTTON_H = 13,
-    BUTTONS_Y = 98,
-    STATUS_Y = 160,
-    SHOWN_PROBLEMS = 4,
+    BUTTONS_Y = 112,
+    STATUS_Y = 172,
+    SHOWN_PROBLEMS = 3,
+    COUNTDOWN = 5,  // seconds from an import at start-up to the game
 };
 
-typedef enum : int { B_FILE, B_FOLDER, B_PLAY, B_QUIT, BUTTONS } Button;
+typedef enum : int { B_FILE, B_FOLDER, B_QUIT, BUTTONS } Button;
 
 // A file dialog's answer, which may come on another thread.
 static SDL_Mutex *dialog_lock;
@@ -42,37 +43,41 @@ static bool running;
 static bool imported;
 static int focus;
 static char *status;  // the last result, or nullptr: the intro
+static uint64_t countdown_start;  // ms; 0 until an import at start-up succeeds
+
+// What happened to the DOS game's saves, as sentences ("" if it had none).
+static void saves_note(const ImportReport *r, char *out, size_t size)
+{
+    out[0] = '\0';
+    if (r->saves_copied)
+        SDL_snprintf(out, size, "Copied %d save%s of the DOS game.", r->saves_copied,
+                     r->saves_copied == 1 ? "" : "s");
+    char slots[64] = "";
+    int skipped = 0;
+    for (int n = 1; n <= IMPORT_SAVE_SLOTS; n++) {
+        if (!r->save_skipped[n])
+            continue;
+        size_t len = SDL_strlen(slots);
+        SDL_snprintf(slots + len, sizeof slots - len, "%s%d", skipped ? ", " : "", n);
+        skipped++;
+    }
+    if (skipped) {
+        size_t len = SDL_strlen(out);
+        SDL_snprintf(out + len, size - len,
+                     "%sSlot%s %s already held a save, so the DOS game's %s not copied.",
+                     len ? " " : "", skipped == 1 ? "" : "s", slots, skipped == 1 ? "was" : "were");
+    }
+}
 
 char *importscreen_describe(const ImportReport *r, int max_problems)
 {
     char *out = nullptr;
     if (r->ok) {
         bool root = r->root && r->root[0];
-        SDL_asprintf(&out, "Imported the %s edition%s%s.", gamedata_edition_name(r->edition),
-                     root ? " from " : "", root ? r->root : "");
-        if (r->saves_copied) {
-            char *more = nullptr;
-            SDL_asprintf(&more, "%s Copied %d save%s of the DOS game.", out, r->saves_copied,
-                         r->saves_copied == 1 ? "" : "s");
-            SDL_free(out);
-            out = more;
-        }
-        char slots[64] = "";
-        int skipped = 0;
-        for (int n = 1; n <= IMPORT_SAVE_SLOTS; n++) {
-            if (!r->save_skipped[n])
-                continue;
-            size_t len = SDL_strlen(slots);
-            SDL_snprintf(slots + len, sizeof slots - len, "%s%d", skipped ? ", " : "", n);
-            skipped++;
-        }
-        if (skipped) {
-            char *more = nullptr;
-            SDL_asprintf(&more, "%s Slot%s %s already held a save, so the DOS game's %s not copied.",
-                         out, skipped == 1 ? "" : "s", slots, skipped == 1 ? "was" : "were");
-            SDL_free(out);
-            out = more;
-        }
+        char saves[256];
+        saves_note(r, saves, sizeof saves);
+        SDL_asprintf(&out, "Imported the %s edition%s%s.%s%s", gamedata_edition_name(r->edition),
+                     root ? " from " : "", root ? r->root : "", saves[0] ? " " : "", saves);
         return out;
     }
     if (r->error) {
@@ -136,7 +141,16 @@ static void finish_import(void)
         SDL_Log("%s", text);
     SDL_free(text);
     text = importscreen_describe(&report, SHOWN_PROBLEMS);
-    if (report.ok) {
+    if (report.ok && !from_menu) {
+        // The countdown to the game; the status keeps the saves' note.
+        imported = true;
+        countdown_start = SDL_GetTicks();
+        focus = B_QUIT;
+        char saves[256];
+        saves_note(&report, saves, sizeof saves);
+        SDL_free(text);
+        text = SDL_strdup(saves);
+    } else if (report.ok) {
         imported = true;
         // A running game keeps the data it was started with until a restart.
         char *data = playerdir_path("data");
@@ -151,14 +165,14 @@ static void finish_import(void)
             text = more;
         }
         SDL_free(data);
-        focus = from_menu ? B_QUIT : B_PLAY;
+        focus = B_QUIT;
     }
     set_status(text);
 }
 
 static void start_import(const char *path)
 {
-    if (thread)
+    if (thread || countdown_start)
         return;
     const char *dir = playerdir();
     if (!dir) {
@@ -222,9 +236,10 @@ static void take_dialog_result(void)
 
 // --- Buttons ----------------------------------------------------------------------
 
-static bool shown(Button b)
+// During an import and the countdown after it only Quit works.
+static bool enabled(Button b)
 {
-    return b != B_PLAY || (imported && !from_menu);
+    return !thread && (!countdown_start || b == B_QUIT);
 }
 
 static const char *label(Button b)
@@ -232,22 +247,18 @@ static const char *label(Button b)
     switch (b) {
     case B_FILE: return "Choose ZIP or ISO...";
     case B_FOLDER: return "Choose folder...";
-    case B_PLAY: return "Play";
     default: return from_menu ? "Back" : "Quit";
     }
 }
 
 static void press(Button b)
 {
-    if (thread || !shown(b))
+    if (!enabled(b))
         return;
     switch (b) {
     case B_FILE:
     case B_FOLDER:
         open_dialog(b);
-        break;
-    case B_PLAY:
-        running = false;
         break;
     default:
         if (!from_menu)
@@ -259,27 +270,17 @@ static void press(Button b)
 
 static void move_focus(int dir)
 {
-    do
-        focus = (focus + dir + BUTTONS) % BUTTONS;
-    while (!shown((Button)focus));
-}
-
-// The shown buttons are drawn one below the other.
-static float button_y(Button b)
-{
-    int row = 0;
-    for (int i = 0; i < b; i++)
-        row += shown((Button)i);
-    return BUTTONS_Y + (float)row * BUTTON_H;
+    if (!enabled(B_FILE))
+        return;
+    focus = (focus + dir + BUTTONS) % BUTTONS;
 }
 
 static int button_at(float x, float y)
 {
-    for (int b = 0; b < BUTTONS; b++)
-        if (shown((Button)b) && panel_inside(x, y, BUTTON_X - 2, button_y((Button)b) - 3,
-                                             BUTTON_W + 4, BUTTON_H))
-            return b;
-    return -1;
+    if (!panel_inside(x, y, BUTTON_X - 2, BUTTONS_Y - 3, BUTTON_W + 4, BUTTONS * BUTTON_H))
+        return -1;
+    int b = (int)((y - BUTTONS_Y + 3) / BUTTON_H);
+    return enabled((Button)b) ? b : -1;
 }
 
 static void handle(const SDL_Event *e)
@@ -345,27 +346,24 @@ static void draw(SDL_Renderer *r)
 {
     panel_begin(r, "REUNION", "Game data");
     panel_color(r, 215, 215, 228, 255);
-    float y = panel_wrap(r, TEXT_X, PANEL_TOP, COLS, LINE, BUTTONS_Y - 4,
-                         from_menu ? "Import another copy of the DOS game: its folder, a ZIP of "
-                                     "it, or the CD's ISO image. It is checked and copied to:"
-                                   : "Reunion needs the files of the DOS game. Choose your copy: "
-                                     "its folder, a ZIP of it, or the CD's ISO image. It is "
-                                     "checked and copied to:");
-    char *data = playerdir_path("data");
+    panel_wrap(r, TEXT_X, PANEL_TOP, COLS, LINE, BUTTONS_Y - 4,
+               from_menu ? "Replace the game data with another copy of the DOS game, one of:"
+                         : "Reunion requires the DOS game's data. Please provide one of:");
     panel_color(r, 170, 190, 225, 255);
-    panel_wrap(r, TEXT_X, y, COLS, LINE, BUTTONS_Y - 4, data ? data : "");
-    SDL_free(data);
+    panel_wrap(r, TEXT_X, PANEL_TOP + 3 * LINE, COLS, LINE, BUTTONS_Y - 4,
+               "1. The CD release, as an ISO image\n"
+               "\n"
+               "2. The floppy release, as a ZIP or\n"
+               "   as a folder");
 
     for (int b = 0; b < BUTTONS; b++) {
-        if (!shown((Button)b))
-            continue;
-        float by = button_y((Button)b);
-        bool focused = b == focus && !thread;
+        float by = BUTTONS_Y + (float)b * BUTTON_H;
+        bool focused = b == focus && enabled((Button)b);
         if (focused) {
             panel_color(r, 50, 70, 130, 255);
             panel_fill(r, BUTTON_X - 2, by - 3, BUTTON_W + 4, BUTTON_H);
         }
-        if (thread)
+        if (!enabled((Button)b))
             panel_color(r, 110, 110, 125, 255);
         else
             panel_color(r, focused ? 255 : 215, focused ? 255 : 215, focused ? 255 : 228, 255);
@@ -376,9 +374,24 @@ static void draw(SDL_Renderer *r)
 
     panel_color(r, 60, 72, 110, 255);
     panel_fill(r, PANEL_X + 4, STATUS_Y - 7, PANEL_W - 8, 1);
-    char line[64];
+    char line[512];
     const char *msg = status;
-    if (thread) {
+    if (countdown_start) {
+        // "Floppy version imported, starting in 5..4..3..2..1"
+        static const char *const names[] = {
+            [EDITION_FLOPPY] = "Floppy version",
+            [EDITION_CD] = "CD version",
+        };
+        const char *name = report.edition ? names[report.edition] : "Game data";
+        int len = SDL_snprintf(line, sizeof line, "%s imported, starting in ", name);
+        int seconds = (int)((SDL_GetTicks() - countdown_start) / 1000);
+        for (int n = COUNTDOWN; n >= SDL_max(COUNTDOWN - seconds, 1) && len < 200; n--)
+            len += SDL_snprintf(line + len, sizeof line - (size_t)len, n < COUNTDOWN ? "..%d" : "%d", n);
+        if (status && status[0])
+            SDL_snprintf(line + len, sizeof line - (size_t)len, "\n\n%s", status);
+        msg = line;
+        panel_color(r, 150, 225, 150, 255);
+    } else if (thread) {
         SDL_snprintf(line, sizeof line, "Checking and copying... %d of %d",
                      SDL_GetAtomicInt(&progress.done), SDL_GetAtomicInt(&progress.total));
         msg = line;
@@ -400,6 +413,7 @@ bool importscreen_run(bool menu)
     from_menu = menu;
     running = true;
     imported = false;
+    countdown_start = 0;
     focus = B_FILE;
     set_status(nullptr);
     if (!dialog_lock)
@@ -414,6 +428,8 @@ bool importscreen_run(bool menu)
         take_dialog_result();
         if (thread && SDL_GetAtomicInt(&finished))
             finish_import();
+        if (countdown_start && SDL_GetTicks() - countdown_start >= COUNTDOWN * 1000)
+            running = false;
         vid_present();
         SDL_Delay(15);
     }
@@ -423,5 +439,6 @@ bool importscreen_run(bool menu)
     input_release();
     import_report_free(&report);
     set_status(nullptr);
+    countdown_start = 0;
     return imported;
 }
