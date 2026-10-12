@@ -1,5 +1,6 @@
 #include "game/cargo.h"
 
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/mouse.h"
@@ -120,10 +121,12 @@ void Cargo_CargoScreen(void)
                 int32_t room = (int32_t)((uint32_t)ds.Cargo_ShipCap - (uint32_t)ds.Cargo_ShipUsed);
                 if (room < amount)
                     amount = room;
-                // BUG? the ship's room is checked above, but this ore's cargo slot is
-                // then capped by the planet's storage limit (Cargo::PlanetCap), as in the original.
+                // The original then caps this ore's cargo slot at the planet's
+                // storage (Cargo::PlanetCap). Port fix (game/fixes.h): the ship's
+                // room alone.
                 int32_t *slot = (int32_t *)&g->Cargo[ds.Cargo_Row - 1];
-                if ((int32_t)((uint32_t)*slot + (uint32_t)amount) > ds.Cargo_PlanetCap)
+                if (!fixes.cargo_planet_cap
+                    && (int32_t)((uint32_t)*slot + (uint32_t)amount) > ds.Cargo_PlanetCap)
                     amount = (int32_t)((uint32_t)ds.Cargo_PlanetCap - (uint32_t)*slot);
                 *slot = (int32_t)((uint32_t)*slot + (uint32_t)amount);
                 int32_t *store = store_at(ds.Cargo_Row);

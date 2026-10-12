@@ -143,7 +143,9 @@ next frame, since the menu may have been opened in the middle of anything:
 - **Cheats.** Freeze money / freeze ore hold `Game_Credits` / New Earth's six
   ore stocks (`Game_HomeStock`, what production draws on; colonies' stores
   are left alone). Every frame of the main loop puts them back, so purchases
-  cost nothing (and income is lost while frozen). The value held is taken
+  cost nothing. A freeze is only a floor: income, and ore mined or unloaded
+  at New Earth, raise the value held, so taxes and a trade group's cargo
+  aren't lost. The value held is taken
   when a freeze is switched on and again at boot and after a load, so a
   freeze outlasting a game holds the new game's stock. Unfreezing leaves the
   stock where it is. Add 100000 credits / add 10000 ore each raise the stock

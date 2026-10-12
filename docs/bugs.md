@@ -22,6 +22,7 @@ menu (F1, Fixes) switches each one or all of them (the golden hashes,
 | `annihilate_leaves_screen` | System 4's annihilation (a story timer, `Intel_AnnihilateSystem4`) deletes buildings and groups and clears the selected group while the group, ship, cargo or surface screens may still hold their indices. `Intel_DestroyBody` leaves those screens first; this does not | Leaves them first, as `Intel_DestroyBody` does |
 | `autoplace_when_full` | `Surface_AutoPlaceBuilding` (a new colony's command centre and starter buildings) drops the building if the player is watching that colony's surface and no spot is free; on any other screen it is added unplaced | Added unplaced in both cases |
 | `away_staff_hidden` | A staff member at the university is left off the command centre (`Command_DrawStaffIcon`, `Command_SetupCommandHotspots`), but the builders' door (`Command_TickPanelDoorAnim`) redraws the builder each time it slides, and the window animation (`Command_TickRoomAnim`) redraws the kind-3 staff member each frame, without checking. They reappear until the screen is next entered | Neither redraws a staff member who is at the university |
+| `cargo_planet_cap` | Loading ore from a colony onto a ship (`Cargo_CargoScreen`) checks the ship's room, then also caps that ore's cargo slot at the colony's storage space (`Cargo_PlanetCap`, the colony force's Storage × 1000). A ship with more room than the colony has storage can't fill up with one ore | Capped by the ship's room only |
 
 ## Suspected, not fixed
 

@@ -65,11 +65,19 @@ void Options_Frame(void)
         }
     }
 
-    // The main loop's hourly update draws the credits on any screen too.
+    // A freeze only stops the stock falling: income, or ore mined or
+    // unloaded at New Earth, raises the value held. The main loop's hourly
+    // update draws the credits on any screen too.
+    if (config.freeze_money && ds.Game_Credits > money_frozen)
+        money_frozen = ds.Game_Credits;
     if (config.freeze_money && ds.Game_Credits != money_frozen) {
         ds.Game_Credits = money_frozen;
         Gfx_DrawCredits();
     }
     if (config.freeze_ore)
-        memcpy(ds.Game_HomeStock, ore_frozen, sizeof ore_frozen);
+        for (int i = 0; i < 6; i++) {
+            if (ds.Game_HomeStock[i] > ore_frozen[i])
+                ore_frozen[i] = ds.Game_HomeStock[i];
+            ds.Game_HomeStock[i] = ore_frozen[i];
+        }
 }

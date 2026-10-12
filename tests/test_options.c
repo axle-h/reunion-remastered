@@ -84,7 +84,8 @@ int main(int argc, char *argv[])
     const uint8_t *rec = (const uint8_t *)&ds.Ui_Screens[0x0C - 1];
     CHECK(rec[0x0C] == 5);
 
-    // Frozen money: spending and income are both undone; unfreezing keeps it.
+    // Frozen money: spending is undone, income kept and then held; unfreezing
+    // keeps it.
     ds.Game_Credits = 1000;
     freeze(true, false);
     Options_Frame();
@@ -94,20 +95,23 @@ int main(int argc, char *argv[])
     CHECK(ds.Game_Credits == 1000);
     ds.Game_Credits += 50;
     Options_Frame();
-    CHECK(ds.Game_Credits == 1000);
+    CHECK(ds.Game_Credits == 1050);
+    ds.Game_Credits -= 50;
+    Options_Frame();
+    CHECK(ds.Game_Credits == 1050);
     // Two clicks before the next frame: both count, and raise the frozen value.
     Options_Request(OPTIONS_ADD_MONEY_ONCE);
     Options_Request(OPTIONS_ADD_MONEY_ONCE);
     ds.Game_Credits -= 5000;
     Options_Frame();
-    CHECK(ds.Game_Credits == 1000 + 2 * OPTIONS_ADD_MONEY);
+    CHECK(ds.Game_Credits == 1050 + 2 * OPTIONS_ADD_MONEY);
     freeze(false, false);
     ds.Game_Credits -= 200;
     Options_Frame();
-    CHECK(ds.Game_Credits == 800 + 2 * OPTIONS_ADD_MONEY);
+    CHECK(ds.Game_Credits == 850 + 2 * OPTIONS_ADD_MONEY);
     Options_Request(OPTIONS_ADD_MONEY_ONCE);
     Options_Frame();
-    CHECK(ds.Game_Credits == 800 + 3 * OPTIONS_ADD_MONEY);
+    CHECK(ds.Game_Credits == 850 + 3 * OPTIONS_ADD_MONEY);
 
     // Ore, all six stocks.
     for (int i = 0; i < 6; i++)
@@ -121,6 +125,13 @@ int main(int argc, char *argv[])
     ds.Game_HomeStock[5] -= 600;
     Options_Frame();
     CHECK(ds.Game_HomeStock[0] == 100 + OPTIONS_ADD_ORE && ds.Game_HomeStock[5] == 600 + OPTIONS_ADD_ORE);
+    // Ore unloaded or mined at New Earth stays, and is then held.
+    ds.Game_HomeStock[1] += 2500;
+    Options_Frame();
+    CHECK(ds.Game_HomeStock[1] == 200 + OPTIONS_ADD_ORE + 2500);
+    ds.Game_HomeStock[1] -= 1000;
+    Options_Frame();
+    CHECK(ds.Game_HomeStock[1] == 200 + OPTIONS_ADD_ORE + 2500);
 
     // A save of a game with a cheat on is the original's size; loading it
     // holds the loaded stock, not the one before.

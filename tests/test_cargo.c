@@ -1,14 +1,55 @@
-// cargo: space arithmetic of the transfer screen (ship capacity, space used by items).
+// cargo: space arithmetic of the transfer screen (ship capacity, space used by
+// items), and loading ore against the planet's storage.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
 #include "game/cargo.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
+#include "game/groups.h"
 #include "platform/fs.h"
 #include "platform/video.h"
 
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
+
+// A ship with room for 4500 t, docked at a colony with 2000 t of storage and
+// 1500 t of ore 2, already carrying 1000 t of it; the "Transfer to ship"
+// button of ore 2 is clicked (right button: all there is).
+static int32_t load_ore(void)
+{
+    static TGroup groups[2][32];
+    static TBody body;
+    static int32_t stores[6];
+    static uint8_t charset[0x2880];
+    SDL_memset(groups, 0, sizeof groups);
+    SDL_memset(&body, 0, sizeof body);
+    ds.Gfx_Charset = charset;
+    ds.Game_Groups = groups;
+    ds.Game_GroupList = 0;
+    ds.Game_SelGroup = 1;
+    TGroup *g = Groups_At(0, 1);
+    g->Status = 1;
+    int32_t carried = 1000;
+    SDL_memcpy(&g->Cargo[1], &carried, 4);
+    body.Owner = 1;
+    body._0A = 1;
+    ds.Game_CurBody = &body;
+    stores[1] = 1500;
+    ds.Cargo_Stores = stores;
+    ds.Cargo_PlanetCap = 2000;
+    ds.Cargo_ShipCap = 4500;
+    ds.Cargo_ShipUsed = 1000;
+    ds.Cargo_ItemCount = 0;
+    ds.Mouse_HeldLeft = false;
+    ds.Game_ScreenEntered = false;
+    ds.Game_MenuCommand = 0;
+    ds.Game_HotspotHit = 0x27 + 2;
+    Cargo_CargoScreen();
+    SDL_memcpy(&carried, &g->Cargo[1], 4);
+    CHECK(carried + stores[1] == 2500 && ds.Cargo_ShipUsed == carried);
+    return carried;
+}
 
 int main(int argc, char *argv[])
 {
@@ -40,6 +81,13 @@ int main(int argc, char *argv[])
     int32_t expect = 4 * ds.Cargo_ItemSpace[0] + ds.Cargo_ItemSpace[2];
     CHECK(Cargo_ItemsSpace(&g) == expect);
     CHECK(expect > 0);
+
+    // The original stops the ship's 2000 t of ore at the planet's storage;
+    // the fix takes all 1500 t, as the ship has room.
+    fixes.cargo_planet_cap = false;
+    CHECK(load_ore() == 2000);
+    fixes.cargo_planet_cap = true;
+    CHECK(load_ore() == 2500);
 
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

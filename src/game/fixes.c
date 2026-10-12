@@ -15,6 +15,7 @@ static constexpr Fixes ALL = {
     .annihilate_leaves_screen = true,
     .autoplace_when_full = true,
     .away_staff_hidden = true,
+    .cargo_planet_cap = true,
 };
 
 Fixes fixes = ALL;
@@ -45,6 +46,9 @@ const FixInfo Fixes_List[] = {
     {"away_staff_hidden", "Staff at university",
      "A staff member at the university stays out of the command centre.",
      &fixes.away_staff_hidden},
+    {"cargo_planet_cap", "Loading cargo",
+     "A ship takes on as much ore as it has room for, whatever the storage.",
+     &fixes.cargo_planet_cap},
 };
 
 const int Fixes_Count = (int)SDL_arraysize(Fixes_List);

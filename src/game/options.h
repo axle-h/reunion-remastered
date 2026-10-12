@@ -7,8 +7,10 @@
 // money or ore holds the stock at a value that is taken when the freeze is
 // switched on and again whenever the game under it changes (boot, new game,
 // load); it is put back at every frame of the main loop, so purchases cost
-// nothing. Unfreezing leaves the stock where it is. The add cheats raise the
-// stock (and a frozen value) by a fixed amount per click.
+// nothing. A freeze is only a floor: a rise (income, mining, a ship
+// unloading) raises the value held. Unfreezing leaves the stock where it
+// is. The add cheats raise the stock (and a frozen value) by a fixed amount
+// per click.
 #pragma once
 
 #include <stdbool.h>

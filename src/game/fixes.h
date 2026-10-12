@@ -42,6 +42,10 @@ typedef struct Fixes {
     // and the kind-3 staff member even while they are at the university.
     // The fix leaves them off, as the rest of the room does.
     bool away_staff_hidden;
+    // Loading ore onto a ship caps the ship's load of that ore at the
+    // colony's storage space, even when the ship has more room. The fix
+    // caps it at the ship's room only.
+    bool cargo_planet_cap;
 } Fixes;
 
 extern Fixes fixes;

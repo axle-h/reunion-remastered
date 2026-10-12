@@ -163,10 +163,10 @@ static void build_rows(void)
     switch (section) {
     case SEC_CHEATS:
         r = add(ROW_TOGGLE, R_FREEZE_MONEY, "Freeze money",
-                "Credits stay where they are: purchases cost nothing.");
+                "Credits never fall: purchases cost nothing, income still counts.");
         r->on = config.freeze_money;
         r = add(ROW_TOGGLE, R_FREEZE_ORE, "Freeze ore",
-                "New Earth's ore stays where it is: production uses none.");
+                "New Earth's ore never falls: production uses none, deliveries count.");
         r->on = config.freeze_ore;
         SDL_snprintf(label, sizeof label, "Add %d credits", hooks.add_money);
         r = add(ROW_ACTION, R_ADD_MONEY, label, "Only during a game.");
