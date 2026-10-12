@@ -151,11 +151,11 @@ the original in a few places, each commented in the code:
 ## Port additions
 
 - **Port menu** (F1, `src/platform/menu.h`): cheats, music card, effects
-  and volumes, display, skip intro, colony stats, the fix switches,
-  restart and quit. The game waits inside `timing_wait_retrace` while it
-  is open. The platform layer knows nothing of the game: display and
-  volumes apply at once, the music switch is made at once by `src/main.c`,
-  and everything that touches game state is carried out by
+  and volumes, display, skip intro, colony stats, Detoxin rate, the fix
+  switches, restart and quit. The game waits inside `timing_wait_retrace`
+  while it is open. The platform layer knows nothing of the game:
+  display and volumes apply at once, the music switch is made at once by
+  `src/main.c`, and everything that touches game state is carried out by
   `Options_Frame` at the main loop's next frame (`src/game/options.h`,
   which also describes the cheats). Scripted runs keep F1 as an ordinary
   key.
@@ -172,6 +172,10 @@ the original in a few places, each commented in the code:
 - **Colony stats** (`src/game/colonystats.h`), switched in the menu's Game
   section like the other additions to the game's screens. Golden runs
   switch these off, since they add hotspots to the state stream.
+- **Detoxin rate** (`Surface_DerrickRate`, `src/game/surface.h`): the
+  droids screen's Detoxin row shows the T/PTP of the body's active
+  Derricks (the original shows `--`, as droids mine no Detoxin), and a
+  Derrick's info adds their Total. Golden runs switch it off too.
 - **Headless runs**: autopilot scripts, `--replay` and soak runs
   (`src/platform/autopilot.h`, README), and the playthrough fixture
   (docs/playthrough.md).

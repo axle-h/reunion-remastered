@@ -27,7 +27,7 @@ build/debug/reunion
 `REUNION_DATA_DIR` CMake setting (default `vendor/Reunion_DOS_EN`).
 F1 opens the port menu over the game: cheats, music (None, Sound Blaster,
 UltraSound), effects and volumes, display mode and size, skipping the
-intro, the colony stats, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
+intro, the colony stats, the Detoxin rate, the fixes, restart and quit. Its settings are kept in `reunion.ini` in
 the SDL pref directory (`~/.local/share/Reunion/Reunion` on Linux).
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to the
 `screenshots` directory there.

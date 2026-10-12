@@ -68,6 +68,12 @@ void Surface_DeleteBuilding(int16_t index);
 // 2ef2:2b1a (= Game_FindBuildingProc): completed buildings of `kind` on the body.
 int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int16_t moon,
                                bool activeOnly);
+// Port addition, switched by config.detoxin_rate (port menu, Game): the
+// Detoxin T/PTP of all the current body's active Derricks, each the
+// Deposits[0] / 10 its info shows (it adds that in 35% of the hours,
+// Sim_UpdateBuildings). The droids screen shows it in the Detoxin row (at
+// most 99), a Derrick's info as the Total row (at most 999).
+int16_t Surface_DerrickRate(void);
 // 2ef2:2b9e: fills the longint table DS:791C + flag * 100 + kind * 4.
 void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon);
 // 2ef2:2c52 / 312f

@@ -1,5 +1,6 @@
 // surface: map loading into the three layers, footprint placement checks,
-// building counts / deletion and the tile blits, on hand-made state.
+// building counts / deletion, the Detoxin rate and the tile blits, on
+// hand-made state.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -217,6 +218,25 @@ static void counting(void)
     CHECK(ds.Game_FindBuildingProc == Surface_CountBuildings);
 }
 
+// The Detoxin rate: the current body's finished, active Derricks, each
+// Deposits[0] / 10.
+static void derrick_rate(void)
+{
+    setup(1, 0);
+    static const struct { uint8_t kind, planet, health, flag; } rec[] = {
+        {5, 1, 0, 1}, {5, 1, 0, 1}, {5, 1, 0, 1}, {5, 1, 0, 0}, {5, 1, 40, 1}, {5, 2, 0, 1}, {4, 1, 0, 1},
+    };
+    for (int i = 0; i < 7; i++) {
+        *bld(i + 1) = (TBuilding){.Kind = rec[i].kind, .System = 1, .Planet = rec[i].planet,
+                                  .Moon = 0, .Health = rec[i].health, .Flag = rec[i].flag};
+    }
+    ds.Game_BuildingCount = 7;
+    body(1)->Deposits[0] = 75;
+    CHECK(Surface_DerrickRate() == 21);
+    body(1)->Deposits[0] = 9;
+    CHECK(Surface_DerrickRate() == 0);
+}
+
 static void hotspots_and_blits(void)
 {
     setup(1, 0);
@@ -286,6 +306,7 @@ int main(int argc, char *argv[])
     load_map();
     placement();
     counting();
+    derrick_rate();
     autoplace_when_full();
     hotspots_and_blits();
     printf(ok ? "surface: ok\n" : "surface: FAILED\n");

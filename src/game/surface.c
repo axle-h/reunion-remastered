@@ -15,6 +15,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 #include "game/textfile.h"
+#include "platform/config.h"
 
 
 static int16_t cur_planet(void)
@@ -358,6 +359,13 @@ void Surface_DrawBuildingInfo(void)
             row = 0;
         SDL_snprintf(s, sizeof s, "%d", b->Flag == 0 ? 0 : b->BD);
         info_line("Working    : ", s, "%", (int16_t)(row + 1));
+
+        if (config.detoxin_rate && b->Kind == 5) {
+            SDL_snprintf(s, sizeof s, "%d", SDL_min(Surface_DerrickRate(), 999));
+            // 21 columns: three digits leave no room for the space, four none
+            // for the unit.
+            info_line("Total      : ", s, SDL_strlen(s) > 2 ? "t/ptp" : " t/ptp", (int16_t)(row + 2));
+        }
     }
     TextFile_ShowBuildingInfo((int16_t)((ds.Surface_SelKind - 1) * 6));
 }
@@ -913,6 +921,12 @@ int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int
             n++;
     }
     return n;
+}
+
+int16_t Surface_DerrickRate(void)
+{
+    int16_t n = Surface_CountBuildings(5, ds.Game_CurSystem, cur_planet(), cur_moon(), true);
+    return (int16_t)(n * (ds.Game_CurBody->Deposits[0] / 10));
 }
 
 // 2ef2:2b9e

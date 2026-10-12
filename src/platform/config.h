@@ -41,6 +41,7 @@ typedef struct Config {
     // [game]
     bool skip_intro;
     bool colony_stats;  // planet info: the POP row opens the colony's stats
+    bool detoxin_rate;  // droids screen and Derrick info: the Derricks' Detoxin rate
     // [fixes]: switched off ones; a fix not listed is on.
     int fix_count;
     char fix_keys[CONFIG_MAX_FIXES][CONFIG_KEY_SIZE];

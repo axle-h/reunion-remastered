@@ -188,8 +188,9 @@ static void run_case(const GoldenCase *c)
     for (int i = 0; i < Fixes_Count; i++)
         config_set_fix(Fixes_List[i].key, !c->original);
     // The golden files describe the game without the colony stats, which
-    // add a hotspot to the planet info screen.
+    // add a hotspot to the planet info screen, or the Detoxin rate.
     config.colony_stats = false;
+    config.detoxin_rate = false;
     char script[1100];
     if (c->script[0] == '@')
         SDL_snprintf(script, sizeof script, "@%s/%s", REUNION_SOURCE_DIR, c->script + 1);

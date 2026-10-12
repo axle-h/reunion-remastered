@@ -60,6 +60,7 @@ typedef enum : int {
     R_SIZE,
     R_SKIP_INTRO,
     R_COLONY_STATS,
+    R_DETOXIN_RATE,
     R_FIXES_ON,
     R_FIXES_OFF,
     R_RESTART,
@@ -205,6 +206,9 @@ static void build_rows(void)
         r = add(ROW_TOGGLE, R_COLONY_STATS, "Colony stats",
                 "Planet info: click POP for food, housing, health and demands.");
         r->on = config.colony_stats;
+        r = add(ROW_TOGGLE, R_DETOXIN_RATE, "Detoxin rate",
+                "Droids screen and Derrick info: all the Derricks' Detoxin T/PTP.");
+        r->on = config.detoxin_rate;
         break;
     case SEC_FIXES:
         add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
@@ -339,6 +343,9 @@ static void act(const Row *r, int dir)
         break;
     case R_COLONY_STATS:
         config.colony_stats = !config.colony_stats;
+        break;
+    case R_DETOXIN_RATE:
+        config.detoxin_rate = !config.detoxin_rate;
         break;
     case R_RESTART:
         input_request_restart();

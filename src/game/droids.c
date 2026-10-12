@@ -11,11 +11,9 @@
 #include "game/mouse.h"
 #include "game/planetinfo.h"
 #include "game/sound.h"
+#include "game/surface.h"
 #include "game/system.h"
-
-// Routines missing from their units' headers.
-int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int16_t moon,
-                               bool activeOnly); // 2ef2:2b1a
+#include "platform/config.h"
 
 
 static bool at_home_planet(void)
@@ -114,7 +112,9 @@ void Droids_DrawDroidsScreen(void)
         for (int16_t k = 1; k <= 6; k++) {
             uint8_t deposit = body->Deposits[k - 1];
             SDL_snprintf(s, sizeof s, "%2d", (int16_t)(deposit * body->_0A) / 10);
-            if (k == 1)
+            if (k == 1 && config.detoxin_rate)
+                SDL_snprintf(s, sizeof s, "%2d", SDL_min(Surface_DerrickRate(), 99));
+            else if (k == 1)
                 SDL_strlcpy(s, "--", sizeof s);
             if (deposit < 10)
                 SDL_strlcpy(s, " -", sizeof s);
