@@ -1,8 +1,8 @@
-// Golden state hashes (docs/native-memory-plan.md, Stage 0): plays a script
-// and compares the hash of the game's state (game/state.h) every N retraces
-// with tests/golden/<case>.txt. The state stream doesn't depend on the
-// memory layout, so these hold across changes to the memory model; a
-// mismatch means the game behaves differently.
+// Golden state hashes: plays a script and compares the hash of the game's
+// state (game/state.h) every N retraces with tests/golden/<case>.txt. The
+// state stream doesn't depend on the memory layout, so these hold across
+// changes to the memory model; a mismatch means the game behaves
+// differently.
 //
 //   test_golden DATA_DIR CASE        compare (exit 0 / 1, 77 without data)
 //   GOLDEN_WRITE=1 test_golden ...   write the golden file instead

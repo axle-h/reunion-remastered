@@ -12,7 +12,7 @@ They worked because the port kept the original's real-mode address space
 (`mem[]`): a port state was also a state of the original. Every unit was
 ported and matched, and the whole game played through
 ([playthrough.md](playthrough.md)), so the port moved to native C memory
-([native-memory-plan.md](native-memory-plan.md)), where the original code
+(docs/port.md, "Memory"), where the original code
 can't run on the port's state any more.
 
 What replaced them: golden hashes of the game's state, which doesn't depend

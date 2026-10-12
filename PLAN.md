@@ -16,7 +16,7 @@ from the user's own copy; we never ship the assets.
 | Music | libxmp | Plays the ProTracker MODs as-is |
 | Build | CMake (≥ 3.25) with presets | Uses system SDL3/libxmp if found, otherwise fetches them with `FetchContent` |
 | VCS | git | `vendor/` and the Ghidra database are git-ignored |
-| Memory | Native C after porting | The faithful real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations (docs/native-memory-plan.md) |
+| Memory | Native C after porting | The faithful real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations (docs/port.md, "Memory"). What remains of the Borland run time (Pascal strings, `Real48`, the heap API) is in docs/pascal-runtime-plan.md |
 | Verification | Differential tests while porting, then golden state hashes | Unicorn ran the original's routines on the port's real-mode memory until every unit matched; native C memory retired them (docs/difftest.md, tag `last-real-mode`). Golden hashes of the layout-independent state and the playthrough's proof guard behaviour since |
 
 ## What we're working from
@@ -150,8 +150,9 @@ Replace everything that touched DOS hardware:
 *(all units ported, ~21k lines of C in src/game/, 50 tests; AdLib music and
 soak testing in progress. Earlier groundwork: data-segment mirror generated from symbols.txt and loaded from the
 original EXE; emulated real-mode memory so far pointers worked, until the
-port moved to native C memory (docs/native-memory-plan.md); see
-docs/port.md.)*
+port moved to native C memory; see
+docs/port.md. Retiring the rest of the Borland run time:
+docs/pascal-runtime-plan.md.)*
 
 - Work leaf-first: graphics/blitters → loaders → text/UI → subsystems
   (research, production, trade, fleets, combat, diplomacy) → main loop.
