@@ -1180,8 +1180,6 @@ void PlanetInfo_RenderSystemView(void)
     ds.PlanetInfo_Frame = System_GetSegment();  // GetMem(0xBCC0)
     ds.PlanetInfo_MoonSprite = System_GetMem(0x2A80);
     ds.PlanetInfo_PlanetSprite = System_GetMem(0x2A80);
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = System_MemAvail();
     Blit_CopyBytes(ds.PlanetInfo_Backdrop, ds.PlanetInfo_Frame, 0xBCC0);
 
     if (ds.PlanetInfo_BodiesHidden == 0) {
@@ -1272,8 +1270,6 @@ void PlanetInfo_RenderSystemView(void)
         ds.Mouse_CursorShape = 0;
     else
         ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(hit - 0x14))->_1A;
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = System_MemAvail();
     System_FreeSegment(ds.PlanetInfo_Frame);
     System_FreeMem(ds.PlanetInfo_MoonSprite, 0x2A80);
     System_FreeMem(ds.PlanetInfo_PlanetSprite, 0x2A80);

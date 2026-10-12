@@ -119,8 +119,6 @@ void Gfx_DrawDitherRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t 
 
 // 405f:1933: fade out, text mode, Halt.
 void Gfx_FatalExit(void);
-// 405f:1999
-void Gfx_OutOfMemoryExit(void);
 // 405f:1a62 (no symbol yet): the unit's ExitProc. Stops sound, releases
 // buffers and, after a run-time error, shows the error screen and waits
 // for a key.

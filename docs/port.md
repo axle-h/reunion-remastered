@@ -75,7 +75,7 @@ The port has no emulated address space; the game's state is ordinary C:
 |---|---|
 | Data segment | `ds`, a C global (above) |
 | Video memory | `vid_screen` (`src/platform/video.c`): the VGA's 64 KB at A000h, of which rows 0..199 are shown; `gfx_screen()` is the drawing target |
-| Heap | `System_GetMem`/`System_FreeMem` (`src/game/system.c`): zeroed C blocks, freed by the next `system_init`. `System_MemAvail`/`MaxAvail` always report 640 KB, so the game's memory checks pass |
+| Heap | `System_GetMem`/`System_FreeMem` (`src/game/system.c`): zeroed C blocks, freed by the next `system_init`. The game's memory checks (`MemAvail`/`MaxAvail`) are left out: the port always has enough |
 
 Buffers the original addresses through their 64 KB segment, with 16-bit
 offsets that can wrap past the block (drawing buffers, map layers), are
@@ -86,7 +86,9 @@ table (`src/game/shipmove.c`), because stars drawn past the backdrop land in
 the star table and change the game's random numbers.
 
 There is no EMS: unit Ems (`src/game/ems.c`) keeps the game data and toolbar
-blocks on the heap, as on a DOS machine without an EMM. The AdLib tune
+blocks on the heap, as on a DOS machine without an EMM, so they never need
+mapping. The original's other run-time helpers (`Move`, `FillChar`, unit
+Dos) are plain C library calls or gone. The AdLib tune
 buffer, which only the port's own player reads, is a C array (docs/audio.md).
 
 The game's state can be serialised in a form that doesn't depend on any of

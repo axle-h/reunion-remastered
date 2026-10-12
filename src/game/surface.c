@@ -949,7 +949,7 @@ void Surface_DeleteBuilding(int16_t index)
 {
     int16_t last = (int16_t)(ds.Game_BuildingCount - 1);
     for (int16_t i = index; i <= last; i++)
-        System_MoveFwd(bldg((int16_t)(i + 1)), bldg(i), 14);
+        memcpy(bldg(i), bldg((int16_t)(i + 1)), 14);
     ds.Game_BuildingCount--;
 }
 

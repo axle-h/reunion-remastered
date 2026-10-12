@@ -47,7 +47,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
     uint8_t *buf = System_GetMem(64000);
     Blit_CopyRect(screen_at(0x2800), save, 0x140, 0x11);
     uint8_t old_pal[0x300];
-    System_MoveFwd(ds.Gfx_Palette, old_pal, 0x300);
+    memcpy(old_pal, ds.Gfx_Palette, 0x300);
 
     PString num, name;
     System_StrLong(scene, 0, &num, 255);
@@ -149,7 +149,7 @@ void AlienTalk_PlayAlienScene(int16_t scene)
 
     Gfx_FadeOut(0, 0xFF, pal);
     Blit_CopyRect(save, screen_at(0x2800), 0x140, 0x11);
-    System_MoveFwd(old_pal, ds.Gfx_Palette, 0x300);
+    memcpy(ds.Gfx_Palette, old_pal, 0x300);
     System_FreeMem(save, 0x1540);
     Mouse_ShowCursor();
     ds.Command_BackdropShown = 0;

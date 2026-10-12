@@ -103,7 +103,6 @@ static void main_anim(void)
     Anim_FreeMainAnim(8);
     CHECK(r->Loaded == 0);
     CHECK(system_heap_used() == before);
-    CHECK(ds.Game_MinMemAvail <= SYSTEM_MEM_PLENTY);
     // Nothing loaded: ok stays true and nothing is drawn.
     uint32_t crc = SDL_crc32(0, scr(), 64000);
     bool drawn = false;

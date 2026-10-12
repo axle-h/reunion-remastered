@@ -1,5 +1,6 @@
 #include "game/gfxpath.h"
 
+#include <string.h>
 
 #include "game/blit.h"
 #include "game/dseg.h"
@@ -119,7 +120,6 @@ void GfxPath_SetToolbar(int16_t screen)
 // 3a1b:00bf
 void GfxPath_RedrawToolbar(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     ds.GfxPath_CellBackgrounds = bar(BG_OFS);
     ds.GfxPath_IconScratch = System_GetMem(0x3C0);
     ds.GfxPath_PageFlagA = *slot_id(7) != 0;
@@ -134,14 +134,11 @@ void GfxPath_RedrawToolbar(void)
         draw_arrow(0x50, ARROW_PREV);
     }
     System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:0366: puts id in the first free slot.
 void GfxPath_AddToolbarIcon(int16_t id)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     ds.GfxPath_CellBackgrounds = bar(BG_OFS);
     ds.GfxPath_IconScratch = System_GetMem(0x3C0);
     uint16_t slot = 1;
@@ -169,8 +166,6 @@ void GfxPath_AddToolbarIcon(int16_t id)
         }
     }
     System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 static void scroll_tick(void)
@@ -197,7 +192,6 @@ static void toggle_pages(void)
 // 3a1b:0586
 void GfxPath_ScrollToolbarNext(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     uint16_t ofs = 0x140;
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
@@ -206,14 +200,11 @@ void GfxPath_ScrollToolbarNext(void)
         scroll_extras();
     }
     toggle_pages();
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:0643
 void GfxPath_ScrollToolbarPrev(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     uint16_t ofs = PAGE_SIZE;
     for (int i = 0; i <= 20; i++) {
         scroll_tick();
@@ -222,32 +213,24 @@ void GfxPath_ScrollToolbarPrev(void)
         scroll_extras();
     }
     toggle_pages();
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:0704
 void GfxPath_ShowToolbar(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
     uint16_t page = ds.GfxPath_PageFlagB == 0 ? (uint16_t)(PAGE_SIZE + 1) : 1;
     Blit_InterlaceReveal(bar(page), gfx_screen(), 0x140, 0x20);
     Mouse_ShowCursor();
     Sound_FreeSampleIfIdle();
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:0780
 void GfxPath_ShowToolbarInstant(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     Mouse_HideCursor();
     copy_to_screen(bar(1), 0);
     Mouse_ShowCursor();
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:07ca: scans the slots up to the first empty one (or the end of the
@@ -266,7 +249,6 @@ bool GfxPath_ToolbarHasIcon(int16_t id)
 // 3a1b:0810
 void GfxPath_IconAllIndex(void)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     Gfx_IconAllOpen();
     uint16_t len;
     for (uint16_t i = 0; i <= 0x43; i++) {
@@ -274,14 +256,11 @@ void GfxPath_IconAllIndex(void)
         Gfx_IconAllReadChunk(&ds.GfxPath_ToolbarBlock.Data, &len);
     }
     Gfx_IconAllClose();
-    Ems_EmsNop(Ems_ToolbarBlock());
-    Ems_EmsMapGameData();
 }
 
 // 3a1b:0864: RLE-decodes the icon (+2 on every pixel) into the scratch buffer.
 void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
 {
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     const uint8_t *src = block_base() + ds.GfxPath_IconIndex[icon];
     uint8_t *out = ds.GfxPath_IconScratch;
     int16_t left = 0x3C0;
@@ -299,9 +278,6 @@ void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
         }
     }  // the original tests != 0 after each run; a damaged icon would run on
     Blit_CopyRectStrided(ds.GfxPath_IconScratch, dest + 0x504, 0x27, 0x18, 0x28, 0x140);
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = (int32_t)System_MemAvail();
-    Ems_EmsNop(Ems_ToolbarBlock());
 }
 
 // 3a1b:0932
@@ -329,7 +305,7 @@ void GfxPath_Init(void)
     Gfx_IconAllOpenSize(&ds.GfxPath_IconAllSize);
     uint16_t size = (uint16_t)(ds.GfxPath_IconAllSize + 0x5500 + ds.GfxPath_CellsSize);
     ds.GfxPath_InitBlock = System_GetMem(size);
-    System_FillChar(ds.GfxPath_InitBlock, size, 2);
+    memset(ds.GfxPath_InitBlock, 2, size);
     Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, ds.GfxPath_InitBlock);
     ds.Game_GfxPathProc = GfxPath_FreeToolbarBuffer;
 }

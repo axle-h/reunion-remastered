@@ -10,13 +10,6 @@
 // the three kinds: SpWar::SpriteRects (war), Cc::Doors (main) and Cc::Rooms
 // (gr). Frames count from 1.
 
-// Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
-static void track_min_mem(void)
-{
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = System_MemAvail();
-}
-
 // Shared body of the three loaders: <prefix><id>.ani, frame count from the
 // first byte of the table entry. keep_nil: the SA loader leaves the pointer
 // alone when the chunk was skipped; the others store the nil.
@@ -47,7 +40,6 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
         }
         Gfx_CloseDataFile();
     }
-    track_min_mem();
 }
 
 // Shared body of the three Free routines. check_size: Main/Gr skip frames
@@ -170,7 +162,6 @@ void Anim_DecodeAnimFrame(const uint8_t *frame, uint8_t *dest, uint8_t colourOff
         if (left == 0)
             break;
     }
-    track_min_mem();
 }
 
 // The rows of 3c64:0666 as source offset (from src), screen offset and

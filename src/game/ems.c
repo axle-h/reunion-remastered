@@ -27,30 +27,6 @@ void Ems_EmsRelease(TEmsBlock *blk)
     blk->Size = 0;
 }
 
-// 4719:0290: maps a block in EMS into the page frame; a heap copy needs
-// nothing.
-void Ems_EmsMapAll(TEmsBlock *blk)
-{
-    (void)blk;
-}
-
-// 4719:02cf
-void Ems_EmsNop(TEmsBlock *blk)
-{
-    (void)blk;
-}
-
-// 4719:02d6
-void Ems_EmsMapGameData(void)
-{
-    TEmsBlock *blk = Ems_GameDataBlock();
-    Ems_EmsMapAll(blk);
-    uint8_t *base = blk->Data;
-    ds.Game_Groups = (TGroup (*)[32])base;
-    ds.Game_Buildings = (TBuilding *)(base + BUILDINGS_OFS);
-    ds.Gfx_Charset = base + CHARSET_OFS;
-}
-
 // 4719:0317
 void Ems_EmsReleaseGameData(void)
 {
@@ -62,6 +38,12 @@ void Ems_Init(void)
 {
     ds.Ems_Buffer = System_GetMem(GAME_DATA_SIZE);
     Ems_EmsMoveToEms(Ems_GameDataBlock(), GAME_DATA_SIZE, ds.Ems_Buffer);
-    Ems_EmsMapGameData();
+    // 4719:02d6 MapGameData. The original maps the block again after every
+    // use of the toolbar block, which shared the EMS page frame; a heap
+    // copy stays where it is.
+    uint8_t *base = ds.Ems_Buffer;
+    ds.Game_Groups = (TGroup (*)[32])base;
+    ds.Game_Buildings = (TBuilding *)(base + BUILDINGS_OFS);
+    ds.Gfx_Charset = base + CHARSET_OFS;
     ds.Ems_RestoreProc = Ems_EmsReleaseGameData;
 }

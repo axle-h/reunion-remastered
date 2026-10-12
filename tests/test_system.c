@@ -47,7 +47,7 @@ static bool str_is(const PString *s, const char *want)
 
 static void test_strings(void)
 {
-    PString t, u;
+    PString t;
     PStr8 short_str;
 
     System_StrStore(PSTR("Reunion of worlds"), (PString *)&short_str, 8);
@@ -74,19 +74,6 @@ static void test_strings(void)
     System_Copy(&t, PSTR("Hello"), 2, -1);
     CHECK(str_is(&t, ""));
 
-    CHECK(System_Pos(PSTR("lo"), PSTR("Hello")) == 4);
-    CHECK(System_Pos(PSTR("l"), PSTR("Hello")) == 3);
-    CHECK(System_Pos(PSTR("aab"), PSTR("aaab")) == 2);
-    CHECK(System_Pos(PSTR("x"), PSTR("Hello")) == 0);
-    CHECK(System_Pos(PSTR(""), PSTR("Hello")) == 0);
-    CHECK(System_Pos(PSTR("Hello!"), PSTR("Hello")) == 0);
-
-    CHECK(System_StrCompare(PSTR("abc"), PSTR("abd")) < 0);
-    CHECK(System_StrCompare(PSTR("abc"), PSTR("ab")) > 0);
-    CHECK(System_StrCompare(PSTR("abc"), PSTR("abc")) == 0);
-    CHECK(System_StrCompare(PSTR("\x80"), PSTR("a")) > 0); // unsigned bytes
-    CHECK(System_StrCompare(PSTR(""), PSTR("a")) < 0);
-
     System_CharToStr(&t, 'Q');
     CHECK(str_is(&t, "Q"));
 
@@ -104,19 +91,7 @@ static void test_strings(void)
     System_Delete(&t, 4, 30000);
     CHECK(str_is(&t, "Hel"));
 
-    System_StrLoad(&u, PSTR("Hlo"));
-    System_Insert(PSTR("el"), &u, 255, 2);
-    CHECK(str_is(&u, "Hello"));
-    System_Insert(PSTR("!"), &u, 255, 99); // past the end: appended
-    CHECK(str_is(&u, "Hello!"));
-    System_Insert(PSTR(">"), &u, 255, -5);
-    CHECK(str_is(&u, ">Hello!"));
-    System_StrStore(PSTR("abcdef"), (PString *)&short_str, 8);
-    System_Insert(PSTR("XYZ"), (PString *)&short_str, 8, 3);
-    CHECK(str_is((PString *)&short_str, "abXYZcde"));
 
-    CHECK(System_UpCase('a') == 'A' && System_UpCase('z') == 'Z');
-    CHECK(System_UpCase('A') == 'A' && System_UpCase('{') == '{' && System_UpCase('\xE1') == '\xE1');
 }
 
 static void test_str_val(void)

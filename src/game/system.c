@@ -121,46 +121,11 @@ void System_StrConcat(PString *tmp, const PString *src)
     tmp->len = old + n;
 }
 
-// 48c7:0d27
-int16_t System_Pos(const PString *sub, const PString *s)
-{
-    if (sub->len == 0 || s->len < sub->len)
-        return 0;
-    for (int i = 0; i <= s->len - sub->len; i++)
-        if (SDL_memcmp(s->s + i, sub->s, sub->len) == 0)
-            return (int16_t)(i + 1);
-    return 0;
-}
-
-// 48c7:0d6d
-int System_StrCompare(const PString *a, const PString *b)
-{
-    int n = a->len < b->len ? a->len : b->len;
-    for (int i = 0; i < n; i++)
-        if (a->s[i] != b->s[i])
-            return (uint8_t)a->s[i] < (uint8_t)b->s[i] ? -1 : 1;
-    return a->len < b->len ? -1 : a->len > b->len;
-}
-
 // 48c7:0d98
 void System_CharToStr(PString *result, char c)
 {
     result->len = 1;
     result->s[0] = c;
-}
-
-// 48c7:0dc5: s := Copy(s, 1, index - 1) + src + Copy(s, index, 255), with
-// each concatenation truncated at 255 and the result at maxLen.
-void System_Insert(const PString *src, PString *s, uint16_t maxLen, int16_t index)
-{
-    PString head, tail;
-    if (index < 1)
-        index = 1;
-    System_Copy(&head, s, 1, (int16_t)(index - 1));
-    System_StrConcat(&head, src);
-    System_Copy(&tail, s, index, 255);
-    System_StrConcat(&head, &tail);
-    System_StrStore(&head, s, maxLen);
 }
 
 // 48c7:0e24: s := Copy(s, 1, index - 1) + Copy(s, index + count, 255).
@@ -299,37 +264,6 @@ int32_t System_ValLong(const PString *s, int16_t *code)
     return value;
 }
 
-// 48c7:1b78
-char System_UpCase(char c)
-{
-    return c >= 'a' && c <= 'z' ? (char)(c - 0x20) : c;
-}
-
-// ===========================================================================
-// Memory
-// ===========================================================================
-
-// 48c7:0b4f
-void System_MoveFwd(const void *src, void *dst, uint16_t count)
-{
-    const uint8_t *s = src;
-    uint8_t *d = dst;
-    while (count--)
-        *d++ = *s++;
-}
-
-// 48c7:1b40
-void System_Move(const void *src, void *dst, uint16_t count)
-{
-    SDL_memmove(dst, src, count);
-}
-
-// 48c7:1b64
-void System_FillChar(void *dst, uint16_t count, uint8_t value)
-{
-    SDL_memset(dst, value, count);
-}
-
 // ===========================================================================
 // Heap. The original's is BP7's free list between HeapOrg and HeapEnd; the
 // port's blocks come from the C allocator, zeroed, and nothing depends on
@@ -419,20 +353,6 @@ uint32_t system_heap_used(void)
     return heap_used;
 }
 
-// 48c7:02e7. The game asks before it loads something big (the start-up
-// check, the satellite animation, picture buffers) and skips or stops when
-// there isn't enough. The port always has enough: all of conventional
-// memory free, which no check asks for.
-int32_t System_MemAvail(void)
-{
-    return SYSTEM_MEM_PLENTY;
-}
-
-// 48c7:0303
-int32_t System_MaxAvail(void)
-{
-    return SYSTEM_MEM_PLENTY;
-}
 
 
 

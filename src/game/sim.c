@@ -6,6 +6,8 @@
 // Advisor:: fields): word timers, each with a "done" byte behind it.
 #include "game/sim.h"
 
+#include <string.h>
+
 #include "game/blit.h"
 #include "game/cargo.h"
 #include "game/colonize.h"
@@ -924,7 +926,7 @@ void Sim_UpdateColonySetups(void)
         if (done) {
             int16_t last = (int16_t)(ds.Game_ColonySetupCount - 1);
             for (int16_t m = k; m <= last; m++)
-                System_MoveFwd(colony_setup((int16_t)(m + 1)), colony_setup(m), 0x10);
+                memcpy(colony_setup(m), colony_setup((int16_t)(m + 1)), 0x10);
             ds.Game_ColonySetupCount--;
         }
     }

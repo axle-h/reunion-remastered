@@ -38,7 +38,7 @@ void Message_AddMessageLogEntry(int16_t kind, const uint8_t *text, const uint8_t
     if (ds.Message_LogCount >= LOG_MAX) {
         int16_t last = (int16_t)(ds.Message_LogCount - 1);
         for (int16_t i = 1; i <= last; i++)
-            System_MoveFwd(log_entry((int16_t)(i + 1)), log_entry(i), LOG_ENTRY);
+            SDL_memcpy(log_entry(i), log_entry((int16_t)(i + 1)), LOG_ENTRY);
         ds.Message_LogCount--;
     }
     ds.Message_LogCount++;
@@ -148,19 +148,17 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
     uint16_t bytes = (uint16_t)(boxh * boxw);  // 16-bit product, as sized in the original
     uint16_t screen_ofs = (uint16_t)((y0 - 3) * 0x140 + (x0 - 3));
 
-    bool saved = (int32_t)(int16_t)bytes <= System_MaxAvail();
-    uint8_t *save = nullptr;
-    if (saved) {
-        save = System_GetMem(bytes);
-        Mouse_HideCursor();
-        Blit_CopyRectStrided(gfx_screen() + screen_ofs, save, boxw, boxh, 0x140, boxw);
-        Blit_FillRect((int16_t)(x0 - 3), (int16_t)(y0 - 3), boxw, boxh, 2);
-        Gfx_DrawRectOutline((int16_t)(x0 - 2), (int16_t)(y0 - 2), (int16_t)(maxw * 6 + x0 + 3),
-                            (int16_t)(y0 + height + 3), 4);
-        Mouse_ShowCursor();
-        for (int16_t i = 1; i <= lineCount; i++)
-            Gfx_DrawTextF9(lines[i], x0, (int16_t)(y0 + 1 + (i - 1) * 9), maxw);
-    }
+    // The original shows the box only when MaxAvail has room to save the
+    // screen under it (the port's heap always has).
+    uint8_t *save = System_GetMem(bytes);
+    Mouse_HideCursor();
+    Blit_CopyRectStrided(gfx_screen() + screen_ofs, save, boxw, boxh, 0x140, boxw);
+    Blit_FillRect((int16_t)(x0 - 3), (int16_t)(y0 - 3), boxw, boxh, 2);
+    Gfx_DrawRectOutline((int16_t)(x0 - 2), (int16_t)(y0 - 2), (int16_t)(maxw * 6 + x0 + 3),
+                        (int16_t)(y0 + height + 3), 4);
+    Mouse_ShowCursor();
+    for (int16_t i = 1; i <= lineCount; i++)
+        Gfx_DrawTextF9(lines[i], x0, (int16_t)(y0 + 1 + (i - 1) * 9), maxw);
 
     if (edit) {
         TextFile_InputLine(buf, (int16_t)((editCol - 1) * 6 + x0),
@@ -186,12 +184,10 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
             (void)TextFile_ReadKey();
     }
 
-    if (saved) {
-        Mouse_HideCursor();
-        Blit_CopyRectStrided(save, gfx_screen() + screen_ofs, boxw, boxh, boxw, 0x140);
-        Mouse_ShowCursor();
-        System_FreeMem(save, bytes);
-    }
+    Mouse_HideCursor();
+    Blit_CopyRectStrided(save, gfx_screen() + screen_ofs, boxw, boxh, boxw, 0x140);
+    Mouse_ShowCursor();
+    System_FreeMem(save, bytes);
 
     if (logIt) {
         // Leading blanks of each line are dropped; empty lines are not logged.
@@ -209,7 +205,7 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
             // BUG? with count > LogCount the count goes negative.
             int16_t keep = (int16_t)(ds.Message_LogCount - count);
             for (int16_t i = 1; i <= keep; i++)
-                System_MoveFwd(log_entry((int16_t)(i + count)), log_entry(i), LOG_ENTRY);
+                SDL_memcpy(log_entry(i), log_entry((int16_t)(i + count)), LOG_ENTRY);
             ds.Message_LogCount = (int16_t)(ds.Message_LogCount - count);
         }
         int16_t next = 1;
@@ -254,11 +250,9 @@ static void restore_sat_background(const SatAnim *a)
 // 34b0:0953
 void Message_PlaySatelliteAnim(int16_t satNo)
 {
-    if (System_MaxAvail() <= 0x199FF)
-        return;
     Mouse_HideCursor();
     uint8_t saved_pal[0x300];
-    System_MoveFwd(ds.Gfx_Palette, saved_pal, 0x300);
+    SDL_memcpy(saved_pal, ds.Gfx_Palette, 0x300);
     uint8_t *pal = Gfx_PalettePtr();
 
     uint8_t *pic = System_GetMem(0xBCC0);
@@ -293,7 +287,7 @@ void Message_PlaySatelliteAnim(int16_t satNo)
     System_FreeMem(a.sprites, 0x2080);
     Gfx_FadeOut(0x40, 0xFE, pal);
     Blit_CopyRect(back, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_MoveFwd(saved_pal, ds.Gfx_Palette, 0x300);
+    SDL_memcpy(ds.Gfx_Palette, saved_pal, 0x300);
     Gfx_FadeIn(0x40, 0xFE, pal);
     System_FreeMem(back, 0xBCC0);
     Mouse_ShowCursor();

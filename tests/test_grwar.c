@@ -74,13 +74,13 @@ static void setup_field(void)
 {
     for (int s = 1; s <= 2; s++) {
         ds.GrWarUnits_UnitLists[s - 1] = System_GetSegment();  // as InitBattleUnits
-        System_FillChar(ds.GrWarUnits_UnitLists[s - 1], 21 * 0x27, 0);
+        SDL_memset(ds.GrWarUnits_UnitLists[s - 1], 0, 21 * 0x27);
     }
     ds.GrWarUnits_AttackerSlotCount = 1;
     ds.GrWarUnits_DefenderSlotCount = 1;
     ds.GrWar_BattleGrids = System_GetMem(0xC6);
     ds.GrWar_Projectiles = System_GetMem(0x708);
-    System_FillChar(ds.GrWar_Projectiles, 0x708, 0);
+    SDL_memset(ds.GrWar_Projectiles, 0, 0x708);
     ds.GrWar_ProjectileCount[0] = 0;
     ds.GrWar_ProjectileCount[1] = 0;
 }
@@ -185,14 +185,14 @@ static void losses(void)
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
+    SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     TGroup *g = &ds.Game_Groups[0][0];
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
     g->Units[1][0].ShipType = 10;
     g->Units[1][0].Weapons[0] = 30;
     g->Units[1][0].Weapons[3] = 40; // weapon 4 is not scaled
     ds.Game_CurBody = System_GetMem(sizeof(TBody));
-    System_FillChar(ds.Game_CurBody, sizeof(TBody), 0);
+    SDL_memset(ds.Game_CurBody, 0, sizeof(TBody));
     for (int r = 0; r < 11; r++)
         ds.Races_Races[r].ForceCount = 0;
 

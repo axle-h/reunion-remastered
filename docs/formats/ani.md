@@ -71,7 +71,7 @@ statistical guess (fewest literal pixels equal to the reference) was tried and
 is unreliable: it picked wrong for `GRANIM1`, `CREDITS/ANIM3` and `INTRO/ANIM3`.
 
 If a frame couldn't be allocated (`MaxAvail` too small), the loader skips it
-and stores size 0 / `nil`. `0516` then reports failure; `0496` falls back to
+and stores size 0 / `nil` (never in the port, whose heap always has room). `0516` then reports failure; `0496` falls back to
 the nearest earlier loaded frame.
 
 ## Palette

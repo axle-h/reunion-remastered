@@ -12,8 +12,7 @@
 #include <stdint.h>
 
 
-// 3c64:0010 / 011e: war\war\sa<id>.ani. Frames that didn't fit in the heap
-// keep a nil pointer.
+// 3c64:0010 / 011e: war\war\sa<id>.ani.
 void Anim_LoadWarAnim(uint16_t id);
 void Anim_FreeWarAnim(uint16_t id);
 // 3c64:019c / 028d: anim\main<id>.ani

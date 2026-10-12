@@ -49,8 +49,6 @@
 #include "game/vecload.h"
 #include "platform/timing.h"
 
-// 26eb:0000 Cheat::Apply (unit not ported; Cheat_Requested is never set).
-void Cheat_Apply(void);
 
 // CurPlanet/CurMoon by Pascal index.
 #define CUR_PLANET(s) ds.Game_CurPlanet[(s) - 1]
@@ -134,11 +132,9 @@ static void startup(void)
     ds.Mouse_LastPushable = 0;
     Title_InitTitleAndMainMenu();
 
-    // 238,000 bytes, 266,000 with a GUS. The port's heap is the DOS one, so
-    // the check stays meaningful.
+    // The original stops here unless MemAvail has 238,000 bytes (266,000
+    // with a GUS); the port's heap always has.
     ds.Main_I = ds.SoundDrv_GusReady ? 28000 : 0;
-    if (System_MemAvail() < ds.Main_I + 0x3A1B0)
-        Gfx_OutOfMemoryExit();
 
     Title_SetMainMenuPalette();
     Groups_InitPlanetForce();
@@ -361,8 +357,8 @@ static bool wait_for_event(void)
         if (ds.Game_Ticks > 100)
             advance_hour(false);
         Mouse_Poll();
-        if (ds.Cheat_Requested)
-            Cheat_Apply();
+        // The original calls Cheat::Apply (26eb:0000) here when
+        // Cheat_Requested is set, which nothing does.
         Options_Frame();  // port addition: the port menu's changes, frozen cheats
         if (!wait_retrace())
             return false;
@@ -395,9 +391,7 @@ static bool wait_for_release(void)
             ds.Game_Ticks++;
         if (ds.Game_CurrentScreen != 29 && ds.Game_Ticks > 100)
             advance_hour(true);
-        Mouse_Poll();
-        if (ds.Cheat_Requested)
-            Cheat_Apply();
+        Mouse_Poll();  // and Cheat::Apply, as above
         if (!wait_retrace())
             return false;
         Gfx_PaletteFlashTick();
@@ -1750,7 +1744,6 @@ void Game_Main(void)
     startup();
     for (;;) {
         ds.Mouse_HiddenClick = ds.Mouse_CursorHidden != 0 && ds.Mouse_BtnRight == 0;
-        Ems_EmsMapGameData();
         if (!ds.Game_ScreenSwitch && !ds.Mouse_HeldPhase && !ds.Mouse_HiddenClick) {
             if (!wait_for_event())
                 return;

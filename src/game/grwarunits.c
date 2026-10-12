@@ -72,8 +72,7 @@ void GrWarUnits_UnitAssignScreen(void)
         ADD32(ds.GrWarUnits_Pool[u->type - 1], u->count);
         int16_t last = ds.GrWarUnits_AttackerSlotCount - 1;
         for (int16_t i = hit - 0x14; i <= last; i++)
-            System_MoveFwd(unit_at(ds.GrWarUnits_UnitLists[0], i + 1),
-                           unit_at(ds.GrWarUnits_UnitLists[0], i), 0x27);
+            memcpy(unit_at(ds.GrWarUnits_UnitLists[0], i), unit_at(ds.GrWarUnits_UnitLists[0], i + 1), 0x27);
         ds.GrWarUnits_AttackerSlotCount--;
         GrWarUnits_DrawUnitList();
         Sound_PlayButtonSfx(ps("\x08" "click-ok"));
@@ -243,11 +242,11 @@ void GrWarUnits_CollectAvailableForces(void)
     }
 
     // Attackers: slots from the totals; what is left over is the pool.
-    System_MoveFwd(ds.GrWarUnits_Totals[0], ds.GrWarUnits_Scratch, 0x10);
+    memcpy(ds.GrWarUnits_Scratch, ds.GrWarUnits_Totals[0], 0x10);
     ds.GrWarUnits_AttackerSlotCount = fill_slots(ds.GrWarUnits_UnitLists[0], false);
-    System_MoveFwd(ds.GrWarUnits_Scratch, ds.GrWarUnits_Pool, 0x10);
+    memcpy(ds.GrWarUnits_Pool, ds.GrWarUnits_Scratch, 0x10);
     // Defenders: every unit goes to a slot.
-    System_MoveFwd(ds.GrWarUnits_Totals[1], ds.GrWarUnits_Scratch, 0x10);
+    memcpy(ds.GrWarUnits_Scratch, ds.GrWarUnits_Totals[1], 0x10);
     ds.GrWarUnits_DefenderSlotCount = fill_slots(ds.GrWarUnits_UnitLists[1], true);
 }
 

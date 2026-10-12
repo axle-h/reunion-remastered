@@ -141,7 +141,7 @@ void GrWar_InitBattleUnits(void)
         if (unit(1, i)->count == 0) {
             int last = ds.GrWarUnits_AttackerSlotCount - 1;
             for (int j = i; j <= last; j++)
-                System_MoveFwd(unit(1, j + 1), unit(1, j), 0x27);
+                memcpy(unit(1, j), unit(1, j + 1), 0x27);
             ds.GrWarUnits_AttackerSlotCount--;
         } else
             i++;
@@ -887,7 +887,7 @@ void GrWar_BattleRound(void)
                 }
                 int last = *proj_count(s) - 1;
                 for (int m = k; m <= last; m++)
-                    System_MoveFwd(pb + m * 0x12, pb + (m - 1) * 0x12, 0x12);
+                    memcpy(pb + (m - 1) * 0x12, pb + m * 0x12, 0x12);
                 (*proj_count(s))--;
             } else {
                 p[4]++;

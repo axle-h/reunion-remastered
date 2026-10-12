@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 #include "game/crt.h"
-#include "game/dos.h"
 #include "game/dseg.h"
 #include "game/mouse.h"
 #include "platform/input.h"
@@ -213,14 +212,6 @@ int main(void)
 {
     hotspots();
     cursor();
-
-    uint8_t res[256], name[] = {10, 'r', 'e', 'u', 'n', 'i', 'o', 'n', '_', 't', 'x'};
-    SDL_setenv_unsafe("REUNION_TX", "hello", 1);
-    Dos_GetEnv(res, name);
-    CHECK(res[0] == 5 && SDL_memcmp(res + 1, "hello", 5) == 0);
-    uint8_t none[] = {6, 'N', 'O', 'S', 'U', 'C', 'H'};
-    Dos_GetEnv(res, none);
-    CHECK(res[0] == 0);
 
     SDL_setenv_unsafe("SDL_VIDEO_DRIVER", "dummy", 1);
     if (SDL_Init(SDL_INIT_VIDEO) && vid_init("test")) {

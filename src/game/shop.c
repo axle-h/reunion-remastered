@@ -322,7 +322,7 @@ static void load_product_picture(bool fade)
     Mouse_ShowCursor();
     System_FreeMem(buf, 24000);
     for (int i = 0; i < 6; i++)
-        System_MoveFwd(ds.Gfx_Palette[0xF9 + i], ds.Gfx_Palette[0xF1 + i], 3);
+        memcpy(ds.Gfx_Palette[0xF1 + i], ds.Gfx_Palette[0xF9 + i], 3);
 }
 
 // 32b4:083a

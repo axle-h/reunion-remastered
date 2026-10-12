@@ -152,8 +152,8 @@ int main(int argc, char *argv[])
     CHECK(palette_lit());
 
     // The same with the GUS music (modules): the start-up memory check asks
-    // for 28,000 bytes more, which in DOS needed EMS; the port always passes
-    // the check (System_MemAvail).
+    // for 28,000 bytes more, which in DOS needed EMS; the port has no such
+    // check.
     config.music = CONFIG_MUSIC_GUS;
     CHECK(run("40:click:160,60;120:click:80,100;1000:quit") == -1);
     config_reset();

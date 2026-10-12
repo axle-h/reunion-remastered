@@ -22,13 +22,6 @@ static inline uint8_t *buffer_base(void)
     return ds.VecLoad_Buffer;
 }
 
-// Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
-static void track_min_mem(void)
-{
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = System_MemAvail();
-}
-
 // Angle i (1/3 degrees) div 3, unsigned like the original.
 static inline int16_t deg(int i)
 {
@@ -407,7 +400,6 @@ void VecLoad_LoadVec(int16_t n)
         ds.VecLoad_Angles[2] = 32;
     }
     ds.VecLoad_Scale = 200;
-    track_min_mem();
 }
 
 // 3d38:0b2e
@@ -431,7 +423,6 @@ void VecLoad_LoadWireVec(int16_t n)
     ds.VecLoad_Spin[1] = 0;
     ds.VecLoad_Spin[2] = 0;
     set_angles(0, 0, 300);
-    track_min_mem();
     Blit_FillRectAt(buffer_base() + 0x0010, 0x6C, 0x6A, 0x40);
 }
 

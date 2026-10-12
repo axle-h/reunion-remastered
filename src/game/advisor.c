@@ -1,5 +1,7 @@
 #include "game/advisor.h"
 
+#include <string.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
@@ -259,7 +261,7 @@ void Advisor_ShowAdvisorAnswer(void)
 // 1991:08de
 void Advisor_LoadAdvisorMenu(void)
 {
-    System_MoveFwd(&ds.Advisor_Menus[ds.Advisor_MenuNumber - 1], &ds.Advisor_CurMenu, 6);
+    memcpy(&ds.Advisor_CurMenu, &ds.Advisor_Menus[ds.Advisor_MenuNumber - 1], 6);
     uint16_t n = ds.Advisor_CurMenu.Count;
     for (uint16_t i = 1; i <= n && n != 0; i++)
         TextFile_ReadTextLine(LIT("rkerdes1.sp"), ds.Advisor_CurMenu.Items[i - 1], menu_line((int)i));

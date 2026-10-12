@@ -354,7 +354,7 @@ void Intel_DisbandGroup(int16_t list, int16_t group)
                     : list == 0               ? ds.Game_GroupCount
                                               : ds.Game_PlanetForceCount;
     for (int16_t i = group; i <= count - 1; i++)
-        System_MoveFwd(Groups_At(list, i + 1), Groups_At(list, i), sizeof(TGroup));
+        memcpy(Groups_At(list, i), Groups_At(list, i + 1), sizeof(TGroup));
     if (list == 0)
         ds.Game_GroupCount--;
     else

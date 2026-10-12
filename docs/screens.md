@@ -26,8 +26,8 @@ screen table at `DS:5114` (`Ui::Screens`, 38 records of 25 bytes, index
    `SoundDrv::GusReady` -> `405f:1999` prints "Not enough memory! Please run
    REUNION with more conventional memory or EMS (max 256k) !" and Halts. (EMS
    keeps `Groups`/`Buildings`/`Charset` in a mapped page: `4719:02d6` re-maps
-   them at the top of every loop pass. The port has no EMS and its
-   `System_MemAvail` always reports enough, so the check passes.)
+   them at the top of every loop pass. The port has neither EMS nor the
+   check.)
 5. `Title::SetMainMenuPalette`, `Groups::InitPlanetForce`,
    `Music::ApplyMusicTrack`, `Command::LoadCommandGfx`, `3a1b:0019` (build menu
    bar), menu bar flags `7C62=7C63=1`, `7C64=1`, `3a1b:0704`, palette fade-in

@@ -17,7 +17,6 @@
 
 // Not ported yet: see stubs.c.
 void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal);  // 4049:0160
-void Sound_SbBreakLoop(void);                                           // 431a:017f
 void GfxPath_FreeToolbarBuffer(void);                                   // 3a1b:09a3
 void Ems_EmsReleaseGameData(void);                                      // 4719:0317
 
@@ -469,13 +468,6 @@ void Gfx_OpenDataFile(const uint8_t *name)
     }
 }
 
-// Game_MinMemAvail := min(Game_MinMemAvail, MemAvail).
-static void track_min_mem(void)
-{
-    if (System_MemAvail() < ds.Game_MinMemAvail)
-        ds.Game_MinMemAvail = System_MemAvail();
-}
-
 // 405f:0af8
 void Gfx_ReadChunk(uint8_t **buf, uint16_t *size)
 {
@@ -488,18 +480,11 @@ void Gfx_ReadChunk(uint8_t **buf, uint16_t *size)
     }
     check_io();
     *size = (uint16_t)((word[0] | word[1] << 8) + 13);
-    if (System_MaxAvail() < (int32_t)*size) {
-        // Skips the chunk. BUG? It seeks length + 13 bytes, 13 more than the
-        // chunk (consistent with the read below, which also takes 13 extra).
-        data_file.pos += *size;
-        *size = 0;
-        *buf = 0;
-    } else {
-        *buf = System_GetMem(*size);
-        file_block_read(&data_file, *buf, *size);
-        check_io();
-    }
-    track_min_mem();
+    // The original skips the chunk when MaxAvail is smaller (the port's heap
+    // never is).
+    *buf = System_GetMem(*size);
+    file_block_read(&data_file, *buf, *size);
+    check_io();
 }
 
 // 405f:0bd6
@@ -600,7 +585,6 @@ void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t r
                 *at(pal, (uint16_t)((i + colourOffset) * 3 + c)) = *at(buf, (uint16_t)(raw + i * 3 + c)) >> 2;
         }
     }
-    track_min_mem();
     System_FreeMem(buf, size);
     Sound_FreeSampleIfIdle();
 }
@@ -1028,14 +1012,6 @@ void Gfx_FatalExit(void)
     System_Halt(0);
 }
 
-// 405f:1999
-void Gfx_OutOfMemoryExit(void)
-{
-    Gfx_SetTextMode();
-    out_write_c("Not enough memory !  Please run with more main memory or EMS (max 256k)\n");
-    System_Halt(0);
-}
-
 // call far [p] for the procedure variables the exit handler calls. nil
 // (unit not initialised): the original would crash; nothing to do.
 static void call_proc(TProc p)
@@ -1048,8 +1024,8 @@ static void call_proc(TProc p)
 void Gfx_ExitHandler(void)
 {
     ds.System_ExitProc = ds.Gfx_SavedExitProc;
-    if (ds.Sound_Enabled && ds.Sound_DeviceType != 1)
-        Sound_SbBreakLoop();
+    // The original ends a looping SB voice here (Sound::SbBreakLoop,
+    // 431a:017f); the port's audio stops with the program.
     Music_StopMusic();
     call_proc(ds.Game_GfxPathProc);
     call_proc(ds.Ems_RestoreProc);
@@ -1112,7 +1088,6 @@ void Gfx_PaletteFlashTick(void)
 void Gfx_Init(void)
 {
     scanlines_pending = 0;  // port: every boot starts the same (tests replay boots)
-    ds.Game_MinMemAvail = 0x009BF9B0;
     ds.Gfx_SavedExitProc = ds.System_ExitProc;
     ds.System_ExitProc = Gfx_ExitHandler;
 }

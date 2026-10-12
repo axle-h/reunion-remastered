@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     dseg_init();
     system_init();
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
+    SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
 
     // Addressing: list 1 starts 32 groups after list 0, groups are 1-based.
     CHECK((uint8_t *)Groups_At(1, 1) - (uint8_t *)Groups_At(0, 1) == 32 * 161);

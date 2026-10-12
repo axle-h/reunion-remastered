@@ -120,7 +120,6 @@ void Title_InitTitleAndMainMenu(void)
     for (uint16_t i = 1; i <= ds.Gfx_HeroCharset.len; i++)
         ds.Gfx_Charset[i - 1] = (uint8_t)ds.Gfx_HeroCharset.s[i - 1];
 
-    Ems_EmsMapAll(Ems_ToolbarBlock());
     uint8_t *icons = Ems_ToolbarBlock()->Data + cells;
     ds.GfxPath_CellBackgrounds = icons;
     Gfx_LoadPic(LIT("icon\\iconmain"), icons, 1, 0x20, 0, 0, 0xF0, false, tpal, 0, 0x21,
@@ -138,7 +137,6 @@ void Title_InitTitleAndMainMenu(void)
         }
     }
 
-    Ems_EmsMapGameData();
     ds.Game_Hero = (int16_t)(System_Random(2) + 1);
     ds.Game_HeroSpriteX = ds.Game_Hero == 1 ? 0x45 : 1;
     Title_StartMenu();
@@ -162,7 +160,7 @@ void Title_InitTitleAndMainMenu(void)
                 0x40, 0, 0xBE);
     ds.Command_BackdropShown = 1;
     Gfx_BlankPalette(Gfx_PalettePtr(), 0, 0xFF);
-    System_MoveFwd(tpal, ds.Gfx_Palette, 0x300);
+    memcpy(ds.Gfx_Palette, tpal, 0x300);
     Blit_CopyBytes(text, gfx_screen() + 0x2800, 0x1540);
     Blit_CopyBytes(main, gfx_screen() + 0x3D40, 0xBCC0);
     System_FreeMem(main, 0xBCC0);
@@ -184,5 +182,5 @@ void Title_SetMainMenuPalette(void)
         ds.Gfx_Palette[fixed[i].index][2] = fixed[i].b;
     }
     for (int i = 0; i < 6; i++)
-        System_MoveFwd(ds.Gfx_Palette[0xF9 + i], ds.Gfx_Palette[0xF1 + i], 3);
+        memcpy(ds.Gfx_Palette[0xF1 + i], ds.Gfx_Palette[0xF9 + i], 3);
 }

@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     dseg_init();
     system_init();
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
+    SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     ds.Game_GroupCount = 3;
     ds.Game_CurrentScreen = 8;
 

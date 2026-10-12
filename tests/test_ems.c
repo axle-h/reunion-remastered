@@ -32,15 +32,12 @@ int main(int argc, char *argv[])
     CHECK(ds.Ems_RestoreProc == Ems_EmsReleaseGameData);
     CHECK(system_heap_used() == used + 0x8770);
 
-    // Another block keeps its own copy; mapping changes nothing.
+    // Another block keeps its own copy.
     TEmsBlock *tb = Ems_ToolbarBlock();
     uint8_t *src = System_GetMem(0xC000);
     Ems_EmsMoveToEms(tb, 0xC000, src);
     CHECK(tb->State == 1 && tb->Data == src && tb->Size == 0xC000);
-    TGroup (*groups)[32] = ds.Game_Groups;
-    Ems_EmsMapAll(tb);
-    Ems_EmsMapGameData();
-    CHECK(ds.Game_Groups == groups && blk->State == 1);
+    CHECK((uint8_t *)ds.Game_Groups == ds.Ems_Buffer && blk->State == 1);
     Ems_EmsRelease(tb);
     CHECK(tb->State == 0 && tb->Size == 0 && system_heap_used() == used + 0x8770);
 

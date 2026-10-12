@@ -54,9 +54,9 @@ static void reset(void)
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = no_wait;
     ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
-    System_FillChar(ds.Game_Groups, 2 * 32 * sizeof(TGroup), 0);
+    SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     ds.Game_Buildings = System_GetMem(1000 * sizeof(TBuilding));
-    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
+    SDL_memset(ds.Game_Buildings, 0, 1000 * sizeof(TBuilding));
 }
 
 static void test_bodies(void)
@@ -230,7 +230,7 @@ static void test_list(void)
 // Places n buildings of the given kinds on 1:5:0 and balances their power.
 static void place(const uint8_t *kinds, const uint8_t *outputs, int n)
 {
-    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
+    SDL_memset(ds.Game_Buildings, 0, 1000 * sizeof(TBuilding));
     for (int i = 0; i < n; i++) {
         TBuilding *b = ds.Game_Buildings + i;
         b->Kind = kinds[i];
@@ -330,7 +330,7 @@ static void test_power(void)
     const TMoonList *ml = ds.Galaxy_MoonLists[7] + 2;
     TBody *moon = body(8, ml->Moons[0]);
     moon->Population = 1000;
-    System_FillChar(ds.Game_Buildings, 1000 * sizeof(TBuilding), 0);
+    SDL_memset(ds.Game_Buildings, 0, 1000 * sizeof(TBuilding));
     TBuilding *mb = bld(1);
     mb->Kind = 11;  // storage bay: 114 workers, 450 energy
     mb->System = 8;
@@ -488,7 +488,7 @@ static void test_system_view(void)
         ds.Vec3D_CosTable[i] = v;
     }
     ds.Galaxy_SystemStatus[7] = 1;
-    System_FillChar(vid_screen, 320 * 200, 0);
+    SDL_memset(vid_screen, 0, 320 * 200);
     PlanetInfo_InitSystemView();
     // One orbit record per planet, from the name table.
     const TBodyName *nm = ds.Galaxy_Names[7];
@@ -613,7 +613,7 @@ static void test_screens(void)
     ds.Game_CurMoon[0] = 0;
     ds.Game_CurrentScreen = 8;
     PlanetInfo_SelectCurBody();
-    System_FillChar(vid_screen, 320 * 200, 0);
+    SDL_memset(vid_screen, 0, 320 * 200);
     ds.PlanetInfo_AlienMode = 0;
     PlanetInfo_DrawPlanetInfoScreen();
     CHECK(screen_pixels() > 20000);
@@ -630,11 +630,11 @@ static void test_screens(void)
     RawText_LoadSzFaj();
     used0 = system_heap_used();  // the race texts stay loaded
     ds.PlanetInfo_AlienMode = 1;
-    System_FillChar(vid_screen, 320 * 200, 0);
+    SDL_memset(vid_screen, 0, 320 * 200);
     PlanetInfo_DrawAlienInfoScreen();
     CHECK(screen_pixels() > 5000);
     ds.PlanetInfo_AlienMode = 0;
-    System_FillChar(vid_screen, 320 * 200, 0);
+    SDL_memset(vid_screen, 0, 320 * 200);
     PlanetInfo_DrawPlanetInfoScreen();
     CHECK(screen_pixels() > 20000);
     PlanetInfo_DrawPlanetSurfaceBackdrop();
@@ -645,7 +645,7 @@ static void test_screens(void)
     PlanetInfo_SelectCurBody();
     ds.Game_CurBody->SurfaceType = 1;
     ds.Surface_TileSet = 1;
-    System_FillChar(vid_screen, 320 * 200, 0);
+    SDL_memset(vid_screen, 0, 320 * 200);
     Colonize_DrawColonizeScreen();
     CHECK(screen_pixels() > 20000);
     System_FreeMem(ds.Surface_BufC, 0xF000);

@@ -1,5 +1,7 @@
 #include "game/pub.h"
 
+#include <string.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
@@ -191,7 +193,7 @@ void Pub_BuildQuestionMenu(void)
 {
     int16_t lines = 0;
     ds.Pub_LineCount = 0;
-    System_MoveFwd(ds.Pub_MenuLists[ds.Pub_Person - 1] + ds.Pub_MenuIdx, &ds.Pub_CurMenu, 6);
+    memcpy(&ds.Pub_CurMenu, ds.Pub_MenuLists[ds.Pub_Person - 1] + ds.Pub_MenuIdx, 6);
     TMenu *m = &ds.Pub_CurMenu;
     // The trader's (2) and the informant's menus list only what is available.
     if (ds.Pub_Person == 2 && ds.Pub_MenuIdx == 6) {

@@ -50,15 +50,8 @@ void System_StrStore(const PString *src, PString *dst, uint16_t maxLen);
 void System_Copy(PString *result, const PString *s, int16_t index, int16_t count);
 // 48c7:0cfb: tmp := tmp + src, truncated to 255 characters.
 void System_StrConcat(PString *tmp, const PString *src);
-// 48c7:0d27: position (1-based) of sub in s, 0 if absent or sub is empty.
-int16_t System_Pos(const PString *sub, const PString *s);
-// 48c7:0d6d: compares a and b like Pascal's <, =, > on strings (bytes
-// unsigned, then length): <0, 0 or >0.
-int System_StrCompare(const PString *a, const PString *b);
 // 48c7:0d98: result := c (a one-character string).
 void System_CharToStr(PString *result, char c);
-// 48c7:0dc5: Insert(src, s, index) for s: string[maxLen].
-void System_Insert(const PString *src, PString *s, uint16_t maxLen, int16_t index);
 // 48c7:0e24: Delete(s, index, count).
 void System_Delete(PString *s, int16_t index, int16_t count);
 // 48c7:1a38: Str(value:width, s) for s: string[maxLen].
@@ -66,22 +59,6 @@ void System_StrLong(int32_t value, int16_t width, PString *s, uint16_t maxLen);
 // 48c7:1a83: Val(s, result, code) for a longint result. code is 0 on
 // success, else the position of the offending character (result 0).
 int32_t System_ValLong(const PString *s, int16_t *code);
-// 48c7:1b78
-char System_UpCase(char c);
-
-// ---------------------------------------------------------------------------
-// Memory. The original takes far pointers; these take host pointers.
-// ---------------------------------------------------------------------------
-
-// 48c7:0b4f: forward byte copy (the compiler's record/array assignment), so
-// an overlapping copy to a higher address repeats the source like the
-// original's rep movsb.
-void System_MoveFwd(const void *src, void *dst, uint16_t count);
-// 48c7:1b40: Move. The original picks the copy direction by comparing the
-// offsets only; for the same segment that is memmove.
-void System_Move(const void *src, void *dst, uint16_t count);
-// 48c7:1b64
-void System_FillChar(void *dst, uint16_t count, uint8_t value);
 
 // ---------------------------------------------------------------------------
 // Heap. Blocks come from the C allocator, zeroed (the original's held
@@ -92,11 +69,6 @@ void System_FillChar(void *dst, uint16_t count, uint8_t value);
 void *System_GetMem(uint16_t size);
 // 48c7:029f: FreeMem. Run-time error 204 for nil (size 0 is ignored).
 void System_FreeMem(void *p, uint16_t size);
-// 48c7:02e7 / 0303: total free bytes and the largest free block, as the
-// game sees them: always SYSTEM_MEM_PLENTY, so its memory checks pass.
-enum : int32_t { SYSTEM_MEM_PLENTY = 0xA0000 };
-int32_t System_MemAvail(void);
-int32_t System_MaxAvail(void);
 // Port addition: a buffer the original addressed through its 64 KB segment
 // (drawing routines' 16-bit offsets, indices that wrap below the block): a
 // whole zeroed segment, so the wrapped offsets stay inside it. The block
