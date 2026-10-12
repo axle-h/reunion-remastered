@@ -14,6 +14,7 @@ static constexpr Fixes ALL = {
     .disband_list_count = true,
     .annihilate_leaves_screen = true,
     .autoplace_when_full = true,
+    .away_staff_hidden = true,
 };
 
 Fixes fixes = ALL;
@@ -41,6 +42,9 @@ const FixInfo Fixes_List[] = {
     {"autoplace_when_full", "New colony buildings",
      "A new colony's buildings are kept when its surface is shown and full.",
      &fixes.autoplace_when_full},
+    {"away_staff_hidden", "Staff at university",
+     "A staff member at the university stays out of the command centre.",
+     &fixes.away_staff_hidden},
 };
 
 const int Fixes_Count = (int)SDL_arraysize(Fixes_List);

@@ -38,6 +38,10 @@ typedef struct Fixes {
     // starter buildings) is dropped if the player is watching that colony's
     // surface and no spot is free. The fix adds it unplaced, as elsewhere.
     bool autoplace_when_full;
+    // The command centre's door and window animations redraw the builder
+    // and the kind-3 staff member even while they are at the university.
+    // The fix leaves them off, as the rest of the room does.
+    bool away_staff_hidden;
 } Fixes;
 
 extern Fixes fixes;

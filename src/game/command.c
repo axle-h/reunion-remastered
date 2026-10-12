@@ -3,6 +3,7 @@
 #include "game/anim.h"
 #include "game/blit.h"
 #include "game/crt.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
 #include "game/sound.h"
@@ -375,8 +376,11 @@ void Command_TickRoomAnim(void)
     bool ok;
     Anim_DrawAnimFrame((uint16_t)ds.Command_AnimFrame, buf, &ok);
     uint16_t fighter = ds.Game_StaffHired[2];
+    // The original draws them even at the university. Port fix
+    // (game/fixes.h): not then.
+    bool away = fixes.away_staff_hidden && ds.Advisor_TrainingKind == 3;
     Mouse_HideCursor();
-    if ((int16_t)fighter > 0 && ds.Command_AnimId < 7) {
+    if ((int16_t)fighter > 0 && !away && ds.Command_AnimId < 7) {
         Blit_BlitTransparentStrided(
             ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[2][fighter - 1] * 0x140
                                              + ds.Command_StaffSrcX[2][fighter - 1] + 0x147),
@@ -560,7 +564,10 @@ void Command_TickPanelDoorAnim(void)
         Blit_CopyRectStrided(ds.Command_MainA4 + (uint16_t)(strip * 0x10), screen_at(0x584D),
                              0x10, 0x5B, 0x100, 0x140);
         uint16_t hired = ds.Game_StaffHired[1];
-        if ((int16_t)hired > 0) {
+        // The original draws them even at the university. Port fix
+        // (game/fixes.h): not then.
+        bool away = fixes.away_staff_hidden && ds.Advisor_TrainingKind == 2;
+        if ((int16_t)hired > 0 && !away) {
             Blit_BlitTransparent(
                 ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[1][hired - 1] * 0x140
                                                  + ds.Command_StaffSrcX[1][hired - 1] + 0x141),

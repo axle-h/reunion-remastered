@@ -6,6 +6,7 @@
 
 #include "game/command.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
 #include "game/system.h"
@@ -136,6 +137,43 @@ static void enter_command_centre(void)
     ds.Game_ScreenSwitch = false;
 }
 
+// The command centre after the door and window animations have run a while,
+// with staff kind `kind` hired and possibly at the university.
+static void run_room(uint8_t *out, int16_t kind, bool hired, bool away)
+{
+    reset();
+    ds.Game_Hero = 1;
+    ds.Game_HeroSpriteX = 0x45;
+    ds.Game_StaffHired[kind - 1] = hired ? 1 : 0;
+    ds.Advisor_TrainingKind = away ? kind : 0;
+    ds.Advisor_TrainingTimer = away ? 50 : 0;
+    ds.Command_DoorTimer = 1; // as the game starts (main_program.c)
+    ds.Command_DoorCountdown = 1;
+    ds.Game_ScreenEntered = true;
+    Command_HandleCommandCentre();
+    for (int i = 0; i < 2000; i++)
+        Command_TickPanelDoorAnim();
+    SDL_memcpy(out, scr, 64000);
+}
+
+// The builders' door redraws the builder (kind 2) and the window animation
+// the kind-3 staff member; at the university they stay away.
+static void away_staff(void)
+{
+    static uint8_t gone[64000], away[64000];
+    for (int16_t kind = 2; kind <= 3; kind++) {
+        fixes.away_staff_hidden = true;
+        run_room(gone, kind, false, false);
+        run_room(away, kind, true, true);
+        CHECK(SDL_memcmp(gone, away, sizeof gone) == 0);
+        // The original draws them back.
+        fixes.away_staff_hidden = false;
+        run_room(away, kind, true, true);
+        CHECK(SDL_memcmp(gone, away, sizeof gone) != 0);
+    }
+    fixes.away_staff_hidden = true;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -144,5 +182,6 @@ int main(int argc, char *argv[])
     }
     menu_palette();
     enter_command_centre();
+    away_staff();
     return ok ? 0 : 1;
 }
