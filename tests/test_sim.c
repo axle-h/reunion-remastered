@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
+#include "game/cargo.h"
 #include "game/dseg.h"
 #include "game/main_program.h"
 #include "game/fixes.h"
@@ -173,6 +174,30 @@ static void test_production(void)
     CHECK(p->Stock == stock + 2 && p->_1D == 0 && p->_21 == 0);
     Sim_ProgressProduction();  // empty queue: untouched
     CHECK(p->Stock == stock + 2 && p->_1D == 0 && p->_21 == 0);
+}
+
+// An hour that strikes between a ship's Transfer click and the cargo
+// screen's set-up (game/sim.c) draws nothing: Cargo::Stores is not set yet.
+// Once the screen is set up, the hour draws its amounts.
+static void test_cargo_switch_pending(void)
+{
+    reset();
+    ds.Game_CurBody = &ds.Galaxy_Bodies[0][4];  // New Earth
+    ds.Game_GroupList = 0;
+    ds.Game_SelGroup = 1;
+    TGroup *g = Groups_Selected();
+    *g = (TGroup){.Kind = 2, .System = 1, .Planet = 5, .Status = 1, .Units = {{{.ShipType = 1}}}};
+    ds.Game_CurrentScreen = 0xD;
+    ds.Game_ScreenSwitch = 1;
+    CHECK(ds.Cargo_Stores == nullptr);
+    static uint8_t before[VID_HEIGHT][VID_WIDTH];
+    SDL_memcpy(before, vid_screen, sizeof before);
+    Sim_ProgressProduction();
+    CHECK(SDL_memcmp(before, vid_screen, sizeof before) == 0);
+    ds.Game_ScreenSwitch = 0;
+    Cargo_InitCargoScreen();
+    Sim_ProgressProduction();
+    CHECK(SDL_memcmp(before, vid_screen, sizeof before) != 0);
 }
 
 // FNV-1a over the DS fields from offset `from` up to `to`.
@@ -466,6 +491,7 @@ int main(int argc, char *argv[])
     test_date();
     test_research();
     test_production();
+    test_cargo_switch_pending();
     test_jade_found();
     test_mine_all_systems();
     test_derricks_on_moons();

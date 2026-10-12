@@ -53,7 +53,7 @@ The port is complete and the game can be won in it.
 - **Playable start to finish:** the playthrough fixture wins a new game
   with seed 12345 using only clicks, keys and what is on screen (Halt(10),
   2930-02-29). Its recording replays to the same end in the plain binary.
-  Seeds 1-6 win too (docs/playthrough.md).
+  Seeds 1-28 win too (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
   music, display, skip intro, colony stats, fix switches, import, restart,
   quit), `reunion.ini`, screenshots, headless autopilot, `--replay` and soak
@@ -86,10 +86,11 @@ In rough priority order.
 
 ### 1. Playthrough robustness
 
-Seeds 1-6 win. Seed 3 used to lose at M16 because New Earth stopped at 5
-Derricks (E21) and the Detoxin for the Space station never gathered; since
-`fixes.station_storage` it builds 18 and wins. Why it stalled was never
-found, so another seed may hit it again (docs/playthrough.md,
+Seeds 1-28 win (2026-10-12). Seed 3 used to lose at M16 because New Earth
+stopped at 5 Derricks (E21) and the Detoxin for the Space station never
+gathered; since `fixes.station_storage` it builds 18 and wins. Why it
+stalled was never found. E21 now finishes in all 28 seeds, by 2928-07-10
+at the latest, but another seed may hit it again (docs/playthrough.md,
 "Robustness").
 
 ### 2. Bugs of the original still open
@@ -119,6 +120,9 @@ the OPL, slide up without carry. This is how the original's music sounds.
 - `advisor.c`: an uninitialised first pass (the port zeroes it).
 - `surface.c` `RegisterBuildingAnims`: marking at uninitialised
   coordinates (the port skips it).
+- `sim.c` `Sim_ProgressProduction`: an hour that strikes between a ship's
+  Transfer click and the cargo screen's set-up draws the cargo amounts
+  through `Cargo::Stores` before it is set (the port skips it).
 - The unreachable money cheat (`26eb`; the port has its own), the GUS and
   AdLib detection and timer bugs (the port replaces the drivers) and
   the copy protection (removed, `src/game/protect.h`).

@@ -72,20 +72,23 @@ a debug one, so ctest runs it only in non-Debug builds
 The same policy, unchanged per seed, from "new game" with `PLAY_SEED`
 (release build, one recording each):
 
-| Seed | Result |
-|---|---|
-| 1 | won 2930-02-21 |
-| 2 | won 2930-03-07 |
-| 3 | won 2930-02-29 |
-| 4 | won 2930-02-23 |
-| 5 | won 2930-03-03 |
-| 6 | won 2930-02-02 |
+| Seed | Won | Seed | Won | Seed | Won | Seed | Won |
+|---|---|---|---|---|---|---|---|
+| 1 | 2930-02-21 | 8 | 2930-02-29 | 15 | 2930-03-02 | 22 | 2930-02-25 |
+| 2 | 2930-03-07 | 9 | 2930-02-22 | 16 | 2930-02-30 | 23 | 2930-02-14 |
+| 3 | 2930-02-29 | 10 | 2930-02-20 | 17 | 2930-02-27 | 24 | 2930-02-16 |
+| 4 | 2930-02-23 | 11 | 2930-02-27 | 18 | 2930-03-05 | 25 | 2930-02-21 |
+| 5 | 2930-03-03 | 12 | 2930-02-14 | 19 | 2930-02-24 | 26 | 2930-03-01 |
+| 6 | 2930-02-02 | 13 | 2930-02-24 | 20 | 2930-03-05 | 27 | 2930-02-13 |
+| 7 | 2930-03-09 | 14 | 2930-02-23 | 21 | 2930-02-29 | 28 | 2930-03-11 |
 
-All six were run on 2026-10-12, with every fix on and the M5 shuttle as
-described above. Seed 3 lost at M16 in earlier runs: New Earth stopped at 5
+All 28 were run on 2026-10-12, with every fix on and the M5 shuttle as
+described above; each recording replays to the same end. The latest win
+is 2930-03-11. Seed 3 lost at M16 in earlier runs: New Earth stopped at 5
 Derricks (E21) and the Detoxin for the Space station never gathered. Since
 the station storage fix (`fixes.station_storage`) it builds 18 and wins.
-Why it stalled is not known (PLAN.md).
+Why it stalled is not known (PLAN.md); E21 now finishes in every seed
+above, between 2928-05-23 and 2928-07-10.
 
 ## The fixture
 
