@@ -1,10 +1,10 @@
 #include "game/gfxpath.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
 #include "game/dseg.h"
-#include "game/ems.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
 #include "game/sound.h"
@@ -28,19 +28,27 @@ static inline TMenuButton *menu_slot(int n)
     return ds.GfxPath_MenuBar + (n - 1);
 }
 
-static inline int16_t *slot_id(int n)
+static inline int16_t slot_id(int n)
 {
-    return &menu_slot(n)->Command;
+    return menu_slot(n)->Command;
 }
 
-static inline PString *slot_label(int n)
+static inline void set_slot_id(int n, int16_t id)
 {
-    return (PString *)&menu_slot(n)->Caption;
+    menu_slot(n)->Command = id;
+}
+
+// Slot n's caption := button label `id` (DS strings both; the caption is a
+// string[18]).
+static void set_slot_label(int n, int16_t id)
+{
+    char label[256];
+    pstr_set(&menu_slot(n)->Caption, 18, pstr_get(label, sizeof label, &ds.Ui_ButtonLabels[id]));
 }
 
 static uint8_t *block_base(void)
 {
-    return Ems_ToolbarBlock()->Data;
+    return ds.GfxPath_ToolbarBlock.Data;
 }
 
 // block base + IconAllSize + extra (the original adds in 16 bits; the
@@ -78,11 +86,11 @@ static void draw_slot(uint16_t k, bool check_icon)
     int slot = k + 1;
     uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
-    int16_t id = *slot_id(slot);
+    int16_t id = slot_id(slot);
     int8_t icon = ds.GfxPath_CommandIcon[id];
     if (!check_icon || icon != 0)
         GfxPath_DrawIcon(icon, cell);
-    System_StrStore((const PString *)&ds.Ui_ButtonLabels[id], slot_label(slot), 18);
+    set_slot_label(slot, id);
 }
 
 // 3a1b:0000
@@ -110,9 +118,9 @@ void GfxPath_SetToolbar(int16_t screen)
     const int8_t *rec = (const int8_t *)&ds.Ui_Screens[screen - 1];
     int16_t count = rec[0x0C];
     for (int16_t i = 1; i <= count; i++)
-        *slot_id(i) = rec[0x0C + i];
+        set_slot_id(i, rec[0x0C + i]);
     for (int16_t i = (int16_t)(count + 1); i <= 12; i++)
-        *slot_id(i) = 0;
+        set_slot_id(i, 0);
     GfxPath_RedrawToolbar();
     ds.Game_HotspotHit = 0;
 }
@@ -121,8 +129,8 @@ void GfxPath_SetToolbar(int16_t screen)
 void GfxPath_RedrawToolbar(void)
 {
     ds.GfxPath_CellBackgrounds = bar(BG_OFS);
-    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
-    ds.GfxPath_PageFlagA = *slot_id(7) != 0;
+    ds.GfxPath_IconScratch = game_alloc(0x3C0);
+    ds.GfxPath_PageFlagA = slot_id(7) != 0;
     for (uint16_t k = 0; k <= 5; k++)
         draw_slot(k, true);
     if (ds.GfxPath_PageFlagA == 0) {
@@ -133,39 +141,39 @@ void GfxPath_RedrawToolbar(void)
         draw_arrow(0x30, ARROW_NEXT);
         draw_arrow(0x50, ARROW_PREV);
     }
-    System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
+    game_free(ds.GfxPath_IconScratch);
 }
 
 // 3a1b:0366: puts id in the first free slot.
 void GfxPath_AddToolbarIcon(int16_t id)
 {
     ds.GfxPath_CellBackgrounds = bar(BG_OFS);
-    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
+    ds.GfxPath_IconScratch = game_alloc(0x3C0);
     uint16_t slot = 1;
-    while (*slot_id(slot) != 0)
+    while (slot_id(slot) != 0)
         slot++;
     if (slot < 13) {
         // BUG? clears slot[slot] 13 - slot times instead of the slots after it.
         for (uint16_t j = slot; j <= 12; j++)
-            *slot_id(slot) = 0;
+            set_slot_id(slot, 0);
     }
-    *slot_id(slot) = id;
+    set_slot_id(slot, id);
     ds.GfxPath_PageFlagA = (ds.GfxPath_PageFlagA == 0 && slot != 7) ? 0 : 1;
 
     uint16_t k = (uint16_t)(slot - 1);
     uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
     GfxPath_DrawIcon(ds.GfxPath_CommandIcon[id], cell);
-    System_StrStore((const PString *)&ds.Ui_ButtonLabels[id], slot_label(slot), 18);
+    set_slot_label(slot, id);
     if (slot == 7) {
         draw_arrow(0x30, ARROW_NEXT);
         draw_arrow(0x50, ARROW_PREV);
         for (uint16_t s = 8; s <= 12; s++) {
             clear_cell(bar(cell_ofs((uint16_t)(s - 1))));
-            slot_label(s)->len = 0;
+            pstr_set(&menu_slot(s)->Caption, 18, "");
         }
     }
-    System_FreeMem(ds.GfxPath_IconScratch, 0x3C0);
+    game_free(ds.GfxPath_IconScratch);
 }
 
 static void scroll_tick(void)
@@ -239,8 +247,8 @@ bool GfxPath_ToolbarHasIcon(int16_t id)
 {
     bool found = false;
     int16_t i = 1;
-    while (*slot_id(i) != 0) {
-        found = found || *slot_id(i) == id;
+    while (slot_id(i) != 0) {
+        found = found || slot_id(i) == id;
         i++;
     }
     return found;
@@ -253,7 +261,7 @@ void GfxPath_IconAllIndex(void)
     uint16_t len;
     for (uint16_t i = 0; i <= 0x43; i++) {
         ds.GfxPath_IconIndex[i] = ds.Gfx_ReadPos;
-        Gfx_IconAllReadChunk(&ds.GfxPath_ToolbarBlock.Data, &len);
+        Gfx_IconAllReadChunk(ds.GfxPath_ToolbarBlock.Data, &len);
     }
     Gfx_IconAllClose();
 }
@@ -283,20 +291,22 @@ void GfxPath_DrawIcon(int16_t icon, uint8_t *dest)
 // 3a1b:0932
 void GfxPath_ShowScreenBackdrop(void)
 {
-    uint8_t *buf = System_GetMem(0xBCC0);
-    uint8_t path[256] = {8, 'g', 'r', 'a', 'f', 'i', 'k', 'a', '\\'};
-    const uint8_t *name = (const uint8_t *)&ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name;
-    for (uint8_t i = 1; i <= name[0] && path[0] < 255; i++)
-        path[++path[0]] = name[i];
+    uint8_t *buf = game_alloc(0xBCC0);
+    char name[256], path[256];
+    pstr_get(name, sizeof name, &ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name);
+    SDL_snprintf(path, sizeof path, "grafika\\%s", name);
     Gfx_LoadPicScreen(path, buf, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
-// 3a1b:09a3
+// 3a1b:09a3: 4719:0253 EmsRelease on the toolbar block.
 void GfxPath_FreeToolbarBuffer(void)
 {
-    Ems_EmsRelease(Ems_ToolbarBlock());
+    if (ds.GfxPath_ToolbarBlock.State == 1)
+        game_free(ds.GfxPath_ToolbarBlock.Data);
+    ds.GfxPath_ToolbarBlock.State = 0;
+    ds.GfxPath_ToolbarBlock.Size = 0;
 }
 
 // 3a1b:09b2
@@ -304,8 +314,13 @@ void GfxPath_Init(void)
 {
     Gfx_IconAllOpenSize(&ds.GfxPath_IconAllSize);
     uint16_t size = (uint16_t)(ds.GfxPath_IconAllSize + 0x5500 + ds.GfxPath_CellsSize);
-    ds.GfxPath_InitBlock = System_GetMem(size);
+    ds.GfxPath_InitBlock = game_alloc(size);
     memset(ds.GfxPath_InitBlock, 2, size);
-    Ems_EmsMoveToEms(Ems_ToolbarBlock(), size, ds.GfxPath_InitBlock);
+    // 4719:0188 EmsMoveToEms. The original moved the block into EMS when an
+    // EMM was installed (state 2, mapped before every use); the port keeps
+    // the heap copy (state 1), as on a DOS machine without an EMM.
+    ds.GfxPath_ToolbarBlock.State = 1;
+    ds.GfxPath_ToolbarBlock.Size = size;
+    ds.GfxPath_ToolbarBlock.Data = ds.GfxPath_InitBlock;
     ds.Game_GfxPathProc = GfxPath_FreeToolbarBuffer;
 }

@@ -7,6 +7,7 @@
 #include "game/anim.h"
 #include "game/blit.h"
 #include "game/gfx.h"
+#include "game/le.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
 #include "game/mouse.h"
@@ -15,7 +16,6 @@
 #include "game/system.h"
 #include "platform/fs.h"
 
-#define NAME(lit) ((const uint8_t *)PSTR(lit))
 
 // Scratch palette for the picture loads (the original used 768 bytes of its
 // stack).
@@ -35,25 +35,23 @@ static inline int32_t lmul(int32_t a, int32_t b)
 void SpWar_EnterSpaceBattle(void)
 {
     Sound_AllocWarSndBuf();
-    uint8_t *buf = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(NAME("war\\spwar"), buf, 0x97, Gfx_PalettePtr());
+    uint8_t *buf = game_alloc(0xBCC0);
+    Gfx_LoadPicScreen("war\\spwar", buf, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(buf, 0xBCC0);
-    ds.SpWar_View = System_GetMem(0x5E60);
-    ds.SpWar_Background = System_GetMem(0x5E60);
-    ds.SpWar_Sprites = System_GetMem(0xF00);
-    ds.SpWar_Face = System_GetMem(0x1180);
-    Gfx_LoadPic(NAME("war\\sphatter"), ds.SpWar_Background, 1, 0x97, 0, 0, 0xA0, false,
+    game_free(buf);
+    ds.SpWar_View = game_alloc(0x5E60);
+    ds.SpWar_Background = game_alloc(0x5E60);
+    ds.SpWar_Sprites = game_alloc(0xF00);
+    ds.SpWar_Face = game_alloc(0x1180);
+    Gfx_LoadPic("war\\sphatter", ds.SpWar_Background, 1, 0x97, 0, 0, 0xA0, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Gfx_LoadPic(NAME("war\\spants"), ds.SpWar_Sprites, 1, 0x30, 0, 0, 0x50, false,
+    Gfx_LoadPic("war\\spants", ds.SpWar_Sprites, 1, 0x30, 0, 0, 0x50, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
     // The picture of the hired fighter (Game::StaffHired[2] in the decompile
     // is 0-based: the third of pilot, builder, fighter, developer).
-    PString num, name;
-    System_StrLong(ds.Game_StaffHired[2], 0, &num, 10);
-    System_StrLoad(&name, PSTR("war\\spface"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic((const uint8_t *)&name, ds.SpWar_Face, 1, 0x50, 0, 0, 0x38, false,
+    char name[32];
+    SDL_snprintf(name, sizeof name, "war\\spface%u", ds.Game_StaffHired[2]);
+    Gfx_LoadPic(name, ds.SpWar_Face, 1, 0x50, 0, 0, 0x38, false,
                 scratch_pal, 0, 0xB0, 0x40, 0, 0xBE);
     SpWar_StepSpaceBattle();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -155,10 +153,10 @@ void SpWar_InitSpaceFleets(void)
     ds.Game_BattleFlag = 0;
     ds.SpWar_BattleOver = 0;
     ds.SpWar_StepNo = 0;
-    ds.SpWar_AttackerList = System_GetMem(0x177C);
-    ds.SpWar_DefenderList = System_GetMem(0x177C);
-    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
-    ds.Anim_Script = System_GetMem(0x230);
+    ds.SpWar_AttackerList = game_alloc(0x177C);
+    ds.SpWar_DefenderList = game_alloc(0x177C);
+    ds.Anim_Record = game_alloc(sizeof(TAnimRecord));
+    ds.Anim_Script = game_alloc(0x230);
     ds.SpWar_Script = 0;
     ds.SpWar_ScriptStep = 0;
     ds.SpWar_RepeatsLeft = 0;
@@ -652,8 +650,8 @@ void SpWar_ApplySpaceLosses(void)
                     int32_t alive = count_alive(list, *count, r * 10 + k, j);
                     uint16_t orig = (uint16_t)f->Units[j - 1];
                     int32_t now = alive + ((int32_t)orig - alive) / 5;
-                    int32_t *loss = (int32_t *)ds.SpWar_LossPtr + (j - 1);
-                    *loss += (int32_t)orig - now;
+                    uint8_t *loss = ds.SpWar_LossPtr + (j - 1) * 4;
+                    wr32le(loss, rd32le(loss) + (int32_t)orig - now);
                     f->Units[j - 1] = (int16_t)now;
                 }
             }
@@ -680,8 +678,8 @@ void SpWar_ApplySpaceLosses(void)
             // (or at nothing), not at the side of this owner. Nil made the
             // original add to the interrupt table at 0000:0000; the port drops it.
             if (ds.SpWar_LossPtr != nullptr) {
-                int32_t *loss = (int32_t *)ds.SpWar_LossPtr + (j - 1);
-                *loss += orig - now;
+                uint8_t *loss = ds.SpWar_LossPtr + (j - 1) * 4;
+                wr32le(loss, rd32le(loss) + orig - now);
             }
             body->Stores[j - 1] = now;
         }
@@ -696,22 +694,19 @@ void SpWar_EndSpaceBattle(void)
     SpWar_ApplySpaceLosses();
     SpWar_FreeWarAnims();
     ds.SpWar_PlayerWon = !(ds.SpWar_AttackerShipCount == 0 || ds.SpWar_Retreated != 0);
-    uint8_t *buf = System_GetMem(0xBCC0);
-    PString name;
-    System_StrLoad(&name, PSTR("war\\"));
-    System_StrConcat(&name, ds.SpWar_PlayerWon ? PSTR("spvict") : PSTR("splost"));
-    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
-                0, 0xB0, 0x40, 0, 0xBE);
+    uint8_t *buf = game_alloc(0xBCC0);
+    Gfx_LoadPic(ds.SpWar_PlayerWon ? "war\\spvict" : "war\\splost", buf, 1, 0x97, 0, 0, 0x140, true,
+                Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(buf, 0xBCC0);
-    PString num;
+    game_free(buf);
+    char num[16];
     for (int c = 1; c <= 4; c++) {
-        System_StrLong(ds.SpWar_AttackerLosses[c - 1], 4, &num, 255);
-        Gfx_DrawTextF9((const uint8_t *)&num, 0x57, c * 9 + 0x4F, 4);
+        SDL_snprintf(num, sizeof num, "%4d", (int)ds.SpWar_AttackerLosses[c - 1]);
+        Gfx_DrawTextF9(num, 0x57, c * 9 + 0x4F, 4);
     }
     for (int c = 1; c <= 4; c++) {
-        System_StrLong(ds.SpWar_DefenderLosses[c - 1], 4, &num, 255);
-        Gfx_DrawTextF9((const uint8_t *)&num, 0x57, c * 9 + 0x86, 4);
+        SDL_snprintf(num, sizeof num, "%4d", (int)ds.SpWar_DefenderLosses[c - 1]);
+        Gfx_DrawTextF9(num, 0x57, c * 9 + 0x86, 4);
     }
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }

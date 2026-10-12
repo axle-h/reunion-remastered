@@ -5,7 +5,6 @@
 
 #include "assets/icons.h"
 #include "game/dseg.h"
-#include "game/ems.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/system.h"
@@ -26,17 +25,17 @@ int main(int argc, char *argv[])
     dseg_init();
     system_init();
     // The icon scratch buffer is allocated by the toolbar's set-up in Main.
-    ds.GfxPath_IconScratch = System_GetMem(0x3C0);
+    ds.GfxPath_IconScratch = game_alloc(0x3C0);
 
     GfxPath_Init();
-    TEmsBlock *blk = Ems_ToolbarBlock();
+    TEmsBlock *blk = &ds.GfxPath_ToolbarBlock;
     CHECK(blk->State == 1 && blk->Data != nullptr);  // a heap copy
     CHECK(ds.Game_GfxPathProc == GfxPath_FreeToolbarBuffer);
     GfxPath_IconAllIndex();
 
     Icons icons;
     CHECK(icons_load("icon\\icon.all", &icons));
-    uint8_t *img = System_GetMem(0x4000);
+    uint8_t *img = game_alloc(0x4000);
     const int picks[] = {0, 1, 10, 33, 67};
     for (size_t k = 0; k < SDL_arraysize(picks); k++) {
         SDL_memset(img, 0, 0x4000);

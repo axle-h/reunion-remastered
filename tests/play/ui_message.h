@@ -148,7 +148,7 @@ void ui_on_interrupt_screen(void (*fn)(void));
 
 // --- Game data block ---
 
-// The game keeps its Groups and Buildings in one block (game/ems.h).
+// The game keeps its Groups and Buildings in one block (Game_InitGameData).
 // Observers that stand for the group and surface screens read the records
 // here.
 struct TGroup;

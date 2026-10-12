@@ -11,8 +11,6 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-static const uint8_t cap_a[] = {3, 'a', 'b', 'c'};
-static const uint8_t cap_long[] = {20, 'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'};
 
 static void hotspots(void)
 {
@@ -22,13 +20,13 @@ static void hotspots(void)
     CHECK(ds.Mouse_Hotspots[0].W == 0 && ds.Mouse_Hotspots[65].Caption.len == 0);
 
     // Hotspot 1 is element 0.
-    Mouse_SetHotspot(1, 100, 50, 20, 10, cap_a, 1, 4);
+    Mouse_SetHotspot(1, 100, 50, 20, 10, "abc", 1, 4);
     CHECK(Mouse_Hotspot(1) == &ds.Mouse_Hotspots[0]);
     CHECK(ds.Mouse_Hotspots[0].X == 100 && ds.Mouse_Hotspots[0].Y == 50);
     CHECK(ds.Mouse_Hotspots[0].Caption.len == 3 && ds.Mouse_Hotspots[0].Repeat_ == 1
           && ds.Mouse_Hotspots[0]._1A == 4);
     // Overlapping hotspot 2 covers hotspot 1's right half; lowest index wins.
-    Mouse_SetHotspot(2, 110, 50, 20, 10, cap_long, 0, 2);
+    Mouse_SetHotspot(2, 110, 50, 20, 10, "ABCDEFGHIJKLMNOPQRST", 0, 2);
     CHECK(ds.Mouse_Hotspots[1].Caption.len == 18);
     ds.Mouse_HotspotCount = 2;
 
@@ -155,7 +153,7 @@ static void poll(void)
     dseg_clear();
     vid_clear();
     ds.Mouse_CursorState = 1;  // hidden: the poll must not draw
-    Mouse_SetHotspot(1, 150, 90, 20, 20, cap_a, 0, 3);
+    Mouse_SetHotspot(1, 150, 90, 20, 20, "abc", 0, 3);
     ds.Mouse_HotspotCount = 1;
 
     int ww, wh;

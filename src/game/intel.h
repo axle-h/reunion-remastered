@@ -30,8 +30,8 @@ static inline TRaceForce *Intel_Force(int16_t race, int16_t force)
     return &Intel_Race(race)->Forces[force - 1];
 }
 
-// 29b9:0000: first contact with `race`: shows msg (Pascal string) once, sets Status and starts its story timers.
-void Intel_FirstContact(int16_t race, const uint8_t *msg);
+// 29b9:0000: first contact with `race`: shows msg once, sets Status and starts its story timers.
+void Intel_FirstContact(int16_t race, const char *msg);
 // 29b9:0217: resets Owner, Colony, Miner, stores (+ population, resistance, tech, attitude when full).
 void Intel_ClearBody(int16_t system, int16_t planet, int16_t moon, bool full);
 // 29b9:0316: SetForceTarget + arrival timer Random(100 - Speed) + 5 + NextMission.

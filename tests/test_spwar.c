@@ -25,12 +25,12 @@ static void reset(void)
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = wait_retrace;
-    ds.SpWar_View = System_GetMem(0x5E60);
-    ds.SpWar_Background = System_GetMem(0x5E60);
-    ds.SpWar_Sprites = System_GetMem(0xF00);
-    ds.SpWar_Face = System_GetMem(0x1180);
-    ds.SpWar_AttackerList = System_GetMem(0x177C);
-    ds.SpWar_DefenderList = System_GetMem(0x177C);
+    ds.SpWar_View = game_alloc(0x5E60);
+    ds.SpWar_Background = game_alloc(0x5E60);
+    ds.SpWar_Sprites = game_alloc(0xF00);
+    ds.SpWar_Face = game_alloc(0x1180);
+    ds.SpWar_AttackerList = game_alloc(0x177C);
+    ds.SpWar_DefenderList = game_alloc(0x177C);
     ds.SpWar_StepNo = 0;
     ds.SpWar_BattleOver = 0;
     ds.SpWar_AttackerShipCount = ds.SpWar_DefenderShipCount = 0;
@@ -128,7 +128,7 @@ static void test_step(void)
 static void test_losses(void)
 {
     reset();
-    ds.Game_Groups = System_GetMem(0x2840);
+    ds.Game_Groups = game_alloc(0x2840);
     memset(ds.Game_Groups, 0, 0x2840);
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;

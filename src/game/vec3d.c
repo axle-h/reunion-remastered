@@ -1,5 +1,7 @@
 #include "game/vec3d.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/minmax.h"
@@ -14,6 +16,8 @@ static inline uint8_t *at(uint8_t *p, uint16_t off)
     return p + off;
 }
 
+// Words at byte offsets: the edge tables (at odd offsets in DS, indexed by
+// signed y) and Project's points, whose 16-bit offset wraps.
 static inline int16_t rdw(uint8_t *p, uint16_t off)
 {
     return (int16_t)(*at(p, off) | *at(p, (uint16_t)(off + 1)) << 8);
@@ -23,6 +27,25 @@ static inline void wrw(uint8_t *p, uint16_t off, int16_t v)
 {
     *at(p, off) = (uint8_t)v;
     *at(p, (uint16_t)(off + 1)) = (uint8_t)((uint16_t)v >> 8);
+}
+
+// Vertices and normals are TVecPoint records, indexed from 1 (every index in
+// the game's models is 1..vertex count, so the original's 16-bit offsets
+// never wrap there); an outline is (x, y) word pairs, from 1 too.
+#pragma pack(push, 1)
+typedef struct VecXY {
+    int16_t X, Y;
+} VecXY;
+#pragma pack(pop)
+
+static inline TVecPoint *points(uint8_t *p)
+{
+    return (TVecPoint *)p;
+}
+
+static inline VecXY *outline(uint8_t *p)
+{
+    return (VecXY *)p;
 }
 
 // cos500[i] (the callers keep i in 0..359).
@@ -42,11 +65,6 @@ static inline int32_t d500(int32_t a)
     return a / 500;
 }
 
-static Real48 real_const(uint8_t e, uint8_t m4, uint8_t m3, uint8_t m2, uint8_t m1, uint8_t m0)
-{
-    return (Real48){{e, m0, m1, m2, m3, m4}};
-}
-
 // --- DrawEdges -------------------------------------------------------------------
 
 // 3e17:0000
@@ -56,13 +74,12 @@ void Vec3D_DrawEdges(uint8_t *bufSeg, uint8_t *verts, uint8_t *edges, int16_t co
     uint16_t n = (uint16_t)count;
     if (n < 1)
         return;
+    const TVecPoint *v = points(verts);
     for (uint16_t i = 1;; i++) {
-        uint8_t a = *at(edges, (uint16_t)(i * 2 - 2));
-        uint8_t b = *at(edges, (uint16_t)(i * 2 - 1));
-        Gfx_DrawLine(bufSeg, (int16_t)(rdw(verts, (uint16_t)(a * 6 - 6)) + 0x46),
-                     (int16_t)(rdw(verts, (uint16_t)(a * 6 - 4)) + 0x32),
-                     (int16_t)(rdw(verts, (uint16_t)(b * 6 - 6)) + 0x46),
-                     (int16_t)(rdw(verts, (uint16_t)(b * 6 - 4)) + 0x32), colour);
+        uint8_t a = edges[i * 2 - 2];
+        uint8_t b = edges[i * 2 - 1];
+        Gfx_DrawLine(bufSeg, (int16_t)(v[a - 1].X + 0x46), (int16_t)(v[a - 1].Y + 0x32),
+                     (int16_t)(v[b - 1].X + 0x46), (int16_t)(v[b - 1].Y + 0x32), colour);
         if (i == n)
             break;
     }
@@ -72,7 +89,7 @@ void Vec3D_DrawEdges(uint8_t *bufSeg, uint8_t *verts, uint8_t *edges, int16_t co
 
 // DrawFaces' outline buffer (a local in the original): up to 20 points and
 // the closing one FillPoly adds.
-static uint8_t face_points[21 * 4];
+static VecXY face_points[21];
 
 // Faces of the two-sided objects that are never drawn. The back-face pass
 // also skips face 28h of model 7 object 1; the front-face pass doesn't.
@@ -96,22 +113,20 @@ static void draw_face_pass(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint
                            uint8_t count, bool back_pass)
 {
     int16_t model = ds.Vec3D_Model, slot = ds.Vec3D_Slot;
-    uint8_t *pts = face_points;
+    const TVecPoint *v = points(verts), *n = points(normals);
     for (uint8_t f = 1;; f++) {
-        int16_t nx = rdw(normals, (uint16_t)(f * 6 - 6));
-        int16_t nz = rdw(normals, (uint16_t)(f * 6 - 2));
+        int16_t nx = n[f - 1].X;
+        int16_t nz = n[f - 1].Z;
         if ((nz < 0) == back_pass) {
             // Reads index k before testing k < 20, so a face without FFh
             // ends after 19 points (its 20th byte is read, not used).
             uint8_t k = 1;
             for (;; k++) {
-                uint8_t v = *at(faces, (uint16_t)((uint16_t)(f * 0x14) + k - 0x15));
-                if (v == 0xFF || k >= 0x14)
+                uint8_t i = faces[f * 0x14 + k - 0x15];
+                if (i == 0xFF || k >= 0x14)
                     break;
-                int16_t x = rdw(verts, (uint16_t)(v * 6 - 6));
-                int16_t y = rdw(verts, (uint16_t)(v * 6 - 4));
-                wrw(pts, (uint16_t)(k * 4 - 4), (int16_t)(x + 0x86));
-                wrw(pts, (uint16_t)(k * 4 - 2), (int16_t)(y + 0x43));
+                face_points[k - 1].X = (int16_t)(v[i - 1].X + 0x86);
+                face_points[k - 1].Y = (int16_t)(v[i - 1].Y + 0x43);
             }
             int16_t shade = back_pass ? (int16_t)(nx - nz) : (int16_t)(nz - nx);
             shade = (int16_t)((uint16_t)(shade + 0x18) << 2);
@@ -122,7 +137,7 @@ static void draw_face_pass(uint8_t *bufSeg, uint8_t *verts, uint8_t *faces, uint
                 shade = 0x2E;
             shade = (int16_t)(shade + 0xC0);
             if (!face_skipped(model, slot, f, back_pass))
-                Vec3D_FillPoly(bufSeg, (int16_t)(k - 1), pts, (uint8_t)shade);
+                Vec3D_FillPoly(bufSeg, (int16_t)(k - 1), (uint8_t *)face_points, (uint8_t)shade);
         }
         if (f == count)
             break;
@@ -154,7 +169,7 @@ static inline int16_t abs16(int16_t v)
 static int16_t idiv16(int16_t v, int16_t d)
 {
     if (d == 0)
-        System_RunError(200);
+        System_RunError(200, nullptr);
     return (int16_t)(v / d);
 }
 
@@ -285,24 +300,44 @@ static void fix_centroid(int16_t model, int16_t slot, int16_t *c)
     }
 }
 
+// System Round (halves away from zero; run-time error 207 outside longint),
+// stored in a word.
+static int16_t round_word(double x)
+{
+    if (!(x > -2147483648.5 && x < 2147483647.5))
+        System_RunError(207, "Round outside longint");
+    return (int16_t)SDL_lround(x);
+}
+
 // 3e17:04d2. Ghidra fails on this one; ported from the disassembly. The
 // original also computes det(P1, P2, P3) per face and never uses it.
+//
+// The original works in Reals (Real48). The port uses an exact integer test
+// for the normal's direction and doubles for the rounding, which give the
+// same centroids and normals on every object of every VECTORS\V*.VEC (254
+// objects, 2,593 faces; checked 2026-10-12 against the Real48 port). 36 of
+// those faces lie in a plane through the centroid (n . C + d = 0 exactly):
+// the original's rounding errors left them unflipped, as the exact test does.
+// On random inputs the two differ only there, when Real48's rounding error
+// happens to be negative (about 3% of random 3-vertex objects, all of whose
+// faces pass through the centroid), and once in 500,000 on full-range
+// coordinates in a normal's last digit.
 void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *faces,
                          uint8_t *normals, uint8_t nVerts, uint8_t nFaces)
 {
-    // Centroid: Real sums of the vertices divided by their count.
-    Real48 cx = {0}, cy = {0}, cz = {0};
-    for (uint16_t v = 1; v <= nVerts; v++) {
-        cx = System_RealAdd(System_LongToReal(rdw(verts, (uint16_t)(v * 6 - 6))), cx);
-        cy = System_RealAdd(System_LongToReal(rdw(verts, (uint16_t)(v * 6 - 4))), cy);
-        cz = System_RealAdd(System_LongToReal(rdw(verts, (uint16_t)(v * 6 - 2))), cz);
+    // Centroid: the sums of the vertices divided by their count.
+    const TVecPoint *v = points(verts);
+    int32_t sum[3] = {0, 0, 0};
+    for (uint16_t i = 1; i <= nVerts; i++) {
+        sum[0] += v[i - 1].X;
+        sum[1] += v[i - 1].Y;
+        sum[2] += v[i - 1].Z;
     }
-    cx = System_RealDiv(cx, System_LongToReal(nVerts));
-    cy = System_RealDiv(cy, System_LongToReal(nVerts));
-    cz = System_RealDiv(cz, System_LongToReal(nVerts));
-
-    int16_t c[3] = {(int16_t)System_Round(cx), (int16_t)System_Round(cy),
-                    (int16_t)System_Round(cz)};
+    if (nVerts == 0)
+        System_RunError(200, "an object without vertices"); // a Real division
+    int16_t c[3];
+    for (int j = 0; j < 3; j++)
+        c[j] = round_word((double)sum[j] / nVerts);
     fix_centroid(model, slot, c);
     TVecPoint *cp = &ds.Vec3D_Centroids[slot - 1];
     cp->X = c[0];
@@ -313,9 +348,10 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *f
     for (uint16_t f = 1; f <= nFaces; f++) {
         int32_t p[3][3];
         for (int k = 0; k < 3; k++) {
-            uint8_t v = *at(faces, (uint16_t)(f * 0x14 - 0x14 + k));
-            for (int j = 0; j < 3; j++)
-                p[k][j] = rdw(verts, (uint16_t)(v * 6 - 6 + j * 2));
+            const TVecPoint *q = &v[faces[f * 0x14 - 0x14 + k] - 1];
+            p[k][0] = q->X;
+            p[k][1] = q->Y;
+            p[k][2] = q->Z;
         }
         int32_t ax = p[1][0] - p[0][0], ay = p[1][1] - p[0][1], az = p[1][2] - p[0][2];
         int32_t bx = p[2][0] - p[0][0], by = p[2][1] - p[0][1], bz = p[2][2] - p[0][2];
@@ -325,29 +361,30 @@ void Vec3D_PrepareObject(int16_t model, int16_t slot, uint8_t *verts, uint8_t *f
         int32_t d = (int32_t)(0u - ((uint32_t)lmul(nx, p[0][0]) + (uint32_t)lmul(ny, p[0][1]) +
                                     (uint32_t)lmul(nz, p[0][2])));
 
-        // n . C + d < 0 (n points away from the centroid): flip it.
-        Real48 s = System_RealMul(System_LongToReal(nx), cx);
-        s = System_RealAdd(s, System_RealMul(System_LongToReal(ny), cy));
-        s = System_RealAdd(s, System_RealMul(System_LongToReal(nz), cz));
-        s = System_RealAdd(s, System_LongToReal(d));
-        if (System_RealCmp(s, (Real48){0}) < 0) {
+        // n . C + d < 0 (n points away from the centroid): flip it. Times
+        // nVerts, so in integers: |n| < 2^31, |sum| < 2^23.
+        int64_t s = (int64_t)nx * sum[0] + (int64_t)ny * sum[1] + (int64_t)nz * sum[2] +
+                    (int64_t)d * nVerts;
+        if (s < 0) {
             nx = (int32_t)(0u - (uint32_t)nx);
             ny = (int32_t)(0u - (uint32_t)ny);
             nz = (int32_t)(0u - (uint32_t)nz);
         }
 
+        // Length 50: n / k with k = Sqrt(len2) / 50 (1 if 0). Sqrt of a len2
+        // that wrapped negative is run-time error 207; game models stay far
+        // below that.
         int32_t len2 = (int32_t)((uint32_t)lmul(nx, nx) + (uint32_t)lmul(ny, ny) +
                                  (uint32_t)lmul(nz, nz));
-        Real48 k = System_RealDiv(System_Sqrt(System_LongToReal(len2)),
-                                  real_const(0x86, 0x48, 0, 0, 0, 0));  // 50.0
-        if (System_RealCmp(k, (Real48){0}) == 0)
-            k = real_const(0x81, 0, 0, 0, 0, 0);  // 1.0
-        uint16_t o = (uint16_t)(f * 6 - 6);
-        wrw(normals, o, (int16_t)System_Round(System_RealDiv(System_LongToReal(nx), k)));
-        wrw(normals, (uint16_t)(o + 2),
-            (int16_t)System_Round(System_RealDiv(System_LongToReal(ny), k)));
-        wrw(normals, (uint16_t)(o + 4),
-            (int16_t)System_Round(System_RealDiv(System_LongToReal(nz), k)));
+        if (len2 < 0)
+            System_RunError(207, "Sqrt of a normal's length that overflowed");
+        double k = SDL_sqrt((double)len2) / 50;
+        if (k == 0)
+            k = 1;
+        TVecPoint *n = &points(normals)[f - 1];
+        n->X = round_word(nx / k);
+        n->Y = round_word(ny / k);
+        n->Z = round_word(nz / k);
     }
 }
 
@@ -369,17 +406,17 @@ static inline uint8_t *edges_b(void)
 void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
 {
     // Close the outline: point n + 1 = point 1.
-    wrw(pts, (uint16_t)((n + 1) * 4 - 4), rdw(pts, 0));
-    wrw(pts, (uint16_t)((n + 1) * 4 - 2), rdw(pts, 2));
+    VecXY *p = outline(pts);
+    p[n] = p[0];
 
     // Lowest and highest y (unsigned compares), scanning from point n down
-    // to point 2; ties keep the point found first.
-    uint16_t maxY = (uint16_t)rdw(pts, 2), minY = maxY;
+    // to point 2; ties keep the point found first. (n is 3..19 in the game's
+    // models; the original's loop would wrap for n < 2.)
+    uint16_t maxY = (uint16_t)p[0].Y, minY = maxY;
     int16_t maxI = 1, minI = 1;
-    uint16_t off = (uint16_t)((n - 1) * 4 + 2);
     uint16_t i = (uint16_t)n;
     do {
-        uint16_t y = (uint16_t)rdw(pts, off);
+        uint16_t y = (uint16_t)p[i - 1].Y;
         if (y > maxY) {
             maxY = y;
             maxI = (int16_t)i;
@@ -388,7 +425,6 @@ void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
             minY = y;
             minI = (int16_t)i;
         }
-        off -= 4;
         i--;
     } while (i != 1);
     int16_t hi = maxI, lo = minI;
@@ -399,9 +435,7 @@ void Vec3D_FillPoly(uint8_t *bufSeg, int16_t n, uint8_t *pts, uint8_t colour)
 
     // Edges lo..hi into table A, hi..n+1 and 1..lo into table B.
     uint8_t *a = edges_a(), *b = edges_b();
-#define EDGE(k, table)                                                                      \
-    Vec3D_TraceEdge(rdw(pts, (uint16_t)((k) * 4 - 4)), rdw(pts, (uint16_t)((k) * 4 - 2)),   \
-                    rdw(pts, (uint16_t)((k) * 4)), rdw(pts, (uint16_t)((k) * 4 + 2)), table)
+#define EDGE(k, table) Vec3D_TraceEdge(p[(k) - 1].X, p[(k) - 1].Y, p[k].X, p[k].Y, table)
     if (lo <= hi - 1)
         for (int16_t k = lo;; k++) {
             EDGE(k, a);
@@ -592,15 +626,11 @@ void Vec3D_Project(int16_t a, int16_t b, int16_t c, uint8_t *src, uint8_t *dst, 
     } while (si != 0);
 }
 
-// 3e17:18db
+// 3e17:18db: the original computes it in Reals (Real48); doubles give the
+// same 361 values (checked 2026-10-12), none closer than 0.003 to a half.
 void Vec3D_InitCosTable(void)
 {
-    const Real48 pi = real_const(0x82, 0x49, 0x0F, 0xDA, 0xA2, 0x21);
-    const Real48 r180 = real_const(0x88, 0x34, 0, 0, 0, 0);
-    const Real48 r500 = real_const(0x89, 0x7A, 0, 0, 0, 0);
-    for (int16_t i = 0; i <= 360; i++) {
-        Real48 x = System_RealDiv(System_RealMul(System_LongToReal(i), pi), r180);
-        int32_t v = System_Round(System_RealMul(System_Cos(x), r500));
-        ds.Vec3D_CosTable[i] = v;
-    }
+    const double pi = 3.14159265358979323846;
+    for (int16_t i = 0; i <= 360; i++)
+        ds.Vec3D_CosTable[i] = (int32_t)SDL_lround(SDL_cos(i * pi / 180) * 500);
 }

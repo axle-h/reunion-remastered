@@ -1,5 +1,7 @@
 #include "game/planetlist.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/minmax.h"
@@ -18,7 +20,7 @@ static PlanetListEntry *entry_at(int16_t i)
 void PlanetList_SetupScrollBarHotspot(void)
 {
     ds.Mouse_HotspotCount = 1;
-    Mouse_SetHotspot(1, 0x134, 0x37, 0xC, 0x8C, (const uint8_t *)PSTR("Scroll bar"), 0, 0);
+    Mouse_SetHotspot(1, 0x134, 0x37, 0xC, 0x8C, "Scroll bar", 0, 0);
 }
 
 // 1390:0047
@@ -110,29 +112,28 @@ void PlanetList_BuildList(void)
 }
 
 // 1390:03e9
-void PlanetList_ListKindCaption(PString *result, int16_t mode, int16_t kind)
+void PlanetList_ListKindCaption(char *dst, size_t cap, int16_t mode, int16_t kind)
 {
-    result->len = 0;
-#define CAP(text) System_StrStore(PSTR(text), result, 0xFF)
+    const char *text = "";
     if (mode == 1) {
         if (kind == 1)
-            CAP("Colony on ");
+            text = "Colony on ";
         if (kind == 2)
-            CAP("Miner station on ");
+            text = "Miner station on ";
     } else if (mode == 2) {
         if (kind == 1)
-            CAP("Accomodable ");
+            text = "Accomodable ";
         if (kind == 2)
-            CAP("Mineable   ");
+            text = "Mineable   ";
     } else if (mode == 3) {
         if (kind == 1)
-            CAP("Aliens on       ");
+            text = "Aliens on       ";
         if (kind == 2)
-            CAP("Enemy colony on ");
+            text = "Enemy colony on ";
         if (kind == 3)
-            CAP("Friendly colony on ");
+            text = "Friendly colony on ";
     }
-#undef CAP
+    SDL_strlcpy(dst, text, cap);
 }
 
 // 1390:04cc
@@ -143,36 +144,35 @@ void PlanetList_DrawList(void)
     for (int16_t row = 1; rows > 0; row++) {
         int16_t i = row + ds.PlanetList_Top - 1;
         const PlanetListEntry *e = entry_at(i);
-        PString tmp, cap, line, name;
+        char cap[256], line[256], name[256];
         int16_t y = (int16_t)(row * 9 + 0x30);
         if (e->Kind < 4) {
-            PlanetList_ListKindCaption(&tmp, ds.PlanetList_Mode, e->Kind);
-            System_StrStore(&tmp, &cap, 0xFF);
-            if (cap.len != 0) {
-                Gfx_DrawTextFC((const uint8_t *)&cap, 10, y, cap.len);
-                int16_t x = (int16_t)(cap.len * 6 + 10);
+            PlanetList_ListKindCaption(cap, sizeof cap, ds.PlanetList_Mode, e->Kind);
+            int16_t len = (int16_t)SDL_strlen(cap);
+            if (len != 0) {
+                Gfx_DrawTextFC(cap, 10, y, len);
+                int16_t x = (int16_t)(len * 6 + 10);
                 if (e->Moon == 0) {
-                    PlanetInfo_GetBodyLocationName(&tmp, e->System, e->Planet, e->Moon);
-                    Gfx_DrawTextF9((const uint8_t *)&tmp, x, y, (int16_t)((0x133 - x) / 6));
+                    PlanetInfo_GetBodyLocationName(line, sizeof line, e->System, e->Planet,
+                                                   e->Moon);
                 } else {
-                    System_StrLoad(&line, (const PString *)&ds.Names_Systems[e->System - 1]);
-                    System_StrConcat(&line, PSTR(" system planet "));
-                    PlanetInfo_GetBodyName(&name, e->System, e->Planet, 0);
-                    System_StrConcat(&line, &name);
-                    Gfx_DrawTextF9((const uint8_t *)&line, x, y, (int16_t)((0x133 - x) / 6));
+                    char system[256];
+                    pstr_get(system, sizeof system, &ds.Names_Systems[e->System - 1]);
+                    PlanetInfo_GetBodyName(name, sizeof name, e->System, e->Planet, 0);
+                    SDL_snprintf(line, sizeof line, "%s system planet %s", system, name);
                 }
+                Gfx_DrawTextF9(line, x, y, (int16_t)((0x133 - x) / 6));
             }
         } else {
             // A moon row: blank the caption of the planet row above and write
             // "moon <name>" after it.
-            PlanetList_ListKindCaption(&tmp, ds.PlanetList_Mode, entry_at(i - 1)->Kind);
-            System_StrStore(&tmp, &cap, 0xFF);
-            int16_t x = (int16_t)(cap.len * 6 + 10);
-            Blit_FillRect(10, y, (int16_t)(cap.len * 6 - 1), 8, 0x40);
-            System_StrLoad(&line, PSTR("moon "));
-            PlanetInfo_GetBodyName(&name, e->System, e->Planet, e->Moon);
-            System_StrConcat(&line, &name);
-            Gfx_DrawTextF9((const uint8_t *)&line, x, y, (int16_t)((0x133 - x) / 6));
+            PlanetList_ListKindCaption(cap, sizeof cap, ds.PlanetList_Mode, entry_at(i - 1)->Kind);
+            int16_t len = (int16_t)SDL_strlen(cap);
+            int16_t x = (int16_t)(len * 6 + 10);
+            Blit_FillRect(10, y, (int16_t)(len * 6 - 1), 8, 0x40);
+            PlanetInfo_GetBodyName(name, sizeof name, e->System, e->Planet, e->Moon);
+            SDL_snprintf(line, sizeof line, "moon %s", name);
+            Gfx_DrawTextF9(line, x, y, (int16_t)((0x133 - x) / 6));
         }
         if (row == shown)
             break;

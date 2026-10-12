@@ -11,6 +11,7 @@
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
 #include "game/planetlist.h"
@@ -49,14 +50,29 @@ static void reset(void)
     static uint8_t charset[0x2880];
     ds.Gfx_Charset = charset;
     // The surface's building tiles, as Surface's set-up allocates them.
-    ds.Surface_BufC = System_GetMem(0xF000);
+    ds.Surface_BufC = game_alloc(0xF000);
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     gfx_wait_retrace = no_wait;
-    ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
+    ds.Game_Groups = game_alloc(2 * 32 * sizeof(TGroup));
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
-    ds.Game_Buildings = System_GetMem(1000 * sizeof(TBuilding));
+    ds.Game_Buildings = game_alloc(1000 * sizeof(TBuilding));
     SDL_memset(ds.Game_Buildings, 0, 1000 * sizeof(TBuilding));
+}
+
+// Planet 0's name (pstr_get's PSTR_NUL, game/system.h): the bytes the
+// original reads there, the end of the system's moon list and its names,
+// never hold PSTR_NUL in the initial data (the rest changes only by moon
+// indices and names typed in the editor).
+static void test_planet0_names(void)
+{
+    bool none = true;
+    for (int s = 1; s <= 8; s++) {
+        const uint8_t *p = (const uint8_t *)(ds.Galaxy_Names[s - 1] - 1);
+        for (int i = 0; i < 256; i++)
+            none = none && p[i] != (uint8_t)PSTR_NUL;
+    }
+    CHECK(none);
 }
 
 static void test_bodies(void)
@@ -67,21 +83,23 @@ static void test_bodies(void)
     ds.Game_CurMoon[7] = 0;
     PlanetInfo_SelectCurBody();
     CHECK(ds.Game_CurBody == body(8, 3));
-    PString s;
-    PlanetInfo_GetBodyName(&s, 8, 3, 0);
-    CHECK(pstr_is(&s, "Earth"));
-    PlanetInfo_GetBodyName(&s, 8, 3, 1);
-    CHECK(pstr_is(&s, "Moon"));
-    PlanetInfo_GetBodyFullName(&s, 8, 3, 0);
-    CHECK(pstr_is(&s, "Earth"));
-    PlanetInfo_GetBodyFullName(&s, 8, 3, 1);
-    CHECK(pstr_is(&s, "Earth Moon"));
-    PlanetInfo_GetBodyLongName(&s, 8, 3, 1);
-    CHECK(pstr_is(&s, "Sun system,planet Earth,moon Moon"));
-    PlanetInfo_GetBodyLocationName(&s, 8, 4, 2);
-    CHECK(pstr_is(&s, "Sun system Mars Deimos"));
-    PlanetInfo_GetBodyLocationName(&s, 8, 4, 0);
-    CHECK(pstr_is(&s, "Sun system Mars"));
+    char s[256], small[6];
+    PlanetInfo_GetBodyName(s, sizeof s, 8, 3, 0);
+    CHECK(SDL_strcmp(s, "Earth") == 0);
+    PlanetInfo_GetBodyName(s, sizeof s, 8, 3, 1);
+    CHECK(SDL_strcmp(s, "Moon") == 0);
+    PlanetInfo_GetBodyFullName(s, sizeof s, 8, 3, 0);
+    CHECK(SDL_strcmp(s, "Earth") == 0);
+    PlanetInfo_GetBodyFullName(s, sizeof s, 8, 3, 1);
+    CHECK(SDL_strcmp(s, "Earth Moon") == 0);
+    PlanetInfo_GetBodyLongName(s, sizeof s, 8, 3, 1);
+    CHECK(SDL_strcmp(s, "Sun system,planet Earth,moon Moon") == 0);
+    PlanetInfo_GetBodyLocationName(s, sizeof s, 8, 4, 2);
+    CHECK(SDL_strcmp(s, "Sun system Mars Deimos") == 0);
+    PlanetInfo_GetBodyLocationName(s, sizeof s, 8, 4, 0);
+    CHECK(SDL_strcmp(s, "Sun system Mars") == 0);
+    PlanetInfo_GetBodyLocationName(small, sizeof small, 8, 4, 0);
+    CHECK(SDL_strcmp(small, "Sun s") == 0);
     CHECK(PlanetInfo_IsCurrentBody(8, 3, 0));
     CHECK(!PlanetInfo_IsCurrentBody(8, 3, 1));
     CHECK(!PlanetInfo_IsCurrentBody(1, 3, 0));
@@ -121,7 +139,7 @@ static void test_bodies(void)
 
 static void test_list(void)
 {
-    ds.PlanetList_Entries = System_GetMem(8 * 100);
+    ds.PlanetList_Entries = game_alloc(8 * 100);
     for (int s = 0; s < 8; s++)
         ds.Galaxy_SystemStatus[s] = 0;
     ds.Galaxy_SystemStatus[0] = 1;  // only systems with status 1 are listed
@@ -186,15 +204,15 @@ static void test_list(void)
         aliens = aliens || (e[i].Planet == 7 && e[i].Kind == 1);
     CHECK(aliens);
 
-    PString cap;
-    PlanetList_ListKindCaption(&cap, 1, 2);
-    CHECK(pstr_is(&cap, "Miner station on "));
-    PlanetList_ListKindCaption(&cap, 3, 3);
-    CHECK(pstr_is(&cap, "Friendly colony on "));
-    PlanetList_ListKindCaption(&cap, 2, 3);
-    CHECK(cap.len == 0);
-    PlanetList_ListKindCaption(&cap, 4, 1);
-    CHECK(cap.len == 0);
+    char cap[32];
+    PlanetList_ListKindCaption(cap, sizeof cap, 1, 2);
+    CHECK(SDL_strcmp(cap, "Miner station on ") == 0);
+    PlanetList_ListKindCaption(cap, sizeof cap, 3, 3);
+    CHECK(SDL_strcmp(cap, "Friendly colony on ") == 0);
+    PlanetList_ListKindCaption(cap, sizeof cap, 2, 3);
+    CHECK(cap[0] == '\0');
+    PlanetList_ListKindCaption(cap, sizeof cap, 4, 1);
+    CHECK(cap[0] == '\0');
 
     // Scroll bar thumb: 30 entries, top at 5.
     ds.PlanetList_Count = 30;
@@ -264,7 +282,7 @@ static void test_power(void)
     // supply 600, energy 1195, demand = population.
     CHECK(bld(2)->W9 == 0 && bld(2)->WB == 376 && bld(2)->BD == 50);
     CHECK(bld(3)->W9 == 73 && bld(3)->WB == 223 && bld(3)->BD == 50);
-    CHECK(*(uint16_t *)body(1, 5)->_04 == 0);
+    CHECK((uint16_t)rd16le(body(1, 5)->_04) == 0);
 
     // With a lower output everything but the plant and the miner station
     // has to go: lowest priority first (stadiums 1, radar 2).
@@ -290,7 +308,7 @@ static void test_power(void)
     CHECK(bld(1)->Flag == 1 && bld(2)->Flag == 1);
     CHECK(bld(2)->WB == 890 && bld(2)->BD == 100);
     // 50 * 780 = 39000 wraps to -26536; / 100 = -265, * 100 / 100.
-    CHECK(*(uint16_t *)body(1, 5)->_04 == (uint16_t)-265);
+    CHECK((uint16_t)rd16le(body(1, 5)->_04) == (uint16_t)-265);
 
     // A lone consumer cannot run: supply is 0 (made 1), 2 < energy.
     static const uint8_t k3[] = {22};
@@ -299,7 +317,7 @@ static void test_power(void)
     b->Population = 0;  // treated as 1
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
     CHECK(bld(1)->Flag == 0);
-    CHECK(*(uint16_t *)body(1, 5)->_04 == 0);
+    CHECK((uint16_t)rd16le(body(1, 5)->_04) == 0);
 
     // Solar satellites add 10000 each to the supply.
     b->Population = 30000;
@@ -402,14 +420,14 @@ static void test_colonize(void)
     ds.Game_ScreenSwitch = false;
     Colonize_ColonizeScreen();
     CHECK(ds.Game_CurrentScreen == 0x15 && !ds.Game_ScreenSwitch);
-    ds.Surface_BufC = System_GetMem(0xF000);
+    ds.Surface_BufC = game_alloc(0xF000);
     ds.Game_MenuCommand = 0x3A;
     Colonize_ColonizeScreen();
     CHECK(ds.Game_CurrentScreen == 0x14 && ds.Game_ScreenSwitch && ds.Game_ColonySetupCount == 0);
 
     // Colonise with enough money: a planet force group is created and paid.
     ds.Game_ColonySetupCount = 1;
-    ds.Surface_BufC = System_GetMem(0xF000);
+    ds.Surface_BufC = game_alloc(0xF000);
     ds.Game_Credits = 120000;
     ds.Colonize_ColonyCost = 100000;
     ds.Game_MenuCommand = 0x3B;
@@ -634,7 +652,7 @@ static void test_screens(void)
     SDL_memset(vid_screen, 0, 320 * 200);
     Colonize_DrawColonizeScreen();
     CHECK(screen_pixels() > 20000);
-    System_FreeMem(ds.Surface_BufC, 0xF000);
+    game_free(ds.Surface_BufC);
     CHECK(system_heap_used() == used0);
 }
 
@@ -645,6 +663,7 @@ int main(int argc, char *argv[])
         return 77;
     }
     reset();
+    test_planet0_names();
     test_bodies();
     test_list();
     test_power();

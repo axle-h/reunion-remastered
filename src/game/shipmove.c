@@ -1,7 +1,7 @@
 // Unit ShipMove (22ca): see shipmove.h.
 #include "game/shipmove.h"
 
-#include <stdio.h>
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
@@ -16,37 +16,31 @@
 // Routines missing from their units' headers.
 void PlanetInfo_SelectCurBody(void);                                             // 357b:3253
 void Message_ShowMessageLine(int16_t lineNo);                                    // 34b0:011a
-void Message_ShowMessageNoLog(const uint8_t *text);                              // 34b0:0197
+void Message_ShowMessageNoLog(const char *text);                              // 34b0:0197
 void Intel_OfferInventionForAnalysis(int16_t idea);                              // 29b9:1409
 void Intel_ScheduleIdea(int16_t idea, int16_t delayBase, int16_t delayRandom);   // 29b9:136e
 void Intel_SetGroupTarget(int16_t group, int16_t system, int16_t planet, int16_t moon); // 29b9:0e66
 void AlienTalk_StartAlienScene(int16_t scene);                                   // 2e4b:0000
 
-#define PS(lit) ((const uint8_t *)PSTR(lit))
-
 // Research::Products[p].State: 0 while the invention is unknown, so the landing
 // events below happen once.
 static int16_t product_state(int16_t p) { return ds.Research_Products[p - 1].State; }
 
-// Pascal string "planets\nagy<n>" in buf.
-static const uint8_t *nagy_name(uint8_t buf[256], int16_t n)
+// "planets\nagy<n>" in buf.
+static const char *nagy_name(char buf[32], int16_t n)
 {
-    int len = snprintf((char *)buf + 1, 255, "planets\\nagy%d", n);
-    buf[0] = (uint8_t)len;
+    SDL_snprintf(buf, 32, "planets\\nagy%d", n);
     return buf;
 }
 
-static void load_view_pic(const uint8_t *name, uint8_t *dest)
+static void load_view_pic(const char *name, uint8_t *dest)
 {
     Gfx_LoadPic(name, dest, 0, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x6f, 0x80, 0, 0x6f);
 }
 
 static void set_caption(int16_t pascalIndex, const char *text)
 {
-    THotspot *h = Mouse_Hotspot(pascalIndex);
-    uint8_t n = (uint8_t)strlen(text);
-    h->Caption.len = n > 18 ? 18 : n;
-    memcpy(h->Caption.s, text, h->Caption.len);
+    pstr_set(&Mouse_Hotspot(pascalIndex)->Caption, 18, text);
 }
 
 static void set_rect(int16_t pascalIndex, int16_t x, uint8_t y, int16_t w, uint8_t hgt)
@@ -103,7 +97,7 @@ void ShipMove_GroupScreen(void)
 
     if (ds.Game_HotspotHit == 0x15) {
         if (g->Status == 1 || g->Status == 2) {
-            Sound_PlayButtonSfx(PS("surface"));
+            Sound_PlayButtonSfx("surface");
             ds.Game_ScreenSwitch = 1;
             ds.Game_CurrentScreen = 0x14;
         }
@@ -112,15 +106,13 @@ void ShipMove_GroupScreen(void)
     if (ds.Game_HotspotHit == 0x16 && (g->Status == 1 || g->Status == 2)) {
         // Launch / Docking
         TBody *body = ds.Game_CurBody;
-        // One expression: a PS() literal inside an if branch would end with
-        // the branch (docs/port-bugs.md #32).
-        const uint8_t *msg =
+        const char *msg =
             body->SurfaceType == 2
-                ? PS(" You cannot land on this type of planet, |          since it is gaseous!")
+                ? " You cannot land on this type of planet, |          since it is gaseous!"
             : g->Kind == 4 && (g->System != 1 || g->Planet != 5 || g->Moon != 0)
-                ? PS(" The satellite carriers can only land |          on your main planet")
+                ? " The satellite carriers can only land |          on your main planet"
             : Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)
-                ? PS(" No ships in this unit ! ")
+                ? " No ships in this unit ! "
                 : nullptr;
         if (msg) {
             Message_ShowMessageNoLog(msg);
@@ -130,7 +122,7 @@ void ShipMove_GroupScreen(void)
                 body->InfoLevel = 6;
             g->Status = (uint8_t)(3 - g->Status);
             ds.Game_HotspotHit = 0;
-            Gfx_DrawStatusText(PS(""));
+            Gfx_DrawStatusText("");
             surf = ds.Game_CurBody->SurfaceType;
             if (ds.ShipMove_InRestrictedArea)
                 surf = 12;
@@ -161,7 +153,7 @@ void ShipMove_GroupScreen(void)
     }
 
     if (ds.Game_HotspotHit == 0x17) {
-        Sound_PlayButtonSfx(PS("transfer"));
+        Sound_PlayButtonSfx("transfer");
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 0xD;
     }
@@ -170,9 +162,9 @@ void ShipMove_GroupScreen(void)
         // Move / Change destination
         if (ds.Game_StaffExp[0] > 0 || g->Kind == 4) {
             if (Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)) {
-                Message_ShowMessageNoLog(PS(" No ships in this unit! "));
+                Message_ShowMessageNoLog(" No ships in this unit! ");
             } else {
-                Sound_PlayButtonSfx(PS("controll"));
+                Sound_PlayButtonSfx("controll");
                 for (int16_t i = 1; i <= 4; i++) {
                     ShipMove_DrawButtonAnimFrame(i);
                     Gfx_WaitFrames(3);
@@ -188,7 +180,7 @@ void ShipMove_GroupScreen(void)
                 ShipMove_DrawButtonAnimFrame(i);
                 Gfx_WaitFrames(3);
             }
-            Message_ShowMessageNoLog(PS(" You haven't got a pilot! "));
+            Message_ShowMessageNoLog(" You haven't got a pilot! ");
             for (int16_t i = 4; i >= 1; i--) {
                 ShipMove_DrawButtonAnimFrame(i);
                 Gfx_WaitFrames(3);
@@ -197,12 +189,12 @@ void ShipMove_GroupScreen(void)
     }
 
     if (ds.Game_HotspotHit == 0x19) {
-        Sound_PlayButtonSfx(PS("baseeff"));
+        Sound_PlayButtonSfx("baseeff");
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 0x10;
     }
     if (ds.Game_HotspotHit == 0x1A) {
-        Sound_PlayButtonSfx(PS("group"));
+        Sound_PlayButtonSfx("group");
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 0x16;
     }
@@ -275,58 +267,59 @@ static uint8_t *backdrop_segment(void)
 
 void ShipMove_FreeBackdrop(void)
 {
-    System_FreeSegment(backdrop_segment());
+    game_free(backdrop_segment());
 }
 
 // Shared tail of the two view initialisers: animation buffers.
 static void alloc_anim_buffers(void)
 {
-    ds.ShipMove_AnimSheet = System_GetMem(0x9100);
-    ds.ShipMove_Backdrop = System_GetSegment() + BACKDROP_AT;  // GetMem(BCC0h)
-    Gfx_LoadPic(PS("planets\\muszianm"), ds.ShipMove_AnimSheet, 0, 0x74, 0, 0, 0x140,
+    ds.ShipMove_AnimSheet = game_alloc(0x9100);
+    // GetMem(BCC0h), in a whole segment with the star table (above).
+    ds.ShipMove_Backdrop = (uint8_t *)game_alloc(GAME_SEGMENT) + BACKDROP_AT;
+    Gfx_LoadPic("planets\\muszianm", ds.ShipMove_AnimSheet, 0, 0x74, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x3F, 0x40, 0, 0x3F);
 }
 
 // 22ca:08d4
 void ShipMove_InitOrbitView(void)
 {
-    uint8_t *dest = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(PS("planets\\muszi"), dest, 0x97, Gfx_PalettePtr());
+    uint8_t *dest = game_alloc(0xBCC0);
+    Gfx_LoadPicScreen("planets\\muszi", dest, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(dest, gfx_screen() + 0x3D40, 0x140, 0x97);
-    load_view_pic(PS("planets\\nagy0"), dest);
+    load_view_pic("planets\\nagy0", dest);
     Mouse_HideCursor();
     ShipMove_BlitViewport(dest);
     Mouse_ShowCursor();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    System_FreeMem(dest, 0xBCC0);
+    game_free(dest);
     alloc_anim_buffers();
 }
 
 // 22ca:09f9
 void ShipMove_InitDockView(int16_t surfaceType)
 {
-    uint8_t name[256];
-    uint8_t *dest = System_GetMem(0xBCC0);
-    Gfx_LoadPicScreen(PS("planets\\muszi"), dest, 0x97, Gfx_PalettePtr());
+    char name[32];
+    uint8_t *dest = game_alloc(0xBCC0);
+    Gfx_LoadPicScreen("planets\\muszi", dest, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(dest, gfx_screen() + 0x3D40, 0x140, 0x97);
     load_view_pic(nagy_name(name, surfaceType), dest);
     Mouse_HideCursor();
     ShipMove_BlitViewport(dest + 0x35C0);
     Mouse_ShowCursor();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    System_FreeMem(dest, 0xBCC0);
+    game_free(dest);
     alloc_anim_buffers();
 }
 
 // 22ca:0b32
 void ShipMove_RedrawBackdrop(void)
 {
-    uint8_t *dest = System_GetMem(0xBCC0);
-    load_view_pic(PS("planets\\nagy0"), dest);
+    uint8_t *dest = game_alloc(0xBCC0);
+    load_view_pic("planets\\nagy0", dest);
     Mouse_HideCursor();
     ShipMove_BlitViewport(dest);
     Mouse_ShowCursor();
-    System_FreeMem(dest, 0xBCC0);
+    game_free(dest);
 }
 
 static void blit_row(const uint8_t *base, int16_t row)
@@ -348,9 +341,9 @@ static void launch_step(const uint8_t *base, int16_t i)
 // 22ca:0bbc
 void ShipMove_LaunchAnimation(int16_t surfaceType)
 {
-    uint8_t name[256];
-    Sound_PlayButtonSfx(PS("launch"));
-    uint8_t *buf = System_GetMem(0xBCC0);
+    char name[32];
+    Sound_PlayButtonSfx("launch");
+    uint8_t *buf = game_alloc(0xBCC0);
     load_view_pic(nagy_name(name, surfaceType), buf);
     Mouse_HideCursor();
     ShipMove_DrawDockDoorFrame(2);
@@ -363,7 +356,7 @@ void ShipMove_LaunchAnimation(int16_t surfaceType)
     for (int16_t i = 0x26; i >= 0; i--)
         launch_step(buf, i);
     Mouse_ShowCursor();
-    load_view_pic(PS("planets\\nagy0"), buf);
+    load_view_pic("planets\\nagy0", buf);
     Gfx_WaitFrames(0x14);
     Mouse_HideCursor();
     ShipMove_BlitViewport(buf + 0x3700);
@@ -401,7 +394,7 @@ void ShipMove_LaunchAnimation(int16_t surfaceType)
     Gfx_WaitFrames(4);
     ShipMove_BlitViewport(buf + 0x140);
     Mouse_ShowCursor();
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
 static void dock_step(const uint8_t *base, int16_t i)
@@ -417,11 +410,11 @@ static void dock_step(const uint8_t *base, int16_t i)
 // 22ca:0fd3
 void ShipMove_DockingAnimation(int16_t surfaceType)
 {
-    uint8_t name[256];
-    Sound_PlayButtonSfx(PS("landing"));
-    uint8_t *buf = System_GetMem(0xBCC0);
+    char name[32];
+    Sound_PlayButtonSfx("landing");
+    uint8_t *buf = game_alloc(0xBCC0);
     nagy_name(name, surfaceType); // the original formats it first, then loads nagy0
-    load_view_pic(PS("planets\\nagy0"), buf);
+    load_view_pic("planets\\nagy0", buf);
     Mouse_HideCursor();
     ShipMove_DrawDockDoorFrame(2);
     for (int16_t i = 1; i <= 2; i++)
@@ -463,7 +456,7 @@ void ShipMove_DockingAnimation(int16_t surfaceType)
     ShipMove_BlitViewport(buf + 0x3480);
     Gfx_WaitVRetrace();
     ShipMove_BlitViewport(buf + 0x35C0);
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
 // Generated from the disassembly of 22ca:132c: each rep movs / movs run, with
@@ -575,7 +568,7 @@ void ShipMove_AnimateStarfield(void)
         Star *s = &stars[i];
         int16_t d = (int16_t)(s->depth + 100);
         if (d == 0)
-            System_RunError(200);
+            System_RunError(200, nullptr);
         int16_t px = (int16_t)((int16_t)(s->x * 100) / d);
         int16_t py = (int16_t)((int16_t)(s->y * 100) / d);
         // The original's 16-bit offset in the backdrop's segment (see

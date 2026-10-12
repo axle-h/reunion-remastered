@@ -1,6 +1,7 @@
 // Unit GrWarUnits (1430): ground battle unit assignment screen.
 #include "game/grwarunits.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
@@ -20,7 +21,6 @@
 
 static GrUnit *unit_at(uint8_t *list, int i) { return (GrUnit *)list + (i - 1); }
 
-static const uint8_t *ps(const char *lit_with_len) { return (const uint8_t *)lit_with_len; }
 
 // 1430:000f
 void GrWarUnits_UnitAssignScreen(void)
@@ -30,7 +30,7 @@ void GrWarUnits_UnitAssignScreen(void)
         ds.Game_CurPlanet[ds.SpWar_BattleSystem - 1] = ds.SpWar_BattlePlanet;
         ds.Game_CurMoon[ds.Game_CurSystem - 1] = ds.SpWar_BattleMoon;
         PlanetInfo_SelectCurBody();
-        Music_PlayTrack(ps("\x05" "earth"));
+        Music_PlayTrack("earth");
         GrWarUnits_CollectAvailableForces();
         GrWarUnits_UnitAssignDrawScreen();
         GrWarUnits_SetupUnitHotspots();
@@ -75,7 +75,7 @@ void GrWarUnits_UnitAssignScreen(void)
             memcpy(unit_at(ds.GrWarUnits_UnitLists[0], i), unit_at(ds.GrWarUnits_UnitLists[0], i + 1), 0x27);
         ds.GrWarUnits_AttackerSlotCount--;
         GrWarUnits_DrawUnitList();
-        Sound_PlayButtonSfx(ps("\x08" "click-ok"));
+        Sound_PlayButtonSfx("click-ok");
     }
     // "Add/sub": left button adds one unit from the pool, the other removes one.
     if (hit > 0x28 && hit < 0x3D && (uint16_t)(hit - 0x28) <= (uint16_t)ds.GrWarUnits_AttackerSlotCount) {
@@ -113,16 +113,16 @@ void GrWarUnits_UnitAssignDrawScreen(void)
     if (ds.GrWarUnits_Totals[0][3] > 0)
         GfxPath_AddToolbarIcon(0x24);
     GfxPath_ShowToolbar();
-    ds.GrWar_UnitIcons = System_GetMem(0x3C00);
-    uint8_t *buf = System_GetMem(0xBCC0);
-    Gfx_LoadPic(ps("\x0C" "war\\grbeoszt"), buf, 1, 0x97, 0, 0, 0x140, true,
+    ds.GrWar_UnitIcons = game_alloc(0x3C00);
+    uint8_t *buf = game_alloc(0xBCC0);
+    Gfx_LoadPic("war\\grbeoszt", buf, 1, 0x97, 0, 0, 0x140, true,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    Gfx_LoadPic(ps("\x0A" "war\\gricon"), ds.GrWar_UnitIcons, 1, 0x30, 0, 0, 0x140, false,
+    Gfx_LoadPic("war\\gricon", ds.GrWar_UnitIcons, 1, 0x30, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x6F, 0x40, 0, 0x6F);
     GrWarUnits_DrawUnitList();
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
 // Fills up to 20 slots of `list` from GrWarUnits::Scratch (types 1..4), at
@@ -165,8 +165,10 @@ void GrWarUnits_CollectAvailableForces(void)
         ds.GrWarUnits_Defence[1][t - 1] = 0;
         ds.GrWarUnits_Totals[1][t - 1] = 0;
     }
-    ds.GrWarUnits_UnitLists[0] = System_GetSegment();  // GetMem(0x333)
-    ds.GrWarUnits_UnitLists[1] = System_GetSegment();  // GetMem(0x333)
+    // GetMem(0x333) each. Whole segments: slot 0 (an empty grid cell, a unit
+    // without a target) wraps to the end of the segment (game/grwar.c, unit).
+    ds.GrWarUnits_UnitLists[0] = game_alloc(GAME_SEGMENT);
+    ds.GrWarUnits_UnitLists[1] = game_alloc(GAME_SEGMENT);
     ds.GrWarUnits_AttackerSlotCount = 0;
     ds.GrWarUnits_DefenderSlotCount = 0;
 
@@ -262,7 +264,7 @@ void GrWarUnits_SetupUnitHotspots(void)
         h->Y = (uint8_t)(k / 4 * 0x17 + 0x38);
         h->W = remove ? 0x12 : 0x1E;
         h->H = 0x10;
-        System_StrStore(remove ? PSTR("Remove unit") : PSTR("Add/sub ??"), (PString *)&h->Caption, 0x12);
+        pstr_set(&h->Caption, 0x12, remove ? "Remove unit" : "Add/sub ??");
         h->Repeat_ = remove;
         h->_1A = 0;
     }
@@ -272,30 +274,30 @@ void GrWarUnits_SetupUnitHotspots(void)
 // emptied slots blanked, then the pool of each type and the force totals.
 void GrWarUnits_DrawUnitList(void)
 {
-    PString s;
+    char s[16];
     int16_t n = ds.GrWarUnits_AttackerSlotCount;
     for (int i = 1; i <= n; i++) {
         const GrUnit *u = unit_at(ds.GrWarUnits_UnitLists[0], i);
         int16_t col = (int16_t)((i - 1) % 4 * 0x4D);
         int16_t row = (int16_t)((i - 1) / 4 * 0x17 + 0x31);
         uint16_t ofs = (uint16_t)(row * 0x140 + col);
-        System_StrLong(u->count, 3, &s, 0x32);
-        Gfx_DrawTextF9((uint8_t *)&s, (int16_t)(col + 0x3D), (int16_t)(row + 7), 3);
+        SDL_snprintf(s, sizeof s, "%3d", u->count);
+        Gfx_DrawTextF9(s, (int16_t)(col + 0x3D), (int16_t)(row + 7), 3);
         int32_t total = ds.GrWarUnits_Totals[0][u->type - 1];
         int32_t str = 0;
         if (total > 0)
             str = (int32_t)((uint32_t)(int32_t)u->count
                             * (uint32_t)ds.GrWarUnits_Attack[0][u->type - 1]) / total;
-        System_StrLong(str, 4, &s, 0x32);
-        Gfx_DrawTextF9((uint8_t *)&s, (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
+        SDL_snprintf(s, sizeof s, "%4d", (int)str);
+        Gfx_DrawTextF9(s, (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
         const uint8_t *icon = ds.GrWar_UnitIcons + (uint16_t)((u->type - 1) * 0x50);
         Blit_CopyRect(icon, gfx_screen() + (uint16_t)(ofs + 10 + 0x8C0), 0x10, 0x10);
     }
     for (int i = n + 1; i <= 0x14; i++) {
         int16_t col = (int16_t)((i - 1) % 4 * 0x4D);
         int16_t row = (int16_t)((i - 1) / 4 * 0x17 + 0x31);
-        Gfx_DrawTextF9((const uint8_t *)PSTR(""), (int16_t)(col + 0x3D), (int16_t)(row + 7), 3);
-        Gfx_DrawTextF9((const uint8_t *)PSTR(""), (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
+        Gfx_DrawTextF9("", (int16_t)(col + 0x3D), (int16_t)(row + 7), 3);
+        Gfx_DrawTextF9("", (int16_t)(col + 0x37), (int16_t)(row + 0xF), 4);
         Mouse_HideCursor();
         Blit_FillRect((int16_t)(col + 10), (int16_t)(row + 7), 0x10, 0x10, 0x40);
         Mouse_ShowCursor();
@@ -309,12 +311,9 @@ void GrWarUnits_DrawUnitList(void)
     for (int t = 1; t <= 4; t++) {
         // Test the attackers' total, print the unassigned pool.
         if (ds.GrWarUnits_Totals[0][t - 1] > 0) {
-            System_StrLong(ds.GrWarUnits_Pool[t - 1], 0, &s, 0x32);
-            PString name;
-            name.len = (uint8_t)strlen(names[t - 1]);
-            memcpy(name.s, names[t - 1], name.len);
-            Gfx_DrawTextF9((uint8_t *)&name, nx[t - 1], ny[t - 1], nw[t - 1]);
-            Gfx_DrawTextF9((uint8_t *)&s, vx[t - 1], ny[t - 1], 5);
+            SDL_snprintf(s, sizeof s, "%d", (int)ds.GrWarUnits_Pool[t - 1]);
+            Gfx_DrawTextF9(names[t - 1], nx[t - 1], ny[t - 1], nw[t - 1]);
+            Gfx_DrawTextF9(s, vx[t - 1], ny[t - 1], 5);
         }
     }
 }

@@ -45,13 +45,13 @@ static void setup(int surface, int variant)
     ds.Surface_TileSet = ds.Surface_Tileset[surface - 1];
     ds.Surface_MapVariant = (int16_t)variant;
     if (ds.Surface_TileLayer) {
-        System_FreeSegment(ds.Surface_TileLayer);
-        System_FreeSegment(ds.Surface_OccupyLayer);
-        System_FreeSegment(ds.Surface_BuildingLayer);
+        game_free(ds.Surface_TileLayer);
+        game_free(ds.Surface_OccupyLayer);
+        game_free(ds.Surface_BuildingLayer);
     }
-    ds.Surface_TileLayer = System_GetSegment();  // GetMem(0x1518)
-    ds.Surface_OccupyLayer = System_GetSegment();  // GetMem(0x1518)
-    ds.Surface_BuildingLayer = System_GetSegment();  // GetMem(0x2A30)
+    ds.Surface_TileLayer = game_alloc(GAME_SEGMENT);  // GetMem(0x1518)
+    ds.Surface_OccupyLayer = game_alloc(GAME_SEGMENT);  // GetMem(0x1518)
+    ds.Surface_BuildingLayer = game_alloc(GAME_SEGMENT);  // GetMem(0x2A30)
 }
 
 static void load_map(void)
@@ -234,7 +234,7 @@ static void hotspots_and_blits(void)
 
     // BlitTile: tile 21 (row 1, column 1) of a sheet to window cell (2, 3).
     ds.Mouse_CursorState = 1;
-    uint8_t *sheet = System_GetMem(0x4000);
+    uint8_t *sheet = game_alloc(0x4000);
     memset(sheet, 0, 0x4000);
     for (int r = 0; r < 16; r++)
         memset(sheet + 0x1400 + 16 + r * 320, 0x77, 16);

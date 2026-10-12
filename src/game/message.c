@@ -1,10 +1,12 @@
 #include "game/message.h"
 
 #include <SDL3/SDL.h>
+#include <string.h>
 
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/gfx.h"
+#include "game/le.h"
 #include "game/mouse.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -13,11 +15,6 @@
 
 enum : uint16_t { LOG_ENTRY = 0x35, LOG_MAX = 15 };
 
-static inline const uint8_t *ps(const PString *s)
-{
-    return (const uint8_t *)s;
-}
-
 // Log entry i (1-based): { kind: integer; text: string[50] }.
 static uint8_t *log_entry(int16_t i)
 {
@@ -25,13 +22,12 @@ static uint8_t *log_entry(int16_t i)
 }
 
 // 34b0:0001
-void Message_AddMessageLogEntry(int16_t kind, const uint8_t *text, const uint8_t *voice)
+void Message_AddMessageLogEntry(int16_t kind, const char *text, const char *voice)
 {
-    uint8_t t[256], v[256];
-    SDL_memcpy(t, text, (size_t)text[0] + 1);
-    SDL_memcpy(v, voice, (size_t)voice[0] + 1);
-    if (v[0] != 0)
-        Sound_PlayButtonSfx(v);
+    char t[256];
+    SDL_strlcpy(t, text, sizeof t);
+    if (voice[0] != '\0')
+        Sound_PlayButtonSfx(voice);
     ds.Gfx_FlashStep = 0x3D;
     ds.Gfx_FlashCount = 3;
     Gfx_PaletteFlashTick();
@@ -43,8 +39,8 @@ void Message_AddMessageLogEntry(int16_t kind, const uint8_t *text, const uint8_t
     }
     ds.Message_LogCount++;
     uint8_t *e = log_entry(ds.Message_LogCount);
-    *(int16_t *)e = kind;
-    System_StrStore((const PString *)t, (PString *)(e + 2), 0x32);
+    wr16le(e, kind);
+    pstr_set(e + 2, 0x32, t);
     if (ds.Game_CurrentScreen == 0x0B)
         Message_DrawMessageLog();
 }
@@ -52,38 +48,30 @@ void Message_AddMessageLogEntry(int16_t kind, const uint8_t *text, const uint8_t
 // 34b0:011a
 void Message_ShowMessageLine(int16_t lineNo)
 {
-    uint8_t s[256];
-    TextFile_ReadTextLine(ps(PSTR("message.txt")), lineNo, s);
-    Message_MessageBox(s, ps(PSTR("attentio")), true, s, false, 0);
+    char s[256] = "";
+    TextFile_ReadTextLine("message.txt", lineNo, s, sizeof s);
+    Message_MessageBox(s, "attentio", true, nullptr, false, 0);
 }
 
 // 34b0:0158
-void Message_ShowMessage(const uint8_t *text)
+void Message_ShowMessage(const char *text)
 {
-    uint8_t s[256];
-    SDL_memcpy(s, text, (size_t)text[0] + 1);
-    Message_MessageBox(s, ps(PSTR("message")), true, s, false, 0);
+    Message_MessageBox(text, "message", true, nullptr, false, 0);
 }
 
 // 34b0:0197
-void Message_ShowMessageNoLog(const uint8_t *text)
+void Message_ShowMessageNoLog(const char *text)
 {
-    uint8_t s[256];
-    SDL_memcpy(s, text, (size_t)text[0] + 1);
-    Message_MessageBox(s, ps(PSTR("hiba")), false, s, false, 0);
+    Message_MessageBox(text, "hiba", false, nullptr, false, 0);
 }
 
-// 34b0:01df
+// 34b0:01df: a space on each side (34b0:01dd is the string ' ').
 void Message_ShowKitalalLine(int16_t lineNo)
 {
-    uint8_t line[256];
-    TextFile_ReadTextLine(ps(PSTR("kitalal.txt")), lineNo, line);
-    PString tmp;
-    // A space on each side (34b0:01dd is the string ' ').
-    System_StrLoad(&tmp, PSTR(" "));
-    System_StrConcat(&tmp, (const PString *)line);
-    System_StrConcat(&tmp, PSTR(" "));
-    Message_ShowMessage(ps(&tmp));
+    char line[256] = "", tmp[256];
+    TextFile_ReadTextLine("kitalal.txt", lineNo, line, sizeof line);
+    SDL_snprintf(tmp, sizeof tmp, " %s ", line);
+    Message_ShowMessage(tmp);
 }
 
 // The blinking "Press mouse button" in the status bar: counter 1..50, text
@@ -92,9 +80,9 @@ static void blink(uint16_t *counter)
 {
     *counter = (uint16_t)(*counter % 50 + 1);
     if (*counter == 25)
-        Gfx_DrawStatusText(ps(PSTR("")));
+        Gfx_DrawStatusText("");
     if (*counter == 50)
-        Gfx_DrawStatusText(ps(PSTR("Press mouse button")));
+        Gfx_DrawStatusText("Press mouse button");
 }
 
 static bool button_down(void)
@@ -104,31 +92,27 @@ static bool button_down(void)
 }
 
 // 34b0:0237
-void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, uint8_t *buf,
+void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t *buf,
                         bool edit, uint8_t maxLen)
 {
-    uint8_t txt[256], vc[256];
-    uint8_t lines[7][55];  // string[54], 1..6 (the original has no room for more)
-    SDL_memcpy(txt, text, (size_t)text[0] + 1);
-    SDL_memcpy(vc, voice, (size_t)voice[0] + 1);
+    char lines[7][55] = {};  // string[54], 1..6 (the original has no room for more)
+    int16_t len[7] = {};
 
-    if (vc[0] != 0)
-        Sound_PlayButtonSfx(vc);
-    for (int i = 1; i <= 6; i++)
-        lines[i][0] = 0;
+    if (voice[0] != '\0')
+        Sound_PlayButtonSfx(voice);
 
     int16_t lineCount = 1;
     int16_t editCol = 0, editLine = 0;
-    for (uint16_t i = 1; i <= txt[0]; i++) {
-        if (txt[i] != '|') {
+    for (size_t i = 0; text[i] != '\0' && i < 255; i++) {
+        if (text[i] != '|') {
             // BUG? more than 6 lines overflow the original's array; extra text is dropped here.
-            if (lineCount <= 6 && lines[lineCount][0] < 54)
-                lines[lineCount][1 + lines[lineCount][0]++] = txt[i];
+            if (lineCount <= 6 && len[lineCount] < 54)
+                lines[lineCount][len[lineCount]++] = text[i];
         } else {
             lineCount++;
         }
-        if (txt[i] == '&' && lineCount <= 6) {
-            editCol = lines[lineCount][0];
+        if (text[i] == '&' && lineCount <= 6) {
+            editCol = len[lineCount];
             editLine = lineCount;
         }
     }
@@ -138,8 +122,8 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
     int16_t height = (int16_t)(lineCount * 9);
     int16_t maxw = 0;
     for (int i = 1; i <= lineCount; i++) {
-        if (lines[i][0] > maxw)
-            maxw = lines[i][0];
+        if (len[i] > maxw)
+            maxw = len[i];
     }
     int16_t x0 = (int16_t)(0xA0 - maxw * 6 / 2);
     int16_t y0 = (int16_t)(0x7C - height / 2);
@@ -150,7 +134,7 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
 
     // The original shows the box only when MaxAvail has room to save the
     // screen under it (the port's heap always has).
-    uint8_t *save = System_GetMem(bytes);
+    uint8_t *save = game_alloc(bytes);
     Mouse_HideCursor();
     Blit_CopyRectStrided(gfx_screen() + screen_ofs, save, boxw, boxh, 0x140, boxw);
     Blit_FillRect((int16_t)(x0 - 3), (int16_t)(y0 - 3), boxw, boxh, 2);
@@ -164,7 +148,7 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
         TextFile_InputLine(buf, (int16_t)((editCol - 1) * 6 + x0),
                            (int16_t)(y0 + 1 + (editLine - 1) * 9), maxLen, false);
     } else {
-        Gfx_DrawStatusText(ps(PSTR("Press mouse button")));
+        Gfx_DrawStatusText("Press mouse button");
         uint16_t counter = 0;
         // Wait for the button to be released (if held), pressed, released.
         while (button_down() && !TextFile_KeyPressed() && !input_quit_requested()) {
@@ -179,7 +163,7 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
             Gfx_WaitVRetrace();
             blink(&counter);
         }
-        Gfx_DrawStatusText(ps(PSTR("")));
+        Gfx_DrawStatusText("");
         if (TextFile_KeyPressed())
             (void)TextFile_ReadKey();
     }
@@ -187,19 +171,16 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
     Mouse_HideCursor();
     Blit_CopyRectStrided(save, gfx_screen() + screen_ofs, boxw, boxh, boxw, 0x140);
     Mouse_ShowCursor();
-    System_FreeMem(save, bytes);
+    game_free(save);
 
     if (logIt) {
         // Leading blanks of each line are dropped; empty lines are not logged.
+        const char *logged[7];
         int16_t count = 0;
-        for (int16_t i = 1; i <= lineCount;) {
-            if (lines[i][0] != 0 && lines[i][1] == ' ') {
-                System_Delete((PString *)lines[i], 1, 1);
-                continue;
-            }
-            if (lines[i][0] != 0)
+        for (int16_t i = 1; i <= lineCount; i++) {
+            logged[i] = lines[i] + strspn(lines[i], " ");
+            if (logged[i][0] != '\0')
                 count++;
-            i++;
         }
         if (ds.Message_LogCount + count > LOG_MAX) {
             // BUG? with count > LogCount the count goes negative.
@@ -211,9 +192,9 @@ void Message_MessageBox(const uint8_t *text, const uint8_t *voice, bool logIt, u
         int16_t next = 1;
         for (int16_t i = 1; i <= lineCount; i++) {
             uint8_t *e = log_entry((int16_t)(ds.Message_LogCount + next));
-            if (lines[i][0] != 0) {
-                *(int16_t *)e = 99;
-                System_StrStore((const PString *)lines[i], (PString *)(e + 2), 0x32);
+            if (logged[i][0] != '\0') {
+                wr16le(e, 99);
+                pstr_set(e + 2, 0x32, logged[i]);
                 next++;
             }
         }
@@ -255,22 +236,19 @@ void Message_PlaySatelliteAnim(int16_t satNo)
     SDL_memcpy(saved_pal, ds.Gfx_Palette, 0x300);
     uint8_t *pal = Gfx_PalettePtr();
 
-    uint8_t *pic = System_GetMem(0xBCC0);
-    Gfx_LoadPic(ps(PSTR("grafika\\szatelit")), pic, 1, 0x97, 0, 0, 0x140, true, pal, 0, 0xB0, 0x40,
+    uint8_t *pic = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\szatelit", pic, 1, 0x97, 0, 0, 0x140, true, pal, 0, 0xB0, 0x40,
                 0, 0xBE);
-    uint8_t *back = System_GetMem(0xBCC0);
+    uint8_t *back = game_alloc(0xBCC0);
     Blit_CopyRect(gfx_screen() + 0x3D40, back, 0x140, 0x97);
     Blit_CopyRect(pic, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(pic, 0xBCC0);
+    game_free(pic);
 
-    SatAnim a = {.sprites = System_GetMem(0x2080)};
-    PString num;
-    System_StrLong(satNo, 0, &num, 0xFF);
-    PString name;
-    System_StrLoad(&name, PSTR("grafika\\sat"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), a.sprites, 1, 0x1A, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    a.backup = System_GetMem(0x1040);
+    SatAnim a = {.sprites = game_alloc(0x2080)};
+    char name[32];
+    SDL_snprintf(name, sizeof name, "grafika\\sat%d", satNo);
+    Gfx_LoadPic(name, a.sprites, 1, 0x1A, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    a.backup = game_alloc(0x1040);
     Gfx_FadeIn(0x40, 0xFE, pal);
 
     a.ofs = 0xA93A;
@@ -283,26 +261,25 @@ void Message_PlaySatelliteAnim(int16_t satNo)
         a.ofs = (uint16_t)(a.ofs + step->DX + step->DY * 0x140);
     }
     Gfx_WaitFrames(0x46);
-    System_FreeMem(a.backup, 0x1040);
-    System_FreeMem(a.sprites, 0x2080);
+    game_free(a.backup);
+    game_free(a.sprites);
     Gfx_FadeOut(0x40, 0xFE, pal);
     Blit_CopyRect(back, gfx_screen() + 0x3D40, 0x140, 0x97);
     SDL_memcpy(ds.Gfx_Palette, saved_pal, 0x300);
     Gfx_FadeIn(0x40, 0xFE, pal);
-    System_FreeMem(back, 0xBCC0);
+    game_free(back);
     Mouse_ShowCursor();
 }
 
 // 34b0:0bbe
 void Message_PromptPlanetName(int16_t sys, int16_t planet)
 {
-    PString s;
-    System_StrLoad(&s, PSTR("| The new planet's name in "));
-    System_StrConcat(&s, (const PString *)&ds.Names_Systems[sys - 1]);
-    System_StrConcat(&s, PSTR(" system? &xxxxxxxx |"));
+    char system[256], s[256];
+    pstr_get(system, sizeof system, &ds.Names_Systems[sys - 1]);
+    SDL_snprintf(s, sizeof s, "| The new planet's name in %s system? &xxxxxxxx |", system);
     // The names of system sys are 13-byte records (string[12]) behind Galaxy::Names[sys].
     uint8_t *name = (uint8_t *)&ds.Galaxy_Names[sys - 1][planet - 1];
-    Message_MessageBox(ps(&s), ps(PSTR("")), false, name, true, 9);
+    Message_MessageBox(s, "", false, name, true, 9);
 }
 
 // 34b0:0c14
@@ -310,16 +287,18 @@ void Message_DrawMessageLog(void)
 {
     for (int16_t i = 1; i <= ds.Message_LogCount; i++) {
         uint8_t *e = log_entry(i);
-        int16_t kind = *(int16_t *)e;
+        int16_t kind = rd16le(e);
+        char text[256];
+        pstr_get(text, sizeof text, e + 2);
         if (kind == 1 || kind == 99)
-            Gfx_DrawTextFC(e + 2, 10, (int16_t)(i * 9 + 0x30), 0x32);
+            Gfx_DrawTextFC(text, 10, (int16_t)(i * 9 + 0x30), 0x32);
         else
-            Gfx_DrawTextF9(e + 2, 10, (int16_t)(i * 9 + 0x30), 0x32);
+            Gfx_DrawTextF9(text, 10, (int16_t)(i * 9 + 0x30), 0x32);
     }
 }
 
 // 34b0:0c8e
 void Message_Init(void)
 {
-    ds.Message_Log = System_GetMem(0x31B);
+    ds.Message_Log = game_alloc(0x31B);
 }

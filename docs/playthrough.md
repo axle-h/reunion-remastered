@@ -214,7 +214,7 @@ hash).
    runs again later from what the screens then show.
 
    **Game data block.** Groups and Buildings share one 8770h-byte block
-   (`game/ems.h`). Observers read groups and buildings through
+   (`Game_InitGameData`). Observers read groups and buildings through
    `ui_group_record` and `ui_building_record`. (When the port still
    emulated EMS, the block shared the page frame with the toolbar graphics,
    and read straight from the frame a group's name came back empty right

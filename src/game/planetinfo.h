@@ -8,11 +8,9 @@
 // planets' moons are listed in the TMoonList array ds.Galaxy_MoonLists, whose
 // Moons[] hold indices into the body array. ds.Galaxy_Names has a TBodyName
 // per body.
-//
-// Pascal strings are PString pointers (length byte plus characters), as in
-// system.h.
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "game/dseg.h"
@@ -54,14 +52,16 @@ void PlanetInfo_SelectCurBody(void);
 // 357b:32f1: (symbols.txt names the parameters the wrong way round; the
 // code compares the first one with CurSystem.)
 bool PlanetInfo_IsCurrentBody(int16_t sys, int16_t planet, int16_t moon);
+// The body names, into dst (cap bytes).
 // 357b:332c: name of the planet (moon = 0) or the moon.
-void PlanetInfo_GetBodyName(PString *result, int16_t sys, int16_t planet, int16_t moon);
+void PlanetInfo_GetBodyName(char *dst, size_t cap, int16_t sys, int16_t planet, int16_t moon);
 // 357b:33b3: "<planet> <moon>"
-void PlanetInfo_GetBodyFullName(PString *result, int16_t sys, int16_t planet, int16_t moon);
+void PlanetInfo_GetBodyFullName(char *dst, size_t cap, int16_t sys, int16_t planet, int16_t moon);
 // 357b:346d: "<System> system,planet <p>,moon <m>"
-void PlanetInfo_GetBodyLongName(PString *result, int16_t sys, int16_t planet, int16_t moon);
+void PlanetInfo_GetBodyLongName(char *dst, size_t cap, int16_t sys, int16_t planet, int16_t moon);
 // 357b:355e: "<System> system <p> <m>"
-void PlanetInfo_GetBodyLocationName(PString *result, int16_t sys, int16_t planet, int16_t moon);
+void PlanetInfo_GetBodyLocationName(char *dst, size_t cap, int16_t sys, int16_t planet,
+                                    int16_t moon);
 
 // 357b:3cc0: balances the power of a body's buildings. Switches buildings
 // off (lowest priority first) while twice the output is below the energy

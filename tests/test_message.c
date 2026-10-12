@@ -4,7 +4,8 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/le.h"
+#include "game/main_program.h"
 #include "game/gfx.h"
 #include "game/message.h"
 #include "game/system.h"
@@ -53,7 +54,7 @@ static void reset(void)
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
+    Game_InitGameData();
     Message_Init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
@@ -92,7 +93,7 @@ static void box(void)
     reset();
     uint32_t used = system_heap_used();
     TextFile_KeyPressed = key_pressed_snapshot;
-    Message_ShowMessageNoLog((const uint8_t *)"\x0bHello|World");
+    Message_ShowMessageNoLog("Hello|World");
     CHECK(seen_fill == 2);      // box background
     CHECK(seen_outline != 2);   // outline or the pattern, not the fill
     CHECK(screen_is_pattern());  // background restored
@@ -103,23 +104,23 @@ static void box(void)
 static void logging(void)
 {
     reset();
-    Message_ShowMessage((const uint8_t *)"\x0f Hello||  World");
+    Message_ShowMessage(" Hello||  World");
     // Empty lines are skipped and leading blanks removed; kind 99.
     CHECK(ds.Message_LogCount == 2);
     uint8_t *e1 = ds.Message_Log;
-    CHECK(*(int16_t *)e1 == 99 && e1[2] == 5 && SDL_memcmp(e1 + 3, "Hello", 5) == 0);
+    CHECK(rd16le(e1) == 99 && e1[2] == 5 && SDL_memcmp(e1 + 3, "Hello", 5) == 0);
     uint8_t *e2 = e1 + 0x35;
-    CHECK(*(int16_t *)e2 == 99 && e2[2] == 5 && SDL_memcmp(e2 + 3, "World", 5) == 0);
+    CHECK(rd16le(e2) == 99 && e2[2] == 5 && SDL_memcmp(e2 + 3, "World", 5) == 0);
 
     // The log keeps 15 entries, dropping the oldest.
     for (int i = 0; i < 20; i++)
-        Message_AddMessageLogEntry(2, (const uint8_t *)"\x03" "abc", (const uint8_t *)"\x00");
+        Message_AddMessageLogEntry(2, "abc", "");
     CHECK(ds.Message_LogCount == 15);
-    CHECK(*(int16_t *)ds.Message_Log == 2);
+    CHECK(rd16le(ds.Message_Log) == 2);
 
     // On screen 0Bh the log is drawn.
     ds.Game_CurrentScreen = 0x0B;
-    Message_AddMessageLogEntry(1, (const uint8_t *)"\x03" "xyz", (const uint8_t *)"\x00");
+    Message_AddMessageLogEntry(1, "xyz", "");
     ds.Game_CurrentScreen = 0;
 }
 
@@ -128,7 +129,7 @@ static void editfield(void)
     reset();
     uint8_t name[13] = {0};
     queue = "Bob\r";
-    Message_MessageBox((const uint8_t *)"\x0fName: &xxxxxxxx", (const uint8_t *)"\x00", false, name,
+    Message_MessageBox("Name: &xxxxxxxx", "", false, name,
                        true, 9);
     CHECK(name[0] == 3 && SDL_memcmp(name + 1, "Bob", 3) == 0);
     CHECK(screen_is_pattern());

@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     }
     dseg_init();
     system_init();
-    ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
+    ds.Game_Groups = game_alloc(2 * 32 * sizeof(TGroup));
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
 
     // Addressing: list 1 starts 32 groups after list 0, groups are 1-based.

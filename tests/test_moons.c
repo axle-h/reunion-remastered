@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/main_program.h"
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/message.h"
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
+    Game_InitGameData();
     Message_Init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     CHECK(moon_hotspots(1, 7) == 0);   // Jade
 
     // A satellite carrier reaching Zeus explores its moons (1b8a:2e4e).
-    ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
+    ds.Game_Groups = game_alloc(2 * 32 * sizeof(TGroup));
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     ds.Game_GroupCount = 1;
     TGroup *g = Groups_At(0, 1);

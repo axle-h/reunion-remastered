@@ -213,10 +213,9 @@ static void text(void)
     reset_data();
 
     // As Title::InitTitleAndMainMenu: charset1 at Charset + 80h, 32 rows.
-    ds.Gfx_Charset = System_GetMem(10368);
-    uint8_t name[] = "\x10grafika\\charset1";
+    ds.Gfx_Charset = game_alloc(10368);
     static uint8_t tmp_pal[0x300];
-    Gfx_LoadPic(name, ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
+    Gfx_LoadPic("grafika\\charset1", ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 320, false, tmp_pal, 0, 2, 0, 0, 2);
 
     Pic pic;
     CHECK(pic_load("GRAFIKA\\CHARSET1.PIC", &pic));
@@ -225,8 +224,7 @@ static void text(void)
     CHECK(pic.width == 320);
 
     // "Hi 42" padded to 7 cells, colour 10h, at (10, 20).
-    const uint8_t s[] = "\x05Hi 42";
-    Gfx_DrawText6x8(s, 10, 20, 7, 0x10);
+    Gfx_DrawText6x8("Hi 42", 10, 20, 7, 0x10);
     const char *want = "Hi 42  ";
     bool same = true;
     for (int cell = 0; cell < 7; cell++) {
@@ -261,7 +259,7 @@ static void load_pic(void)
     vid_palette[0x3F][0] = 33;
     vid_palette[0xFE][0] = 33;
     vid_palette[0xFF][0] = 33;
-    uint8_t name[] = "\x0cgrafika\\main";
+    const char *name = "grafika\\main";
     Gfx_LoadPicScreen(name, gfx_screen(), rows, Gfx_PalettePtr());
 
     static uint8_t want[320 * 200];
@@ -286,14 +284,14 @@ static void load_pic(void)
     CHECK(system_heap_used() == 0);
 
     // rows is clipped to the picture height (405f:0ccb): nothing past it.
-    uint8_t *buf = System_GetMem((uint16_t)(320 * (h + 4)));
+    uint8_t *buf = game_alloc((uint16_t)(320 * (h + 4)));
     SDL_memset(buf, 0xEE, (size_t)320 * (h + 4));
     Gfx_LoadPic(name, buf, 1, (uint16_t)(h + 4), 0, 0, 320, false, Gfx_PalettePtr(), 0, 0xB0, 0x40,
                 0, 0xBE);
     CHECK(SDL_memcmp(buf, want, (size_t)w * h) == 0);
     const uint8_t *tail = buf + w * h;
     CHECK(tail[0] == 0xEE && tail[320 * 4 - 1] == 0xEE);
-    System_FreeMem(buf, (uint16_t)(320 * (h + 4)));
+    game_free(buf);
     SDL_free(data);
 }
 
@@ -305,10 +303,10 @@ static void icon_all(void)
     Gfx_IconAllOpenSize(&size);
     Gfx_IconAllClose();
     Gfx_IconAllOpen();
-    uint8_t *buf = System_GetMem(size);
+    uint8_t *buf = game_alloc(size);
     uint16_t lens[ICON_COUNT];
     for (int i = 0; i < ICON_COUNT; i++)
-        Gfx_IconAllReadChunk(&buf, &lens[i]);
+        Gfx_IconAllReadChunk(buf, &lens[i]);
     Gfx_IconAllClose();
     CHECK(ds.Gfx_ReadPos == size - 2 * ICON_COUNT);
 

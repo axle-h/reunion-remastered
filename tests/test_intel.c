@@ -6,7 +6,7 @@
 
 #include "game/alientalk.h"
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/main_program.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
@@ -32,7 +32,7 @@ static void reset(void)
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
+    Game_InitGameData();
     Message_Init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
     CHECK(c->Population == 0 && c->Attitude == 0);
 
     // Groups: SetGroupTarget statuses, SendGroupHome, DisbandGroup with the planet force merge.
-    ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
+    ds.Game_Groups = game_alloc(2 * 32 * sizeof(TGroup));
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     ds.Game_GroupCount = 3;
     ds.Game_PlanetForceCount = 1;
@@ -289,7 +289,6 @@ int main(int argc, char *argv[])
 
     // FirstContact: Status by race, message once, story timers from fixed seeds.
     reset();
-    PString text = {.len = 5, .s = "Hello"};
     for (int rc = 2; rc <= 12; rc++)
         Intel_Race(rc)->Status = 0;
     ds.Research_Products[7].State = 0;
@@ -297,7 +296,7 @@ int main(int argc, char *argv[])
     seed = 555;
     ds.System_RandSeed = seed;
     messages = 0;
-    Intel_FirstContact(2, &text.len);
+    Intel_FirstContact(2, "Hello");
     CHECK(Intel_Race(2)->Status == 4 && messages > 0);
     CHECK(ds.Game_IdeaTimer[7] >= 0x14 && ds.Game_IdeaTimer[7] <= 0x14 + 0x13);
     uint16_t t1 = (uint16_t)ds.Intel_Race2Timer1, t2 = (uint16_t)ds.Intel_Race2Timer2;
@@ -308,29 +307,29 @@ int main(int argc, char *argv[])
     CHECK(t4 >= t3 + 100 && t4 < t3 + 100 + 0x14);
     messages = 0;
     ds.System_RandSeed = seed;
-    Intel_FirstContact(2, &text.len);               // second contact: nothing
+    Intel_FirstContact(2, "Hello");               // second contact: nothing
     CHECK(messages == 0 && ds.System_RandSeed == seed);
-    Intel_FirstContact(0, &text.len);               // race 0: nothing
+    Intel_FirstContact(0, "Hello");               // race 0: nothing
     CHECK(messages == 0);
-    Intel_FirstContact(3, &text.len);
+    Intel_FirstContact(3, "Hello");
     CHECK(Intel_Race(3)->Status == 2);
-    Intel_FirstContact(4, &text.len);
+    Intel_FirstContact(4, "Hello");
     CHECK(Intel_Race(4)->Status == 6);
     CHECK(ds.Game_CurrentScreen == 0x22 && ds.AlienTalk_Race == 5 && ds.Game_ScreenSwitch);
     CHECK(ds.Intel_Race4Timer >= 0x5DC && ds.Intel_Race4Timer < 0x5DC + 500);
     for (int rc = 7; rc <= 10; rc++) {
-        Intel_FirstContact((int16_t)rc, &text.len);
+        Intel_FirstContact((int16_t)rc, "Hello");
         CHECK(Intel_Race(rc)->Status == 2);
     }
     CHECK(ds.Intel_Race7to10Timer >= 200 && ds.Intel_Race7to10Timer < 250);
-    Intel_FirstContact(5, &text.len);
+    Intel_FirstContact(5, "Hello");
     CHECK(Intel_Race(5)->Status == 4);
     CHECK(ds.Intel_Race5Timer >= 0x14 && ds.Intel_Race5Timer < 0x28);
-    Intel_FirstContact(0xB, &text.len);
+    Intel_FirstContact(0xB, "Hello");
     CHECK(Intel_Race(0xB)->Status == 6 && ds.AlienTalk_Race == 10);
     seed = 888;
     ds.System_RandSeed = seed;
-    Intel_FirstContact(0xC, &text.len);
+    Intel_FirstContact(0xC, "Hello");
     CHECK(Intel_Race(0xC)->Status == 2);
     CHECK(ds.Intel_LaunchRace == 12 && ds.Intel_LaunchForce == 3 && ds.Intel_LaunchMission == 2);
     CHECK(ds.Intel_LaunchTimer >= 1000 && ds.Intel_LaunchTimer < 1200);

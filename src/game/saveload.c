@@ -229,7 +229,7 @@ void SaveLoad_LoadInit(void)
 void SaveLoad_ReadSlotNames(void)
 {
     // Allocated afresh on every call, as in the original.
-    ds.SaveLoad_SlotTable = System_GetMem(0x108);
+    ds.SaveLoad_SlotTable = game_alloc(0x108);
     for (int16_t n = 1; n <= SLOT_COUNT; n++) {
         uint8_t *e = slot_entry(n);
         FILE *f = open_slot(n, false);
@@ -257,7 +257,8 @@ static uint8_t *screen_at(uint16_t off)
 static void DrawSlotNames(void)
 {
     for (int16_t n = 1; n <= SLOT_COUNT; n++) {
-        const uint8_t *name = slot_entry(n) + 1;
+        char name[256];
+        pstr_get(name, sizeof name, slot_entry(n) + 1);
         if (n == ds.SaveLoad_SelectedSlot)
             Gfx_DrawTextB3(name, 0x10, (n - 1) * 9 + 0x40, 0x13);
         else
@@ -376,17 +377,17 @@ static void DiskScreenCloseAnim(void)
 // 1a3e:0ee5
 static void DiskScreenInit(void)
 {
-    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
-    ds.Anim_Script = System_GetMem(0x230);
-    ds.SaveLoad_BufFrame = System_GetMem(0x1324);
+    ds.Anim_Record = game_alloc(sizeof(TAnimRecord));
+    ds.Anim_Script = game_alloc(0x230);
+    ds.SaveLoad_BufFrame = game_alloc(0x1324);
     ds.Anim_Record->Loaded = 0;
     Anim_LoadMainAnim(0x11);
-    ds.SaveLoad_BufBack = System_GetMem(0xBCC0);
-    ds.SaveLoad_BufButtons = System_GetMem(0x5140);
+    ds.SaveLoad_BufBack = game_alloc(0xBCC0);
+    ds.SaveLoad_BufButtons = game_alloc(0x5140);
     uint8_t *pal = Gfx_PalettePtr();
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\disk"), ds.SaveLoad_BufBack, 1, 0x97, 0,
+    Gfx_LoadPic("grafika\\disk", ds.SaveLoad_BufBack, 1, 0x97, 0,
                 0, 0x140, ds.Game_StartChoice != 2, pal, 0, 0xB0, 0x40, 0, 0xBE);
-    Gfx_LoadPic((const uint8_t *)PSTR("grafika\\diskbr"), ds.SaveLoad_BufButtons, 1, 0x41,
+    Gfx_LoadPic("grafika\\diskbr", ds.SaveLoad_BufButtons, 1, 0x41,
                 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(ds.SaveLoad_BufBack, screen_at(0x3D40), 0x140, 0x97);
     DrawDiskFrame(ds.Game_MusicTrack == 0 ? 0x16 : 0);
@@ -402,11 +403,11 @@ static void DiskScreenInit(void)
 static void SetupDiskHotspots(void)
 {
     ds.Mouse_HotspotCount = 5;
-    Mouse_SetHotspot(1, 0x111, 0x9B, 0x10, 0x0D, (const uint8_t *)PSTR("Music 1"), 1, 0);
-    Mouse_SetHotspot(2, 0x122, 0x9B, 0x10, 0x0D, (const uint8_t *)PSTR("Music 2"), 1, 0);
-    Mouse_SetHotspot(3, 0x111, 0xA9, 0x22, 0x0D, (const uint8_t *)PSTR("Stop music"), 1, 0);
-    Mouse_SetHotspot(4, 0x111, 0xB7, 0x22, 0x0D, (const uint8_t *)PSTR("Effects on/off"), 1, 0);
-    Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, (const uint8_t *)PSTR("Select slot"), 0, 0);
+    Mouse_SetHotspot(1, 0x111, 0x9B, 0x10, 0x0D, "Music 1", 1, 0);
+    Mouse_SetHotspot(2, 0x122, 0x9B, 0x10, 0x0D, "Music 2", 1, 0);
+    Mouse_SetHotspot(3, 0x111, 0xA9, 0x22, 0x0D, "Stop music", 1, 0);
+    Mouse_SetHotspot(4, 0x111, 0xB7, 0x22, 0x0D, "Effects on/off", 1, 0);
+    Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, "Select slot", 0, 0);
 }
 
 // 1a3e:0008
@@ -444,7 +445,7 @@ void SaveLoad_DiskScreen(void)
     if (ds.Game_MenuCommand == 0x49)
         Gfx_FatalExit();
     if ((uint16_t)ds.Game_HotspotHit > 0x14 && (uint16_t)ds.Game_HotspotHit < 0x19) {
-        Sound_PlayButtonSfx((const uint8_t *)PSTR("x"));
+        Sound_PlayButtonSfx("x");
         SaveLoad_PressButton((int16_t)(ds.Game_HotspotHit - 0x14));
         Gfx_WaitFrames(0x14);
         SaveLoad_PressButton(0);

@@ -29,14 +29,15 @@ enum : int {
 
 // --- Text helpers ---
 
-// A Pascal-string row text as drawn by TextFile_DrawReply: without the
-// answer code ("NN "), '|' line breaks as spaces, runs of blanks as one.
-static void drawn_text(const uint8_t *p, int skip, char *out, size_t size)
+// A row text as drawn by TextFile_DrawReply: without the answer code
+// ("NN "), '|' line breaks as spaces, runs of blanks as one.
+static void drawn_text(const char *p, int skip, char *out, size_t size)
 {
     size_t n = 0;
     bool blank = true;  // drops leading blanks
-    for (int i = 1 + skip; i <= p[0] && n + 1 < size; i++) {
-        char c = p[i] == '|' ? ' ' : (char)p[i];
+    size_t len = SDL_strlen(p);
+    for (size_t i = (size_t)skip; i < len && n + 1 < size; i++) {
+        char c = p[i] == '|' ? ' ' : p[i];
         if (c == ' ') {
             if (!blank)
                 out[n++] = ' ';
@@ -51,7 +52,7 @@ static void drawn_text(const uint8_t *p, int skip, char *out, size_t size)
     out[n] = 0;
 }
 
-static int text_lines(const uint8_t *p)
+static int text_lines(const char *p)
 {
     return TextFile_CountLines(p);
 }
@@ -60,11 +61,7 @@ static int text_lines(const uint8_t *p)
 static bool text_starts(const char *text, const char *want)
 {
     char w[TALK_TEXT_MAX];
-    uint8_t p[256];
-    size_t n = SDL_strlen(want);
-    p[0] = (uint8_t)(n < 255 ? n : 255);
-    SDL_memcpy(p + 1, want, p[0]);
-    drawn_text(p, 0, w, sizeof w);
+    drawn_text(want, 0, w, sizeof w);
     return SDL_strncasecmp(text, w, SDL_strlen(w)) == 0;
 }
 
@@ -83,14 +80,14 @@ static void log_menu(const char *what, const TalkMenu *m)
 }
 
 // Line `line` of TEXT\<name><num><ext>, as the game reads it.
-static void text_file_line(const char *name, const PString *num, const char *ext, int line, uint8_t *out)
+static void text_file_line(const char *name, const PString *num, const char *ext, int line,
+                           char out[256])
 {
-    uint8_t file[64];
-    SDL_snprintf((char *)file + 1, sizeof file - 1, "%s%.*s%s", name, num->len, num->s, ext);
-    file[0] = (uint8_t)SDL_strlen((char *)file + 1);
-    out[0] = 0;
+    char file[64];
+    SDL_snprintf(file, sizeof file, "%s%.*s%s", name, num->len, num->s, ext);
+    out[0] = '\0';
     if (line > 0)
-        TextFile_ReadTextLine(file, (int16_t)line, out);
+        TextFile_ReadTextLine(file, (int16_t)line, out, 256);
 }
 
 // --- Alien talk (screen 34): alientalk.c, main_program.c screen_alien_talk ---
@@ -117,7 +114,7 @@ bool ui_talk_menu(TalkMenu *m)
         return false;
     int row = 1;
     for (int k = 0; k < ds.Alien_CurMenu[0] && k < TALK_QUESTIONS_MAX; k++) {
-        const uint8_t *q = ds.AlienTalk_QuestionBuf + k * 0x100;
+        const char *q = (const char *)ds.AlienTalk_QuestionBuf + k * 0x100;
         drawn_text(q, 3, m->text[k], TALK_TEXT_MAX);
         m->row[k] = row;
         row += text_lines(q);
@@ -131,7 +128,7 @@ void ui_talk_reply(char *out, size_t size)
     out[0] = 0;
     if (!ui_talk_shown() || !ds.AlienTalk_Locked)
         return;
-    uint8_t line[256];
+    char line[256];
     text_file_line("valasz", (const PString *)&ds.AlienTalk_RaceStr, ".at", ds.AlienTalk_ReplyLine,
                    line);
     drawn_text(line, 3, out, size);
@@ -150,9 +147,9 @@ static bool talk_replied(void)
 
 // --- Pub questions (screen 25): pub.c, main_program.c screen_pub_dialog ---
 
-static const uint8_t *pub_line(int i)
+static const char *pub_line(int i)
 {
-    return ds.Pub_Lines + (i - 1) * 256;
+    return (const char *)ds.Pub_Lines + (i - 1) * 256;
 }
 
 bool ui_pub_menu(TalkMenu *m)
@@ -181,7 +178,7 @@ void ui_pub_reply(char *out, size_t size)
         drawn_text(pub_line(1), 3, out, size);
         return;
     }
-    uint8_t line[256];
+    char line[256];
     text_file_line("valasz", (const PString *)&ds.Pub_PersonStr, ".loc", ds.Pub_ReplyLine, line);
     drawn_text(line, 3, out, size);
 }
@@ -402,7 +399,7 @@ bool ui_advisor_menu(TalkMenu *m)
     if (!on_screen(SCREEN_ADVISOR) || ds.Mouse_HotspotCount != 1)
         return false;
     for (int k = 0; k < ds.Advisor_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
-        const uint8_t *p = ds.Advisor_MenuLines + k * 0x3D;
+        const char *p = (const char *)ds.Advisor_MenuLines + k * 0x3D;
         drawn_text(p, 0, m->text[k], TALK_TEXT_MAX);
         m->row[k] = k + 1;
         m->count++;
@@ -418,7 +415,7 @@ void ui_advisor_reply(char *out, size_t size)
         SDL_snprintf(out, size, "It will be %d credits", (int)ds.Advisor_TrainingPrice);
         return;
     }
-    uint8_t line[256];
+    char line[256];
     PString none = {0};
     text_file_line("valasz1.sp", &none, "", ds.Advisor_Answer, line);
     drawn_text(line, 3, out, size);

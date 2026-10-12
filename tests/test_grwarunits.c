@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     }
     dseg_init();
     system_init();
-    ds.Game_Groups = System_GetMem(2 * 32 * sizeof(TGroup));
+    ds.Game_Groups = game_alloc(2 * 32 * sizeof(TGroup));
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     ds.Game_GroupCount = 1;
     ds.Game_PlanetForceCount = 0;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
     g->Units[1][0] = (TGroupSlot){.ShipType = 100, .Weapons = {10, 20, 30, 0}};
     TBody body = {0}; // owner 0: stores ignored
-    ds.Game_CurBody = System_GetMem(sizeof(TBody));
+    ds.Game_CurBody = game_alloc(sizeof(TBody));
     memcpy(ds.Game_CurBody, &body, sizeof body);
 
     GrWarUnits_CollectAvailableForces();

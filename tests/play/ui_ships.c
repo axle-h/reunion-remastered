@@ -4,6 +4,7 @@
 
 #include "game/dseg.h"
 #include "game/groups.h"
+#include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
 #include "play/play.h"
@@ -89,15 +90,16 @@ void ui_group_location(const char *name, char *out, size_t n)
     // Groups_DrawGroupPanel's line.
     static const char *const prefix[] = {"", "In the dock of ", "In orbit ", "",
                                          "Fly to ", "Fly to ", "Fly to "};
-    PString loc;
-    PlanetInfo_GetBodyLocationName(&loc, g->System, g->Planet, g->Moon);
-    SDL_snprintf(out, n, "%s%.*s", g->Status <= 6 ? prefix[g->Status] : "", loc.len, loc.s);
+    char loc[256];
+    PlanetInfo_GetBodyLocationName(loc, sizeof loc, g->System, g->Planet, g->Moon);
+    SDL_snprintf(out, n, "%s%s", g->Status <= 6 ? prefix[g->Status] : "", loc);
 }
 
-static const int16_t *grid_unit(const TGroup *g, int cat, int s)
+// Word w of the unit slot (0 = ShipType; groups.c unit_at).
+static int16_t grid_unit(const TGroup *g, int cat, int s, int w)
 {
     uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
-    return (const int16_t *)((const uint8_t *)g + row * 0x28 + s * 10 - 21);
+    return rd16le((const uint8_t *)g + row * 0x28 + s * 10 - 21 + w * 2);
 }
 
 static const PStr16 *product_name(uint8_t id)
@@ -139,7 +141,7 @@ int ui_group_units(const char *name, const char *ship, const char *weapon)
     int cat, s, w;
     if (!g || !grid_find(g, ship, weapon, &cat, &s, &w))
         return 0;
-    return grid_unit(g, cat, s)[w];
+    return grid_unit(g, cat, s, w);
 }
 
 void ui_cargo_space(int32_t *used, int32_t *cap, int32_t *planet_cap)
@@ -185,8 +187,8 @@ int32_t ui_cargo_planet(const char *item)
     if (row == 0)
         return 0;
     if (row <= 6)
-        return ds.Cargo_Stores[row - 1];
-    return *ds.Cargo_ItemStore[idx - 1];
+        return rd32le(ds.Cargo_Stores + (row - 1) * 4);
+    return rd16le(ds.Cargo_ItemStore[idx - 1]);
 }
 
 // Body hotspots of the system view (PlanetInfo_SetupSystemViewHotspots):
@@ -359,7 +361,7 @@ bool ui_equip(const char *group, const char *ship, const char *weapon, int n)
     // Ship slot buttons are hotspots 8.., weapon buttons 13 + 5 per row.
     int j = w == 0 ? s + 7 : w + 0xC + (s - 1) * 5;
     for (int tries = 0; tries < 4 * n + 20; tries++) {
-        int now = grid_unit(selected_group(), cat, s)[w];
+        int now = grid_unit(selected_group(), cat, s, w);
         if (now == n)
             return true;
         if (j > ds.Mouse_HotspotCount || !ui_hotspot_captioned(j, weapon ? weapon : ship)) {
@@ -368,12 +370,12 @@ bool ui_equip(const char *group, const char *ship, const char *weapon, int n)
         }
         ui_click_hotspot(j, now > n ? UI_PRESS_RIGHT : UI_PRESS);
         ui_settle();
-        if (grid_unit(selected_group(), cat, s)[w] == now) {
+        if (grid_unit(selected_group(), cat, s, w) == now) {
             play_log("ui_equip: %s stays at %d (wanted %d)", weapon ? weapon : ship, now, n);
             return false;
         }
     }
-    return grid_unit(selected_group(), cat, s)[w] == n;
+    return grid_unit(selected_group(), cat, s, w) == n;
 }
 
 typedef struct {

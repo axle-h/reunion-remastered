@@ -1,8 +1,11 @@
 #include "game/shipinfo.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/le.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/satellite.h"
@@ -10,11 +13,10 @@
 #include "game/system.h"
 
 // 357b:332c PlanetInfo::GetBodyName (result is a 255-character temporary)
-void PlanetInfo_GetBodyName(PString *result, int16_t system, int16_t planet, int16_t moon);
+void PlanetInfo_GetBodyName(char *dst, size_t cap, int16_t system, int16_t planet, int16_t moon);
 // 357b:3253
 void PlanetInfo_SelectCurBody(void);
 
-#define S(lit) ((const uint8_t *)PSTR(lit))
 
 // Offset of the info panel text lines and of the grid on screen, from the code.
 enum : uint16_t {
@@ -77,7 +79,7 @@ void ShipInfo_ShipInfoScreen(void)
         ds.Game_CurMoon[ds.Game_CurSystem - 1] = g->Moon;
         PlanetInfo_SelectCurBody();
         if (ds.Mouse_HeldLeft != 0 && ds.Game_GroupList == 0) {
-            Sound_PlayButtonSfx(S("controll"));
+            Sound_PlayButtonSfx("controll");
             if (ds.Game_SelGroup != 0)
                 ShipInfo_EraseSelectionMarker();
             ds.Game_SelGroup = (int16_t)(ds.Game_HotspotHit - 0x36);
@@ -88,7 +90,7 @@ void ShipInfo_ShipInfoScreen(void)
             ds.Game_CurrentScreen = 0x11;
         }
         if (ds.Mouse_HeldLeft == 0 || ds.Game_GroupList == 1) {
-            Sound_PlayButtonSfx(S("group"));
+            Sound_PlayButtonSfx("group");
             if (ds.Game_SelGroup != 0)
                 ShipInfo_EraseSelectionMarker();
             ds.Game_SelGroup = (int16_t)(ds.Game_HotspotHit - 0x36);
@@ -108,9 +110,9 @@ void ShipInfo_ShipInfoScreen(void)
     // only when it switches).
     if (ds.Game_HotspotHit == 0x15) {
         if (ds.Game_GroupList == 0) {
-            Sound_PlayButtonSfx(S("hiba"));
+            Sound_PlayButtonSfx("hiba");
         } else {
-            Sound_PlayButtonSfx(S("change"));
+            Sound_PlayButtonSfx("change");
             ds.Game_GroupList = 0;
             ds.Game_ShownGroupCount = ds.Game_GroupCount;
             ds.Game_SelGroup = ds.Game_SelGroup0;
@@ -123,9 +125,9 @@ void ShipInfo_ShipInfoScreen(void)
     }
     if (ds.Game_HotspotHit == 0x15) {
         if (ds.Game_GroupList == 1) {
-            Sound_PlayButtonSfx(S("hiba"));
+            Sound_PlayButtonSfx("hiba");
         } else {
-            Sound_PlayButtonSfx(S("change"));
+            Sound_PlayButtonSfx("change");
             ds.Game_GroupList = 1;
             ds.Game_ShownGroupCount = ds.Game_PlanetForceCount;
             ds.Game_SelGroup = ds.Game_SelGroup1;
@@ -153,25 +155,21 @@ void ShipInfo_ShipInfoScreen(void)
 }
 
 // grafika\ship<list+1>
-static void ship_backdrop_name(PString *tmp)
+static const char *ship_backdrop_name(char name[32])
 {
-    PString num;
-    System_StrLong(ds.Game_GroupList + 1, 0, &num, 255);
-    System_StrLoad(tmp, PSTR("grafika\\ship"));
-    System_StrConcat(tmp, &num);
+    SDL_snprintf(name, 32, "grafika\\ship%d", ds.Game_GroupList + 1);
+    return name;
 }
 
 // 26fe:02e6
 void ShipInfo_InitShipInfoScreen(void)
 {
-    PString name;
-    ds.ShipInfo_Backdrop = System_GetMem(0xBCC0);
-    ship_backdrop_name(&name);
-    Gfx_LoadPicScreen((const uint8_t *)&name, ds.ShipInfo_Backdrop, 0x97,
-                      Gfx_PalettePtr());
+    char name[32];
+    ds.ShipInfo_Backdrop = game_alloc(0xBCC0);
+    Gfx_LoadPicScreen(ship_backdrop_name(name), ds.ShipInfo_Backdrop, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(ds.ShipInfo_Backdrop, gfx_screen() + ROW49, 320, 0x97);
-    ds.ShipInfo_Sprites = System_GetMem(0x5000);
-    Gfx_LoadPic(S("grafika\\ship3"), ds.ShipInfo_Sprites, 1, 0x40, 0, 0, 320, false,
+    ds.ShipInfo_Sprites = game_alloc(0x5000);
+    Gfx_LoadPic("grafika\\ship3", ds.ShipInfo_Sprites, 1, 0x40, 0, 0, 320, false,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     ShipInfo_DrawAllGroupIcons();
     if (ds.Game_SelGroup != 0) {
@@ -252,13 +250,12 @@ void ShipInfo_DrawGroupIconBuffered(int16_t icon, int16_t slot)
 // wipes them in along a rotating line.
 void ShipInfo_SwitchGroupList(void)
 {
-    PString name;
-    ship_backdrop_name(&name);
-    Gfx_LoadPic((const uint8_t *)&name, ds.ShipInfo_Backdrop, 1, 0x97, 0, 0, 320, false,
+    char name[32];
+    Gfx_LoadPic(ship_backdrop_name(name), ds.ShipInfo_Backdrop, 1, 0x97, 0, 0, 320, false,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    ds.ShipInfo_Buffer = System_GetSegment();  // GetMem(0xFB40)
-    // 26fe:0710: the buffer is addressed by its segment, as in the icon
-    // routines (a whole segment in the port: System_GetSegment).
+    // 26fe:0710: a 320-wide image of the view from row 49. The icons and
+    // markers (slots 1..32) and the wipe's lines stay inside it.
+    ds.ShipInfo_Buffer = game_alloc(0xFB40);
     Blit_CopyBytes(ds.ShipInfo_Backdrop, ds.ShipInfo_Buffer + ROW49, 0xBCC0);
     int16_t n = ds.Game_ShownGroupCount;
     for (int16_t i = 1; i <= n; i++)
@@ -298,27 +295,25 @@ void ShipInfo_SwitchGroupList(void)
         Gfx_DrawLineCopy(gfx_screen(), x, 0x31, 0x5F, 0x7D, bseg);
     }
     Mouse_ShowCursor();
-    System_FreeSegment(ds.ShipInfo_Buffer);
+    game_free(ds.ShipInfo_Buffer);
 }
 
-static void store30(const PString *src, PString *dst) { System_StrStore(src, dst, 0x1E); }
+// The panel's strings are string[30]s.
+enum { S30 = 31 };
 
 // "Time remaining: n": (pilot experience + legs) / (experience + 1) + jump
 static void draw_time_remaining(const TGroup *g, int16_t y)
 {
-    PString s30, tmp;
+    char s30[S30];
     int16_t legs = (int16_t)(g->Leg1 + g->Leg2);
     uint16_t exp = ds.Game_StaffExp[0];
     int32_t dividend = (int32_t)exp + legs;
     uint16_t divisor = (uint16_t)(exp + 1);
     if (divisor == 0)
-        System_RunError(200);
+        System_RunError(200, nullptr);
     int32_t q = dividend / divisor;
-    System_StrLong(q + g->Jump, 0, &s30, 0x1E);
-    System_StrLoad(&tmp, PSTR("Time remaining:"));
-    System_StrConcat(&tmp, &s30);
-    store30(&tmp, &s30);
-    Gfx_DrawTextF9((const uint8_t *)&s30, 0xCA, y, 0x12);
+    SDL_snprintf(s30, sizeof s30, "Time remaining:%d", (int)(q + g->Jump));
+    Gfx_DrawTextF9(s30, 0xCA, y, 0x12);
 }
 
 // 26fe:093b: right-hand info panel for the selected group
@@ -329,40 +324,38 @@ void ShipInfo_DrawGroupInfo(void)
         return;
     }
     const TGroup *g = Groups_Selected();
-    PString tmp, loc1, loc2, num;
-    PlanetInfo_GetBodyName(&tmp, g->System, g->Planet, 0);
-    store30(&tmp, &loc1);
-    PlanetInfo_GetBodyName(&tmp, g->System, g->Planet, g->Moon);
-    store30(&tmp, &loc2);
-    if (g->Moon == 0)
-        loc2.len = 0;
+    char loc1[S30], loc2[S30] = "", num[S30], name[256], system[256];
+    PlanetInfo_GetBodyName(loc1, sizeof loc1, g->System, g->Planet, 0);
+    if (g->Moon != 0)
+        PlanetInfo_GetBodyName(loc2, sizeof loc2, g->System, g->Planet, g->Moon);
+    pstr_get(name, sizeof name, &g->Name);
 
     if (g->Status == 7) {
-        Gfx_DrawTextFC((const uint8_t *)&g->Name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9(S("Base on: "), 0xCA, 0x46, 0x12);
-        System_StrLong(g->System, 0, &num, 0x1E);
-        Gfx_DrawTextF9((const uint8_t *)&ds.Names_Systems[g->System - 1], 0x102, 0x46, 8);
-        Gfx_DrawTextF9((const uint8_t *)&loc1, 0xD3, 0x4F, 0xF);
-        Gfx_DrawTextF9((const uint8_t *)&loc2, 0xDC, 0x59, 0xE);
-        Gfx_DrawTextF9(S(""), 0xCA, 0x64, 0x12);
+        Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
+        Gfx_DrawTextF9("Base on: ", 0xCA, 0x46, 0x12);
+        pstr_get(system, sizeof system, &ds.Names_Systems[g->System - 1]);
+        Gfx_DrawTextF9(system, 0x102, 0x46, 8);
+        Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
+        Gfx_DrawTextF9(loc2, 0xDC, 0x59, 0xE);
+        Gfx_DrawTextF9("", 0xCA, 0x64, 0x12);
     }
     if (g->Status >= 4 && g->Status <= 6) {
-        Gfx_DrawTextFC((const uint8_t *)&g->Name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9(S("Destination:"), 0xCA, 0x46, 0x12);
-        System_StrLong(g->System, 0, &num, 0x1E);
-        Gfx_DrawTextF9((const uint8_t *)&ds.Names_SystemsShort[g->System - 1], 0x114, 0x46, 5);
-        Gfx_DrawTextF9((const uint8_t *)&loc1, 0xD3, 0x4F, 0xF);
-        Gfx_DrawTextF9((const uint8_t *)&loc2, 0xDC, 0x59, 0xE);
+        Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
+        Gfx_DrawTextF9("Destination:", 0xCA, 0x46, 0x12);
+        pstr_get(system, sizeof system, &ds.Names_SystemsShort[g->System - 1]);
+        Gfx_DrawTextF9(system, 0x114, 0x46, 5);
+        Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
+        Gfx_DrawTextF9(loc2, 0xDC, 0x59, 0xE);
         draw_time_remaining(g, 100);
     }
     if (g->Status == 1 || g->Status == 2) {
-        Gfx_DrawTextFC((const uint8_t *)&g->Name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9(S("Currently on:"), 0xCA, 0x46, 0x12);
-        System_StrLong(g->System, 0, &num, 0x1E);
-        Gfx_DrawTextF9((const uint8_t *)&ds.Names_SystemsShort[g->System - 1], 0x11A, 0x46, 5);
-        Gfx_DrawTextF9((const uint8_t *)&loc1, 0xD3, 0x4F, 0xF);
-        Gfx_DrawTextF9((const uint8_t *)&loc2, 0xDC, 0x59, 0xE);
-        Gfx_DrawTextF9(S(""), 0xCA, 0x64, 0x12);
+        Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
+        Gfx_DrawTextF9("Currently on:", 0xCA, 0x46, 0x12);
+        pstr_get(system, sizeof system, &ds.Names_SystemsShort[g->System - 1]);
+        Gfx_DrawTextF9(system, 0x11A, 0x46, 5);
+        Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
+        Gfx_DrawTextF9(loc2, 0xDC, 0x59, 0xE);
+        Gfx_DrawTextF9("", 0xCA, 0x64, 0x12);
     }
 
     // Clear the unit list area, then one line per non-empty slot of each category.
@@ -383,10 +376,10 @@ void ShipInfo_DrawGroupInfo(void)
                 const uint8_t *entry = layout + j * 0x19 + 0x21;
                 int16_t count = units[j - 1].ShipType;
                 if (count > 0) {
-                    System_StrLong(count, 3, &num, 0x1E);
-                    Gfx_DrawTextF9(entry + 2, 0xCC, y, 0xB);
-                    Gfx_DrawTextF9(S(":"), 0x112, y, 1);
-                    Gfx_DrawTextFC((const uint8_t *)&num, 0x118, y, 4);
+                    Gfx_DrawTextF9(pstr_get(name, sizeof name, entry + 2), 0xCC, y, 0xB);
+                    Gfx_DrawTextF9(":", 0x112, y, 1);
+                    SDL_snprintf(num, sizeof num, "%3d", count);
+                    Gfx_DrawTextFC(num, 0x118, y, 4);
                     y = (int16_t)(y + 9);
                 }
             }
@@ -398,15 +391,17 @@ void ShipInfo_DrawGroupInfo(void)
 
     if (g->Kind == 4) {
         // Carrier: satellites in the first unit slot's weapon words.
-        const int16_t *words = (const int16_t *)&g->Units[0][0];
+        const uint8_t *words = (const uint8_t *)&g->Units[0][0];
         const uint8_t *layout = ds.Groups_TypeSlots[g->Kind - 1].Layout[3];
         int n = layout[1];
         for (int j = 1; j <= n; j++) {
-            if (words[j] > 0) {
-                System_StrLong(words[j], 3, &num, 0x1E);
-                Gfx_DrawTextF9((const uint8_t *)&ds.Names_Satellites[j - 1], 0xD0, y, 0xB);
-                Gfx_DrawTextF9(S(":"), 0x112, y, 1);
-                Gfx_DrawTextFC((const uint8_t *)&num, 0x118, y, 4);
+            int16_t count = rd16le(words + j * 2);
+            if (count > 0) {
+                Gfx_DrawTextF9(pstr_get(name, sizeof name, &ds.Names_Satellites[j - 1]), 0xD0, y,
+                               0xB);
+                Gfx_DrawTextF9(":", 0x112, y, 1);
+                SDL_snprintf(num, sizeof num, "%3d", count);
+                Gfx_DrawTextFC(num, 0x118, y, 4);
                 y = (int16_t)(y + 9);
             }
         }
@@ -423,10 +418,10 @@ void ShipInfo_DrawGroupInfo(void)
             total = (int16_t)(total + g->Units[0][j - 1].Weapons[3]);
     }
     if (g->Kind == 2 && total > 0) {
-        System_StrLong(total, 3, &num, 0x1E);
-        Gfx_DrawTextF9(S("Miner stat"), 0xD0, y, 0xB);
-        Gfx_DrawTextF9(S(":"), 0x112, y, 1);
-        Gfx_DrawTextFC((const uint8_t *)&num, 0x118, y, 4);
+        SDL_snprintf(num, sizeof num, "%3d", total);
+        Gfx_DrawTextF9("Miner stat", 0xD0, y, 0xB);
+        Gfx_DrawTextF9(":", 0x112, y, 1);
+        Gfx_DrawTextFC(num, 0x118, y, 4);
     }
 }
 
@@ -438,20 +433,17 @@ void ShipInfo_DrawGroupFlightInfo(void)
         return;
     }
     const TGroup *g = Groups_Selected();
-    PString tmp, loc1, loc2, num;
-    PlanetInfo_GetBodyName(&tmp, g->System, g->Planet, 0);
-    store30(&tmp, &loc1);
-    PlanetInfo_GetBodyName(&tmp, g->System, g->Planet, g->Moon);
-    store30(&tmp, &loc2);
-    if (g->Moon == 0)
-        loc2.len = 0;
+    char loc1[S30], loc2[S30] = "", name[256];
+    PlanetInfo_GetBodyName(loc1, sizeof loc1, g->System, g->Planet, 0);
+    if (g->Moon != 0)
+        PlanetInfo_GetBodyName(loc2, sizeof loc2, g->System, g->Planet, g->Moon);
     if (g->Status == 4 || g->Status == 5 || g->Status == 6) {
-        Gfx_DrawTextF9(S("Destination:"), 0xCA, 0x46, 0x12);
-        System_StrLong(g->System, 0, &num, 0x1E);
-        Gfx_DrawTextF9((const uint8_t *)&ds.Names_SystemsShort[g->System - 1], 0x114, 0x46, 5);
-        Gfx_DrawTextF9((const uint8_t *)&loc1, 0xD3, 0x4F, 0xF);
+        Gfx_DrawTextF9("Destination:", 0xCA, 0x46, 0x12);
+        Gfx_DrawTextF9(pstr_get(name, sizeof name, &ds.Names_SystemsShort[g->System - 1]), 0x114,
+                       0x46, 5);
+        Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
         if (g->Moon != 0)
-            Gfx_DrawTextF9((const uint8_t *)&loc2, 0xDC, 0x59, 0xE);
+            Gfx_DrawTextF9(loc2, 0xDC, 0x59, 0xE);
         draw_time_remaining(g, 100);
     }
 }
@@ -492,19 +484,18 @@ void ShipInfo_EraseSelectionMarkerBuffered(void)
 void ShipInfo_SetupShipInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = (int16_t)(ds.Game_ShownGroupCount + 0x22);
-    Mouse_SetHotspot(1, 0, 0xBC, 200, 12, S("Change mode"), 1, 0);
-    Mouse_SetHotspot(2, 0, 0, 0, 0, S(""), 1, 0);
+    Mouse_SetHotspot(1, 0, 0xBC, 200, 12, "Change mode", 1, 0);
+    Mouse_SetHotspot(2, 0, 0, 0, 0, "", 1, 0);
     for (int16_t i = 1; i <= 0x20; i++) {
         THotspot *h = Mouse_Hotspot((int16_t)(i + 2));
         h->X = (int16_t)(((i - 1) / 8) * 0x30);
         h->Y = (uint8_t)(((i - 1) % 8 << 4) + 0x3C);
         h->W = 0x10;
         h->H = 0x11;
-        if (ds.Game_ShownGroupCount < i)
-            h->Caption.len = 0;
-        else
-            System_StrStore((const PString *)&Groups_At(ds.Game_GroupList, i)->Name,
-                            (PString *)&h->Caption, 0x12);
+        char name[256] = "";
+        if (ds.Game_ShownGroupCount >= i)
+            pstr_get(name, sizeof name, &Groups_At(ds.Game_GroupList, i)->Name);
+        pstr_set(&h->Caption, 0x12, name);
         h->Repeat_ = 0;
         h->_1A = 0;
     }
@@ -514,8 +505,9 @@ void ShipInfo_SetupShipInfoHotspots(void)
         h->Y = (uint8_t)(((i - 1) % 8 << 4) + 0x3C);
         h->W = 0x20;
         h->H = 0x11;
-        System_StrStore((const PString *)&Groups_At(ds.Game_GroupList, i)->Name,
-                        (PString *)&h->Caption, 0x12);
+        char name[256];
+        pstr_get(name, sizeof name, &Groups_At(ds.Game_GroupList, i)->Name);
+        pstr_set(&h->Caption, 0x12, name);
         h->Repeat_ = 0;
         h->_1A = 0;
     }

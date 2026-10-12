@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     CHECK(!Adlib_Playing());
 
     // Un-obfuscated MAIN1 starts with its order list 0, 1, 2, ...
-    AdlibMusic_LoadMusicFile((const uint8_t *)"\x05" "main1");
+    AdlibMusic_LoadMusicFile("main1");
     const uint8_t *tune = AdlibMusic_Tune();
     CHECK(tune[0] == 0 && tune[1] == 1 && tune[2] == 2 && tune[11] == 11);
 
@@ -97,10 +97,7 @@ int main(int argc, char *argv[])
     static const char *const names[] = { "atv1", "atv2", "atv3", "atv4", "atv5", "choise",
                                          "earth", "failure", "main2", "space", "talk" };
     for (size_t i = 0; i < SDL_arraysize(names); i++) {
-        uint8_t name[16];
-        name[0] = (uint8_t)SDL_strlen(names[i]);
-        SDL_memcpy(name + 1, names[i], name[0]);
-        Music_PlayTrack(name);
+        Music_PlayTrack(names[i]);
         p = render(4, &rms);
         printf("%s: peak %d, rms %.0f\n", names[i], p, rms);
         CHECK(Adlib_Playing());
@@ -109,7 +106,7 @@ int main(int argc, char *argv[])
     Music_StopMusic();
 
     // The music volume applies to the OPL too.
-    Music_PlayTrack((const uint8_t *)"\x05" "main2");
+    Music_PlayTrack("main2");
     render(2, nullptr);
     audio_set_music_volume(0);
     render(1, nullptr); // the 512-frame chunk in progress may still be loud
@@ -148,7 +145,7 @@ int main(int argc, char *argv[])
     config.music = CONFIG_MUSIC_SOUND_BLASTER;
     Music_SwitchDevice();
     CHECK(ds.Music_Backend == 1 && ds.Game_MusicTrack == 1);
-    Music_PlayTrack((const uint8_t *)"\x04" "talk");
+    Music_PlayTrack("talk");
     CHECK(Adlib_Playing());
     config.music = CONFIG_MUSIC_GUS;
     Music_SwitchDevice();
@@ -165,7 +162,7 @@ int main(int argc, char *argv[])
 
     // The start menu's hero voice stays held back when the music switches to
     // the modules there, and comes in when let go.
-    Music_PlayTrack((const uint8_t *)"\x06" "choise");
+    Music_PlayTrack("choise");
     Music_HoldHeroVoice(true);
     config.music = CONFIG_MUSIC_GUS;
     Music_SwitchDevice();

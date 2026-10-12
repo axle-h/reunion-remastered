@@ -40,9 +40,9 @@ void Mouse_HitTest(uint16_t *hit);
 void Mouse_HitTestCursor(int16_t *hit);
 // 4758:0749
 void Mouse_ClearHotspots(int16_t first, int16_t last);
-// 4758:079d; caption is a Pascal string (length byte + chars).
+// 4758:079d: caption is cut to 18 characters (the hotspot's string[18]).
 void Mouse_SetHotspot(int16_t index, int16_t x, uint8_t y, int16_t w, uint8_t h,
-                      const uint8_t *caption, uint8_t repeat_, uint8_t flag);
+                      const char *caption, uint8_t repeat_, uint8_t flag);
 
 // Hotspot j (1..66, as in Pascal).
 static inline THotspot *Mouse_Hotspot(int16_t j)

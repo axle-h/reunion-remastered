@@ -9,8 +9,6 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-#define P(lit) ((const uint8_t *)PSTR(lit))
-
 // 1413:000a
 void BaseEff_BaseEffScreen(void)
 {
@@ -61,7 +59,7 @@ void BaseEff_BaseEffScreen(void)
     }
     const TBody *body = ds.Game_CurBody;
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == 0x15) {
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
         if ((int8_t)body->Owner > 1 && body->InfoLevel > 0x27) {
             ds.PlanetInfo_AlienMode = 1;
             PlanetInfo_DrawAlienInfoScreen();
@@ -70,12 +68,12 @@ void BaseEff_BaseEffScreen(void)
         ds.Game_HotspotHit = 0;
     }
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == 0x16) {
-        Sound_PlayButtonSfx(P("baseeff"));
+        Sound_PlayButtonSfx("baseeff");
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x10;
     }
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == 0x17) {
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
         if (body->InfoLevel > 5) {
             ds.PlanetInfo_AlienMode = 3;
             PlanetInfo_DrawPlanetSurfaceBackdrop();
@@ -85,14 +83,14 @@ void BaseEff_BaseEffScreen(void)
     }
     // Port addition (game/colonystats.h): the POP row opens the colony stats.
     if (ds.PlanetInfo_AlienMode == 0 && ds.Game_HotspotHit == COLONY_STATS_HIT) {
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
         ds.PlanetInfo_AlienMode = COLONY_STATS_MODE;
         ColonyStats_Draw();
         PlanetInfo_SetupPlanetInfoHotspots();
         ds.Game_HotspotHit = 0;
     }
     if (ds.PlanetInfo_AlienMode != 0 && ds.Game_HotspotHit == 0x15) {
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
         ds.PlanetInfo_AlienMode = 0;
         PlanetInfo_DrawPlanetInfoScreen();
         PlanetInfo_SetupPlanetInfoHotspots();

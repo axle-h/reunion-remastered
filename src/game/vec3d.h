@@ -2,11 +2,11 @@
 // orthographic projection with a cosine table, per-object normals and
 // centroids, flat-shaded polygon fill and wireframe edges.
 //
-// Everything is integer code ported for bit-exact results: 16-bit words
-// wrap, 16-bit offsets from a pointer wrap (bufSeg is a segment's start),
-// and Real48 arithmetic goes through the System unit's ports. Points are 6-byte records of three words;
-// faces are 20-byte records of 1-based vertex-index bytes ended by FFh;
-// edges are two index bytes.
+// Everything is ported for bit-exact results: 16-bit words wrap, 16-bit
+// offsets from a pointer wrap (bufSeg is a segment's start), and the
+// original's Real arithmetic is integer or double code with the same results.
+// Points are 6-byte records of three words; faces are 20-byte records of
+// 1-based vertex-index bytes ended by FFh; edges are two index bytes.
 //
 // Data segment state: Vec3D_CosTable, Vec3D_Centroids (per object slot),
 // the two x-per-scanline edge tables Vec3D_EdgesA/B, and the current model
@@ -44,5 +44,5 @@ void Vec3D_TraceEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t *ta
 // scale. mode 2 swaps the first two matrix rows.
 void Vec3D_Project(int16_t a, int16_t b, int16_t c, uint8_t *src, uint8_t *dst, int16_t scale,
                    int16_t count, int16_t mode);
-// 3e17:18db: cos500[i] = Round(Cos(i * pi / 180) * 500) in Real48.
+// 3e17:18db: cos500[i] = Round(Cos(i * pi / 180) * 500).
 void Vec3D_InitCosTable(void);

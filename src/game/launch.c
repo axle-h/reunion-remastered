@@ -14,7 +14,7 @@ void PlanetInfo_SetupSystemViewHotspots(void);   // 357b:18cc
 void PlanetInfo_InitSystemView(void);            // 357b:235a
 void PlanetInfo_ReloadSystemView(void);          // 357b:26ee
 void PlanetInfo_SelectCurBody(void);             // 357b:3253
-void Message_ShowMessageNoLog(const uint8_t *text); // 34b0:0197
+void Message_ShowMessageNoLog(const char *text); // 34b0:0197
 
 // The system view table (Launch::SystemViewTable, filled by PlanetInfo): Kind <= 4 is a
 // group, else the force of race Kind - 3; Index is the group or force number.
@@ -27,8 +27,7 @@ void Message_ShowMessageNoLog(const uint8_t *text); // 34b0:0197
 #define CUR_PLANET (ds.Game_CurPlanet[ds.Game_CurSystem - 1])
 #define CUR_MOON (ds.Game_CurMoon[ds.Game_CurSystem - 1])
 
-#define SFX(lit) ((const uint8_t *)PSTR(lit))
-#define MSG(lit) Message_ShowMessageNoLog((const uint8_t *)PSTR(lit))
+#define MSG(lit) Message_ShowMessageNoLog(lit)
 
 // 18e0:00e8
 void Launch_MapScreen(void)
@@ -64,14 +63,14 @@ void Launch_MapScreen(void)
     // A star system was clicked while the galaxy is shown.
     if (hit > 0x14 && hit < 0x1D && CUR_PLANET == 0) {
         if (ds.Game_CurSystem < 0 || ds.Game_CurSystem != ds.Game_HotspotHit - 0x14) {
-            Sound_PlayButtonSfx(SFX("x"));
+            Sound_PlayButtonSfx("x");
             ds.Game_CurSystem = ds.Game_HotspotHit - 0x14;
             CUR_PLANET = 0;
             PlanetInfo_SetupSystemViewHotspots();
             PlanetInfo_ReloadSystemView();
             ds.Game_HotspotHit = 0;
         } else {
-            Sound_PlayButtonSfx(SFX("x"));
+            Sound_PlayButtonSfx("x");
         }
     }
 
@@ -80,7 +79,7 @@ void Launch_MapScreen(void)
     if (hit > 0x14 && hit < 0x27 && CUR_PLANET != 0 && ds.Mouse_HeldLeft == 0) {
         int16_t e = ds.Game_HotspotHit - 0x14;
         if (SYS_VIEW(e).Kind < 5) {
-            Sound_PlayButtonSfx(SFX("controll"));
+            Sound_PlayButtonSfx("controll");
             ds.Game_GroupList = 0;
             ds.Game_SelGroup = SYS_VIEW(e).Index;
             ds.Game_ShownGroupCount = ds.Game_GroupCount;
@@ -88,7 +87,7 @@ void Launch_MapScreen(void)
             ds.Game_ScreenSwitch = true;
             ds.Game_SelGroup0 = ds.Game_SelGroup;
         } else {
-            Sound_PlayButtonSfx(SFX("x"));
+            Sound_PlayButtonSfx("x");
         }
     }
 
@@ -97,7 +96,7 @@ void Launch_MapScreen(void)
     if (hit > 0x14 && hit < 0x27 && CUR_PLANET != 0 && ds.Mouse_HeldLeft != 0
         && ds.Mouse_Buttons == 0) {
         int16_t e = ds.Game_HotspotHit - 0x14;
-        Sound_PlayButtonSfx(SFX("x"));
+        Sound_PlayButtonSfx("x");
         ds.Launch_InvadeIcon = 0;
         bool anyFighter = false;
         for (int16_t i = 1; i <= 0x12; i++)
@@ -154,12 +153,12 @@ void Launch_MapScreen(void)
             ds.Game_CurrentScreen = 8;
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
             CUR_MOON = 0;
-            Sound_PlayButtonSfx(SFX("planetin"));
+            Sound_PlayButtonSfx("planetin");
         } else {
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
             CUR_MOON = 0;
             ds.Game_HotspotHit = 0;
-            Sound_PlayButtonSfx(SFX("planet"));
+            Sound_PlayButtonSfx("planet");
             GfxPath_SetToolbar(7);
             GfxPath_AddToolbarIcon(0x21);
             GfxPath_ShowToolbar();
@@ -177,10 +176,10 @@ void Launch_MapScreen(void)
         ds.Game_ScreenSwitch = true;
         if (ds.Mouse_HeldLeft == 0) {
             ds.Game_CurrentScreen = 8;
-            Sound_PlayButtonSfx(SFX("planetin"));
+            Sound_PlayButtonSfx("planetin");
         } else {
             ds.Game_CurrentScreen = 0x14;
-            Sound_PlayButtonSfx(SFX("surface"));
+            Sound_PlayButtonSfx("surface");
         }
         CUR_MOON = ds.Game_HotspotHit - 0x27;
     }
@@ -234,7 +233,7 @@ void Launch_MapScreen(void)
         } else if (Groups_IsGroupEmpty(0, sel)) {
             MSG(" No ships in this unit! ");
         } else if (g->Status == 2) {
-            Sound_PlayButtonSfx(SFX("x"));
+            Sound_PlayButtonSfx("x");
             ds.Game_ScreenSwitch = true;
             ds.Game_CurrentScreen = 0x12;
         } else {
@@ -280,7 +279,7 @@ void Launch_DestinationScreen(void)
             if ((ds.Game_StaffHired[0] == 2 && ds.Game_CurSystem < 4
                  && (uint16_t)(ds.Game_HotspotHit - 0x14) < 4)
                 || ds.Game_StaffHired[0] == 3 || g->Kind == 4) {
-                Sound_PlayButtonSfx(SFX("x"));
+                Sound_PlayButtonSfx("x");
                 ds.Game_CurSystem = ds.Game_HotspotHit - 0x14;
                 CUR_PLANET = 0;
                 PlanetInfo_SetupSystemViewHotspots();
@@ -297,14 +296,14 @@ void Launch_DestinationScreen(void)
     hit = (uint16_t)ds.Game_HotspotHit;
     if (CUR_PLANET == 0 && hit > 0x27) {
         if (ds.Mouse_HeldLeft == 0) {
-            Sound_PlayButtonSfx(SFX("moveship"));
+            Sound_PlayButtonSfx("moveship");
             ds.Game_ScreenSwitch = true;
             ds.Game_CurrentScreen = ds.Launch_SavedScreen;
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
             CUR_MOON = 0;
             ds.Launch_DestinationActive = 0;
         } else {
-            Sound_PlayButtonSfx(SFX("planet"));
+            Sound_PlayButtonSfx("planet");
             CUR_PLANET = ds.Game_HotspotHit - 0x27;
             GfxPath_SetToolbar(0x12);
             GfxPath_AddToolbarIcon(0x21);
@@ -315,7 +314,7 @@ void Launch_DestinationScreen(void)
     }
 
     if (CUR_PLANET == 0 && ds.Game_HotspotHit == 0x27) {
-        Sound_PlayButtonSfx(SFX("moveship"));
+        Sound_PlayButtonSfx("moveship");
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = ds.Launch_SavedScreen;
         CUR_PLANET = 0;
@@ -325,7 +324,7 @@ void Launch_DestinationScreen(void)
 
     hit = (uint16_t)ds.Game_HotspotHit;
     if (hit > 0x26 && CUR_PLANET > 0 && !ds.Game_ScreenSwitch) {
-        Sound_PlayButtonSfx(SFX("moveship"));
+        Sound_PlayButtonSfx("moveship");
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = ds.Launch_SavedScreen;
         CUR_MOON = ds.Game_HotspotHit - 0x27;

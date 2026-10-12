@@ -1,7 +1,7 @@
 // Unit GfxPath (3a1b): the 12-icon toolbar at the top of the screen and the
 // ICON.ALL icon store.
 //
-// One block (ems.h's Ems_ToolbarBlock, DS:7DFA) holds ICON.ALL (DS:54CA
+// One block (GfxPath_ToolbarBlock's, DS:7DFA) holds ICON.ALL (DS:54CA
 // bytes), then two 320x33 pages of the bar (page 1 at +1, page 2 at +2940h
 // +1 past the icons) and the 48x32 cell backgrounds (240 wide). The slots
 // are 21-byte records at DS:7C51 + 21 * slot (slot 1..12): a label string[17]

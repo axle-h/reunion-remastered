@@ -1,11 +1,13 @@
 // Unit Intel (29b9): see intel.h.
 #include "game/intel.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/alientalk.h"
 #include "game/fixes.h"
 #include "game/groups.h"
+#include "game/le.h"
 #include "game/message.h"
 #include "game/planetinfo.h"
 #include "game/research.h"
@@ -32,16 +34,12 @@ static TBody *body_at(int16_t system, int16_t planet, int16_t moon)
     return body_by_index(system, moon_list(system, planet)[moon]);
 }
 
-static const uint8_t *ps(const PString *p) { return &p->len; }
-
 // 29b9:0000
-void Intel_FirstContact(int16_t race, const uint8_t *msg)
+void Intel_FirstContact(int16_t race, const char *msg)
 {
-    PString text;
-    memcpy(&text, msg, (size_t)msg[0] + 1);
     if (race == 0 || Intel_Race(race)->Status >= 1)
         return;
-    Message_ShowMessage(ps(&text));
+    Message_ShowMessage(msg);
     TRace *r = Intel_Race(race);
     r->Status = 4;
     if (race == 3 || race == 0xC)
@@ -295,13 +293,11 @@ void Intel_ClaimBodyForPlayer(int16_t system, int16_t planet, int16_t moon)
     ds.Game_SelGroup = ds.Game_ShownGroupCount;
     ds.Game_SelGroup1 = ds.Game_ShownGroupCount;
     Groups_ClearGroup();
-    PString name, tmp;
-    PlanetInfo_GetBodyName(&tmp, system, planet, moon);
-    System_StrStore(&tmp, &name, 255);
+    char name[256], tmp[256];
+    PlanetInfo_GetBodyName(name, sizeof name, system, planet, moon);
     TGroup *g = Groups_At(1, ds.Game_SelGroup);
-    System_StrLoad(&tmp, &name);
-    System_StrConcat(&tmp, PSTR(" forces"));
-    System_StrStore(&tmp, (PString *)&g->Name, 17);
+    SDL_snprintf(tmp, sizeof tmp, "%s forces", name);
+    pstr_set(&g->Name, 17, tmp);
     g->Kind = 5;
     g->Status = 7;
     g->System = (uint8_t)system;
@@ -323,9 +319,9 @@ void Intel_ForceLands(int16_t race, int16_t force)
 }
 
 // Slot (row t = 1..2, unit u = 1..4) of a group: ShipType and Weapons[1..4] as five words.
-static int16_t *group_slot(TGroup *g, int t, int u)
+static uint8_t *group_slot(TGroup *g, int t, int u)
 {
-    return (int16_t *)((uint8_t *)g + t * 40 + u * 10 - 21);
+    return (uint8_t *)g + t * 40 + u * 10 - 21;
 }
 
 // 29b9:0b93
@@ -339,10 +335,10 @@ void Intel_DisbandGroup(int16_t list, int16_t group)
             for (int t = 1; t <= 2; t++) {
                 if (g->Kind == 1 || (g->Kind == 3 && t == 1)) {
                     for (int u = 1; u <= 4; u++) {
-                        int16_t *src = group_slot(g, t, u);
-                        int16_t *dst = group_slot(pf, t, u);
+                        const uint8_t *src = group_slot(g, t, u);
+                        uint8_t *dst = group_slot(pf, t, u);
                         for (int w = 0; w < 5; w++)
-                            dst[w] = (int16_t)(dst[w] + src[w]);
+                            wr16le(dst + w * 2, (int16_t)(rd16le(dst + w * 2) + rd16le(src + w * 2)));
                     }
                 }
             }
@@ -578,165 +574,102 @@ bool Intel_IsRaceActive(int16_t race)
     return status == 2 || status == 4;
 }
 
+// The intel reports are built a piece at a time in 255-character strings;
+// cutting each step is the same as cutting the whole message once.
+
+// msg += "<n:3>  <name><tail>", the lines of unit counts.
+static void append_count(char msg[256], int n, const void *pname, const char *tail)
+{
+    char name[256], item[300];
+    SDL_snprintf(item, sizeof item, "%3d  %s%s", n, pstr_get(name, sizeof name, pname), tail);
+    SDL_strlcat(msg, item, 256);
+}
+
+// msg += "  <name><tail>".
+static void append_name(char msg[256], const void *pname, const char *tail)
+{
+    char name[256], item[300];
+    SDL_snprintf(item, sizeof item, "  %s%s", pstr_get(name, sizeof name, pname), tail);
+    SDL_strlcat(msg, item, 256);
+}
+
 // 29b9:1501 (nested in ShowRaceIntel; `race` and `kind` come from its frame)
 static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int16_t planet, int16_t moon,
                                 int16_t body)
 {
-    PString tmp, title, msg, num;
-    PlanetInfo_GetBodyLongName(&tmp, system, planet, moon);
-    System_StrStore(PSTR(""), &title, 50);
-    System_StrStore(&tmp, &title, 50);
+    char title[51], name[256], msg[256];  // title is a string[50]
+    PlanetInfo_GetBodyLongName(title, sizeof title, system, planet, moon);
     const TBody *b = body_by_index(system, body);
     if ((int8_t)b->Owner != race || b->Colony == 0)
         return;
-    const PString *name = (const PString *)&Intel_Race(race)->Name;
+    pstr_get(name, sizeof name, &Intel_Race(race)->Name);
     if (kind == 1) {
-        System_StrLoad(&tmp, PSTR("    Information on: "));
-        System_StrConcat(&tmp, name);
-        System_StrConcat(&tmp, PSTR("|"));
-        System_StrStore(&tmp, &msg, 255);
-        if (b->_01 != 0) {
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, PSTR("  Their main planet is | "));
-            System_StrConcat(&tmp, &title);
-            System_StrConcat(&tmp, PSTR(""));
-            System_StrStore(&tmp, &msg, 255);
-        } else {
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, PSTR("    Their colony is on| "));
-            System_StrConcat(&tmp, &title);
-            System_StrConcat(&tmp, PSTR(""));
-            System_StrStore(&tmp, &msg, 255);
-        }
-        Message_ShowMessage(ps(&msg));
+        SDL_snprintf(msg, sizeof msg, "    Information on: %s|%s%s", name,
+                     b->_01 != 0 ? "  Their main planet is | " : "    Their colony is on| ",
+                     title);
+        Message_ShowMessage(msg);
     }
     if (kind == 3) {
         // BUG?: the "Information on" line is built and then replaced by the next one.
-        System_StrLoad(&tmp, PSTR("    Information on: "));
-        System_StrConcat(&tmp, name);
-        System_StrStore(&tmp, &msg, 255);
-        System_StrLoad(&tmp, PSTR("  Their garrison troops are on| "));
-        System_StrConcat(&tmp, &title);
-        System_StrConcat(&tmp, PSTR(": "));
-        System_StrStore(&tmp, &msg, 255);
+        SDL_snprintf(msg, sizeof msg, "  Their garrison troops are on| %s: ", title);
         for (int i = 1; i <= 4; i++) {
-            if (i & 1) {
-                System_StrLoad(&tmp, &msg);
-                System_StrConcat(&tmp, PSTR("|"));
-                System_StrStore(&tmp, &msg, 255);
-            }
-            System_StrLong(b->Stores[i - 1], 3, &num, 255);
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, &num);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_ShipClasses[i - 1]);
-            System_StrConcat(&tmp, PSTR(" "));
-            System_StrStore(&tmp, &msg, 255);
+            if (i & 1)
+                SDL_strlcat(msg, "|", sizeof msg);
+            append_count(msg, (int)b->Stores[i - 1], &ds.Names_ShipClasses[i - 1], " ");
         }
         for (int i = 1; i <= 4; i++) {
-            if (i & 1) {
-                System_StrLoad(&tmp, &msg);
-                System_StrConcat(&tmp, PSTR("|"));
-                System_StrStore(&tmp, &msg, 255);
-            }
-            System_StrLong(b->Stores[i + 3], 3, &num, 255);
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, &num);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_GroundUnits[i - 1]);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrStore(&tmp, &msg, 255);
+            if (i & 1)
+                SDL_strlcat(msg, "|", sizeof msg);
+            append_count(msg, (int)b->Stores[i + 3], &ds.Names_GroundUnits[i - 1], "  ");
         }
-        Message_ShowMessage(ps(&msg));
+        Message_ShowMessage(msg);
     }
 }
 
 // 29b9:185e (nested in ShowRaceIntel)
 static void show_race_army_info(int16_t race)
 {
-    PString tmp, msg, num;
+    char msg[256];
     const TRace *r = Intel_Race(race);
-    const PString *name = (const PString *)&r->Name;
     int16_t forces = r->ForceCount;
     for (int16_t f = 1; f <= forces; f++) {
         const TRaceForce *rf = &r->Forces[f - 1];
         if (rf->Mission == 0 || rf->Active == 0)
             continue;
-        System_StrLong(f, 0, &num, 255);
-        System_StrLoad(&tmp, PSTR(" Information on: "));
-        System_StrConcat(&tmp, name);
-        System_StrConcat(&tmp, PSTR(" |"));
-        System_StrStore(&tmp, &msg, 255);
-        // BUG?: the first line is replaced by the next one.
-        System_StrLoad(&tmp, PSTR("  The "));
-        System_StrConcat(&tmp, &num);
-        System_StrConcat(&tmp, PSTR(". army power is  "));
-        System_StrStore(&tmp, &msg, 255);
+        // BUG?: a first line " Information on: <race> |" is built and then
+        // replaced by the next one.
+        SDL_snprintf(msg, sizeof msg, "  The %d. army power is  ", f);
         for (int k = 1; k <= 4; k++) {
-            if (k & 1) {
-                System_StrLoad(&tmp, &msg);
-                System_StrConcat(&tmp, PSTR("|"));
-                System_StrStore(&tmp, &msg, 255);
-            }
-            System_StrLong((uint16_t)rf->Units[k - 1], 3, &num, 255);
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, &num);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_ShipClasses[k - 1]);
-            System_StrConcat(&tmp, PSTR(" "));
-            System_StrStore(&tmp, &msg, 255);
+            if (k & 1)
+                SDL_strlcat(msg, "|", sizeof msg);
+            append_count(msg, (uint16_t)rf->Units[k - 1], &ds.Names_ShipClasses[k - 1], " ");
         }
         for (int k = 1; k <= 4; k++) {
-            if (k & 1) {
-                System_StrLoad(&tmp, &msg);
-                System_StrConcat(&tmp, PSTR("|"));
-                System_StrStore(&tmp, &msg, 255);
-            }
-            System_StrLong((uint16_t)rf->Units[k + 3], 3, &num, 255);
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, &num);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_GroundUnits[k - 1]);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrStore(&tmp, &msg, 255);
+            if (k & 1)
+                SDL_strlcat(msg, "|", sizeof msg);
+            append_count(msg, (uint16_t)rf->Units[k + 3], &ds.Names_GroundUnits[k - 1], "  ");
         }
-        Message_ShowMessage(ps(&msg));
+        Message_ShowMessage(msg);
     }
 }
 
 // 29b9:1aed (nested in ShowRaceIntel)
 static void show_race_weapon_info(int16_t race)
 {
-    PString tmp, msg;
     const TRace *r = Intel_Race(race);
     const uint8_t *flags = (const uint8_t *)r->KnownSystems; // [0..3] ship classes, [4..7] ground units
-    System_StrLoad(&tmp, PSTR(" Information on: "));
-    System_StrConcat(&tmp, (const PString *)&r->Name);
-    System_StrStore(&tmp, &msg, 255);
-    // BUG?: replaces the line above.
-    System_StrStore(PSTR("    Their weapons are |"), &msg, 255);
+    // BUG?: " Information on: <race>" is built and then replaced by this.
+    char msg[256] = "    Their weapons are |";
     for (int k = 1; k <= 4; k++) {
-        if (flags[k - 1] != 0) {
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_ShipClasses[k - 1]);
-            System_StrConcat(&tmp, PSTR(" "));
-            System_StrStore(&tmp, &msg, 255);
-        }
+        if (flags[k - 1] != 0)
+            append_name(msg, &ds.Names_ShipClasses[k - 1], " ");
     }
-    System_StrLoad(&tmp, &msg);
-    System_StrConcat(&tmp, PSTR("|"));
-    System_StrStore(&tmp, &msg, 255);
+    SDL_strlcat(msg, "|", sizeof msg);
     for (int k = 1; k <= 4; k++) {
-        if (flags[k + 3] != 0) {
-            System_StrLoad(&tmp, &msg);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrConcat(&tmp, (const PString *)&ds.Names_GroundUnits[k - 1]);
-            System_StrConcat(&tmp, PSTR("  "));
-            System_StrStore(&tmp, &msg, 255);
-        }
+        if (flags[k + 3] != 0)
+            append_name(msg, &ds.Names_GroundUnits[k - 1], "  ");
     }
-    Message_ShowMessage(ps(&msg));
+    Message_ShowMessage(msg);
 }
 
 // 29b9:1c49

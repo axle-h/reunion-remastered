@@ -1634,8 +1634,8 @@
 4a81:7812 Droids::DigitsPic: pointer                 // grafika\szamok, 8980h bytes: droid figures, face digits at +5780h, small digits at +5963h (2527:001f)
 4a81:7816 Cargo::ItemCount: word  // entries in ItemList (2583:0494)
 4a81:7818 Cargo::ItemList: array[1..13] of word  // Cargo::Items indices of the storable items (product done)
-4a81:7832 Cargo::ItemStore: array[1..13] of ^integer  // the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494)
-4a81:7866 Cargo::Stores: ^longint  // the planet's ore stocks (Game::HomeStock or CurBody^.Stores)
+4a81:7832 Cargo::ItemStore: array[1..13] of pointer  // ^integer, the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494); byte pointers in the port, as they point into packed records
+4a81:7866 Cargo::Stores: pointer  // ^longint, the planet's ore stocks (Game::HomeStock or CurBody^.Stores); a byte pointer in the port, as it points into packed records
 4a81:786a Cargo::ShipUsed: longint  // cargo space used on the ship
 4a81:786e Cargo::ShipCap: longint  // ship cargo capacity
 4a81:7872 Cargo::PlanetCap: longint  // storage space on the planet (planet force Storage * 1000)

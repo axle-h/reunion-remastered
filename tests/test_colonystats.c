@@ -7,7 +7,7 @@
 
 #include "game/colonystats.h"
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/main_program.h"
 #include "game/gfx.h"
 #include "game/message.h"
 #include "game/sim.h"
@@ -37,7 +37,7 @@ static void reset(void)
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
+    Game_InitGameData();
     Message_Init();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;

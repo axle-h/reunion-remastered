@@ -1,5 +1,7 @@
 #include "game/research.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
@@ -7,14 +9,7 @@
 #include "game/sound.h"
 #include "game/system.h"
 
-#include <string.h>
-
 #define PRODUCT(k) ds.Research_Products[(k) - 1]
-
-static inline const uint8_t *pstr(const void *p)
-{
-    return (const uint8_t *)p;
-}
 
 // Offset of invention k's icon on screen (rows of 16 lines, 5 per row). The
 // original computes it two ways (0a1a and 0bae) that give the same value.
@@ -47,8 +42,8 @@ void Research_ResearchScreen(void)
         else
             ds.Game_SelInvention = ds.Game_CurResearch;
         GfxPath_ShowScreenBackdrop();
-        ds.Research_IconBuffer = System_GetMem(0x6901);
-        Gfx_LoadPic(pstr(PSTR("grafika\\cds")), ds.Research_IconBuffer, 1, 0x54, 0, 0,
+        ds.Research_IconBuffer = game_alloc(0x6901);
+        Gfx_LoadPic("grafika\\cds", ds.Research_IconBuffer, 1, 0x54, 0, 0,
                     0x140, false, Gfx_PalettePtr(), 0, 0x1F, 0x40, 0, 0x1F);
         Research_DrawInventionIcons();
         if (ds.Game_CurResearch > 0)
@@ -63,7 +58,7 @@ void Research_ResearchScreen(void)
         Research_ResetSelectionFrame();
         ds.Game_SelInvention = (int16_t)(ds.Game_HotspotHit - 0x14);
         if (ds.Game_SelInvention == 14 && ds.Intel_Invention14Revealed == 0) {
-            Sound_PlayButtonSfx(pstr(PSTR("x")));
+            Sound_PlayButtonSfx("x");
             Research_DrawInventionInfo();
         } else {
             int16_t st = p->State;
@@ -79,7 +74,7 @@ void Research_ResearchScreen(void)
                     }                                                                     \
                 }
             if (st == 3) {
-                Sound_PlayButtonSfx(pstr(PSTR("startdes")));
+                Sound_PlayButtonSfx("startdes");
                 p->State = 4;
                 STOP_CURRENT();
                 ds.Game_CurResearch = ds.Game_SelInvention;
@@ -87,13 +82,13 @@ void Research_ResearchScreen(void)
                 Research_PlayIconTransitionIn(4, ds.Game_SelInvention);
                 ds.Research_ProgressFrame = 0;
             } else if (st == 4) {
-                Sound_PlayButtonSfx(pstr(PSTR("designab")));
+                Sound_PlayButtonSfx("designab");
                 p->State = 3;
                 ds.Game_CurResearch = 0;
                 Research_DrawInventionInfo();
                 Research_PlayIconTransitionOut(4, ds.Game_SelInvention);
             } else if (st == 1) {
-                Sound_PlayButtonSfx(pstr(PSTR("startdes")));
+                Sound_PlayButtonSfx("startdes");
                 p->State = 2;
                 STOP_CURRENT();
                 ds.Game_CurResearch = ds.Game_SelInvention;
@@ -101,13 +96,13 @@ void Research_ResearchScreen(void)
                 Research_PlayIconTransitionIn(2, ds.Game_SelInvention);
                 ds.Research_ProgressFrame = 0;
             } else if (st == 2) {
-                Sound_PlayButtonSfx(pstr(PSTR("designab")));
+                Sound_PlayButtonSfx("designab");
                 p->State = 1;
                 ds.Game_CurResearch = 0;
                 Research_DrawInventionInfo();
                 Research_PlayIconTransitionOut(2, ds.Game_SelInvention);
             } else if (st == 5) {
-                Sound_PlayButtonSfx(pstr(PSTR("designre")));
+                Sound_PlayButtonSfx("designre");
                 Research_DrawInventionInfo();
                 Research_PlayIconTransitionIn(1, ds.Game_SelInvention);
                 Research_PlayIconTransitionOut(1, ds.Game_SelInvention);
@@ -130,12 +125,13 @@ void Research_SetupResearchHotspots(void)
         h->Y = (uint8_t)(((j - 1) / 5 << 4) + 0x34);
         h->W = 0x20;
         h->H = 0x10;
+        char name[256];
         if (PRODUCT(j).State < 1)
-            h->Caption.len = 0;
+            pstr_set(&h->Caption, 0x12, "");
         else
-            System_StrStore((const PString *)&PRODUCT(j).Name, (PString *)&h->Caption, 0x12);
+            pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &PRODUCT(j).Name));
         if (j == 14 && ds.Intel_Invention14Revealed == 0)
-            System_StrStore(PSTR("Unknown"), (PString *)&h->Caption, 0x12);
+            pstr_set(&h->Caption, 0x12, "Unknown");
         h->Repeat_ = 1;
         h->_1A = 0;
     }
@@ -148,37 +144,35 @@ void Research_DrawInventionInfo(void)
         return;
     const TProduct *p = &PRODUCT(ds.Game_SelInvention);
     if (ds.Game_SelInvention == 14 && ds.Intel_Invention14Revealed == 0) {
-        Gfx_DrawTextF9(pstr(PSTR("Project name :")), 0xBE, 0x4C, 0x12);
-        Gfx_DrawTextF9(pstr(PSTR("Unknown")), 0xC8, 0x58, 0x10);
-        Gfx_DrawTextF9(pstr(PSTR("")), 0xBE, 0x64, 0x12);
-        Gfx_DrawTextF9(pstr(PSTR("")), 0xBE, 0x70, 0x12);
+        Gfx_DrawTextF9("Project name :", 0xBE, 0x4C, 0x12);
+        Gfx_DrawTextF9("Unknown", 0xC8, 0x58, 0x10);
+        Gfx_DrawTextF9("", 0xBE, 0x64, 0x12);
+        Gfx_DrawTextF9("", 0xBE, 0x70, 0x12);
         Blit_FillRect(0xBD, 0x8B, 0x72, 0x14, 0x40);
         return;
     }
-    PString s = {0}, t;
-    Gfx_DrawTextF9(pstr(PSTR("Project name :")), 0xBE, 0x4C, 0x12);
-    Gfx_DrawTextF9(pstr(&p->Name), 0xC8, 0x58, 0x10);
+    char s[256], t[256];
+    Gfx_DrawTextF9("Project name :", 0xBE, 0x4C, 0x12);
+    Gfx_DrawTextF9(pstr_get(t, sizeof t, &p->Name), 0xC8, 0x58, 0x10);
+    const char *state = "";
     switch (p->State) {
-    case 1: System_StrStore(PSTR("Can be developed"), &s, 255); break;
-    case 2: System_StrStore(PSTR("Under development"), &s, 255); break;
-    case 3: System_StrStore(PSTR("Can be analysed"), &s, 255); break;
-    case 4: System_StrStore(PSTR("Under analysis"), &s, 255); break;
-    case 5: System_StrStore(PSTR("Done"), &s, 255); break;
+    case 1: state = "Can be developed"; break;
+    case 2: state = "Under development"; break;
+    case 3: state = "Can be analysed"; break;
+    case 4: state = "Under analysis"; break;
+    case 5: state = "Done"; break;
     default: break;
     }
-    Gfx_DrawTextF9(pstr(&s), 0xBE, 0x64, 0x12);
+    Gfx_DrawTextF9(state, 0xBE, 0x64, 0x12);
     if (p->State == 2 || p->State == 4) {
-        System_StrLong(p->Progress / 100, 0, &s, 255);
         if (ds.Game_StaffExp[3] == 0) {
-            Gfx_DrawTextF9(pstr(PSTR("No developer")), 0xBE, 0x70, 0x12);
+            Gfx_DrawTextF9("No developer", 0xBE, 0x70, 0x12);
         } else {
-            System_StrLoad(&t, PSTR("Completed: "));
-            System_StrConcat(&t, &s);
-            System_StrConcat(&t, PSTR("%"));
-            Gfx_DrawTextF9(pstr(&t), 0xBE, 0x70, 0x12);
+            SDL_snprintf(t, sizeof t, "Completed: %d%%", p->Progress / 100);
+            Gfx_DrawTextF9(t, 0xBE, 0x70, 0x12);
         }
     } else {
-        Gfx_DrawTextF9(pstr(PSTR("")), 0xBE, 0x70, 0x12);
+        Gfx_DrawTextF9("", 0xBE, 0x70, 0x12);
     }
     if (p->State >= 5) {
         Blit_FillRect(0xBD, 0x8B, 0x72, 0x14, 0x40);
@@ -190,31 +184,30 @@ void Research_DrawInventionInfo(void)
         {0xBD, 0xE0, 0x95, 6, ":"},  {0xEB, 0x11A, 0x95, 8, "  :"},
     };
     for (int k = 0; k < 4; k++) {
-        System_StrLong(p->Skills[k], 0, &s, 255);
-        System_StrLoad(&t, (const PString *)&ds.Names_Disciplines[k]);
-        PString sep;
-        sep.len = (uint8_t)strlen(pos[k].sep);
-        memcpy(sep.s, pos[k].sep, sep.len);
-        System_StrConcat(&t, &sep);
-        Gfx_DrawTextF9(pstr(&t), pos[k].nx, pos[k].y, pos[k].w);
-        Gfx_DrawTextFC(pstr(&s), pos[k].vx, pos[k].y, 1);
+        char discipline[256];
+        pstr_get(discipline, sizeof discipline, &ds.Names_Disciplines[k]);
+        SDL_snprintf(t, sizeof t, "%s%s", discipline, pos[k].sep);
+        SDL_snprintf(s, sizeof s, "%d", p->Skills[k]);
+        Gfx_DrawTextF9(t, pos[k].nx, pos[k].y, pos[k].w);
+        Gfx_DrawTextFC(s, pos[k].vx, pos[k].y, 1);
     }
 }
 
 // 2d66:074c
 void Research_DrawDeveloperSkills(void)
 {
-    PString s;
+    char s[256];
     if (ds.Game_StaffHired[3] == 0) {
         for (int k = 1; k <= 4; k++)
-            Gfx_DrawTextF9(pstr(PSTR("-")), (int16_t)(ds.Research_SkillX[k - 1] + 100), 0xBC, 1);
-        Gfx_DrawTextF9(pstr(PSTR("No developer")), 8, 0xBC, 0xE);
+            Gfx_DrawTextF9("-", (int16_t)(ds.Research_SkillX[k - 1] + 100), 0xBC, 1);
+        Gfx_DrawTextF9("No developer", 8, 0xBC, 0xE);
     } else {
         for (int k = 1; k <= 4; k++) {
-            System_StrLong(ds.Game_DevSkill[k - 1], 0, &s, 255);
-            Gfx_DrawTextF9(pstr(&s), (int16_t)(ds.Research_SkillX[k - 1] + 100), 0xBC, 1);
+            SDL_snprintf(s, sizeof s, "%d", (int)ds.Game_DevSkill[k - 1]);
+            Gfx_DrawTextF9(s, (int16_t)(ds.Research_SkillX[k - 1] + 100), 0xBC, 1);
         }
-        Gfx_DrawTextF9(pstr(&ds.Staff_Names[3][ds.Game_StaffHired[3] - 1]), 8, 0xBC, 0xE);
+        Gfx_DrawTextF9(pstr_get(s, sizeof s, &ds.Staff_Names[3][ds.Game_StaffHired[3] - 1]), 8,
+                       0xBC, 0xE);
     }
     // Update arrows beside the developer's name: dim when no developer can work.
     const uint8_t *base = ds.Research_IconBuffer;

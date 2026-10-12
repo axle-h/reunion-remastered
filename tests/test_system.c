@@ -1,5 +1,5 @@
-// system: Borland Pascal 7 run-time library ports (strings, Val/Str, Random,
-// Real48, heap) against known BP7 results.
+// system: Borland Pascal 7 run-time library ports (Val, Random, the heap,
+// the exit path) against known BP7 results, and the Pascal string boundary.
 #include <SDL3/SDL.h>
 #include <setjmp.h>
 #include <stdio.h>
@@ -40,80 +40,8 @@ static void catch_error(uint16_t code)
         }                                                                                          \
     } while (0)
 
-static bool str_is(const PString *s, const char *want)
+static void test_val(void)
 {
-    return s->len == SDL_strlen(want) && SDL_memcmp(s->s, want, s->len) == 0;
-}
-
-static void test_strings(void)
-{
-    PString t;
-    PStr8 short_str;
-
-    System_StrStore(PSTR("Reunion of worlds"), (PString *)&short_str, 8);
-    CHECK(str_is((PString *)&short_str, "Reunion "));
-
-    System_StrLoad(&t, PSTR("abc"));
-    System_StrConcat(&t, PSTR("def"));
-    CHECK(str_is(&t, "abcdef"));
-
-    // Concatenation stops at 255 characters.
-    t.len = 250;
-    SDL_memset(t.s, 'x', 250);
-    System_StrConcat(&t, PSTR("0123456789"));
-    CHECK(t.len == 255 && t.s[249] == 'x' && t.s[250] == '0' && t.s[254] == '4');
-
-    System_Copy(&t, PSTR("Hello"), 2, 3);
-    CHECK(str_is(&t, "ell"));
-    System_Copy(&t, PSTR("Hello"), 0, 2); // index < 1 counts as 1
-    CHECK(str_is(&t, "He"));
-    System_Copy(&t, PSTR("Hello"), 4, 100);
-    CHECK(str_is(&t, "lo"));
-    System_Copy(&t, PSTR("Hello"), 6, 1);
-    CHECK(str_is(&t, ""));
-    System_Copy(&t, PSTR("Hello"), 2, -1);
-    CHECK(str_is(&t, ""));
-
-    System_CharToStr(&t, 'Q');
-    CHECK(str_is(&t, "Q"));
-
-    System_StrLoad(&t, PSTR("Hello world"));
-    System_Delete(&t, 6, 6);
-    CHECK(str_is(&t, "Hello"));
-    System_StrLoad(&t, PSTR("Hello"));
-    System_Delete(&t, 0, 2); // index < 1 counts as 1
-    CHECK(str_is(&t, "llo"));
-    System_StrLoad(&t, PSTR("Hello"));
-    System_Delete(&t, 3, 0);
-    System_Delete(&t, 256, 1);
-    System_Delete(&t, 9, 1);
-    CHECK(str_is(&t, "Hello"));
-    System_Delete(&t, 4, 30000);
-    CHECK(str_is(&t, "Hel"));
-
-
-}
-
-static void test_str_val(void)
-{
-    PString s;
-    PStr6 small;
-
-    System_StrLong(42, 0, &s, 255);
-    CHECK(str_is(&s, "42"));
-    System_StrLong(42, 5, &s, 255);
-    CHECK(str_is(&s, "   42"));
-    System_StrLong(-7, 3, &s, 255);
-    CHECK(str_is(&s, " -7"));
-    System_StrLong(-2147483647 - 1, 0, &s, 255);
-    CHECK(str_is(&s, "-2147483648"));
-    System_StrLong(0, -3, &s, 255);
-    CHECK(str_is(&s, "0"));
-    System_StrLong(1234567, 0, (PString *)&small, 6); // digits cut to maxLen
-    CHECK(str_is((PString *)&small, "123456"));
-    System_StrLong(12, 10, (PString *)&small, 6);
-    CHECK(str_is((PString *)&small, "    12"));
-
     static const struct {
         const char *s;
         int32_t value;
@@ -145,10 +73,8 @@ static void test_str_val(void)
         {"00000000000012", 12, 0},
     };
     for (size_t i = 0; i < SDL_arraysize(vals); i++) {
-        s.len = (uint8_t)SDL_strlen(vals[i].s);
-        SDL_memcpy(s.s, vals[i].s, s.len);
         int16_t code = -1;
-        int32_t v = System_ValLong(&s, &code);
+        int32_t v = System_ValLong(vals[i].s, &code);
         if (v != vals[i].value || code != vals[i].code) {
             printf("FAILED Val('%s') = %d code %d\n", vals[i].s, (int)v, code);
             ok = false;
@@ -174,137 +100,117 @@ static void test_random(void)
     CHECK(System_Random(0xFFFF) == (uint16_t)(((uint64_t)(0xFFFFFFFFu * 0x08088405u + 1) * 0xFFFF) >> 32));
 }
 
-static Real48 R(double d) { return real48_from_double(d); }
-static double D(Real48 r) { return real48_to_double(r); }
-
-static bool bytes_are(Real48 r, const uint8_t want[6])
+// pstr_set leaves the bytes the original's StrStore leaves (tail included);
+// pstr_get reads them back.
+static void test_pstr(void)
 {
-    return SDL_memcmp(r.b, want, 6) == 0;
-}
-
-// |got - want| within `ulps` units of the last mantissa bit of want.
-static bool near(double got, double want, double ulps)
-{
-    if (want == 0)
-        return got == 0;
-    int e = 0; // want = m * 2^e, 1 <= |m| < 2
-    for (double m = SDL_fabs(want); m >= 2; m /= 2)
-        e++;
-    for (double m = SDL_fabs(want); m < 1; m *= 2)
-        e--;
-    return SDL_fabs(got - want) <= ulps * SDL_scalbn(1.0, e - 39);
-}
-
-static void test_real(void)
-{
-    // Known encodings.
-    CHECK(bytes_are(System_LongToReal(1), (const uint8_t[6]){0x81, 0, 0, 0, 0, 0}));
-    CHECK(bytes_are(System_LongToReal(-1), (const uint8_t[6]){0x81, 0, 0, 0, 0, 0x80}));
-    CHECK(bytes_are(System_LongToReal(10), (const uint8_t[6]){0x84, 0, 0, 0, 0, 0x20}));
-    CHECK(bytes_are(System_LongToReal(0), (const uint8_t[6]){0}));
-    CHECK(bytes_are(R(0.5), (const uint8_t[6]){0x80, 0, 0, 0, 0, 0}));
-    CHECK(bytes_are(R(SDL_PI_D), (const uint8_t[6]){0x82, 0x21, 0xA2, 0xDA, 0x0F, 0x49}));
-    CHECK(D(System_LongToReal(-2147483647 - 1)) == -2147483648.0);
-    CHECK(D(System_LongToReal(123456789)) == 123456789.0);
-    CHECK(D(R(1e30)) > 0.99e30 && D(R(-3.25)) == -3.25);
-
-    // Arithmetic: exact cases and BP's rounding of 1/3.
-    CHECK(D(System_RealAdd(R(1), R(2))) == 3);
-    CHECK(D(System_RealSub(R(1), R(2))) == -1);
-    CHECK(bytes_are(System_RealSub(R(1.5), R(1.5)), (const uint8_t[6]){0}));
-    CHECK(D(System_RealMul(R(3), R(-7))) == -21);
-    CHECK(D(System_RealSqr(R(1.5))) == 2.25);
-    CHECK(D(System_RealDiv(R(10), R(4))) == 2.5);
-    CHECK(bytes_are(System_RealDiv(R(1), R(3)),
-                    (const uint8_t[6]){0x7F, 0xAB, 0xAA, 0xAA, 0xAA, 0x2A}));
-    CHECK(D(System_RealAdd(R(1e20), R(1))) == D(R(1e20))); // too small to count
-    CHECK(System_RealCmp(R(1), R(2)) < 0 && System_RealCmp(R(-1), R(-2)) > 0);
-    CHECK(System_RealCmp(R(-1), R(1)) < 0 && System_RealCmp(R(2.5), R(2.5)) == 0);
-    CHECK(System_RealCmp(R(0), R(-0.0)) == 0 && System_RealCmp(R(0), R(1e-30)) < 0);
-
-    // Against double: within one unit of the 40-bit mantissa.
-    uint32_t seed = 12345;
-    for (int i = 0; i < 20000; i++) {
-        double x[2];
-        for (int j = 0; j < 2; j++) {
-            seed = seed * 1103515245u + 12345;
-            double m = (seed >> 8) / 16777216.0 + 0.5;
-            seed = seed * 1103515245u + 12345;
-            x[j] = D(R(SDL_scalbn((seed & 0x100) ? -m : m, (int)(seed >> 20) % 40 - 20)));
-        }
-        double s = D(System_RealAdd(R(x[0]), R(x[1])));
-        double p = D(System_RealMul(R(x[0]), R(x[1])));
-        double q = D(System_RealDiv(R(x[0]), R(x[1])));
-        if (!near(s, x[0] + x[1], 1.0) || !near(p, x[0] * x[1], 1.0) || !near(q, x[0] / x[1], 1.0)) {
-            printf("FAILED %.17g op %.17g: %.17g %.17g %.17g\n", x[0], x[1], s, p, q);
-            ok = false;
-            break;
+    static const char *const texts[] = {"", "a", "Hello, world", "exactly ten",
+                                        "a string longer than the field's fifty characters, "
+                                        "so it is cut"};
+    static const uint8_t maxes[] = {0, 1, 5, 11, 50, 255};
+    for (size_t t = 0; t < SDL_arraysize(texts); t++) {
+        for (size_t m = 0; m < SDL_arraysize(maxes); m++) {
+            // StrStore: the length byte and up to maxLen characters.
+            PString want, got;
+            SDL_memset(&want, 0xAA, sizeof want);
+            SDL_memset(&got, 0xAA, sizeof got);
+            want.len = (uint8_t)SDL_min(SDL_strlen(texts[t]), (size_t)maxes[m]);
+            SDL_memcpy(want.s, texts[t], want.len);
+            pstr_set(&got, maxes[m], texts[t]);
+            CHECK(SDL_memcmp(&want, &got, sizeof want) == 0);
+            char back[256];
+            CHECK(pstr_get(back, sizeof back, &got) == back);
+            CHECK(SDL_strlen(back) == got.len && SDL_memcmp(back, got.s, got.len) == 0);
         }
     }
-
-    // Trunc/Round/Int/Frac.
-    CHECK(System_Trunc(R(2.7)) == 2 && System_Trunc(R(-2.7)) == -2);
-    CHECK(System_Round(R(2.5)) == 3 && System_Round(R(-2.5)) == -3);
-    CHECK(System_Round(R(0.5)) == 1 && System_Round(R(0.49)) == 0 && System_Round(R(-0.7)) == -1);
-    CHECK(System_Trunc(R(0.99)) == 0 && System_Trunc(R(0)) == 0);
-    CHECK(System_Trunc(R(2147483647.0)) == 2147483647);
-    CHECK(System_Round(R(-2147483648.0)) == -2147483647 - 1);
-    EXPECT_ERROR(System_Trunc(R(2147483648.0)), 207);
-    EXPECT_ERROR(System_Round(R(2147483647.5)), 207);
-    EXPECT_ERROR(System_Round(R(1e12)), 207);
-    CHECK(D(System_Int(R(-2.75))) == -2 && D(System_Int(R(0.75))) == 0);
-    CHECK(D(System_Int(R(1e15))) == 1e15 && D(System_Int(R(12345.5))) == 12345);
-    CHECK(D(System_Frac(R(2.75))) == 0.75 && D(System_Frac(R(-2.75))) == -0.75);
-
-    // Errors.
-    EXPECT_ERROR(System_RealDiv(R(1), R(0)), 200);
-    EXPECT_ERROR(System_RealMul(R(1e38), R(1e38)), 205);
-    EXPECT_ERROR(System_RealAdd(R(1.7e38), R(1.7e38)), 205);
-    EXPECT_ERROR(System_Sqrt(R(-1)), 207);
-    CHECK(D(System_RealMul(R(1e-30), R(1e-30))) == 0); // underflow is 0
-
-    // Sqrt and Cos are iterations/series: close to the true value.
-    CHECK(D(System_Sqrt(R(4))) == 2 && D(System_Sqrt(R(0))) == 0);
-    CHECK(near(D(System_Sqrt(R(2))), SDL_sqrt(2.0), 2));
-    CHECK(near(D(System_Sqrt(R(1e10))), 1e5, 2));
-    CHECK(near(D(System_Sqrt(R(0.0003))), SDL_sqrt(D(R(0.0003))), 2));
-    static const double angles[] = {0, 0.5, 1, 1.5, 2, 3, SDL_PI_D / 3, SDL_PI_D, -1, 4, 6, 7, 10, 100, -20};
-    for (size_t i = 0; i < SDL_arraysize(angles); i++) {
-        double a = D(R(angles[i]));
-        double c = D(System_Cos(R(a)));
-        if (SDL_fabs(c - SDL_cos(a)) > 1e-9) {
-            printf("FAILED Cos(%g) = %.12f, want %.12f\n", a, c, SDL_cos(a));
-            ok = false;
-        }
-    }
+    // A string[N] field, and a destination shorter than the string.
+    PStr7 field = {0};
+    pstr_set(&field, 7, "planets");
+    char small[4];
+    CHECK(SDL_strcmp(pstr_get(small, sizeof small, &field), "pla") == 0);
+    // A 255-character string fits a 256-byte buffer.
+    PString full;
+    full.len = 255;
+    SDL_memset(full.s, 'x', 255);
+    char buf[256];
+    CHECK(SDL_strlen(pstr_get(buf, sizeof buf, &full)) == 255);
+    // NUL bytes (game data read past a table) survive the round trip.
+    PString in = {.len = 5, .s = {'a', 0, 'b', 0, 0}}, out;
+    SDL_memset(&out, 0xAA, sizeof out);
+    pstr_get(buf, sizeof buf, &in);
+    CHECK(SDL_strlen(buf) == 5 && buf[1] == PSTR_NUL && buf[4] == PSTR_NUL);
+    pstr_set(&out, 255, buf);
+    CHECK(SDL_memcmp(&in, &out, 6) == 0);
 }
 
 static void test_heap(void)
 {
     system_init();
-    CHECK(System_GetMem(0) == nullptr && system_heap_used() == 0);
-    uint8_t *a = System_GetMem(10), *b = System_GetMem(5);
-    CHECK(a && b && system_heap_used() == 16 + 8);  // sizes rounded to 8
+    CHECK(system_heap_used() == 0);
+    uint8_t *a = game_alloc(10), *b = game_alloc(5);
+    CHECK(a && b && system_heap_used() == 10 + 5);
     bool zero = true;
     for (int i = 0; i < 10; i++)
         zero = zero && a[i] == 0;
     CHECK(zero);
-    System_FreeMem(a, 10);
-    CHECK(system_heap_used() == 8);
-    System_FreeMem(b, 0);  // size 0: ignored
-    CHECK(system_heap_used() == 8);
-    EXPECT_ERROR(System_FreeMem(nullptr, 8), 204);
+    game_free(a);
+    CHECK(system_heap_used() == 5);
+    EXPECT_ERROR(game_free(nullptr), 204);
 
     // A whole segment: 16-bit offsets stay inside it.
-    uint8_t *seg = System_GetSegment();
+    uint8_t *seg = game_alloc(GAME_SEGMENT);
     seg[0xFFFF] = 1;
-    CHECK(system_heap_used() == 8 + 0x10000);
-    System_FreeSegment(seg);
-    CHECK(system_heap_used() == 8);
+    CHECK(system_heap_used() == 5 + 0x10000);
+    game_free(seg);
+    CHECK(system_heap_used() == 5);
 
     // A new start frees what the last run left (b).
     system_init();
     CHECK(system_heap_used() == 0);
+}
+
+static int hook_calls;
+static uint8_t exit_code;
+
+static void count_hook(void)
+{
+    hook_calls++;
+}
+
+[[noreturn]] static void catch_exit(uint8_t code)
+{
+    exit_code = code;
+    longjmp(on_error, 1);
+}
+
+// Halt and fatal errors run the exit hook once, then the exit handler with
+// the code (a run-time error's own code; headless, so no message box).
+static void test_exit(void)
+{
+    system_init();
+    CHECK(system_exit_hook == nullptr);
+    system_runerror_handler = nullptr;
+    system_exit_handler = catch_exit;
+    static const struct {
+        int kind;
+        uint8_t code;
+    } runs[] = {{0, 15}, {1, 200}, {2, 0}};
+    for (size_t i = 0; i < SDL_arraysize(runs); i++) {
+        system_exit_hook = count_hook;
+        hook_calls = 0;
+        exit_code = 0xFF;
+        if (setjmp(on_error) == 0) {
+            if (runs[i].kind == 0)
+                System_Halt(runs[i].code);
+            else if (runs[i].kind == 1)
+                System_RunError(runs[i].code, "test");
+            else
+                system_fatal(runs[i].code, "Cannot Open test");
+        }
+        CHECK(hook_calls == 1 && system_exit_hook == nullptr && exit_code == runs[i].code);
+    }
+    system_exit_handler = nullptr;
+    system_runerror_handler = catch_error;
 }
 
 int main(void)
@@ -312,11 +218,11 @@ int main(void)
     dseg_clear();
     vid_clear();
     system_runerror_handler = catch_error;
-    test_strings();
-    test_str_val();
+    test_val();
     test_random();
-    test_real();
+    test_pstr();
     test_heap();
+    test_exit();
     printf("%s\n", ok ? "ok" : "FAILED");
     return ok ? 0 : 1;
 }

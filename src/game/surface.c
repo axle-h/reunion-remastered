@@ -1,7 +1,7 @@
 // Unit Surface (2ef2): see surface.h.
 #include "game/surface.h"
 
-#include <stdio.h>
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "assets/map.h"
@@ -16,7 +16,6 @@
 #include "game/system.h"
 #include "game/textfile.h"
 
-#define P(lit) ((const uint8_t *)PSTR(lit))
 
 static int16_t cur_planet(void)
 {
@@ -30,7 +29,8 @@ static int16_t cur_moon(void)
 
 // Cell (x, y) of a map layer; `size` is 1 for the byte layers and 2 for the
 // word layer. The offset wraps like the original's 16-bit arithmetic (x or
-// y 0 is below the layer), inside the layer's segment (System_GetSegment).
+// y 0 is below the layer), inside the layer's segment (a whole one in the
+// port).
 static void *cell(uint8_t *layer, int16_t x, int16_t y, int size)
 {
     return layer + (uint16_t)(x * 60 * size + y * size - 61 * size);
@@ -98,57 +98,51 @@ static void screen_blit_rect(const uint8_t *src, uint16_t dest_ofs, int16_t w, i
 // 2ef2:004a
 void Surface_EnterSurface(void)
 {
-    PString s, tmp, prefix;
+    char name[32];
+    int16_t set = ds.Surface_TileSet;
 
-    uint8_t *pic = System_GetMem(0xBCC0);
-    Gfx_LoadPic(P("grafika\\designer"), pic, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+    uint8_t *pic = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\designer", pic, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
     Blit_CopyRect(pic, gfx_screen() + 0x3D40, 0x140, 0x97);
     Mouse_HideCursor();
     Blit_FillRect(0x5D, 0x35, 0xE0, 0x90, 0x40);
     Mouse_ShowCursor();
-    ds.Surface_BufA = System_GetMem(0x24FF);
+    ds.Surface_BufA = game_alloc(0x24FF);
     Blit_CopyRectStrided(pic + 0x69E, ds.Surface_BufA, 0x7B, 0x4D, 0x140, 0x7B);
-    System_FreeMem(pic, 0xBCC0);
+    game_free(pic);
 
-    System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
-    ds.Surface_RadarColors = System_GetMem(0x820);
-    System_StrLoad(&tmp, PSTR("planets\\radar"));
-    System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_RadarColors, 1, 0x1A, 0, 0, 0x50, false,
+    ds.Surface_RadarColors = game_alloc(0x820);
+    SDL_snprintf(name, sizeof name, "planets\\radar%d", set);
+    Gfx_LoadPic(name, ds.Surface_RadarColors, 1, 0x1A, 0, 0, 0x50, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
-    System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
-    prefix.len = 0;
-    if (ds.Game_CurBody->Owner > 1)
-        System_StrStore(PSTR("t"), &prefix, 0xFF);
-    ds.Surface_BufC = System_GetMem(0xF000);
-    System_StrLoad(&tmp, PSTR("planets\\epul"));
-    System_StrConcat(&tmp, &prefix);
-    System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false,
+    ds.Surface_BufC = game_alloc(0xF000);
+    SDL_snprintf(name, sizeof name, "planets\\epul%s%d", ds.Game_CurBody->Owner > 1 ? "t" : "",
+                 set);
+    Gfx_LoadPic(name, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
     int16_t fanim = ds.Surface_FanimHeight[ds.Surface_TileSet - 1];
     if (fanim != 0) {
-        ds.Surface_BufD = System_GetMem((uint16_t)(fanim * 0x140));
-        System_StrLoad(&tmp, PSTR("planets\\fanim"));
-        System_StrConcat(&tmp, &s);
+        ds.Surface_BufD = game_alloc((uint16_t)(fanim * 0x140));
+        SDL_snprintf(name, sizeof name, "planets\\fanim%d", set);
         // 0C0h rows whatever the sheet height; LoadPic clips to the picture.
-        Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufD, 1, 0xC0, 0, 0, 0x140, false,
+        Gfx_LoadPic(name, ds.Surface_BufD, 1, 0xC0, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
     }
 
     int16_t felsz = ds.Surface_FelszHeight[ds.Surface_TileSet - 1];
-    ds.Surface_BufB = System_GetMem((uint16_t)(felsz * 0x140));
-    System_StrLoad(&tmp, PSTR("planets\\felsz"));
-    System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufB, 1, (uint16_t)felsz, 0, 0, 0x140,
+    ds.Surface_BufB = game_alloc((uint16_t)(felsz * 0x140));
+    SDL_snprintf(name, sizeof name, "planets\\felsz%d", set);
+    Gfx_LoadPic(name, ds.Surface_BufB, 1, (uint16_t)felsz, 0, 0, 0x140,
                 false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0x3F);
 
-    ds.Surface_TileLayer = System_GetSegment();  // GetMem(0x1518)
-    ds.Surface_OccupyLayer = System_GetSegment();  // GetMem(0x1518)
-    ds.Surface_BuildingLayer = System_GetSegment();  // GetMem(0x2A30)
+    // GetMem(0x1518), 0x1518 and 0x2A30. Whole segments: x or y 0 is below
+    // the layer and wraps (cell).
+    ds.Surface_TileLayer = game_alloc(GAME_SEGMENT);
+    ds.Surface_OccupyLayer = game_alloc(GAME_SEGMENT);
+    ds.Surface_BuildingLayer = game_alloc(GAME_SEGMENT);
     Surface_LoadMap();
 
     ds.Surface_RadarDouble = ds.Surface_MapWidth < 0x2E && ds.Surface_MapHeight < 0x1F;
@@ -160,26 +154,19 @@ void Surface_EnterSurface(void)
     ds.Surface_RadarY = (int16_t)((dy + 0x3C) / 2 + 0x8B);
     ds.Surface_RadarOfs = (uint16_t)(ds.Surface_RadarY * 0x140 + ds.Surface_RadarX);
     if (!ds.Surface_RadarDouble)
-        ds.Surface_RadarBuf = System_GetMem((uint16_t)(w * h));
+        ds.Surface_RadarBuf = game_alloc((uint16_t)(w * h));
     else
-        ds.Surface_RadarBuf = System_GetMem((uint16_t)(w * 4 * h));
+        ds.Surface_RadarBuf = game_alloc((uint16_t)(w * 4 * h));
     ds.Surface_RadarStale = 0xFFFF;
 }
 
 // 2ef2:03e7
 void Surface_LoadMap(void)
 {
-    PString kind, variant, name;
     const TBody *body = ds.Game_CurBody;
-    System_StrLong((int8_t)body->SurfaceType, 0, &kind, 0xFF);
-    System_StrLong(ds.Surface_MapVariant, 0, &variant, 0xFF);
-    System_StrLoad(&name, PSTR("map\\map"));
-    System_StrConcat(&name, &kind);
-    System_StrConcat(&name, PSTR("_"));
-    System_StrConcat(&name, &variant);
-    System_StrConcat(&name, PSTR(".map"));
-    char path[256];
-    snprintf(path, sizeof path, "%.*s", name.len, name.s);
+    char path[32];
+    SDL_snprintf(path, sizeof path, "map\\map%d_%d.map", (int8_t)body->SurfaceType,
+                 ds.Surface_MapVariant);
 
     struct map m;
     // The original stops with a run-time error when the file can't be read.
@@ -188,7 +175,7 @@ void Surface_LoadMap(void)
     // The original reads the cells into a GetMem'd buffer and frees it at
     // the end (the heap keeps the trace).
     uint16_t size = (uint16_t)(m.width * m.height);
-    uint8_t *cells = System_GetMem(size);
+    uint8_t *cells = game_alloc(size);
     memcpy(cells, m.cells, size);
     for (uint16_t row = 1; row <= (uint16_t)m.height; row++) {
         for (uint16_t col = 1; col <= (uint16_t)m.width; col++) {
@@ -202,7 +189,7 @@ void Surface_LoadMap(void)
             *building_at((int16_t)col, (int16_t)row) = 0;
         }
     }
-    System_FreeMem(cells, size);
+    game_free(cells);
     ds.Surface_MapWidth = (uint16_t)m.width;
     ds.Surface_MapHeight = (uint16_t)m.height;
     map_free(&m);
@@ -245,38 +232,37 @@ void Surface_RegisterBuildingAnims(int16_t system, int16_t planet, int16_t moon)
 // 2ef2:0791
 void Surface_SetupSurfaceHotspots(void)
 {
-    static const uint8_t empty[1] = {0};
     bool cb = ds.Surface_CanBuild != 0;
     ds.Mouse_HotspotCount = 0xC;
-    Mouse_SetHotspot(1, 0x5D, 0x35, 0xE0, 0x90, P("Terrain"), 0, 0);
-    Mouse_SetHotspot(2, 0, 0x8A, 0x59, 0x3E, P("Radar"), 0, 0);
-    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, cb ? P("Invention up ") : P("No effect"), 1, 0);
-    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, cb ? P("Invention down") : P("No effect"), 1, 0);
-    Mouse_SetHotspot(5, 0xC, 0x42, 0x4D, 0x3B, cb ? P("Invention Info") : P("No effect"), 1, 0);
-    Mouse_SetHotspot(6, 0x59, 0x35, 4, 0x90, P("Left"), 0, 1);
-    Mouse_SetHotspot(7, 0x13D, 0x35, 3, 0x90, P("Right"), 0, 2);
-    Mouse_SetHotspot(8, 0x5D, 0x31, 0xE0, 4, P("Up"), 0, 3);
-    Mouse_SetHotspot(9, 0x5D, 0xC5, 0xE0, 3, P("Down"), 0, 4);
-    Mouse_SetHotspot(10, 0, 0x32, 0x2C, 0xD, cb ? P("Build") : empty, 1, 0);
-    Mouse_SetHotspot(11, 0x2D, 0x32, 0x2C, 0xD, P("Destroy"), 1, 0);
+    Mouse_SetHotspot(1, 0x5D, 0x35, 0xE0, 0x90, "Terrain", 0, 0);
+    Mouse_SetHotspot(2, 0, 0x8A, 0x59, 0x3E, "Radar", 0, 0);
+    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, cb ? "Invention up " : "No effect", 1, 0);
+    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, cb ? "Invention down" : "No effect", 1, 0);
+    Mouse_SetHotspot(5, 0xC, 0x42, 0x4D, 0x3B, cb ? "Invention Info" : "No effect", 1, 0);
+    Mouse_SetHotspot(6, 0x59, 0x35, 4, 0x90, "Left", 0, 1);
+    Mouse_SetHotspot(7, 0x13D, 0x35, 3, 0x90, "Right", 0, 2);
+    Mouse_SetHotspot(8, 0x5D, 0x31, 0xE0, 4, "Up", 0, 3);
+    Mouse_SetHotspot(9, 0x5D, 0xC5, 0xE0, 3, "Down", 0, 4);
+    Mouse_SetHotspot(10, 0, 0x32, 0x2C, 0xD, cb ? "Build" : "", 1, 0);
+    Mouse_SetHotspot(11, 0x2D, 0x32, 0x2C, 0xD, "Destroy", 1, 0);
 }
 
 // 2ef2:1441 (the Ghidra fragment at 1472 is its second half)
 void Surface_SetupInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = 4;
-    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, P("See surface"), 1, 0);
-    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, P("See surface"), 1, 0);
-    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, P("Invention up"), 1, 0);
-    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, P("Invention down"), 1, 0);
+    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, "See surface", 1, 0);
+    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, "See surface", 1, 0);
+    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, "Invention up", 1, 0);
+    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, "Invention down", 1, 0);
 }
 
 // 2ef2:151b
 void Surface_SetupSimpleInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = 2;
-    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, P("See surface"), 1, 0);
-    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, P("See surface"), 1, 0);
+    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, "See surface", 1, 0);
+    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, "See surface", 1, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,76 +270,52 @@ void Surface_SetupSimpleInfoHotspots(void)
 // ---------------------------------------------------------------------------
 
 // Draws "<label><value><suffix>" in the info panel at row `row`.
-static void info_line(const PString *label, const PString *value, const PString *suffix,
-                      const PString *suffix2, int16_t row)
+static void info_line(const char *label, const char *value, const char *suffix, int16_t row)
 {
-    PString tmp;
-    System_StrLoad(&tmp, label);
-    System_StrConcat(&tmp, value);
-    if (suffix)
-        System_StrConcat(&tmp, suffix);
-    if (suffix2)
-        System_StrConcat(&tmp, suffix2);
-    Gfx_DrawTextFC((const uint8_t *)&tmp, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
+    char tmp[256];
+    SDL_snprintf(tmp, sizeof tmp, "%s%s%s", label, value, suffix);
+    Gfx_DrawTextFC(tmp, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
 }
 
 // 2ef2:0a9d (+ fragment 0e00)
 void Surface_DrawBuildingInfo(void)
 {
-    PString s, s2, tmp;
+    char s[256], tmp[256];
     const TBuildingType *bt = btype(ds.Surface_SelKind);
     int8_t cat = (int8_t)bt->Category;
     // Category 0 reads the three bytes before the table, as the original does.
     const int8_t *rows = &ds.Surface_CategoryRows[0][0] + (cat - 1) * 3;
 
-    Gfx_DrawTextF9((const uint8_t *)bt, 0x75, 0x3B, 0x12);
-    System_StrLong(bt->Cost, 0, &s, 0xFF);
+    Gfx_DrawTextF9(pstr_get(tmp, sizeof tmp, &bt->Name), 0x75, 0x3B, 0x12);
 
     if (ds.Surface_Mode == 3) {
-        System_StrLoad(&tmp, PSTR("Cost       : "));
-        System_StrConcat(&tmp, &s);
-        Gfx_DrawTextFC((const uint8_t *)&tmp, 0x62, 0x46, 0x14);
+        SDL_snprintf(tmp, sizeof tmp, "Cost       : %d", (int)bt->Cost);
+        Gfx_DrawTextFC(tmp, 0x62, 0x46, 0x14);
         for (int16_t i = 1; i <= 3; i++)
-            Gfx_DrawTextFC(P(""), 0x62, (int16_t)(i * 9 + 0x46), 0x15);
+            Gfx_DrawTextFC("", 0x62, (int16_t)(i * 9 + 0x46), 0x15);
 
-        System_StrLong(bt->Production, 0, &s, 0xFF);
-        if (cat == 2 || cat == 9) {
-            System_StrStore(PSTR("Production : mine"), &s, 0xFF);
-        } else {
-            System_StrLoad(&tmp, PSTR("Production : "));
-            System_StrConcat(&tmp, &s);
-            System_StrConcat(&tmp, PSTR(" kwh"));
-            System_StrStore(&tmp, &s, 0xFF);
-        }
+        if (cat == 2 || cat == 9)
+            SDL_strlcpy(s, "Production : mine", sizeof s);
+        else
+            SDL_snprintf(s, sizeof s, "Production : %d kwh", bt->Production);
         int16_t row = rows[0];
         if (row > 0)
-            Gfx_DrawTextFC((const uint8_t *)&s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
+            Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
 
-        System_StrLong(bt->Workers, 0, &s, 0xFF);
-        System_StrLoad(&tmp, PSTR("Workers    : "));
-        System_StrConcat(&tmp, &s);
-        System_StrStore(&tmp, &s, 0xFF);
+        SDL_snprintf(s, sizeof s, "Workers    : %d", bt->Workers);
         row = rows[1];
         if (row > 0)
-            Gfx_DrawTextFC((const uint8_t *)&s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
+            Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
 
-        System_StrLong(bt->Energy, 0, &s, 0xFF);
-        System_StrLoad(&tmp, PSTR("Energy     : "));
-        System_StrConcat(&tmp, &s);
-        System_StrConcat(&tmp, PSTR(" kwh"));
-        System_StrStore(&tmp, &s, 0xFF);
+        SDL_snprintf(s, sizeof s, "Energy     : %d kwh", (int)bt->Energy);
         row = rows[2];
         if (row > 0)
-            Gfx_DrawTextFC((const uint8_t *)&s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
+            Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
     }
 
     if (ds.Surface_Mode == 4) {
         const TBuilding *b = bldg(ds.Surface_SelBuilding);
-        if (b->Flag != 0)
-            System_StrStore(PSTR("Active"), &s, 0xFF);
-        else
-            System_StrStore(PSTR("Passive"), &s, 0xFF);
-        info_line(PSTR("Status     : "), &s, nullptr, nullptr, 0);
+        info_line("Status     : ", b->Flag != 0 ? "Active" : "Passive", "", 0);
 
         int16_t row = rows[0];
         if (row > 0) {
@@ -362,39 +324,29 @@ void Surface_DrawBuildingInfo(void)
             v = v / 100;
             v = (int32_t)((uint32_t)v * b->BD);
             v = v / 100;
-            System_StrLong(v, 0, &s, 0xFF);
-            System_StrLoad(&tmp, &s);
-            System_StrConcat(&tmp, PSTR(" kwh"));
-            System_StrStore(&tmp, &s, 0xFF);
+            SDL_snprintf(s, sizeof s, "%d kwh", (int)v);
             if (cat == 2) {
                 const TBody *body = ds.Game_CurBody;
-                System_StrLong(body->Deposits[0] / 10, 0, &s, 0xFF);
-                System_StrLoad(&tmp, &s);
-                System_StrConcat(&tmp, PSTR(" t/ptp"));
-                System_StrStore(&tmp, &s, 0xFF);
+                SDL_snprintf(s, sizeof s, "%d t/ptp", body->Deposits[0] / 10);
                 if (body->Deposits[0] < 10)
-                    System_StrStore(PSTR("NONE"), &s, 0xFF);
+                    SDL_strlcpy(s, "NONE", sizeof s);
             }
             if (b->Flag == 0)
-                System_StrStore(PSTR("NONE"), &s, 0xFF);
-            info_line(PSTR("Production : "), &s, nullptr, nullptr, row);
+                SDL_strlcpy(s, "NONE", sizeof s);
+            info_line("Production : ", s, "", row);
         }
 
         row = rows[1];
         if (row > 0) {
-            System_StrLong((uint16_t)b->W9, 0, &s, 0xFF);
-            System_StrLong(bt->Workers, 0, &s2, 0xFF);
-            if (b->Flag == 0)
-                System_StrStore(PSTR("0"), &s, 0xFF);
-            info_line(PSTR("Workers    : "), &s, PSTR("/"), &s2, row);
+            SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->W9);
+            SDL_snprintf(tmp, sizeof tmp, "/%d", bt->Workers);
+            info_line("Workers    : ", s, tmp, row);
         }
 
         row = rows[2];
         if (row > 0) {
-            System_StrLong((uint16_t)b->WB, 0, &s, 0xFF);
-            if (b->Flag == 0)
-                System_StrStore(PSTR("0"), &s, 0xFF);
-            info_line(PSTR("Energy     : "), &s, PSTR(" kwh"), nullptr, row);
+            SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->WB);
+            info_line("Energy     : ", s, " kwh", row);
         }
 
         row = rows[2];
@@ -404,10 +356,8 @@ void Surface_DrawBuildingInfo(void)
             row = rows[0];
         if (row < 0)
             row = 0;
-        System_StrLong(b->BD, 0, &s, 0xFF);
-        if (b->Flag == 0)
-            System_StrStore(PSTR("0"), &s, 0xFF);
-        info_line(PSTR("Working    : "), &s, PSTR("%"), nullptr, (int16_t)(row + 1));
+        SDL_snprintf(s, sizeof s, "%d", b->Flag == 0 ? 0 : b->BD);
+        info_line("Working    : ", s, "%", (int16_t)(row + 1));
     }
     TextFile_ShowBuildingInfo((int16_t)((ds.Surface_SelKind - 1) * 6));
 }
@@ -415,12 +365,10 @@ void Surface_DrawBuildingInfo(void)
 // 2ef2:112c
 void Surface_ShowBuildingInfoView(void)
 {
-    PString s, name;
-    uint8_t *buf = System_GetMem(0x1950);
-    System_StrLong(ds.Surface_SelKind, 0, &s, 0xFF);
-    System_StrLoad(&name, PSTR("epulet\\epulet"));
-    System_StrConcat(&name, &s);
-    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
+    char name[32];
+    uint8_t *buf = game_alloc(0x1950);
+    SDL_snprintf(name, sizeof name, "epulet\\epulet%d", ds.Surface_SelKind);
+    Gfx_LoadPic(name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
     Mouse_HideCursor();
     Blit_FillRect(0x5D, 0x35, 0xE0, 0x90, 0x40);
@@ -429,24 +377,22 @@ void Surface_ShowBuildingInfoView(void)
     Mouse_HideCursor();
     screen_blit_rect(buf + 0xB6, 0x46E4, 0x56, 0x44, 0x5A);
     Mouse_ShowCursor();
-    System_FreeMem(buf, 0x1950);
+    game_free(buf);
     Surface_DrawBuildingInfo();
 }
 
 // 2ef2:1204: like 112c but only replaces the building picture.
 void Surface_ShowBuildingPicture(void)
 {
-    PString s, name;
-    uint8_t *buf = System_GetMem(0x1950);
-    System_StrLong(ds.Surface_SelKind, 0, &s, 0xFF);
-    System_StrLoad(&name, PSTR("epulet\\epulet"));
-    System_StrConcat(&name, &s);
-    Gfx_LoadPic((const uint8_t *)&name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
+    char name[32];
+    uint8_t *buf = game_alloc(0x1950);
+    SDL_snprintf(name, sizeof name, "epulet\\epulet%d", ds.Surface_SelKind);
+    Gfx_LoadPic(name, buf, 1, 0x48, 0, 0, 0x5A, false, Gfx_PalettePtr(),
                 0, 0x6F, 0x40, 0, 0xBE);
     Mouse_HideCursor();
     screen_blit_rect(buf + 0xB6, 0x46E4, 0x56, 0x44, 0x5A);
     Mouse_ShowCursor();
-    System_FreeMem(buf, 0x1950);
+    game_free(buf);
     Surface_DrawBuildingInfo();
 }
 
@@ -575,8 +521,10 @@ void Surface_DrawBuildingPreview(int16_t kind)
 {
     if (!body_shown(ds.Game_CurBody))
         return;
+    char name[256];
     if (ds.Surface_CanBuild != 0)
-        Gfx_DrawTextF9((const uint8_t *)btype(ds.Surface_SelKind), 3, 0x82, 0xE);
+        Gfx_DrawTextF9(pstr_get(name, sizeof name, &btype(ds.Surface_SelKind)->Name), 3, 0x82,
+                       0xE);
     const TBuildingType *bt = btype(kind);
     int16_t ox = (int16_t)((0x4D - (int16_t)((int8_t)bt->Width << 4)) / 2 + 0xC);
     int16_t oy = (int16_t)((0x40 - (int16_t)((int8_t)bt->Height << 4)) / 2 + 0x40);
@@ -803,9 +751,9 @@ void Surface_BuildOnCurrentPlanet(int16_t kind, int16_t x, int16_t y)
 {
     // BUG? A full building table plays the 'x' sound; the 'buildin' branch is skipped.
     if (ds.Game_BuildingCount > 999)
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
     if (ds.Game_BuildingCount < 1000) {
-        Sound_PlayButtonSfx(P("buildin"));
+        Sound_PlayButtonSfx("buildin");
         Surface_AddBuilding((uint8_t)kind, (uint8_t)ds.Game_CurSystem, (uint8_t)cur_planet(),
                             (uint8_t)cur_moon(), (uint8_t)x, (uint8_t)y);
         ds.Surface_SelBuilding = ds.Game_BuildingCount;

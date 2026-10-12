@@ -17,17 +17,32 @@ field in the original's order.
   comment gives the Pascal bounds, and the C index is the Pascal index minus
   the lower bound (`Galaxy::SunNames[3]` → `ds.Galaxy_SunNames[2]`).
 - `boolean` is `uint8_t`, since the original may store any byte value.
-  Strings are `PStrN` / `PString` (length byte + chars). `real` is the
-  6-byte `Real48`. `pointer` and `^T` are host pointers (`uint8_t *`, `T *`);
-  procedural types (`TProc = procedure;` in `types.pas`) are C function
-  pointers. `farptr` marks the few real-mode far pointer values nothing uses
-  any more (the Borland heap's variables, interrupt vectors).
+  Strings are `PStrN` / `PString` (length byte + chars): they are game
+  data, saved and hashed byte for byte. Game code uses C strings and
+  converts at the boundary with `pstr_get` / `pstr_set`
+  (`src/game/system.h`), which keep exactly the bytes the original's
+  `StrStore` leaves; a NUL inside a Pascal string (read past a table) is
+  carried as `PSTR_NUL`. The text routines take C strings, except the line
+  editor, which edits game data in place. `real` would be the 6-byte
+  `Real48`, but no DS field or record has one; the game's few Real
+  computations (the cosine table, model normals, taxes) are integer or
+  `double` code checked to give the original's results. `pointer` and `^T`
+  are host pointers (`uint8_t *`, `T *`); procedural types
+  (`TProc = procedure;` in `types.pas`) are C function pointers. `farptr`
+  marks the few real-mode far pointer values nothing uses any more (the
+  Borland heap's variables, interrupt vectors).
 - `DSeg` keeps the original's globals in order with no padding: in a dozen
   places the original reads or writes past an array into the next globals
   (alien-talk lines into `Surface::Mode`, race 0/1 records before
   `Races::Races`, index 0 of 1-based tables), and those stay the same
   bytes. Only pointer fields differ in size from the original. Bytes nobody
   named are `_pad_XXXX` arrays.
+- Packed means many words and longwords sit at odd addresses. Code reaches
+  them through the packed struct itself (`ds.X`, `rec->X`, a pointer to a
+  packed record) or, at a byte offset, with `rd16le`/`wr16le`/`rd32le`/
+  `wr32le` (`src/game/le.h`), never through an `int16_t *` or `int32_t *`.
+  The `asan` and `trap` presets check alignment, so a new misaligned access
+  fails their runs.
 
 `dseg_init()` (`src/game/dseg.c`) does what the original's startup does:
 DS gets the typed constants, DS `0000–759d`, and the rest is zero. The
@@ -75,19 +90,24 @@ The port has no emulated address space; the game's state is ordinary C:
 |---|---|
 | Data segment | `ds`, a C global (above) |
 | Video memory | `vid_screen` (`src/platform/video.c`): the VGA's 64 KB at A000h, of which rows 0..199 are shown; `gfx_screen()` is the drawing target |
-| Heap | `System_GetMem`/`System_FreeMem` (`src/game/system.c`): zeroed C blocks, freed by the next `system_init`. The game's memory checks (`MemAvail`/`MaxAvail`) are left out: the port always has enough |
+| Heap | `game_alloc`/`game_free` (`src/game/system.c`), the original's `GetMem`/`FreeMem` without sizes on free: zeroed C blocks, tracked so the next `system_init` frees them (restart and quit `longjmp` past whatever the stack held). The game's memory checks (`MemAvail`/`MaxAvail`) are left out: the port always has enough |
 
-Buffers the original addresses through their 64 KB segment, with 16-bit
-offsets that can wrap past the block (drawing buffers, map layers), are
-whole segments (`System_GetSegment`); code that relies on the wrap keeps a
+Every other block has the original's size. Buffers the original addresses
+through their 64 KB segment, with 16-bit offsets that can wrap or run past
+the block, are whole segments (`game_alloc(GAME_SEGMENT)`), and each
+allocation says why: the map layers (x or y 0 is below the layer), the
+ground battle's unit lists (slot 0 wraps to the segment's end) and field,
+the planet frame (sprites at its top edge), and the vector models' buffer
+(polygons drawn unclipped). Code that relies on the wrap keeps a
 `(uint16_t)` offset from the segment's start and says so. One pair keeps the
 original's heap layout on purpose: the flight view's backdrop and star
 table (`src/game/shipmove.c`), because stars drawn past the backdrop land in
 the star table and change the game's random numbers.
 
-There is no EMS: unit Ems (`src/game/ems.c`) keeps the game data and toolbar
-blocks on the heap, as on a DOS machine without an EMM, so they never need
-mapping. The original's other run-time helpers (`Move`, `FillChar`, unit
+There is no EMS: the game data and toolbar blocks (`Game_InitGameData`,
+`GfxPath_Init`) stay on the heap, as on a DOS machine without an EMM, so they
+never need mapping, and unit Ems is folded into its callers. Their
+`TEmsBlock` variables keep the original's state 1 (a heap copy). The original's other run-time helpers (`Move`, `FillChar`, unit
 Dos) are plain C library calls or gone. The AdLib tune
 buffer, which only the port's own player reads, is a C array (docs/audio.md).
 
@@ -105,10 +125,20 @@ program body (`src/game/main_program.c`). The original never returns from
 Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
 `longjmp` back to `main()` instead:
 
-- `System_Halt` / `RunError` run the ExitProc chain, then call
-  `system_exit_handler` with the exit code. Code 15 (start.exe: restart)
-  boots again; code 10 (start.exe: VICTORY) will play the
-  victory cut-scene.
+- `System_Halt` / `RunError` run the exit hook (the original's only
+  ExitProc, `Gfx_ExitHandler`: it stops the music and frees the toolbar),
+  then call `system_exit_handler` with the exit code. Code 15 (start.exe:
+  restart) boots again; code 10 (start.exe: VICTORY) plays the victory
+  cut-scene.
+- A run-time error (`System_RunError`: the original's code, the port's
+  routine and, for file errors, the path) and the data loaders' "Cannot
+  Open" are fatal errors (`system_fatal`): reported on stderr and, when a
+  player is watching, in a message box, instead of the original's text-mode
+  error screen. Scripted runs (autopilot, `--replay`, tests, the offscreen
+  and dummy video drivers) never show the box, so a failure can't block
+  them. Tests catch run-time errors with `system_runerror_handler`. The
+  original's "Not enough memory" error is gone: the port doesn't emulate the
+  DOS memory limit, and a failing C allocator is a plain "Out of memory".
 - Closing the window sets a quit request that `timing_wait_retrace()` turns
   into a call of the quit handler at the next retrace. Every waiting loop of
   the original waits for retrace somewhere, so no loop needs its own check.

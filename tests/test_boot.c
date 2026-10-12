@@ -7,7 +7,6 @@
 #include <stdio.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
 #include "game/gfx.h"
 #include "game/main_program.h"
 #include "game/system.h"
@@ -60,18 +59,18 @@ static int run(const char *script)
 static int match_percent(const char *name, uint16_t rows, uint16_t last, uint16_t offset,
                          uint16_t fade_last, int dest_row)
 {
-    uint8_t *buf = System_GetMem(64000);
-    uint8_t *pal = System_GetMem(768);
-    uint8_t pname[64];
-    pname[0] = (uint8_t)SDL_snprintf((char *)pname + 1, sizeof pname - 1, "grafika\\%s", name);
+    uint8_t *buf = game_alloc(64000);
+    uint8_t *pal = game_alloc(768);
+    char pname[64];
+    SDL_snprintf(pname, sizeof pname, "grafika\\%s", name);
     Gfx_LoadPic(pname, buf, 1, rows, 0, 0, 320, false, pal, 0, last, offset, 0, fade_last);
     const uint8_t *pic = buf;
     int same = 0;
     for (int y = 0; y < rows; y++)
         for (int x = 0; x < VID_WIDTH; x++)
             same += vid_screen[dest_row + y][x] == pic[y * 320 + x];
-    System_FreeMem(pal, 768);
-    System_FreeMem(buf, 64000);
+    game_free(pal);
+    game_free(buf);
     return same * 100 / (rows * VID_WIDTH);
 }
 
@@ -110,6 +109,24 @@ static bool record_shown(void)
     return timing_wait_retrace();
 }
 
+// The game data block (unit Ems's in the original): Groups, Buildings and the
+// charset in one heap block, freed by the exit hook's RestoreProc.
+static void game_data(void)
+{
+    dseg_init();
+    system_init();
+    size_t used = system_heap_used();
+    Game_InitGameData();
+    const TEmsBlock *blk = &ds.Ems_GameData;
+    CHECK(blk->State == 1 && blk->Size == 0x8770 && blk->Data == ds.Ems_Buffer);
+    CHECK((uint8_t *)ds.Game_Groups == ds.Ems_Buffer);
+    CHECK((uint8_t *)ds.Game_Buildings == ds.Ems_Buffer + 0x2840);
+    CHECK(ds.Gfx_Charset == ds.Ems_Buffer + 0x5EF0);
+    CHECK(system_heap_used() == used + 0x8770);
+    ds.Ems_RestoreProc();
+    CHECK(blk->State == 0 && blk->Size == 0 && system_heap_used() == used);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -121,6 +138,7 @@ int main(int argc, char *argv[])
         printf("SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
+    game_data();
     system_exit_handler = on_halt;
     timing_set_quit_handler(on_quit);
 
@@ -158,7 +176,7 @@ int main(int argc, char *argv[])
     CHECK(run("40:click:160,60;120:click:80,100;1000:quit") == -1);
     config_reset();
     CHECK(ds.SoundDrv_GusReady);
-    CHECK(Ems_GameDataBlock()->State == 1 && Ems_ToolbarBlock()->State == 1);
+    CHECK(ds.Ems_GameData.State == 1 && ds.GfxPath_ToolbarBlock.State == 1);
     CHECK(ds.Game_CurrentScreen == 1);
     p = match_percent("main", 0x97, 0xB0, 0x40, 0xBE, 49);
     printf("command centre (GUS music): %d%% of main.pic\n", p);
@@ -191,8 +209,10 @@ int main(int argc, char *argv[])
     CHECK(bar_min > 20);
     CHECK(first_black > 0 && fading >= 3);
 
-    // "Exit to DOS" halts with code 0.
+    // "Exit to DOS" halts with code 0, after the exit hook has freed the
+    // toolbar and game data blocks.
     CHECK(run("40:click:160,120;300:quit") == 0);
+    CHECK(ds.Ems_GameData.State == 0 && ds.GfxPath_ToolbarBlock.State == 0);
 
     audio_shutdown();
     SDL_Quit();

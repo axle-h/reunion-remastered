@@ -95,9 +95,9 @@ int main(int argc, char *argv[])
     ds.Pub_Person = 1;                                             // not the trader
     memcpy(&ds.Pub_PersonStr, "\x01" "1", 2);                      // '1'
     for (int16_t r = 1; r <= 3; r++) {
-        uint8_t line[256];
-        TextFile_ReadTextLine((const uint8_t *)"\x0B" "valasz1.loc", r, line);
-        int16_t want = (int16_t)((line[1] - '0') * 10 + (line[2] - '0'));
+        char line[256] = "";
+        TextFile_ReadTextLine("valasz1.loc", r, line, sizeof line);
+        int16_t want = (int16_t)((line[0] - '0') * 10 + (line[1] - '0'));
         ds.Pub_ReplyLine = r;
         ds.Pub_MenuIdx = 99;
         ds.Pub_QuestionCode = 0x55;

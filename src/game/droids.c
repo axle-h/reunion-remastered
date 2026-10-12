@@ -1,10 +1,13 @@
 #include "game/droids.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
+#include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
 #include "game/sound.h"
@@ -14,7 +17,6 @@
 int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int16_t moon,
                                bool activeOnly); // 2ef2:2b1a
 
-#define P(lit) ((const uint8_t *)PSTR(lit))
 
 static bool at_home_planet(void)
 {
@@ -38,8 +40,8 @@ void Droids_DroidsScreen(void)
         PlanetInfo_SelectCurBody();
         Droids_SetupDroidsHotspots();
         GfxPath_ShowScreenBackdrop();
-        ds.Droids_DigitsPic = System_GetMem(0x8980);
-        Gfx_LoadPic(P("grafika\\szamok"), ds.Droids_DigitsPic, 1, 0x6E, 0, 0, 0x140, false,
+        ds.Droids_DigitsPic = game_alloc(0x8980);
+        Gfx_LoadPic("grafika\\szamok", ds.Droids_DigitsPic, 1, 0x6E, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xB0);
         Droids_DrawDroidsScreen();
         Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -53,7 +55,7 @@ void Droids_DroidsScreen(void)
         int16_t a = Surface_CountBuildings(0x19, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
         int16_t b = Surface_CountBuildings(4, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
         if (body->_0A < b + a && body->Colony != 0 && body->Owner == 1 && body->_0A < 9) {
-            Sound_PlayButtonSfx(P("addroid"));
+            Sound_PlayButtonSfx("addroid");
             body->_0A++;
             if (at_home_planet())
                 ds.Research_Products[1].Stock--;
@@ -63,7 +65,7 @@ void Droids_DroidsScreen(void)
         }
     }
     if (ds.Game_HotspotHit == 0x15) {
-        Sound_PlayButtonSfx(P("surface"));
+        Sound_PlayButtonSfx("surface");
         ds.Game_CurrentScreen = 0x14;
         ds.Game_ScreenSwitch = true;
     }
@@ -75,14 +77,14 @@ void Droids_DrawDroidsScreen(void)
     const TBody *body = ds.Game_CurBody;
     uint16_t droids = body->_0A;
     int16_t stock;
-    const int32_t *stores;
+    const uint8_t *stores;  // six longints in a packed record
     if (at_home_planet()) {
         stock = ds.Research_Products[1].Stock;
-        stores = ds.Game_HomeStock;
+        stores = (const uint8_t *)ds.Game_HomeStock;
     } else {
         int16_t force = Groups_FindPlanetForce(ds.Game_CurSystem, cur_planet(), cur_moon());
         stock = body->Colony == 0 ? 0 : Groups_At(1, force)->Items[12];
-        stores = body->Stores;
+        stores = (const uint8_t *)body->Stores;
     }
     int16_t cap = (int16_t)(Surface_CountBuildings(0x19, ds.Game_CurSystem, cur_planet(), cur_moon(), false)
                             + Surface_CountBuildings(4, ds.Game_CurSystem, cur_planet(), cur_moon(), false));
@@ -100,22 +102,23 @@ void Droids_DrawDroidsScreen(void)
     Blit_CopyRect(pic + (uint16_t)(0x5963 + (cap / 10) * 13), scr + 0x8DB1, 13, 9);
     Blit_CopyRect(pic + (uint16_t)(0x5963 + (cap % 10) * 13), scr + 0x8DBE, 13, 9);
 
-    PString s;
+    char s[16];
     for (int16_t k = 1; k <= 6; k++) {
-        System_StrLong(stores[k - 1], 6, &s, 0xFF);
-        if (stores[k - 1] == 0)
-            System_StrStore(PSTR("     -"), &s, 0xFF);
-        Gfx_DrawTextF9((const uint8_t *)&s, 0x3B, (int16_t)((k - 1) * 8 + 0x39), 6);
+        int32_t store = rd32le(stores + (k - 1) * 4);
+        SDL_snprintf(s, sizeof s, "%6d", (int)store);
+        if (store == 0)
+            SDL_strlcpy(s, "     -", sizeof s);
+        Gfx_DrawTextF9(s, 0x3B, (int16_t)((k - 1) * 8 + 0x39), 6);
     }
     if (body->Owner == 1 && (body->Colony != 0 || body->_0A != 0)) {
         for (int16_t k = 1; k <= 6; k++) {
             uint8_t deposit = body->Deposits[k - 1];
-            System_StrLong((int16_t)((int16_t)(deposit * body->_0A) / 10), 2, &s, 0xFF);
+            SDL_snprintf(s, sizeof s, "%2d", (int16_t)(deposit * body->_0A) / 10);
             if (k == 1)
-                System_StrStore(PSTR("--"), &s, 0xFF);
+                SDL_strlcpy(s, "--", sizeof s);
             if (deposit < 10)
-                System_StrStore(PSTR(" -"), &s, 0xFF);
-            Gfx_DrawTextF9((const uint8_t *)&s, 0x71, (int16_t)((k - 1) * 8 + 0x39), 2);
+                SDL_strlcpy(s, " -", sizeof s);
+            Gfx_DrawTextF9(s, 0x71, (int16_t)((k - 1) * 8 + 0x39), 2);
         }
     }
 }
@@ -124,5 +127,5 @@ void Droids_DrawDroidsScreen(void)
 void Droids_SetupDroidsHotspots(void)
 {
     ds.Mouse_HotspotCount = 1;
-    Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, P("Back to surface"), 1, 0);
+    Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, "Back to surface", 1, 0);
 }

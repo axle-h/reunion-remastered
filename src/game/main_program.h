@@ -17,6 +17,14 @@ void Game_Main(void);
 // AdlibMusic) are skipped. Needs fs_init, dseg_init, system_init.
 void Game_InitUnits(void);
 
+// 4719:0325 (unit Ems's initialiser): allocates the game data block
+// (Ems_Buffer, 8770h bytes) and points Game_Groups, Game_Buildings and
+// Gfx_Charset into it (Buildings = Groups + 2840h, Charset = Groups + 5EF0h).
+// The original moved the block into EMS when an EMM was installed (TEmsBlock
+// state 2, mapped before every use); the port keeps it on the heap (state 1),
+// as on a DOS machine without an EMM.
+void Game_InitGameData(void);
+
 // Port addition for test fixtures (tests/play/): retraces spent in the main
 // loop's wait for an event, i.e. with the current screen set up and taking
 // clicks. Not part of the game state.

@@ -68,15 +68,14 @@ int main(int argc, char *argv[])
     ds.Research_Products[6].Ores[4] = 1;
     ds.Research_Products[6].Ores[5] = 0;
     ds.Shop_Sel = 2;                          // list[1] = product 7
-    int32_t *stock = ds.Shop_OreStock;
     for (int k = 0; k < 6; k++)
-        stock[k] = 1000;
-    stock[2] = 22;                            // ore 3: 22 in stock, 5 per piece -> 4 pieces
+        ds.Shop_OreStock[k] = 1000;
+    ds.Shop_OreStock[2] = 22;                 // ore 3: 22 in stock, 5 per piece -> 4 pieces
     ds.Shop_Qty = 9;
     Shop_UpdateOrderOres();
     CHECK(ds.Shop_Qty == 4);
-    int32_t *needed = ds.Shop_OreNeeded;
-    CHECK(needed[0] == 40 && needed[2] == 20 && needed[4] == 4 && needed[1] == 0);
+    CHECK(ds.Shop_OreNeeded[0] == 40 && ds.Shop_OreNeeded[2] == 20 && ds.Shop_OreNeeded[4] == 4
+          && ds.Shop_OreNeeded[1] == 0);
     uint8_t *flags = ds.Shop_OreShort;        // would one more piece run out?
     CHECK(flags[2] == 1 && flags[0] == 0 && flags[4] == 0);   // 25 > 22
     CHECK(pstr_is(&ds.Shop_OreHeader, "Ore needed: (4 pieces )"));

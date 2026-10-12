@@ -36,7 +36,7 @@ static int32_t load_ore(void)
     body._0A = 1;
     ds.Game_CurBody = &body;
     stores[1] = 1500;
-    ds.Cargo_Stores = stores;
+    ds.Cargo_Stores = (uint8_t *)stores;
     ds.Cargo_PlanetCap = 2000;
     ds.Cargo_ShipCap = 4500;
     ds.Cargo_ShipUsed = 1000;

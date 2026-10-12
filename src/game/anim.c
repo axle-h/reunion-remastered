@@ -13,18 +13,14 @@
 // Shared body of the three loaders: <prefix><id>.ani, frame count from the
 // first byte of the table entry. keep_nil: the SA loader leaves the pointer
 // alone when the chunk was skipped; the others store the nil.
-static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16_t str_max,
-                      bool keep_nil)
+static void load_anim(uint16_t id, const char *prefix, uint8_t frames, bool keep_nil)
 {
     TAnimRecord *rec = ds.Anim_Record;
     if (rec->Loaded == 0) {
         rec->Loaded = 1;
-        PString num, path;
-        System_StrLong((int16_t)id, 0, &num, str_max);
-        System_StrLoad(&path, prefix);
-        System_StrConcat(&path, &num);
-        System_StrConcat(&path, PSTR(".ani"));
-        Gfx_OpenDataFile(&path.len);
+        char path[64];
+        SDL_snprintf(path, sizeof path, "%s%d.ani", prefix, (int16_t)id);
+        Gfx_OpenDataFile(path);
         uint16_t count = frames;
         if (count != 0) {
             for (uint16_t i = 1;; i++) {
@@ -42,9 +38,10 @@ static void load_anim(uint16_t id, const PString *prefix, uint8_t frames, uint16
     }
 }
 
-// Shared body of the three Free routines. check_size: Main/Gr skip frames
-// whose size is 0; War frees every frame (FreeMem of nil/0 does nothing).
-static void free_anim(uint8_t frames, bool check_size)
+// Shared body of the three Free routines. Main/Gr skip frames whose size is
+// 0; War frees every frame, but FreeMem with size 0 does nothing, so all
+// three skip them.
+static void free_anim(uint8_t frames)
 {
     TAnimRecord *rec = ds.Anim_Record;
     if (rec->Loaded != 0) {
@@ -52,8 +49,8 @@ static void free_anim(uint8_t frames, bool check_size)
         uint16_t count = frames;
         if (count != 0) {
             for (uint16_t i = 1;; i++) {
-                if (!check_size || rec->Sizes[i - 1] != 0)
-                    System_FreeMem(rec->Frames[i - 1], rec->Sizes[i - 1]);
+                if (rec->Sizes[i - 1] != 0)
+                    game_free(rec->Frames[i - 1]);
                 if (i == count)
                     break;
             }
@@ -64,37 +61,37 @@ static void free_anim(uint8_t frames, bool check_size)
 // 3c64:0010
 void Anim_LoadWarAnim(uint16_t id)
 {
-    load_anim(id, PSTR("war\\war\\sa"), ds.SpWar_SpriteRects[id - 1].Frames, 5, true);
+    load_anim(id, "war\\war\\sa", ds.SpWar_SpriteRects[id - 1].Frames, true);
 }
 
 // 3c64:011e
 void Anim_FreeWarAnim(uint16_t id)
 {
-    free_anim(ds.SpWar_SpriteRects[id - 1].Frames, false);
+    free_anim(ds.SpWar_SpriteRects[id - 1].Frames);
 }
 
 // 3c64:019c
 void Anim_LoadMainAnim(uint16_t id)
 {
-    load_anim(id, PSTR("anim\\main"), ds.Cc_Doors[id - 1].Frames, 4, false);
+    load_anim(id, "anim\\main", ds.Cc_Doors[id - 1].Frames, false);
 }
 
 // 3c64:028d
 void Anim_FreeMainAnim(uint16_t id)
 {
-    free_anim(ds.Cc_Doors[id - 1].Frames, true);
+    free_anim(ds.Cc_Doors[id - 1].Frames);
 }
 
 // 3c64:031d
 void Anim_LoadGrAnim(uint16_t id)
 {
-    load_anim(id, PSTR("war\\grwar\\granim"), ds.Cc_Rooms[id - 1].Frames, 4, false);
+    load_anim(id, "war\\grwar\\granim", ds.Cc_Rooms[id - 1].Frames, false);
 }
 
 // 3c64:0415
 void Anim_FreeGrAnim(uint16_t id)
 {
-    free_anim(ds.Cc_Rooms[id - 1].Frames, true);
+    free_anim(ds.Cc_Rooms[id - 1].Frames);
 }
 
 // 3c64:0496

@@ -126,6 +126,13 @@ bool vid_init(const char *title)
     return true;
 }
 
+bool vid_visible(void)
+{
+    const char *driver = SDL_GetCurrentVideoDriver();
+    return window && driver && SDL_strcmp(driver, "offscreen") != 0
+           && SDL_strcmp(driver, "dummy") != 0;
+}
+
 void vid_shutdown(void)
 {
     SDL_DestroyTexture(texture);

@@ -1,22 +1,15 @@
 #include "game/title.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
-#include "game/ems.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/mouse.h"
 #include "game/music.h"
 #include "game/sound.h"
 #include "game/system.h"
-
-static inline const uint8_t *ps(const PString *p)
-{
-    return (const uint8_t *)p;
-}
-
-#define LIT(s) ps(PSTR(s))
 
 // Mouse::BtnDown is written by the INT 33h callback; here Mouse_Update stands in
 // for it, and a retrace wait lets the platform layer run.
@@ -60,11 +53,9 @@ void Title_HeroSelect(void)
     while (Sound_IsSbPlaying())
         Gfx_WaitVRetrace();
     Sound_PlaySelectSfx(2);
-    PString num, name;
-    System_StrLong(ds.Game_Hero, 0, &num, 5);
-    System_StrLoad(&name, PSTR("grafika\\hero"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), gfx_screen(), 1, 200, 0, 0, 0x140, false, pal, 0, 0xFF, 0, 0, 0xFF);
+    char name[32];
+    SDL_snprintf(name, sizeof name, "grafika\\hero%d", ds.Game_Hero);
+    Gfx_LoadPic(name, gfx_screen(), 1, 200, 0, 0, 0x140, false, pal, 0, 0xFF, 0, 0, 0xFF);
     Gfx_WaitFrames(140);
     Gfx_FadeFromWhite(1, 0xFF, pal, 150);
     while (Sound_IsSbPlaying())
@@ -80,10 +71,10 @@ void Title_StartMenu(void)
     uint8_t *pal = Gfx_PalettePtr();
 
     Gfx_BlankPalette(pal, 0, 0xFF);
-    Music_PlayTrack(LIT("choise"));
+    Music_PlayTrack("choise");
     // Port deviation (docs/port-bugs.md #1): no "choose your hero" voice yet.
     Music_HoldHeroVoice(true);
-    Gfx_LoadPic(LIT("grafika\\options"), gfx_screen(), 1, 200, 0, 0, 0x140, false, pal,
+    Gfx_LoadPic("grafika\\options", gfx_screen(), 1, 200, 0, 0, 0x140, false, pal,
                 0, 0xFF, 0, 0, 0xFF);
     Gfx_FadeIn(0, 0xFF, pal);
     Mouse_ShowCursor();
@@ -114,15 +105,16 @@ void Title_InitTitleAndMainMenu(void)
     uint16_t cells = (uint16_t)(ds.GfxPath_IconAllSize + 0x54FF);  // GfxPath's BG_OFS
     ds.GfxPath_CellBackgrounds = ds.GfxPath_InitBlock + cells;
     memset(tpal, 0, 768);
-    Gfx_LoadPic(LIT("grafika\\charset1"), ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 0x140, false, tpal,
+    Gfx_LoadPic("grafika\\charset1", ds.Gfx_Charset + 0x80, 1, 0x20, 0, 0, 0x140, false, tpal,
                 0, 2, 0, 0, 2);
     // The characters of the game's own font (Gfx_HeroCharset) head the sheet.
-    for (uint16_t i = 1; i <= ds.Gfx_HeroCharset.len; i++)
-        ds.Gfx_Charset[i - 1] = (uint8_t)ds.Gfx_HeroCharset.s[i - 1];
+    char hero[256];
+    size_t n = SDL_strlen(pstr_get(hero, sizeof hero, &ds.Gfx_HeroCharset));
+    SDL_memcpy(ds.Gfx_Charset, hero, n);
 
-    uint8_t *icons = Ems_ToolbarBlock()->Data + cells;
+    uint8_t *icons = ds.GfxPath_ToolbarBlock.Data + cells;
     ds.GfxPath_CellBackgrounds = icons;
-    Gfx_LoadPic(LIT("icon\\iconmain"), icons, 1, 0x20, 0, 0, 0xF0, false, tpal, 0, 0x21,
+    Gfx_LoadPic("icon\\iconmain", icons, 1, 0x20, 0, 0, 0xF0, false, tpal, 0, 0x21,
                 2, 0, 0x21);
 
     // Six 16x16 cursor shapes from iconmain; colour 2 is transparent.
@@ -144,7 +136,7 @@ void Title_InitTitleAndMainMenu(void)
         Gfx_FatalExit();
     if (ds.Game_StartChoice == 1) {
         Gfx_BlankPalette(Gfx_PalettePtr(), 0, 0xFF);
-        Gfx_LoadPic(LIT("grafika\\choise"), gfx_screen(), 1, 200, 0, 0, 0x140, false,
+        Gfx_LoadPic("grafika\\choise", gfx_screen(), 1, 200, 0, 0, 0x140, false,
                     Gfx_PalettePtr(), 0, 0xFF, 0, 0, 0xFF);
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
         // Port deviation (docs/port-bugs.md #1): the voice plays from here.
@@ -152,19 +144,19 @@ void Title_InitTitleAndMainMenu(void)
         Title_HeroSelect();
     }
 
-    uint8_t *text = System_GetMem(0x1540);
-    uint8_t *main = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\text"), text, 1, 0x11, 0, 0, 0x140, false, tpal, 0, 0xF,
+    uint8_t *text = game_alloc(0x1540);
+    uint8_t *main = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\text", text, 1, 0x11, 0, 0, 0x140, false, tpal, 0, 0xF,
                 0x24, 0, 0xF);
-    Gfx_LoadPic(LIT("grafika\\main"), main, 1, 0x97, 0, 0, 0x140, false, tpal, 0, 0xB0,
+    Gfx_LoadPic("grafika\\main", main, 1, 0x97, 0, 0, 0x140, false, tpal, 0, 0xB0,
                 0x40, 0, 0xBE);
     ds.Command_BackdropShown = 1;
     Gfx_BlankPalette(Gfx_PalettePtr(), 0, 0xFF);
     memcpy(ds.Gfx_Palette, tpal, 0x300);
     Blit_CopyBytes(text, gfx_screen() + 0x2800, 0x1540);
     Blit_CopyBytes(main, gfx_screen() + 0x3D40, 0xBCC0);
-    System_FreeMem(main, 0xBCC0);
-    System_FreeMem(text, 0x1540);
+    game_free(main);
+    game_free(text);
 }
 
 // 321d:0866: fixed colours for the menu bar and status line (not written to the DAC).

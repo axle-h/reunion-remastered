@@ -425,7 +425,7 @@ below were retired with the real-mode memory model; they are at the tag
 - **Cause:** the original (`2ef2:03e7`) reads the map cells into a
   `GetMem(width * height)` buffer and frees it at the end; the port decoded
   from host memory only.
-- **Fix:** `src/game/surface.c:204` copies the cells into a `System_GetMem`
+- **Fix:** `src/game/surface.c:204` copies the cells into a heap (`game_alloc`)
   buffer, reads them from there and frees it. `test_diff_surface` fails on the
   old code.
 - **Status:** fixed
@@ -561,7 +561,8 @@ below were retired with the real-mode memory model; they are at the tag
   the pointer was dangling; at -O2 the stack slot was reused and the box drew
   nothing. GCC warned only for the shop.
 - **Fix:** both choose the text in one conditional expression in the block
-  that uses it; `PSTR`'s comment says why.
+  that uses it; `PSTR`'s comment said why. Since then game code uses C
+  strings (docs/pascal-runtime-plan.md, Stage 3) and `PSTR` is gone.
 - **Verified:** `test_play_ships` passes in the release build (it failed
   before) and in the debug build.
 - **Status:** fixed
@@ -582,4 +583,25 @@ below were retired with the real-mode memory model; they are at the tag
 - **Verified:** `test_play_talk` passes in the sanitizer build with no
   report; the playthrough proof (`tests/play/proof_12345.txt`) replays to the
   same hash.
+- **Status:** fixed
+
+## 34. The sphere model overran the C heap
+
+- **Seen:** found while checking `Vec3D_PrepareObject` on every model
+  (docs/pascal-runtime-plan.md, Stage 1): loading `VECTORS\V34.VEC` with
+  the shop's buffers and freeing them crashed in the heap's `free`. The
+  shop (products 34 and 35) and the command centre's wireframe load these
+  files.
+- **Cause:** the 183-vertex sphere (V34 object 5, V35 object 1) has 380
+  edges and 200 faces, more than its 600-byte edge and 960h-byte face blocks
+  hold (docs/formats/vec.md), and `read_object` (`src/game/vecload.c`) reads
+  them all. The original's heap put the 17 blocks of each kind back to back,
+  so the overrun went into the next object's block, unused in both files. The
+  port gave each block its own C allocation, so the overrun wrote over the
+  C heap's bookkeeping.
+- **Fix:** `alloc_common` and `VecLoad_AllocVecBuffers` allocate each set of
+  17 blocks as one block, so the overrun lands where it did in the original.
+- **Verified:** `test_vec3d` loads, draws and frees both files; with the
+  separate blocks it fails under ASan (`heap-buffer-overflow` in
+  `block_read`).
 - **Status:** fixed

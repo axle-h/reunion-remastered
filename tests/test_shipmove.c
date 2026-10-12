@@ -51,7 +51,7 @@ static void viewport(void)
 static void starfield(void)
 {
     ds.Mouse_CursorState = 1;
-    ds.ShipMove_Backdrop = System_GetSegment() + 8;  // as alloc_anim_buffers
+    ds.ShipMove_Backdrop = (uint8_t *)game_alloc(GAME_SEGMENT) + 8;  // as alloc_anim_buffers
 
     ds.System_RandSeed = 1234;
     ShipMove_InitStarfield();
@@ -82,7 +82,7 @@ static void starfield(void)
     CHECK(memcmp(copy, ds.ShipMove_Stars, sizeof copy) == 0);
 
     // Animate a travelling group: stars appear in the backdrop and on screen.
-    ds.Game_Groups = System_GetMem(0x2840);
+    ds.Game_Groups = game_alloc(0x2840);
     memset(ds.Game_Groups, 0, 0x2840);
     ds.Game_GroupList = 0;
     ds.Game_SelGroup = 1;

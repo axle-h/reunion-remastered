@@ -5,7 +5,8 @@
 #include <string.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/le.h"
+#include "game/main_program.h"
 #include "game/saveload.h"
 #include "game/system.h"
 #include "platform/fs.h"
@@ -29,8 +30,8 @@ int main(int argc, char *argv[])
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
-    ds.Message_Log = System_GetMem(0x31B);
+    Game_InitGameData();
+    ds.Message_Log = game_alloc(0x31B);
 
     // Never touch the real save directory.
     char dir[128];
@@ -64,14 +65,14 @@ int main(int argc, char *argv[])
     CHECK(f && size == SAVELOAD_FILE_SIZE);
     if (f && size == SAVELOAD_FILE_SIZE) {
         CHECK(f[0] == 6 && memcmp(f + 1, "Hello!", 6) == 0);
-        CHECK(*(int32_t *)(f + 0x388C) == 120000);
-        CHECK(*(uint16_t *)(f + 0x38A8) == 2927 && *(uint16_t *)(f + 0x38AA) == 8
-              && *(uint16_t *)(f + 0x38AC) == 13 && *(uint16_t *)(f + 0x38AE) == 23);
-        CHECK(*(int16_t *)(f + 0x3952) == 23);
+        CHECK(rd32le(f + 0x388C) == 120000);
+        CHECK(rd16le(f + 0x38A8) == 2927 && rd16le(f + 0x38AA) == 8 && rd16le(f + 0x38AC) == 13
+              && rd16le(f + 0x38AE) == 23);
+        CHECK(rd16le(f + 0x3952) == 23);
         CHECK(f[0x3954] == ((uint8_t *)ds.Game_Buildings)[0]);
         CHECK(f[0x0038 + 5] == 0x5A);
         CHECK(f[0x79DE + 100] == 0xA5);
-        CHECK(*(int16_t *)(f + 0xA269) == 1);
+        CHECK(rd16le(f + 0xA269) == 1);
     }
 
     // Round trip: wreck the state, reload, compare with a snapshot.

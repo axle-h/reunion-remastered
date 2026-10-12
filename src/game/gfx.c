@@ -18,7 +18,6 @@
 // Routines missing from their units' headers.
 void RawText_SetPaletteRange(int16_t first, int16_t last, const uint8_t *pal);  // 4049:0160
 void GfxPath_FreeToolbarBuffer(void);                                   // 3a1b:09a3
-void Ems_EmsReleaseGameData(void);                                      // 4719:0317
 
 bool (*gfx_wait_retrace)(void) = timing_wait_retrace;
 
@@ -43,69 +42,13 @@ uint8_t *Gfx_PalettePtr(void)
     return (uint8_t *)&ds.Gfx_Palette;
 }
 
-// Pascal string helpers (length byte + chars, at most 255).
-static void pstr_copy(uint8_t *dst, const uint8_t *src)
+// Pos(c, Gfx_CharsetChars): 1-based index or 0. The charset holds neither
+// NUL nor PSTR_NUL, so text from game data draws as the original's does.
+static uint16_t charset_pos(char c)
 {
-    SDL_memmove(dst, src, (size_t)src[0] + 1);
-}
-
-static void pstr_cat(uint8_t *dst, const uint8_t *src)
-{
-    size_t n = SDL_min((size_t)src[0], (size_t)(255 - dst[0]));
-    SDL_memcpy(dst + 1 + dst[0], src + 1, n);
-    dst[0] = (uint8_t)(dst[0] + n);
-}
-
-static void pstr_cat_c(uint8_t *dst, const char *src)
-{
-    uint8_t tmp[256];
-    size_t n = SDL_min(SDL_strlen(src), (size_t)255);
-    tmp[0] = (uint8_t)n;
-    SDL_memcpy(tmp + 1, src, n);
-    pstr_cat(dst, tmp);
-}
-
-static void pstr_from_c(uint8_t *dst, const char *src)
-{
-    dst[0] = 0;
-    pstr_cat_c(dst, src);
-}
-
-static void pstr_to_c(char *dst, const uint8_t *src)
-{
-    SDL_memcpy(dst, src + 1, src[0]);
-    dst[src[0]] = '\0';
-}
-
-// Str(v:0, s).
-static void str_long(uint8_t *dst, int64_t v)
-{
-    char tmp[32];
-    SDL_snprintf(tmp, sizeof tmp, "%lld", (long long)v);
-    pstr_from_c(dst, tmp);
-}
-
-// Pos(c, s) for a one-character substring: 1-based index or 0.
-static uint16_t pos_char(uint8_t c, const PString *s)
-{
-    for (uint16_t i = 0; i < s->len; i++) {
-        if ((uint8_t)s->s[i] == c)
-            return i + 1;
-    }
-    return 0;
-}
-
-// Write(Output, s) / WriteLn. The text screen is gone; output goes to stdout.
-static void out_write(const uint8_t *s)
-{
-    fwrite(s + 1, 1, s[0], stdout);
-    fflush(stdout);
-}
-
-static void out_write_c(const char *s)
-{
-    fputs(s, stdout);
-    fflush(stdout);
+    char chars[256];
+    const char *p = SDL_strchr(pstr_get(chars, sizeof chars, &ds.Gfx_CharsetChars), c);
+    return p && c != '\0' ? (uint16_t)(p - chars + 1) : 0;
 }
 
 // --- Borland file variables ---------------------------------------------------
@@ -118,18 +61,18 @@ typedef struct {
     size_t size;
     size_t pos;
     bool open;
+    char path[256];  // for error reports
 } DosFile;
 
 static DosFile data_file;  // DS:91EE
 static uint16_t io_res;
 
-static void file_reset(DosFile *f, const uint8_t *name)
+static void file_reset(DosFile *f, const char *name)
 {
-    char path[256];
-    pstr_to_c(path, name);
     SDL_free(f->data);
     *f = (DosFile){0};
-    f->data = fs_load(path, &f->size);
+    SDL_strlcpy(f->path, name, sizeof f->path);
+    f->data = fs_load(f->path, &f->size);
     if (f->data)
         f->open = true;
     else if (io_res == 0)
@@ -157,7 +100,9 @@ static void file_close(DosFile *f)
     if (!f->open && io_res == 0)
         io_res = 103;
     SDL_free(f->data);
-    *f = (DosFile){0};
+    f->data = nullptr;
+    f->size = f->pos = 0;
+    f->open = false;
 }
 
 static uint16_t io_result(void)
@@ -167,18 +112,19 @@ static uint16_t io_result(void)
     return r;
 }
 
-static void check_io(void)
+static void check_io(const DosFile *f)
 {
     if (io_res != 0)
-        System_RunError(io_result());
+        System_RunError(io_result(), f->path);
 }
 
-// SetTextMode; Write(Output, msg); Halt.
-static void cannot_open(const uint8_t *msg)
+// "Cannot Open <name>": the original switches to text mode, writes it and
+// halts (exit code 0); the port reports it as a fatal error.
+static void cannot_open(const char *name)
 {
-    Gfx_SetTextMode();
-    out_write(msg);
-    System_Halt(0);
+    char text[300];
+    SDL_snprintf(text, sizeof text, "Cannot Open %s", name);
+    system_fatal(0, text);
 }
 
 // --- palette -------------------------------------------------------------------
@@ -218,7 +164,7 @@ typedef enum { FADE_IN, FADE_OUT, FROM_WHITE, TO_WHITE } FadeKind;
 static uint8_t fade_value(FadeKind kind, uint8_t v, int16_t s, int16_t steps)
 {
     if (steps == 0)
-        System_RunError(200);  // IDIV by zero
+        System_RunError(200, nullptr);  // IDIV by zero
     switch (kind) {
     case FADE_IN:
         return (uint8_t)((int16_t)(uint16_t)(v * s) / steps);
@@ -383,38 +329,29 @@ void Gfx_WaitFramesOrClick(int32_t n)
 // --- files ---------------------------------------------------------------------
 
 // 405f:0856
-void Gfx_LoadFile(const uint8_t *name, uint8_t **buf, uint16_t *size)
+void Gfx_LoadFile(const char *name, uint8_t **buf, uint16_t *size)
 {
-    uint8_t nm[256];
-    pstr_copy(nm, name);
     DosFile f = {0};
-    file_reset(&f, nm);
+    file_reset(&f, name);
     if (io_result() != 0) {
-        uint8_t msg[256];
-        pstr_from_c(msg, "Cannot Open ");
-        pstr_cat(msg, nm);
-        cannot_open(msg);
+        cannot_open(name);
         return;
     }
     // FileSize is a longint; only its low word is kept.
     *size = (uint16_t)f.size;
-    *buf = System_GetMem(*size);
+    *buf = game_alloc(*size);
     file_block_read(&f, *buf, *size);
-    check_io();
+    check_io(&f);
     file_close(&f);
-    check_io();
+    check_io(&f);
 }
 
 // 405f:095a
 void Gfx_IconAllOpenSize(uint16_t *size)
 {
-    uint8_t name[32];
-    pstr_from_c(name, "icon\\icon.all");
-    file_reset(&data_file, name);
+    file_reset(&data_file, "icon\\icon.all");
     if (io_result() != 0) {
-        uint8_t msg[64];
-        pstr_from_c(msg, "Cannot Open ICON\\ICON.ALL");
-        cannot_open(msg);
+        cannot_open("ICON\\ICON.ALL");
         return;
     }
     *size = (uint16_t)data_file.size;
@@ -423,14 +360,12 @@ void Gfx_IconAllOpenSize(uint16_t *size)
 // 405f:09ce: no IOResult check, so a missing file fails at the first read.
 void Gfx_IconAllOpen(void)
 {
-    uint8_t name[32];
-    pstr_from_c(name, "icon\\icon.all");
-    file_reset(&data_file, name);
+    file_reset(&data_file, "icon\\icon.all");
     ds.Gfx_ReadPos = 0;
 }
 
 // 405f:09f3
-void Gfx_IconAllReadChunk(uint8_t *const *buf, uint16_t *len)
+void Gfx_IconAllReadChunk(uint8_t *buf, uint16_t *len)
 {
     uint8_t word[2] = {0, 0};
     if (io_res == 0 && data_file.open && data_file.pos + 2 <= data_file.size) {
@@ -439,33 +374,27 @@ void Gfx_IconAllReadChunk(uint8_t *const *buf, uint16_t *len)
     } else if (io_res == 0) {
         io_res = data_file.open ? 100 : 103;
     }
-    check_io();
+    check_io(&data_file);
     *len = (uint16_t)(word[0] | word[1] << 8);
     uint16_t ofs = ds.Gfx_ReadPos;
     ds.Gfx_ReadPos = (uint16_t)(ds.Gfx_ReadPos + *len);
-    file_block_read(&data_file, *buf + ofs, *len);
-    check_io();
+    file_block_read(&data_file, buf + ofs, *len);
+    check_io(&data_file);
 }
 
 // 405f:0a57
 void Gfx_IconAllClose(void)
 {
     file_close(&data_file);
-    check_io();
+    check_io(&data_file);
 }
 
 // 405f:0a78
-void Gfx_OpenDataFile(const uint8_t *name)
+void Gfx_OpenDataFile(const char *name)
 {
-    uint8_t nm[256];
-    pstr_copy(nm, name);
-    file_reset(&data_file, nm);
-    if (io_result() != 0) {
-        uint8_t msg[256];
-        pstr_from_c(msg, "Cannot Open ");
-        pstr_cat(msg, nm);
-        cannot_open(msg);
-    }
+    file_reset(&data_file, name);
+    if (io_result() != 0)
+        cannot_open(name);
 }
 
 // 405f:0af8
@@ -478,20 +407,20 @@ void Gfx_ReadChunk(uint8_t **buf, uint16_t *size)
     } else if (io_res == 0) {
         io_res = data_file.open ? 100 : 103;
     }
-    check_io();
+    check_io(&data_file);
     *size = (uint16_t)((word[0] | word[1] << 8) + 13);
     // The original skips the chunk when MaxAvail is smaller (the port's heap
     // never is).
-    *buf = System_GetMem(*size);
+    *buf = game_alloc(*size);
     file_block_read(&data_file, *buf, *size);
-    check_io();
+    check_io(&data_file);
 }
 
 // 405f:0bd6
 void Gfx_CloseDataFile(void)
 {
     file_close(&data_file);
-    check_io();
+    check_io(&data_file);
 }
 
 // --- pictures --------------------------------------------------------------------
@@ -507,16 +436,14 @@ enum : uint16_t { LOADPIC_FADE_STEPS_PER_RETRACE = 8 };
 // (the stream stays linear), and the palette index colourOffset + i is not
 // clipped. The inline-asm prologue (0c97..0cd8, which the decompile drops)
 // shifts the fade range by colourOffset and clips rows to the header height.
-void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
+void Gfx_LoadPic(const char *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
                  uint16_t y, uint16_t stride, bool fade, uint8_t *pal, uint16_t firstColour,
                  uint16_t lastColour, uint16_t colourOffset, uint16_t fadeFirst, uint16_t fadeLast)
 {
     (void)unused;
-    uint8_t nm[256], path[256];
-    pstr_copy(nm, name);
     Sound_FreeSampleIfIdle();
-    pstr_copy(path, nm);
-    pstr_cat_c(path, ".pic");
+    char path[256];  // name + '.pic', cut to 255 characters
+    SDL_snprintf(path, sizeof path, "%s.pic", name);
     uint8_t *buf;
     uint16_t size;
     Gfx_LoadFile(path, &buf, &size);
@@ -585,29 +512,26 @@ void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t r
                 *at(pal, (uint16_t)((i + colourOffset) * 3 + c)) = *at(buf, (uint16_t)(raw + i * 3 + c)) >> 2;
         }
     }
-    System_FreeMem(buf, size);
+    game_free(buf);
     Sound_FreeSampleIfIdle();
 }
 
 // 405f:0f23
-void Gfx_LoadPicScreen(const uint8_t *name, uint8_t *dest, uint16_t rows, uint8_t *pal)
+void Gfx_LoadPicScreen(const char *name, uint8_t *dest, uint16_t rows, uint8_t *pal)
 {
-    uint8_t nm[256];
-    pstr_copy(nm, name);
-    Gfx_LoadPic(nm, dest, 0, rows, 0, 0, 320, true, pal, 0, 0xB0, 0x40, 0, 0xBE);
+    Gfx_LoadPic(name, dest, 0, rows, 0, 0, 320, true, pal, 0, 0xB0, 0x40, 0, 0xBE);
 }
 
 // 405f:0f7a
-void Gfx_ShowGrafikaPic(const uint8_t *name)
+void Gfx_ShowGrafikaPic(const char *name)
 {
-    uint8_t path[256];
-    uint8_t *buf = System_GetMem(0xBCC0);
-    pstr_from_c(path, "grafika\\");
-    pstr_cat(path, name);
+    char path[256];
+    uint8_t *buf = game_alloc(0xBCC0);
+    SDL_snprintf(path, sizeof path, "grafika\\%s", name);
     Gfx_LoadPicScreen(path, buf, 151, Gfx_PalettePtr());
     Blit_CopyRect(buf, gfx_screen() + 49 * 320, 320, 151);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
 // --- video mode ------------------------------------------------------------------
@@ -651,16 +575,20 @@ static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
 
 // 405f:1056. Characters not in Gfx_CharsetChars get glyph 78 (the scan
 // gives up after 79 characters).
-void Gfx_DrawText6x8(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
+void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
 {
-    // The original pads in a 256-byte stack copy; widths over 255 would run
-    // off its end. BUG? Here the padding is clipped to the buffer.
+    // The original pads in a 256-byte stack copy of the string (length byte
+    // first); widths over 255 would run off its end. BUG? Here the padding
+    // is clipped to the buffer.
     uint8_t str[512] = {0};
-    pstr_copy(str, s);
+    str[0] = (uint8_t)SDL_min(SDL_strlen(s), (size_t)255);
+    SDL_memcpy(str + 1, s, str[0]);
     bool hide = text_under_cursor(x, y, width);
     if (hide)
         Mouse_HideCursor();
-    uint8_t blank = (uint8_t)(pos_char(' ', &ds.Gfx_CharsetChars) - 1);
+    uint8_t blank = (uint8_t)(charset_pos(' ') - 1);
+    char chars[256] = {};
+    pstr_get(chars, sizeof chars, &ds.Gfx_CharsetChars);
     if (str[0] == 0) {
         str[0] = 1;
         str[1] = ' ';
@@ -668,7 +596,7 @@ void Gfx_DrawText6x8(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint
     uint16_t len = str[0];
     for (uint16_t i = 1; i <= len; i++) {
         uint16_t k = 0;
-        while (k < 78 && (uint8_t)ds.Gfx_CharsetChars.s[k] != str[i])
+        while (k < 78 && (uint8_t)chars[k] != str[i])
             k++;
         str[i] = (uint8_t)k;
     }
@@ -690,43 +618,43 @@ void Gfx_DrawText6x8(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint
 }
 
 // 405f:11e8
-void Gfx_DrawStatusText(const uint8_t *s)
+void Gfx_DrawStatusText(const char *s)
 {
     Gfx_DrawText6x8(s, 16, 37, 18, 0x34);
 }
 
 // 405f:1218
-void Gfx_DrawTextF9(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextF9(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xF9);
 }
 
 // 405f:124b
-void Gfx_DrawTextFC(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextFC(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xFC);
 }
 
 // 405f:127e
-void Gfx_DrawTextF1(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextF1(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xF1);
 }
 
 // 405f:12b1
-void Gfx_DrawTextF4(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextF4(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xF4);
 }
 
 // 405f:12e4
-void Gfx_DrawTextB0(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextB0(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xB0);
 }
 
 // 405f:1317
-void Gfx_DrawTextB3(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_DrawTextB3(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_DrawText6x8(s, x, y, width, 0xB3);
 }
@@ -734,33 +662,25 @@ void Gfx_DrawTextB3(const uint8_t *s, int16_t x, int16_t y, int16_t width)
 // 405f:134c: "Year-Month-Day-Hour".
 void Gfx_DrawGameDate(void)
 {
-    uint8_t t[256], part[256];
-    str_long(t, ds.Game_Year);
-    pstr_cat_c(t, "-");
-    str_long(part, ds.Game_Month);
-    pstr_cat(t, part);
-    pstr_cat_c(t, "-");
-    str_long(part, ds.Game_Day);
-    pstr_cat(t, part);
-    pstr_cat_c(t, "-");
-    str_long(part, ds.Game_Hour);
-    pstr_cat(t, part);
+    char t[32];
+    SDL_snprintf(t, sizeof t, "%u-%u-%u-%u", ds.Game_Year, ds.Game_Month, ds.Game_Day,
+                 ds.Game_Hour);
     Gfx_DrawText6x8(t, 224, 37, 13, 0x34);
 }
 
 // 405f:140a
 void Gfx_DrawCredits(void)
 {
-    uint8_t t[256];
-    str_long(t, ds.Game_Credits);
+    char t[16];
+    SDL_snprintf(t, sizeof t, "%d", (int)ds.Game_Credits);
     Gfx_DrawText6x8(t, 144, 37, 10, 0x34);
 }
 
 // 405f:143a
 void Gfx_FlashCredits(void)
 {
-    uint8_t t[256];
-    str_long(t, ds.Game_Credits);
+    char t[16];
+    SDL_snprintf(t, sizeof t, "%d", (int)ds.Game_Credits);
     Gfx_DrawText6x8(t, 144, 37, 10, 0xFC);
     Gfx_WaitFrames(6);
     Gfx_DrawText6x8(t, 144, 37, 10, 0x34);
@@ -784,18 +704,18 @@ static void type_glyph(int16_t x, int16_t y, uint16_t cell, uint8_t g, uint8_t c
 
 // 405f:14c1. Clears the cells, then types the text one character at a time
 // with a click and a 300-scanline pause per non-blank character.
-void Gfx_TypeText(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
+void Gfx_TypeText(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
 {
+    // The original's 256-byte copy of the string, length byte first.
     uint8_t str[256] = {0};
-    pstr_copy(str, s);
-    uint8_t kiiro[8];
-    pstr_from_c(kiiro, "kiiro");
-    Sound_PlaySfx(kiiro);
+    str[0] = (uint8_t)SDL_min(SDL_strlen(s), (size_t)255);
+    SDL_memcpy(str + 1, s, str[0]);
+    Sound_PlaySfx("kiiro");
     // The original also works out whether the cursor overlaps the text, but
     // never uses it: it hides the cursor around every character instead.
     if ((uint16_t)width >= 1) {
         for (uint16_t i = 1;; i++) {
-            uint8_t g = (uint8_t)(pos_char(' ', &ds.Gfx_CharsetChars) - 1);
+            uint8_t g = (uint8_t)(charset_pos(' ') - 1);
             type_glyph(x, y, i, g, colour);
             if (i == (uint16_t)width)
                 break;
@@ -803,14 +723,16 @@ void Gfx_TypeText(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t
     }
     // s := s + 52 spaces, then Delete(s, width + 1, 255). The bytes past the
     // new length keep the spaces, which the loop below may read.
-    pstr_cat_c(str, "                                                    ");
+    uint8_t pad = (uint8_t)SDL_min(52, 255 - str[0]);
+    SDL_memset(str + 1 + str[0], ' ', pad);
+    str[0] = (uint8_t)(str[0] + pad);
     int32_t idx = (int16_t)(width + 1);
     if (idx >= 1 && idx <= str[0])
         str[0] = (uint8_t)(idx - 1);
     if ((uint16_t)width >= 1) {
         for (uint16_t i = 1;; i++) {
             uint8_t ch = str[(uint8_t)i];  // BUG? the original reads past the 256-byte buffer for width > 255
-            uint8_t g = (uint8_t)(pos_char(ch, &ds.Gfx_CharsetChars) - 1);
+            uint8_t g = (uint8_t)(charset_pos((char)ch) - 1);
             Mouse_HideCursor();
             type_glyph(x, y, i, g, colour);
             Mouse_ShowCursor();
@@ -825,13 +747,13 @@ void Gfx_TypeText(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t
 }
 
 // 405f:17a2
-void Gfx_TypeTextF9(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_TypeTextF9(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_TypeText(s, x, y, width, 0xF9);
 }
 
 // 405f:17d5
-void Gfx_TypeTextFC(const uint8_t *s, int16_t x, int16_t y, int16_t width)
+void Gfx_TypeTextFC(const char *s, int16_t x, int16_t y, int16_t width)
 {
     Gfx_TypeText(s, x, y, width, 0xFC);
 }
@@ -1020,46 +942,18 @@ static void call_proc(TProc p)
         p();
 }
 
-// 405f:1a62, installed as ExitProc by Gfx_Init.
+// 405f:1a62, installed as ExitProc by Gfx_Init (the port's exit hook,
+// game/system.h). After a run-time error the original then fades out,
+// switches to text mode, prints "External or internal error!" with the code
+// and address and waits for a key, or for error 203 asks for more
+// conventional memory; the port reports fatal errors itself (system_fatal).
 void Gfx_ExitHandler(void)
 {
-    ds.System_ExitProc = ds.Gfx_SavedExitProc;
     // The original ends a looping SB voice here (Sound::SbBreakLoop,
     // 431a:017f); the port's audio stops with the program.
     Music_StopMusic();
     call_proc(ds.Game_GfxPathProc);
     call_proc(ds.Ems_RestoreProc);
-    if (ds.System_ErrorAddr == 0)
-        return;
-
-    Gfx_FadeOut(0, 0xFF, Gfx_PalettePtr());
-    Gfx_SetTextMode();
-    uint8_t t[256];
-    if (ds.System_ExitCode == 203) {  // heap overflow
-        out_write_c("Not enough memory!\n");
-        out_write_c("Please run REUNION with more conventional memory or EMS (max 256k) !\n");
-    } else {
-        // The strings are verbatim, odd "103" and "23" included.
-        out_write_c("External or internal error!\n");
-        out_write_c("Error code:      103");
-        str_long(t, ds.System_ExitCode);
-        out_write(t);
-        out_write_c("23\n");
-        out_write_c("Error address:   ");
-        str_long(t, (uint16_t)(ds.System_ErrorAddr >> 16));
-        out_write(t);
-        out_write_c(":");
-        str_long(t, (uint16_t)ds.System_ErrorAddr);
-        out_write(t);
-        out_write_c("\n");
-    }
-    // repeat until KeyPressed. One retrace per poll keeps events flowing and
-    // lets a closed window end the wait.
-    while (!Crt_KeyPressed()) {
-        if (!gfx_wait_retrace())
-            break;
-    }
-    ds.System_ErrorAddr = 0;
 }
 
 // 405f:1c21: colour 0 goes R = 60 - 2 * |FlashStep - 31| (byte arithmetic)
@@ -1088,6 +982,5 @@ void Gfx_PaletteFlashTick(void)
 void Gfx_Init(void)
 {
     scanlines_pending = 0;  // port: every boot starts the same (tests replay boots)
-    ds.Gfx_SavedExitProc = ds.System_ExitProc;
-    ds.System_ExitProc = Gfx_ExitHandler;
+    system_exit_hook = Gfx_ExitHandler;
 }

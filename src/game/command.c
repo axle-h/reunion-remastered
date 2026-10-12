@@ -1,5 +1,7 @@
 #include "game/command.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/anim.h"
 #include "game/blit.h"
 #include "game/crt.h"
@@ -22,13 +24,6 @@ static inline uint8_t *screen_at(uint16_t off)
     return gfx_screen() + off;
 }
 
-static inline const uint8_t *ps(const PString *p)
-{
-    return (const uint8_t *)p;
-}
-
-#define LIT(s) ps(PSTR(s))
-
 // Cc::Rooms holds the 14 war animations; StartMainAnim also looks up room
 // animations there, and the endings' ids 15 and 16 read on into the table
 // after it (SpWar::ScriptPlays), as in the original.
@@ -38,25 +33,13 @@ static const TWarAnim *war_anim(int16_t id)
 }
 
 // Gfx_LoadPic with the arguments shared by every command-centre sheet.
-static void load_sheet(const uint8_t *name, uint8_t *dest, uint16_t rows, uint16_t stride)
+static void load_sheet(const char *name, uint8_t *dest, uint16_t rows, uint16_t stride)
 {
     Gfx_LoadPic(name, dest, 1, rows, 0, 0, stride, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
 }
 
 // Sound names of the staff kinds (pilots, builders, fighters, developers).
 static const char *const staff_sfx[5] = {"", "pilots", "builders", "fighters", "develope"};
-
-static void play_sfx(const char *name)
-{
-    PString s;
-    uint8_t n = 0;
-    while (name[n] != 0) {
-        s.s[n] = name[n];
-        n++;
-    }
-    s.len = n;
-    Sound_PlayButtonSfx(ps(&s));
-}
 
 // The research/messages hotspots start a room animation and play its frames
 // out before the screen changes.
@@ -92,50 +75,50 @@ void Command_HandleCommandCentre(void)
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x18;
         if (ds.Command_StaffPicked >= 1 && ds.Command_StaffPicked <= 4)
-            play_sfx(staff_sfx[ds.Command_StaffPicked]);
+            Sound_PlayButtonSfx(staff_sfx[ds.Command_StaffPicked]);
     }
     if (ds.Game_HotspotHit == 0x19) {
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 3;
-        play_sfx("research");
+        Sound_PlayButtonSfx("research");
         play_room_anim(0xB);
     }
     if (ds.Game_HotspotHit == 0x1A) {
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0xB;
-        play_sfx("messages");
+        Sound_PlayButtonSfx("messages");
         play_room_anim(0xC);
     }
     if (ds.Game_HotspotHit == 0x1B) {
-        play_sfx("door1");
+        Sound_PlayButtonSfx("door1");
         Command_OpenPanelMaina2();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 2;
     }
     if (ds.Game_HotspotHit == 0x1C) {
-        play_sfx("door2");
+        Sound_PlayButtonSfx("door2");
         Command_OpenPanelMaina1();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 5;
     }
     if (ds.Game_HotspotHit == 0x1D) {
-        play_sfx("starmap");
+        Sound_PlayButtonSfx("starmap");
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 7;
     }
     if (ds.Game_HotspotHit == 0x1E) {
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x17;
-        play_sfx("local");
+        Sound_PlayButtonSfx("local");
     }
     if (ds.Game_HotspotHit == 0x1F) {
-        play_sfx("door3");
+        Sound_PlayButtonSfx("door3");
         Command_OpenPanelMaina3And4();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x10;
     }
     if (ds.Game_HotspotHit == 0x20) {
-        play_sfx("surface");
+        Sound_PlayButtonSfx("surface");
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 0x14;
     }
@@ -144,11 +127,11 @@ void Command_HandleCommandCentre(void)
 // 3abd:0275: grafika\main on the screen below the toolbar.
 void Command_DrawCommandBackdrop(void)
 {
-    uint8_t *dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\main"), dest, 1, 0x97, 0, 0, 200, ds.Command_BackdropShown != 0,
+    uint8_t *dest = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\main", dest, 1, 0x97, 0, 0, 200, ds.Command_BackdropShown != 0,
                 Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(dest, screen_at(SCREEN_AT), 0x140, 0x97);
-    System_FreeMem(dest, 0xBCC0);
+    game_free(dest);
     Command_LoadCommandGfx();
     if (ds.Command_BackdropShown == 0)
         Gfx_FadeIn(0, 0xFF, Gfx_PalettePtr());
@@ -162,16 +145,16 @@ void Command_LoadCommandGfx(void)
 {
     Command_InitRoomAnim();
     Command_StartMainAnim((int16_t)(System_Random(6) + 1));
-    ds.Command_MainA5 = System_GetMem(0x5280);
-    ds.Command_Heroes = System_GetMem(0x4C40);
-    ds.Command_MainA4 = System_GetMem(0x5B00);
-    ds.Command_MainFace = System_GetMem(0xE600);
-    load_sheet(LIT("grafika\\mainface"), ds.Command_MainFace, 0xB8, 0x140);
-    load_sheet(LIT("grafika\\heroes"), ds.Command_Heroes, 0x3D, 0x140);
+    ds.Command_MainA5 = game_alloc(0x5280);
+    ds.Command_Heroes = game_alloc(0x4C40);
+    ds.Command_MainA4 = game_alloc(0x5B00);
+    ds.Command_MainFace = game_alloc(0xE600);
+    load_sheet("grafika\\mainface", ds.Command_MainFace, 0xB8, 0x140);
+    load_sheet("grafika\\heroes", ds.Command_Heroes, 0x3D, 0x140);
     Command_DrawHeroPortrait();
     Command_DrawAllStaffIcons();
-    load_sheet(LIT("grafika\\maina4"), ds.Command_MainA4, 0x5B, 0x100);
-    load_sheet(LIT("grafika\\maina5"), ds.Command_MainA5, 0x42, 0x140);
+    load_sheet("grafika\\maina4", ds.Command_MainA4, 0x5B, 0x100);
+    load_sheet("grafika\\maina5", ds.Command_MainA5, 0x42, 0x140);
 }
 
 // The edge lines of the hologram panel opening or closing: one pass of the
@@ -192,15 +175,14 @@ void Command_ShowHologram(int16_t vec)
     uint8_t *pal = Gfx_PalettePtr();
 
     Command_FreeRoomAnim();
-    System_FreeMem(ds.Command_MainA4, 0x5B00);
-    System_FreeMem(ds.Command_MainFace, 0xE600);
-    ds.Command_Offscreen = System_GetSegment();  // GetMem(64000)
-    Sound_PlayButtonSfx(LIT("holo"));
-    PString num, name;
-    System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
-    System_StrLoad(&name, PSTR("grafika\\holo"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), ds.Command_Offscreen + SCREEN_AT, 1, 0x97, 0, 0, 0x140, false,
+    game_free(ds.Command_MainA4);
+    game_free(ds.Command_MainFace);
+    // A 320x200 copy of the screen; the iris lines and blits stay inside it.
+    ds.Command_Offscreen = game_alloc(64000);
+    Sound_PlayButtonSfx("holo");
+    char name[32];
+    SDL_snprintf(name, sizeof name, "grafika\\holo%d", ds.Game_Hero);
+    Gfx_LoadPic(name, ds.Command_Offscreen + SCREEN_AT, 1, 0x97, 0, 0, 0x140, false,
                 pal, 0, 0xB0, 0x40, 0, 0xBE);
 
     for (int16_t n = 1;; n++) {
@@ -219,7 +201,9 @@ void Command_ShowHologram(int16_t vec)
             break;
     }
 
-    ds.VecLoad_Buffer = System_GetSegment();  // GetMem(0x8980)
+    // GetMem(0x8980). A whole segment: the wireframe's edges are drawn
+    // unclipped at 16-bit offsets (game/vec3d.h).
+    ds.VecLoad_Buffer = game_alloc(GAME_SEGMENT);
     VecLoad_AllocWireBuffers();
     VecLoad_LoadWireVec(vec);
     VecLoad_SetWirePalette();
@@ -240,9 +224,9 @@ void Command_ShowHologram(int16_t vec)
     if (Crt_KeyPressed())
         (void)Crt_ReadKey();
     VecLoad_FreeWireBuffers();
-    System_FreeSegment(ds.VecLoad_Buffer);
+    game_free(ds.VecLoad_Buffer);
 
-    Gfx_LoadPic(LIT("grafika\\main"), ds.Command_Offscreen + SCREEN_AT, 1, 0x97, 0, 0, 0x140,
+    Gfx_LoadPic("grafika\\main", ds.Command_Offscreen + SCREEN_AT, 1, 0x97, 0, 0, 0x140,
                 false, pal, 0, 0xB0, 0x40, 0, 0xBE);
     Command_DrawHeroPortraitToBuffer();
     for (int16_t n = 0x39;; n--) {
@@ -251,16 +235,16 @@ void Command_ShowHologram(int16_t vec)
             break;
     }
     Sound_FreeSampleIfIdle();
-    ds.Command_MainFace = System_GetMem(0xE600);
-    load_sheet(LIT("grafika\\mainface"), ds.Command_MainFace, 0xB8, 0x140);
+    ds.Command_MainFace = game_alloc(0xE600);
+    load_sheet("grafika\\mainface", ds.Command_MainFace, 0xB8, 0x140);
     Command_TickAmbientLights();
     Blit_CopyRect(ds.Command_Offscreen + SCREEN_AT, screen_at(SCREEN_AT), 0x140, 0x97);
     Command_TickAmbientLights();
     Command_DrawHeroPortrait();
     Command_DrawAllStaffIcons();
-    System_FreeSegment(ds.Command_Offscreen);
-    ds.Command_MainA4 = System_GetMem(0x5B00);
-    load_sheet(LIT("grafika\\maina4"), ds.Command_MainA4, 0x5B, 0x100);
+    game_free(ds.Command_Offscreen);
+    ds.Command_MainA4 = game_alloc(0x5B00);
+    load_sheet("grafika\\maina4", ds.Command_MainA4, 0x5B, 0x100);
     Command_InitRoomAnim();
 }
 
@@ -278,8 +262,9 @@ void Command_SetupCommandHotspots(void)
             h->Y = (uint8_t)(ds.Command_StaffY[s - 1] + 0x32);
             h->W = (int16_t)(ds.Command_StaffW[s - 1] - 2);
             h->H = (uint8_t)(ds.Command_StaffH[s - 1] - 2);
-            System_StrStore((const PString *)&ds.Staff_Names[s - 1][hired - 1],
-                            (PString *)&h->Caption, 0x12);
+            char name[256];
+            pstr_get(name, sizeof name, &ds.Staff_Names[s - 1][hired - 1]);
+            pstr_set(&h->Caption, 0x12, name);
             h->Repeat_ = 1;
             ds.Command_StaffHotspotCount++;
             ds.Command_StaffHotspotKind[ds.Command_StaffHotspotCount - 1] = s;
@@ -292,25 +277,25 @@ void Command_SetupCommandHotspots(void)
         h->Y = 0;
         h->W = 0;
         h->H = 0;
-        h->Caption.len = 0;
+        pstr_set(&h->Caption, 0x12, "");
         h->Repeat_ = 1;
         h->_1A = 0;
     }
-    Mouse_SetHotspot(5, 0x2A, 0x47, 0x26, 0x3C, LIT("RESEARCH-DESIGN"), 1, 0);
-    Mouse_SetHotspot(6, 0, 0x47, 0x2A, 0x4F, LIT("MESSAGE"), 1, 0);
-    Mouse_SetHotspot(7, 0xA3, 0x31, 0x1E, 0x36, LIT("COMMANDERS"), 1, 0);
-    Mouse_SetHotspot(8, 0xFF, 0x31, 0x41, 0x58, LIT("INFO-BUY"), 1, 0);
-    Mouse_SetHotspot(9, 0, 0x31, 0x50, 0x16, LIT("STARMAP"), 1, 0);
-    Mouse_SetHotspot(10, 0x51, 0x31, 0x30, 0x31, LIT("SPACE LOCAL"), 1, 0);
-    Mouse_SetHotspot(11, 0xC2, 0x31, 0x35, 0x52, LIT("SHIP INFO"), 1, 0);
-    Mouse_SetHotspot(12, 0x49, 0x9D, 0xBE, 0x2B, LIT("PLANET MAIN"), 1, 0);
+    Mouse_SetHotspot(5, 0x2A, 0x47, 0x26, 0x3C, "RESEARCH-DESIGN", 1, 0);
+    Mouse_SetHotspot(6, 0, 0x47, 0x2A, 0x4F, "MESSAGE", 1, 0);
+    Mouse_SetHotspot(7, 0xA3, 0x31, 0x1E, 0x36, "COMMANDERS", 1, 0);
+    Mouse_SetHotspot(8, 0xFF, 0x31, 0x41, 0x58, "INFO-BUY", 1, 0);
+    Mouse_SetHotspot(9, 0, 0x31, 0x50, 0x16, "STARMAP", 1, 0);
+    Mouse_SetHotspot(10, 0x51, 0x31, 0x30, 0x31, "SPACE LOCAL", 1, 0);
+    Mouse_SetHotspot(11, 0xC2, 0x31, 0x35, 0x52, "SHIP INFO", 1, 0);
+    Mouse_SetHotspot(12, 0x49, 0x9D, 0xBE, 0x2B, "PLANET MAIN", 1, 0);
 }
 
 // 3abd:0ba1
 void Command_InitRoomAnim(void)
 {
-    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
-    ds.Anim_Script = System_GetMem(0x230);
+    ds.Anim_Record = game_alloc(sizeof(TAnimRecord));
+    ds.Anim_Script = game_alloc(0x230);
     ds.Command_AnimId = 0;
     ds.Command_AnimFrame = 0;
     ds.Command_AnimTick = 1;
@@ -321,8 +306,8 @@ void Command_InitRoomAnim(void)
 void Command_FreeRoomAnim(void)
 {
     Command_StopMainAnim();
-    System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
-    System_FreeMem(ds.Anim_Script, 0x230);
+    game_free(ds.Anim_Record);
+    game_free(ds.Anim_Script);
 }
 
 // 3abd:0c05: random delay 100..299 frames before the first frame.
@@ -367,7 +352,7 @@ void Command_TickRoomAnim(void)
     Anim_LoadMainAnim((uint16_t)id);
     const TRoomAnim *room = &ds.Cc_Doors[ds.Command_AnimId - 1];
     uint16_t size = (uint16_t)(room->H * room->W);
-    uint8_t *buf = System_GetMem(size);
+    uint8_t *buf = game_alloc(size);
     uint16_t scr = (uint16_t)(room->Y * 0x140 + room->X);
     Mouse_HideCursor();
     Blit_CopyRectStrided(screen_at(scr), buf + (uint16_t)(w + 1), (int16_t)(w - 2),
@@ -390,7 +375,7 @@ void Command_TickRoomAnim(void)
                          (int16_t)(ds.Cc_Doors[id - 1].H - 2), (int16_t)w, 0x140);
     Mouse_ShowCursor();
     ds.Command_AnimDelay = 0;
-    System_FreeMem(buf, size);
+    game_free(buf);
 }
 
 // 3abd:0e5d: next frame (wrapping) straight to the screen, for the endings.
@@ -413,8 +398,8 @@ void Command_StepMainAnim(void)
 void Command_FreeGrRoomAnim(void)
 {
     Command_StopGrAnim();
-    System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
-    System_FreeMem(ds.Anim_Script, 0x230);
+    game_free(ds.Anim_Record);
+    game_free(ds.Anim_Script);
 }
 
 // 3abd:0efe
@@ -472,8 +457,8 @@ static void panel_tick(void)
 // 3abd:102c
 void Command_OpenPanelMaina1(void)
 {
-    uint8_t *dest = System_GetMem(0x95D0);
-    load_sheet(LIT("grafika\\maina1"), dest, 0x88, 0x11A);
+    uint8_t *dest = game_alloc(0x95D0);
+    load_sheet("grafika\\maina1", dest, 0x88, 0x11A);
     panel_tick();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
@@ -486,14 +471,14 @@ void Command_OpenPanelMaina1(void)
         if (n == 6)
             break;
     }
-    System_FreeMem(dest, 0x95D0);
+    game_free(dest);
 }
 
 // 3abd:1122
 void Command_OpenPanelMaina2(void)
 {
-    uint8_t *dest = System_GetMem(0x19BA);
-    load_sheet(LIT("grafika\\maina2"), dest, 0x59, 0x4A);
+    uint8_t *dest = game_alloc(0x19BA);
+    load_sheet("grafika\\maina2", dest, 0x59, 0x4A);
     panel_tick();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
@@ -506,14 +491,14 @@ void Command_OpenPanelMaina2(void)
         if (n == 4)
             break;
     }
-    System_FreeMem(dest, 0x19BA);
+    game_free(dest);
 }
 
 // 3abd:1221
 void Command_OpenPanelMaina3And4(void)
 {
-    uint8_t *buf = System_GetMem(0x5B00);
-    load_sheet(LIT("grafika\\maina4"), buf, 0x5B, 0x100);
+    uint8_t *buf = game_alloc(0x5B00);
+    load_sheet("grafika\\maina4", buf, 0x5B, 0x100);
     Gfx_WaitVRetrace();
     for (int16_t n = 1;; n++) {
         int16_t strip = ds.Command_DoorDir == 0 ? n : (int16_t)(0x10 - n);
@@ -526,10 +511,10 @@ void Command_OpenPanelMaina3And4(void)
         if (n == 6)
             break;
     }
-    System_FreeMem(buf, 0x5B00);
+    game_free(buf);
 
-    buf = System_GetMem(0x2346);
-    load_sheet(LIT("grafika\\maina3"), buf, 0x69, 0x56);
+    buf = game_alloc(0x2346);
+    load_sheet("grafika\\maina3", buf, 0x69, 0x56);
     Gfx_WaitVRetrace();
     for (int16_t n = 1;; n++) {
         Mouse_HideCursor();
@@ -541,7 +526,7 @@ void Command_OpenPanelMaina3And4(void)
         if (n == 4)
             break;
     }
-    System_FreeMem(buf, 0x2346);
+    game_free(buf);
 }
 
 // 3abd:1395: the door beside the builders' desk opens and closes at random
@@ -672,23 +657,16 @@ void Command_DrawAllStaffIcons(void)
 void Command_ShowDeathEnding(void)
 {
     uint8_t *pal = Gfx_PalettePtr();
-    PString num, name;
-    if (ds.Game_PrevScreen == 0x20)
-        System_StrStore(PSTR("1"), &num, 0xFF);
-    else
-        System_StrStore(PSTR("2"), &num, 0xFF);
-    uint8_t *buf = System_GetMem(64000);
-    System_StrLoad(&name, PSTR("grafika\\deathsz"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
+    char name[32];
+    uint8_t *buf = game_alloc(64000);
+    Gfx_LoadPic(ds.Game_PrevScreen == 0x20 ? "grafika\\deathsz1" : "grafika\\deathsz2", buf, 0,
+                200, 0, 0, 0x140, true, pal, 0, 0xFF, 0, 0, 0xFF);
     Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     Gfx_WaitFrames(0x2D0);
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
-    System_StrLong(ds.Game_Hero, 0, &num, 0xFF);
-    System_StrLoad(&name, PSTR("grafika\\death"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
+    SDL_snprintf(name, sizeof name, "grafika\\death%d", ds.Game_Hero);
+    Gfx_LoadPic(name, buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0, 0xB0);
     Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x8C);
     if (ds.Game_Hero == 2) {
@@ -705,10 +683,10 @@ void Command_ShowDeathEnding(void)
         Gfx_WaitFrames(0x67C);
     }
     Gfx_FadeOutSteps(0, 0xFF, pal, 0x46);
-    Gfx_LoadPic(LIT("grafika\\death"), buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0,
+    Gfx_LoadPic("grafika\\death", buf, 0, 200, 0, 0, 0x140, false, pal, 0, 0xB0, 0x40, 0,
                 0xB0);
     Blit_CopyRect(buf, gfx_screen(), 0x140, 200);
-    System_FreeMem(buf, 64000);
+    game_free(buf);
     Gfx_WaitFrames(0x46);
     Gfx_FadeInSteps(0, 0xFF, pal, 0x46);
     Command_InitRoomAnim();

@@ -2,7 +2,7 @@
 // detail screen (0x16) and the New Group screen (0x15).
 //
 // Game_Groups points to array[0..1] of array[1..32] of TGroup in the game
-// data block (game/ems.h): list 0 = fleets, list 1 = planet forces.
+// data block (Game_InitGameData): list 0 = fleets, list 1 = planet forces.
 #pragma once
 
 #include <stdint.h>

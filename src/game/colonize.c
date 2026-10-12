@@ -1,5 +1,7 @@
 #include "game/colonize.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/groups.h"
@@ -13,7 +15,6 @@
 // Routines missing from their units' headers.
 void Surface_DrawBuildingTiles(int16_t kind, int16_t x, int16_t y); // 2ef2:1b98
 
-#define P(lit) ((const uint8_t *)PSTR(lit))
 
 static int16_t cur_planet(void)
 {
@@ -60,9 +61,9 @@ void Colonize_ColonizeScreen(void)
             cs->Moon = (uint8_t)cur_moon();
         } else {
             if (ds.Game_StaffHired[1] == 0)
-                Message_ShowMessageNoLog(P("|  You haven't got a builder!  |"));
+                Message_ShowMessageNoLog("|  You haven't got a builder!  |");
             else
-                Message_ShowMessageNoLog(P("|  You builder not able to build this colony  |"));
+                Message_ShowMessageNoLog("|  You builder not able to build this colony  |");
             int16_t cur = ds.Game_CurrentScreen;
             ds.Game_CurrentScreen = ds.Game_PrevScreen;
             ds.Game_PrevScreen = cur;
@@ -72,10 +73,10 @@ void Colonize_ColonizeScreen(void)
     }
     if (ds.Game_MenuCommand == 0x3B) {
         if (ds.Game_Credits < ds.Colonize_ColonyCost) {
-            Sound_PlayButtonSfx(P("hiba"));
+            Sound_PlayButtonSfx("hiba");
             Gfx_FlashCredits();
         } else {
-            System_FreeMem(ds.Surface_BufC, 0xF000);
+            game_free(ds.Surface_BufC);
             ds.Game_CurrentScreen = 0x14;
             ds.Game_ScreenSwitch = true;
             Satellite_AcquireBody();
@@ -85,13 +86,11 @@ void Colonize_ColonizeScreen(void)
             ds.Game_SelGroup = ds.Game_ShownGroupCount;
             ds.Game_SelGroup1 = ds.Game_ShownGroupCount;
             Groups_ClearGroup();
-            PString name, tmp;
-            PlanetInfo_GetBodyName(&tmp, ds.Game_CurSystem, cur_planet(), cur_moon());
-            System_StrStore(&tmp, &name, 0xFF);
+            char name[256], tmp[256];
+            PlanetInfo_GetBodyName(name, sizeof name, ds.Game_CurSystem, cur_planet(), cur_moon());
             TGroup *g = Groups_At(1, ds.Game_SelGroup);
-            System_StrLoad(&tmp, &name);
-            System_StrConcat(&tmp, PSTR(" forces"));
-            System_StrStore(&tmp, (PString *)&g->Name, 0x11);
+            SDL_snprintf(tmp, sizeof tmp, "%s forces", name);
+            pstr_set(&g->Name, 0x11, tmp);
             g->Kind = 5;
             g->Status = 7;
             g->System = (uint8_t)ds.Game_CurSystem;
@@ -103,7 +102,7 @@ void Colonize_ColonizeScreen(void)
         }
     }
     if (ds.Game_MenuCommand == 0x3A) {
-        System_FreeMem(ds.Surface_BufC, 0xF000);
+        game_free(ds.Surface_BufC);
         ds.Game_CurrentScreen = 0x14;
         ds.Game_ScreenSwitch = true;
         ds.Game_ColonySetupCount--;
@@ -124,35 +123,35 @@ void Colonize_ColonizeScreen(void)
     if (*picked == 0) {
         // Select: the colony plus the chosen buildings must stay payable.
         if (ds.Colonize_ColonyCost + bt->Cost <= ds.Game_Credits) {
-            Sound_PlayButtonSfx(P("x"));
+            Sound_PlayButtonSfx("x");
             Gfx_DrawCredits();
             *picked = 1;
             Surface_DrawBuildingTiles(sb->Building, sb->X, sb->Y);
             ds.Colonize_ColonyCost += bt->Cost;
         } else {
-            Sound_PlayButtonSfx(P("hiba"));
+            Sound_PlayButtonSfx("hiba");
             Gfx_FlashCredits();
         }
     } else {
-        Sound_PlayButtonSfx(P("x"));
+        Sound_PlayButtonSfx("x");
         Gfx_DrawCredits();
         *picked = 0;
         Gfx_DrawDitherRect(sb->X, sb->Y, (int16_t)(bt->Width * 16 + sb->X - 1),
                            (int16_t)(bt->Height * 16 + sb->Y - 1), 0x40);
         ds.Colonize_ColonyCost -= bt->Cost;
     }
-    PString s;
-    System_StrLong(ds.Colonize_ColonyCost, 0, &s, 0xFF);
-    Gfx_DrawTextF9((const uint8_t *)&s, 0x114, 0xB9, 6);
+    char s[16];
+    SDL_snprintf(s, sizeof s, "%d", (int)ds.Colonize_ColonyCost);
+    Gfx_DrawTextF9(s, 0x114, 0xB9, 6);
 }
 
 // 2841:04c6
 void Colonize_SetupColonizeHotspots(void)
 {
     ds.Mouse_HotspotCount = 9;
-    Mouse_SetHotspot(1, 0x10B, 0x36, 0x30, 0x30, P("Change people"), 1, 0);
-    Mouse_SetHotspot(2, 0x10B, 0x69, 0x17, 0x0B, P("Previous people"), 1, 0);
-    Mouse_SetHotspot(3, 0x123, 0x69, 0x17, 0x0B, P("Next people"), 1, 0);
+    Mouse_SetHotspot(1, 0x10B, 0x36, 0x30, 0x30, "Change people", 1, 0);
+    Mouse_SetHotspot(2, 0x10B, 0x69, 0x17, 0x0B, "Previous people", 1, 0);
+    Mouse_SetHotspot(3, 0x123, 0x69, 0x17, 0x0B, "Next people", 1, 0);
     for (int16_t k = 1; k <= 6; k++) {
         const TStarterBuilding *sb = &ds.Colony_StarterBuildings[k - 1];
         const TBuildingType *bt = &ds.Surface_BuildingTypes[sb->Building - 1];
@@ -161,7 +160,8 @@ void Colonize_SetupColonizeHotspots(void)
         h->Y = (uint8_t)sb->Y;
         h->W = (int16_t)(sb->W << 4);
         h->H = (uint8_t)(sb->H << 4);
-        System_StrStore((const PString *)&bt->Name, (PString *)&h->Caption, 0x12);
+        char name[256];
+        pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &bt->Name));
         h->Repeat_ = 1;
         h->_1A = 0;
     }
@@ -171,17 +171,15 @@ void Colonize_SetupColonizeHotspots(void)
 void Colonize_DrawColonizeScreen(void)
 {
     PlanetInfo_SelectCurBody();
-    uint8_t *buf = System_GetMem(0xBCC0);
-    Gfx_LoadPic(P("grafika\\koloniz"), buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
+    uint8_t *buf = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\koloniz", buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(),
                 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(buf, 0xBCC0);
-    PString s, tmp;
-    System_StrLong(ds.Surface_TileSet, 0, &s, 0xFF);
-    ds.Surface_BufC = System_GetMem(0xF000);
-    System_StrLoad(&tmp, PSTR("planets\\epul"));
-    System_StrConcat(&tmp, &s);
-    Gfx_LoadPic((const uint8_t *)&tmp, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false,
+    game_free(buf);
+    char s[16], name[32];
+    ds.Surface_BufC = game_alloc(0xF000);
+    SDL_snprintf(name, sizeof name, "planets\\epul%d", ds.Surface_TileSet);
+    Gfx_LoadPic(name, ds.Surface_BufC, 1, 0xC0, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0x3F, 0x90, 0, 0xBE);
     const TBody *body = ds.Game_CurBody;
     for (int16_t k = 1; k <= 6; k++) {
@@ -190,14 +188,13 @@ void Colonize_DrawColonizeScreen(void)
         Surface_DrawBuildingTiles(sb->Building, sb->X, sb->Y);
         Gfx_DrawDitherRect(sb->X, sb->Y, (int16_t)(bt->Width * 16 + sb->X - 1),
                            (int16_t)(bt->Height * 16 + sb->Y - 1), 0x40);
-        System_StrLong(bt->Cost, 0, &s, 0xFF);
+        SDL_snprintf(s, sizeof s, "%d", (int)bt->Cost);
         if (!Colonize_TypeAvailable(bt) || !Colonize_SuitsSurface(bt, (int8_t)body->SurfaceType))
-            System_StrStore(PSTR("Sorry"), &s, 0xFF);
-        Gfx_DrawTextF9((const uint8_t *)&s, (int16_t)(sb->X + 2), (int16_t)(sb->Y - 0xB), 5);
+            SDL_strlcpy(s, "Sorry", sizeof s);
+        Gfx_DrawTextF9(s, (int16_t)(sb->X + 2), (int16_t)(sb->Y - 0xB), 5);
     }
-    System_StrLong(100000, 0, &s, 0xFF);
-    Gfx_DrawTextF9(P("Cost of colony:"), 0xB4, 0xB9, 0xF);
-    Gfx_DrawTextF9((const uint8_t *)&s, 0x114, 0xB9, 6);
+    Gfx_DrawTextF9("Cost of colony:", 0xB4, 0xB9, 0xF);
+    Gfx_DrawTextF9("100000", 0x114, 0xB9, 6);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }
 

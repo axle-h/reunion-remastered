@@ -6,6 +6,7 @@
 // Advisor:: fields): word timers, each with a "done" byte behind it.
 #include "game/sim.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
@@ -36,7 +37,7 @@
 void Command_ShowHologram(int16_t vec);                                // 3abd:04b4
 void AlienTalk_StartAlienScene(int16_t scene);                         // 2e4b:0000
 void AlienTalk_StartAlienTalk(int16_t race);                           // 2e4b:03a5
-void Intel_FirstContact(int16_t race, const uint8_t *msg);             // 29b9:0000
+void Intel_FirstContact(int16_t race, const char *msg);             // 29b9:0000
 void Intel_DispatchForce(int16_t race, int16_t force, int16_t system, int16_t planet,
                          int16_t moon, uint8_t nextMission);           // 29b9:0316
 void Intel_DispatchForceNow(int16_t race, int16_t force, int16_t system, int16_t planet,
@@ -70,8 +71,6 @@ void Surface_RebuildRadar(void);                                       // 2ef2:2
 // Data access (the original's 1-based arrays).
 // ---------------------------------------------------------------------------
 
-static inline const uint8_t *ps(const PString *s) { return &s->len; }
-
 static inline TProduct *product(int16_t p) { return &ds.Research_Products[p - 1]; }
 static inline TRace *race(int16_t r) { return Intel_Race(r); }
 static inline int8_t *system_status(int16_t s) { return &ds.Galaxy_SystemStatus[s - 1]; }
@@ -81,9 +80,10 @@ static inline int8_t *planet_status(int16_t s, int16_t p)
 }
 // Completed observatories in system s, counted by UpdateBuildings.
 static inline int16_t *observatories(int16_t s) { return &ds.Sim_Observatories[s - 1]; }
-static inline const PString *system_name(int16_t s)
+// Galaxy::Names of system s, into buf.
+static const char *system_name(char buf[256], int16_t s)
 {
-    return (const PString *)&ds.Names_Systems[s - 1];
+    return pstr_get(buf, 256, &ds.Names_Systems[s - 1]);
 }
 // Game::CurPlanet[CurSystem] / CurMoon[CurSystem].
 static inline int16_t *cur_planet(void) { return &ds.Game_CurPlanet[ds.Game_CurSystem - 1]; }
@@ -91,7 +91,6 @@ static inline int16_t *cur_moon(void) { return &ds.Game_CurMoon[ds.Game_CurSyste
 // Game::CurMoon[s] for any system.
 static inline int16_t cur_moon_of(int16_t s) { return ds.Game_CurMoon[s - 1]; }
 static inline TColonySetup *colony_setup(int16_t k) { return &ds.Game_ColonySetups[k - 1]; }
-static inline int32_t *home_stock(int16_t i) { return &ds.Game_HomeStock[i - 1]; }
 // Game::Buildings^[i].
 static inline TBuilding *building(int16_t i)
 {
@@ -123,18 +122,16 @@ static inline int32_t lmul(int32_t a, int32_t b) { return (int32_t)((uint32_t)a 
 static int32_t ldiv32(int32_t a, int32_t b)
 {
     if (b == 0)
-        System_RunError(200);
+        System_RunError(200, nullptr);
     return (int32_t)((int64_t)a / b);
 }
 
 // a + b + c into a 255-character temporary, then ShowMessage.
-static void show3(const PString *a, const PString *b, const PString *c)
+static void show3(const char *a, const char *b, const char *c)
 {
-    PString t;
-    System_StrLoad(&t, a);
-    System_StrConcat(&t, b);
-    System_StrConcat(&t, c);
-    Message_ShowMessage(ps(&t));
+    char t[256];
+    SDL_snprintf(t, sizeof t, "%s%s%s", a, b, c);
+    Message_ShowMessage(t);
 }
 
 // Jade: Amnesty (system 1) planet 7, the Jaanosians' home world.
@@ -250,23 +247,17 @@ void Sim_ProcessPubTimers(void)
                     if (item == 0)
                         continue;
                     int32_t amount = ldiv32(deal->Amounts[j - 1], divisor);
-                    PString num, t;
-                    System_StrLong(amount, 0, &num, 0xFF);
+                    char name[256], t[256];
                     if (item < 10) {
-                        *home_stock(item) += amount;
-                        System_StrLoad(&t, PSTR("You got "));
-                        System_StrConcat(&t, &num);
-                        System_StrConcat(&t, PSTR(" t of "));
-                        System_StrConcat(&t, (const PString *)&ds.Names_Ores[item - 1]);
+                        ds.Game_HomeStock[item - 1] += amount;
+                        pstr_get(name, sizeof name, &ds.Names_Ores[item - 1]);
+                        SDL_snprintf(t, sizeof t, "You got %d t of %s", (int)amount, name);
                     } else {
                         product((int16_t)(item - 10))->Stock += (int16_t)amount;
-                        System_StrLoad(&t, PSTR("You got "));
-                        System_StrConcat(&t, &num);
-                        System_StrConcat(&t, PSTR(" pieces of "));
-                        System_StrConcat(&t, (const PString *)&product((int16_t)(item - 10))->Name);
-                        System_StrConcat(&t, PSTR("s"));
+                        pstr_get(name, sizeof name, &product((int16_t)(item - 10))->Name);
+                        SDL_snprintf(t, sizeof t, "You got %d pieces of %ss", (int)amount, name);
                     }
-                    Message_ShowMessage(ps(&t));
+                    Message_ShowMessage(t);
                 }
             } else {
                 Message_ShowMessageLine(0x2A);
@@ -285,8 +276,8 @@ void Sim_ProcessPubTimers(void)
         if ((int16_t)deal->Year == (int32_t)ds.Game_Year && deal->Month == ds.Game_Month
             && deal->Day == ds.Game_Day && deal->Hour == ds.Game_Hour) {
             if (System_Random(3) < 4) {  // always
-                uint8_t line[256];
-                TextFile_ReadTextLine(ps(PSTR("pirate.txt")), k, line);
+                char line[256] = "";
+                TextFile_ReadTextLine("pirate.txt", k, line, sizeof line);
                 Message_ShowMessage(line);
             } else {
                 deal->Active = 0;
@@ -320,7 +311,8 @@ void Sim_ProgressResearch(void)
             p->Progress = 0;
             p->State = 5;
             ds.Game_CurResearch = 0;
-            show3(PSTR("The "), (const PString *)&p->Name, PSTR(" is ready for production"));
+            char name[256];
+            show3("The ", pstr_get(name, sizeof name, &p->Name), " is ready for production");
             if (ds.Game_CurrentScreen == 3) {
                 Research_ResetSelectionFrame();
                 ds.Game_SelInvention = k;
@@ -430,12 +422,10 @@ typedef struct BodyEventsFrame {
 static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16_t planet,
                                   int16_t moon, int16_t bodyIdx)
 {
-    PString name;   // string[50]
-    PString line;   // bp-116h
-    PString t;
-    PlanetInfo_GetBodyLongName(&t, system, planet, moon);
-    System_StrStore(&t, &name, 0x32);
-    const PString *end = PSTR(" ");
+    char name[51];  // string[50]
+    char t[256];
+    PlanetInfo_GetBodyLongName(name, sizeof name, system, planet, moon);
+    const char *end = " ";
 
     TBody *b = body(system, bodyIdx);
     if (b->Owner == 1 && b->Colony != 0) {
@@ -451,14 +441,14 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         int16_t sick = b->_14 == 0 ? 2 : 1;
         if (b->_14 == 0 && medicine == 0) {
             if (System_Random(5) == 0)
-                show3(PSTR("Because of disease your people need a medicine plant|  on "), &name, end);
+                show3("Because of disease your people need a medicine plant|  on ", name, end);
             target -= 10;
             if (target > 25)
                 target = 25;
         }
         if (lmul(sick, b->Population) > hospital) {
             if (System_Random(5) == 0)
-                show3(PSTR(" Due to sanitary conditions you need a hospital |  on "), &name, end);
+                show3(" Due to sanitary conditions you need a hospital |  on ", name, end);
             target -= 10;
             b->Population -= 200;
             if (target > 25)
@@ -486,12 +476,12 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             target += 10;
         if (b->Population > 50000 && stadium == 0) {
             if (System_Random(5) == 0)
-                show3(PSTR("  Your people ask for a stadium | on "), &name, end);
+                show3("  Your people ask for a stadium | on ", name, end);
             target -= 20;
         }
         if (b->Population > 70000 && university == 0) {
             if (System_Random(5) == 0)
-                show3(PSTR("  Your people demand a University | on "), &name, end);
+                show3("  Your people demand a University | on ", name, end);
             target -= 20;
         }
         if (planet < 3 && kind_count(19) == 0) {
@@ -499,7 +489,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 4));
                 b->Population -= (uint16_t)(r + 500);
                 Intel_ScheduleIdea(0x1E, 0x32, 0x19);
-                show3(PSTR(" Your people are dying because of radiation |  on "), &name, end);
+                show3(" Your people are dying because of radiation |  on ", name, end);
             }
             target -= 40;
         }
@@ -514,8 +504,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                     hit = i;
             }
             if (hit == -1) {
-                show3(PSTR("  A meteorite hit your colony on | "), &name,
-                      PSTR(" |        but causes no harm."));
+                show3("  A meteorite hit your colony on | ", name, " |        but causes no harm.");
             } else {
                 Surface_DeleteBuilding(hit);
                 int16_t n = (int16_t)(Surface_CountBuildings(0x19, system, planet, moon, false)
@@ -529,14 +518,14 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 b->Population -= r;
                 Intel_ScheduleIdea(0x1C, 0xFA, 100);
                 b->Attitude -= 10;
-                show3(PSTR("  One of your buildings has exploded |      due to meteorite impact| on "),
-                      &name, end);
+                show3("  One of your buildings has exploded |      due to meteorite impact| on ",
+                      name, end);
             }
             target -= 30;
         }
         if (b->Population > food) {
             if (System_Random(3) == 0)
-                show3(PSTR(" Your people are starving |  on "), &name, end);
+                show3(" Your people are starving |  on ", name, end);
             target -= 15;
             if (target > 25)
                 target = 25;
@@ -544,7 +533,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         }
         if (b->Population > living) {
             if (System_Random(3) == 0)
-                show3(PSTR(" There isn't enough living space|  on "), &name, end);
+                show3(" There isn't enough living space|  on ", name, end);
             target -= 10;
             if (target > 25)
                 target = 25;
@@ -568,14 +557,18 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             maxPop = MinMax_Min(maxPop, 80000);
 
         // Taxes: Round(Population * TechLevel * Resistance * (Attitude + 40) / 200000).
-        static const Real48 k200000 = {{0x92, 0x00, 0x00, 0x00, 0x50, 0x43}};
-        Real48 tech = System_LongToReal((int8_t)b->TechLevel);
-        Real48 att = System_LongToReal(b->Attitude + 40);
-        Real48 res = System_LongToReal(b->Resistance);
-        Real48 x = System_RealMul(System_LongToReal(b->Population), tech);
-        x = System_RealMul(x, res);
-        x = System_RealMul(x, att);
-        parent->income += System_Round(System_RealDiv(x, k200000));
+        // The original multiplies and divides Reals (Real48). Every operand is
+        // an integer (TechLevel 0..7 read as a shortint, Resistance 0..60,
+        // Attitude + 40 in -88..167, population held near maxPop <= 200000),
+        // and while the product stays below 2^40 (|Population| < 15.6
+        // million) the Real chain is exact up to the division, whose
+        // rounding never crosses a half: this is the same result (checked
+        // 2026-10-12 on every operand combination at edge populations, every
+        // division boundary below 2^40 and 20 million random cases).
+        int64_t taxes = (int64_t)b->Population * (int8_t)b->TechLevel * b->Resistance *
+                        (b->Attitude + 40);
+        int64_t rounded = (taxes < 0 ? -taxes : taxes) + 100000;
+        parent->income += (int32_t)(taxes < 0 ? -(rounded / 200000) : rounded / 200000);
 
         if (System_Random((uint16_t)(b->Resistance * b->Resistance)) < 100)
             b->Resistance++;
@@ -609,16 +602,16 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             if (b->Stores[6] == 5 && System_Random(3) < 2)
                 b->Stores[6] = 4;
             if (b->Stores[6] == 5) {
-                show3(PSTR(" Your people have revolted  |  on "), &name, end);
+                show3(" Your people have revolted  |  on ", name, end);
                 Intel_DestroyBody(system, planet, moon);
             } else {
-                show3(PSTR(" Your advisors report that| there are rebellious forces |  on "), &name, end);
+                show3(" Your advisors report that| there are rebellious forces |  on ", name, end);
             }
         } else {
             b->Stores[6] = 0;
         }
         if (b->Population < 1000) {
-            show3(PSTR(" Your colony has been destroyed  |  on "), &name, end);
+            show3(" Your colony has been destroyed  |  on ", name, end);
             Intel_DestroyBody(system, planet, moon);
         }
         if (b->Colony != 0 && b->Owner == 1)
@@ -643,12 +636,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         b->InfoLevel = 60;
 
     if (b->InfoLevel - gain < 10 && b->InfoLevel >= 10 && (int8_t)b->Owner < 2) {
-        System_StrLoad(&t, end);
-        System_StrConcat(&t, &name);
-        System_StrConcat(&t, b->_03 != 0 ? PSTR(" |    is ready for mining ")
-                                         : PSTR(" |    is not suitable for mining "));
-        System_StrStore(&t, &line, 0xFF);
-        Message_ShowMessage(ps(&line));
+        show3(end, name,
+              b->_03 != 0 ? " |    is ready for mining " : " |    is not suitable for mining ");
         if (product(5)->State == 0 && ds.Game_IdeaTimer[4] == -1 && b->_03 != 0) {
             Intel_ScheduleIdea(5, 0x14, 0x28);
             Message_ShowMessageLine(2);
@@ -662,22 +651,20 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             // Galaxy::SurfaceColonisable[Surface::Tileset[SurfaceType]]
             uint16_t tileset = (uint16_t)ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
             if (b->Surveyed != 0 && ds.Galaxy_SurfaceColonisable[tileset - 1] != 0)
-                show3(end, &name, PSTR(" |    is a suitable place for living"));
+                show3(end, name, " |    is a suitable place for living");
             else
-                show3(end, &name, PSTR(" |    is not suitable for living"));
+                show3(end, name, " |    is not suitable for living");
         } else {
-            show3(PSTR(" Your satellite reports alien activity on | "), &name, end);
+            show3(" Your satellite reports alien activity on | ", name, end);
             if (PlanetInfo_IsCurrentBody(system, planet, moon) && ds.Game_CurrentScreen == 8)
                 PlanetInfo_LoadPlanetFajPic(0xD, true);
         }
     }
     if (b->InfoLevel - gain < 40 && b->InfoLevel >= 40 && (int8_t)b->Owner > 1) {
-        System_StrLoad(&t, PSTR(" Your satellite found "));
-        System_StrConcat(&t, (const PString *)&race((int8_t)b->Owner)->Name);
-        System_StrConcat(&t, PSTR(" colony at | "));
-        System_StrConcat(&t, &name);
-        System_StrConcat(&t, end);
-        Message_ShowMessage(ps(&t));
+        char who[256];
+        pstr_get(who, sizeof who, &race((int8_t)b->Owner)->Name);
+        SDL_snprintf(t, sizeof t, " Your satellite found %s colony at | %s%s", who, name, end);
+        Message_ShowMessage(t);
         if (PlanetInfo_IsCurrentBody(system, planet, moon) && ds.Game_CurrentScreen == 8)
             PlanetInfo_LoadPlanetFajPic((int8_t)b->Owner, true);
     }
@@ -699,11 +686,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 Surface_AutoPlaceBuilding(1, system, planet, moon);
             }
         }
-        System_StrLoad(&t, PSTR("  The building of a colony started  | on "));
-        System_StrConcat(&t, &name);
-        System_StrConcat(&t, end);
-        System_StrStore(&t, &line, 0xFF);
-        Message_ShowMessage(ps(&line));
+        show3("  The building of a colony started  | on ", name, end);
         b->Miner = 0;
         b->Colony = 1;
         b->Population += (uint16_t)(System_Random(3000) + 2000);
@@ -763,32 +746,32 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         *planet_status(system, planet) = 0;
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();
-        show3(PSTR(" Your observatory found a new planet |          in "), system_name(system),
-              PSTR(" system"));
+        char sys[256];
+        show3(" Your observatory found a new planet |          in ", system_name(sys, system),
+              " system");
         Message_PromptPlanetName(system, planet);
         parent->discovered = 1;
     }
     if (moon == 0 && *planet_status(system, planet) == -2 && *system_status(system) == 1
         && System_Random(5) == 1 && !parent->discovered) {
         any = false;
+        const char *who = "";
         int16_t count = ds.Game_GroupCount;
         for (int16_t i = 1; i <= count; i++) {
             TGroup *g = Groups_At(0, i);
             if (g->System == system && g->Status > 2) {
                 any = true;
-                System_StrStore(g->Kind == 4 ? PSTR("satellite carrier") : PSTR("pilots"), &line, 0xFF);
+                who = g->Kind == 4 ? "satellite carrier" : "pilots";
             }
         }
         if (any) {
             *planet_status(system, planet) = 0;
             if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
                 PlanetInfo_SetupSystemViewHotspots();
-            System_StrLoad(&t, PSTR(" Your "));
-            System_StrConcat(&t, &line);
-            System_StrConcat(&t, PSTR(" found a new planet |        in "));
-            System_StrConcat(&t, system_name(system));
-            System_StrConcat(&t, PSTR(" system "));
-            Message_ShowMessage(ps(&t));
+            char sys[256];
+            SDL_snprintf(t, sizeof t, " Your %s found a new planet |        in %s system ", who,
+                         system_name(sys, system));
+            Message_ShowMessage(t);
             Message_PromptPlanetName(system, planet);
             parent->discovered = 1;
         }
@@ -798,8 +781,9 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         *planet_status(system, planet) = 0;
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();
-        show3(PSTR(" Your Psy-radar radar found a new planet |          in "), system_name(system),
-              PSTR(" system"));
+        char sys[256];
+        show3(" Your Psy-radar radar found a new planet |          in ", system_name(sys, system),
+              " system");
         Message_PromptPlanetName(system, planet);
         parent->discovered = 1;
     }
@@ -944,8 +928,8 @@ static void Sim_MineBody(int16_t system, int16_t planet, int16_t moon, int16_t b
     // Ores 2..6; without a colony only the droids (_0A) mine, 30% of the time.
     if (system == 1 && planet == 5 && moon == 0) {
         for (int16_t j = 2; j <= 6; j++) {
-            if (*home_stock(j) < cap && (b->Colony != 0 || System_Random(100) < 0x1E))
-                *home_stock(j) += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->_0A) / 10;
+            if (ds.Game_HomeStock[j - 1] < cap && (b->Colony != 0 || System_Random(100) < 0x1E))
+                ds.Game_HomeStock[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->_0A) / 10;
         }
     } else {
         for (int16_t j = 2; j <= 6; j++) {
@@ -982,17 +966,12 @@ static bool is_selected_fleet(int16_t i)
 }
 
 // " Your pilots met with ..." + system + " |" + spaces + "They call themselves '" + race + "'"
-static void first_contact(int16_t r, const PString *intro, const PString *where,
-                          const PString *callThem)
+static void first_contact(int16_t r, const char *intro, const char *where, const char *callThem)
 {
-    PString t;
-    System_StrLoad(&t, intro);
-    System_StrConcat(&t, where);
-    System_StrConcat(&t, PSTR(" |"));
-    System_StrConcat(&t, callThem);
-    System_StrConcat(&t, (const PString *)&race(r)->Name);
-    System_StrConcat(&t, PSTR("'"));
-    Intel_FirstContact(r, ps(&t));
+    char name[256], t[256];
+    pstr_get(name, sizeof name, &race(r)->Name);
+    SDL_snprintf(t, sizeof t, "%s%s |%s%s'", intro, where, callThem, name);
+    Intel_FirstContact(r, t);
 }
 
 // 1b8a:2a0e
@@ -1019,7 +998,7 @@ void Sim_ProcessTravellingGroups(void)
         }
         if (ds.Game_CurrentScreen == 0x11 && i >= 0 && ds.Game_SelGroup == i && g->Leg1 > 0
             && (int32_t)g->Leg1 <= (int32_t)(uint16_t)(ds.Game_StaffExp[0] + 1))
-            Sound_PlayButtonSfx(ps(PSTR("hiper")));
+            Sound_PlayButtonSfx("hiper");
         if (g->Leg1 > 0)
             g->Leg1 -= (int16_t)(ds.Game_StaffExp[0] + 1);
         else if (g->Jump > 0)
@@ -1052,27 +1031,26 @@ void Sim_ProcessTravellingGroups(void)
             ds.Intel_Phoenix1Armed = 0;
         }
 
-        PString t, who, s2;
+        char t[256], name[256], sys[256], body[256];
         if (g->Leg2 == 0) {
-            System_StrLoad(&t, (const PString *)&g->Name);
-            System_StrConcat(&t, PSTR(" arrived to "));
-            System_StrConcat(&t, system_name(g->System));
-            System_StrConcat(&t, PSTR(" "));
-            PlanetInfo_GetBodyFullName(&s2, g->System, g->Planet, g->Moon);
-            System_StrConcat(&t, &s2);
-            System_StrStore(&t, &who, 0xFF);
-            Message_AddMessageLogEntry(2, ps(&who), ps(PSTR("message")));
+            // A group in a system, not at a planet, arrives at planet 0: its
+            // name is the bytes before the system's names (pstr_get's
+            // PSTR_NUL).
+            pstr_get(name, sizeof name, &g->Name);
+            PlanetInfo_GetBodyFullName(body, sizeof body, g->System, g->Planet, g->Moon);
+            SDL_snprintf(t, sizeof t, "%s arrived to %s %s", name, system_name(sys, g->System),
+                         body);
+            Message_AddMessageLogEntry(2, t, "message");
             g->Status = 2;
             arrived = true;
         }
         if (g->Leg2 == 0) {
             if (g->Planet == 0) {
                 if (*system_status(g->System) == 0) {
-                    System_StrLoad(&t, PSTR(" Your ships explored "));
-                    System_StrConcat(&t, system_name(g->System));
-                    System_StrConcat(&t, PSTR(" system"));
-                    System_StrConcat(&t, PSTR(" |    They found new planets"));
-                    Message_ShowMessage(ps(&t));
+                    SDL_snprintf(t, sizeof t,
+                                 " Your ships explored %s system |    They found new planets",
+                                 system_name(sys, g->System));
+                    Message_ShowMessage(t);
                     if (g->System == 5)
                         Protect_ArmDateQuestion();
                     *system_status(g->System) = 1;
@@ -1100,14 +1078,10 @@ void Sim_ProcessTravellingGroups(void)
             }
             if (*planet_status(g->System, g->Planet) == 0) {
                 *planet_status(g->System, g->Planet) = 1;
-                System_StrStore(g->Kind == 4 ? PSTR("satellite carrier") : PSTR("pilots"), &who, 0xFF);
-                System_StrLoad(&t, PSTR("Your "));
-                System_StrConcat(&t, &who);
-                System_StrConcat(&t, PSTR(" explored "));
-                PlanetInfo_GetBodyName(&s2, g->System, g->Planet, 0);
-                System_StrConcat(&t, &s2);
-                System_StrConcat(&t, PSTR("'s moons"));
-                Message_ShowMessage(ps(&t));
+                PlanetInfo_GetBodyName(body, sizeof body, g->System, g->Planet, 0);
+                SDL_snprintf(t, sizeof t, "Your %s explored %s's moons",
+                             g->Kind == 4 ? "satellite carrier" : "pilots", body);
+                Message_ShowMessage(t);
             }
         }
 
@@ -1117,8 +1091,8 @@ void Sim_ProcessTravellingGroups(void)
                 ds.Pub_People[9].State = 2;
             if (g->Planet != 0 && Groups_At(0, i)->Kind != 4 && (int8_t)bd->Owner >= 2
                 && race((int8_t)bd->Owner)->Status == 0)
-                first_contact((int8_t)bd->Owner, PSTR(" Your pilots met with a new alien race in "),
-                              system_name(g->System), PSTR("         They call themselves '"));
+                first_contact((int8_t)bd->Owner, " Your pilots met with a new alien race in ",
+                              system_name(sys, g->System), "         They call themselves '");
             if (g->Planet != 0 && Groups_At(0, i)->Kind != 4) {
                 for (int16_t r = 2; r <= 12; r++) {
                     TRace *rc = race(r);
@@ -1129,9 +1103,9 @@ void Sim_ProcessTravellingGroups(void)
                         TRaceForce *fc = (TRaceForce *)((uint8_t *)rc + 0xC + f * 0x1B);
                         if (fc->Active == 1 && fc->System == g->System && fc->Body == g->Planet
                             && fc->Moon == g->Moon)
-                            first_contact(r, PSTR(" Your pilots met with new alien race in "),
-                                          system_name(g->System),
-                                          PSTR("         They call themselves '"));
+                            first_contact(r, " Your pilots met with new alien race in ",
+                                          system_name(sys, g->System),
+                                          "         They call themselves '");
                     }
                 }
             }
@@ -1207,8 +1181,8 @@ void Sim_ProcessTravellingGroups(void)
 // 1b8a:3546
 void Sim_CheckEnemyAttacks(void)
 {
-    PString t, s2;
-    PString where;  // string[50]
+    char t[256], body[256], name[256], sys[256];
+    char where[51];  // string[50]
     for (int16_t r = 2; r <= 12; r++) {
         TRace *rc = race(r);
         // Forces with Active = 2 are on their way; _03 counts down the hours.
@@ -1217,8 +1191,7 @@ void Sim_CheckEnemyAttacks(void)
             TRaceForce *fc = (TRaceForce *)((uint8_t *)rc + 0xC + f * 0x1B);
             if (fc->Active != 2)
                 continue;
-            PlanetInfo_GetBodyLongName(&t, fc->System, fc->Body, fc->Moon);
-            System_StrStore(&t, &where, 0x32);
+            PlanetInfo_GetBodyLongName(where, sizeof where, fc->System, fc->Body, fc->Moon);
             fc->_03--;
             if ((int16_t)fc->_03 < 0)
                 fc->_03 = 0;
@@ -1232,8 +1205,9 @@ void Sim_CheckEnemyAttacks(void)
                 TGroup *pf = Groups_At(1, k);
                 if (fc->System == pf->System && fc->Body == pf->Planet && fc->Moon == pf->Moon) {
                     if (rc->Status == 0)
-                        first_contact(r, PSTR("   New alien race's ships arrived |     at your colony in "),
-                                      system_name(pf->System), PSTR(" They call themselves '"));
+                        first_contact(r,
+                                      "   New alien race's ships arrived |     at your colony in ",
+                                      system_name(sys, pf->System), " They call themselves '");
                     else if (rc->Status == 2)
                         hostile = true;
                 }
@@ -1246,15 +1220,15 @@ void Sim_CheckEnemyAttacks(void)
                 if (fc->System == g->System && fc->Body == g->Planet && fc->Moon == g->Moon
                     && g->Status <= 2) {
                     if (rc->Status == 0)
-                        first_contact(r, PSTR(" Your pilots met with new alien race in |   "), &where,
-                                      PSTR("     They call themselves '"));
+                        first_contact(r, " Your pilots met with new alien race in |   ", where,
+                                      "     They call themselves '");
                     else if (rc->Status == 2)
                         hostile = true;
                 }
             }
             if (hostile)
-                show3(PSTR("            ATTENTION!         |     Enemy fleet approaching   | "), &where,
-                      PSTR(" "));
+                show3("            ATTENTION!         |     Enemy fleet approaching   | ", where,
+                      " ");
         }
 
         // (2841:0893: the original halts here after wrong page answers.)
@@ -1266,8 +1240,7 @@ void Sim_CheckEnemyAttacks(void)
             TRaceForce *fc = (TRaceForce *)((uint8_t *)rc + 0xC + f * 0x1B);
             if (!(fc->Active == 1 && fc->NextMission != 0 && --fc->Timer == 0))
                 continue;
-            PlanetInfo_GetBodyLongName(&t, fc->System, fc->Body, fc->Moon);
-            System_StrStore(&t, &where, 0x32);
+            PlanetInfo_GetBodyLongName(where, sizeof where, fc->System, fc->Body, fc->Moon);
             TBody *bd = body_at(fc->System, fc->Body, fc->Moon);
             // Battle setup (SpWar/GrWar).
             ds.SpWar_BattleSystem = fc->System;
@@ -1293,32 +1266,23 @@ void Sim_CheckEnemyAttacks(void)
             }
             if (!defended) {
                 if (ds.SpWar_GroundBattle != 0) {
-                    System_StrLoad(&t, PSTR("| Your colony is under attack by "));
-                    System_StrConcat(&t, (const PString *)&rc->Name);
-                    System_StrConcat(&t, PSTR(" |  at "));
-                    System_StrConcat(&t, &where);
-                    System_StrConcat(&t, PSTR(" |"));
-                    Message_ShowMessage(ps(&t));
+                    SDL_snprintf(t, sizeof t, "| Your colony is under attack by %s |  at %s |",
+                                 pstr_get(name, sizeof name, &rc->Name), where);
+                    Message_ShowMessage(t);
                     ds.Game_CurrentScreen = 0x1D;
                     ds.Game_ScreenSwitch = 1;
                 }
             } else {
                 if (ds.SpWar_GroundBattle == 0) {
-                    System_StrLoad(&t, PSTR(" Your ships around "));
-                    PlanetInfo_GetBodyLongName(&s2, fc->System, fc->Body, 0);
-                    System_StrConcat(&t, &s2);
-                    System_StrConcat(&t, PSTR(" |"));
-                    System_StrConcat(&t, PSTR("        is under attack by "));
-                    System_StrConcat(&t, (const PString *)&rc->Name);
-                    System_StrConcat(&t, PSTR(" "));
-                    Message_ShowMessage(ps(&t));
+                    PlanetInfo_GetBodyLongName(body, sizeof body, fc->System, fc->Body, 0);
+                    SDL_snprintf(t, sizeof t,
+                                 " Your ships around %s |        is under attack by %s ", body,
+                                 pstr_get(name, sizeof name, &rc->Name));
+                    Message_ShowMessage(t);
                 } else {
-                    System_StrLoad(&t, PSTR("| Your colony is under attack by "));
-                    System_StrConcat(&t, (const PString *)&rc->Name);
-                    System_StrConcat(&t, PSTR(" |  at "));
-                    System_StrConcat(&t, &where);
-                    System_StrConcat(&t, PSTR(" |"));
-                    Message_ShowMessage(ps(&t));
+                    SDL_snprintf(t, sizeof t, "| Your colony is under attack by %s |  at %s |",
+                                 pstr_get(name, sizeof name, &rc->Name), where);
+                    Message_ShowMessage(t);
                 }
                 ds.Game_CurrentScreen = 0x1D;
                 ds.Game_ScreenSwitch = 1;
@@ -1378,7 +1342,7 @@ void Sim_GrowStaffExperience(void)
         ds.Game_CurrentScreen = -1;
         ds.Game_ScreenSwitch = 1;
     }
-    Message_ShowMessage(ps(PSTR("| Your advisor has returned from the university |")));
+    Message_ShowMessage("| Your advisor has returned from the university |");
     if (ds.Game_CurrentScreen == 3) {
         Research_DrawInventionInfo();
         Research_DrawDeveloperSkills();

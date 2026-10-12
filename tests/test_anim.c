@@ -66,7 +66,7 @@ static void setup(void)
     dseg_init();
     system_init();
     // The record Anim::Record points to (InitRoomAnim allocates it).
-    ds.Anim_Record = System_GetMem(sizeof(TAnimRecord));
+    ds.Anim_Record = game_alloc(sizeof(TAnimRecord));
     SDL_memset(ds.Anim_Record, 0, sizeof(TAnimRecord));
 }
 

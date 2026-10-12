@@ -1,5 +1,6 @@
 #include "game/pub.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
@@ -12,15 +13,20 @@
 // Routines missing from their units' headers.
 bool Intel_IsRaceActive(int16_t race);  // 29b9:1461
 
-static const uint8_t *ps(const PString *p)
+// Question line i (1..5): the original's string[255] array on the heap, here
+// C strings.
+static char *line_at(int i)
 {
-    return (const uint8_t *)p;
+    return (char *)ds.Pub_Lines + (i - 1) * 256;
 }
-#define LIT(s) ps(PSTR(s))
 
-static uint8_t *line_at(int i) // question line i (1..5), string[255]
+// "<prefix><person><suffix>" (kerdes1.loc, valasz1.loc, ...).
+static char *person_file(char name[32], const char *prefix, const char *suffix)
 {
-    return ds.Pub_Lines + (i - 1) * 256;
+    char person[4];
+    pstr_get(person, sizeof person, &ds.Pub_PersonStr);
+    SDL_snprintf(name, 32, "%s%s%s", prefix, person, suffix);
+    return name;
 }
 
 // LineItem[j]. The original doesn't check the range: the trader's menu can
@@ -53,14 +59,14 @@ void Pub_DrawPubSprite(int16_t idx)
 // 1fd2:00d9
 void Pub_LoadPubGraphics(void)
 {
-    ds.Pub_PiratesSheet = System_GetMem(0xAF00);
-    Gfx_LoadPic(LIT("grafika\\pirates"), ds.Pub_PiratesSheet, 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
-    uint8_t *dest = System_GetMem(0xBCC0);
-    Gfx_LoadPic(LIT("grafika\\kocsma"), dest, 1, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    ds.Pub_PiratesSheet = game_alloc(0xAF00);
+    Gfx_LoadPic("grafika\\pirates", ds.Pub_PiratesSheet, 1, 0x8C, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    uint8_t *dest = game_alloc(0xBCC0);
+    Gfx_LoadPic("grafika\\kocsma", dest, 1, 0x97, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(dest, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_FreeMem(dest, 0xBCC0);
-    ds.Pub_AnimSheet = System_GetMem(64000);
-    Gfx_LoadPic(LIT("grafika\\kocsmaan"), ds.Pub_AnimSheet, 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    game_free(dest);
+    ds.Pub_AnimSheet = game_alloc(64000);
+    Gfx_LoadPic("grafika\\kocsmaan", ds.Pub_AnimSheet, 1, 200, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     for (int16_t i = 10; i >= 1; i--)
         Pub_DrawPubSprite(i);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
@@ -78,7 +84,8 @@ void Pub_SetupPubHotspots(void)
             h->Y = (uint8_t)(p->Y + 0x32);
             h->W = (int16_t)(p->W - 2);
             h->H = (uint8_t)(p->H - 2);
-            System_StrStore((const PString *)&p->Name, (PString *)&h->Caption, 0x12);
+            char name[256];
+            pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &p->Name));
             h->Repeat_ = 1;
             h->_1A = 0;
         } else {
@@ -90,35 +97,28 @@ void Pub_SetupPubHotspots(void)
 // 1fd2:02f4
 void Pub_LoadPersonPortrait(void)
 {
-    PString suffix, name, num;
-    if (ds.Pub_Person == 6)
-        System_StrStore(PSTR("2"), &suffix, 255);
-    else
-        suffix.len = 0;
-    ds.Pub_Lines = System_GetMem(0x500);
-    uint8_t *buf = System_GetMem(0xBCC0);
-    System_StrLoad(&name, PSTR("grafika\\beszed"));
-    System_StrConcat(&name, &suffix);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+    char name[32], person[4];
+    ds.Pub_Lines = game_alloc(0x500);
+    uint8_t *buf = game_alloc(0xBCC0);
+    SDL_snprintf(name, sizeof name, "grafika\\beszed%s", ds.Pub_Person == 6 ? "2" : "");
+    Gfx_LoadPic(name, buf, 1, 0x97, 0, 0, 0x140, true, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);
-    System_StrLong(ds.Pub_Person, 0, (PString *)&ds.Pub_PersonStr, 2);
+    SDL_snprintf(person, sizeof person, "%d", ds.Pub_Person);
+    pstr_set(&ds.Pub_PersonStr, 2, person);
     if (ds.Pub_Person != 6) {
-        System_StrLoad(&name, PSTR("alien\\kocsmb"));
-        System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
-        Gfx_LoadPic(ps(&name), buf, 1, 0x4E, 0, 0, 0x52, false, Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
+        Gfx_LoadPic(person_file(name, "alien\\kocsmb", ""), buf, 1, 0x4E, 0, 0, 0x52, false,
+                    Gfx_PalettePtr(), 0, 0xB0, 0x40, 0, 0xBE);
         Blit_CopyRectStrided(buf + 0x53, buf + 16000, 0x4F, 0x4C, 0x52, 0x140);
         Mouse_HideCursor();
         Blit_BlitTransparent(buf + 16000, gfx_screen() + 0x3D8D, 0x4F, 0x4C, 0x40);
         Mouse_ShowCursor();
     }
-    System_StrLong(ds.Pub_People[ds.Pub_Person - 1].Portrait, 0, &num, 255);
-    System_StrLoad(&name, PSTR("alien\\alien"));
-    System_StrConcat(&name, &num);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0xBE);
+    SDL_snprintf(name, sizeof name, "alien\\alien%d", ds.Pub_People[ds.Pub_Person - 1].Portrait);
+    Gfx_LoadPic(name, buf, 1, 0x97, 0, 0, 0x62, false, Gfx_PalettePtr(), 0, 0x3F, 0xB0, 0, 0xBE);
     Mouse_HideCursor();
     Blit_CopyRectStrided(buf + 99, gfx_screen() + 0x3F60, 0x5F, 0x8F, 0x62, 0x140);
     Mouse_ShowCursor();
-    System_FreeMem(buf, 0xBCC0);
+    game_free(buf);
 }
 
 // 1fd2:04f0
@@ -130,7 +130,7 @@ void Pub_SetupTalkHotspot(void)
     h->Y = 0x86;
     h->W = 0xD2;
     h->H = 0x3F;
-    System_StrStore(PSTR("Talking"), (PString *)&h->Caption, 0x12);
+    pstr_set(&h->Caption, 0x12, "Talking");
     h->Repeat_ = 0;
     h->_1A = 0;
     ds.Pub_HoverCol = 0xFFFF;
@@ -140,52 +140,37 @@ void Pub_SetupTalkHotspot(void)
 // 1fd2:0544
 void Pub_ReadQuestionCode(void)
 {
-    PString name, line, c1;
-    System_StrLoad(&name, PSTR("kerdes"));
-    System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
-    System_StrConcat(&name, PSTR(".loc"));
-    TextFile_ReadTextLine(ps(&name), ds.Pub_QuestionLine, (uint8_t *)&line);
+    char name[32], line[256] = "";
+    TextFile_ReadTextLine(person_file(name, "kerdes", ".loc"), ds.Pub_QuestionLine, line,
+                          sizeof line);
     // The code is the first two characters of the line.
-    System_CharToStr(&name, line.s[0]);
-    System_CharToStr(&c1, line.s[1]);
-    System_StrConcat(&name, &c1);
-    System_StrStore(&name, &line, 255);
-    int16_t code;
-    ds.Pub_QuestionCode = (int16_t)System_ValLong(&line, &code);
+    ds.Pub_QuestionCode = TextFile_LineCode(line);
 }
 
 // 1fd2:05fe
 void Pub_ShowReply(void)
 {
-    PString name, line, t;
+    char name[32], line[256] = "";
     int16_t lines;
-    System_StrLoad(&name, PSTR("valasz"));
-    System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
-    System_StrConcat(&name, PSTR(".loc"));
-    TextFile_ReadTextLine(ps(&name), ds.Pub_ReplyLine, (uint8_t *)&line);
+    TextFile_ReadTextLine(person_file(name, "valasz", ".loc"), ds.Pub_ReplyLine, line,
+                          sizeof line);
     if (ds.Pub_Person == 2 && ds.Pub_ReplyLine > 9 && ds.Pub_ReplyLine < 0xE) {
         // The trader names a price: quantity * unit price of the item.
         int32_t price = (int32_t)((uint32_t)ds.Pub_ItemQty[ds.Pub_OfferItem - 1]
                                   * (uint32_t)ds.Pub_ItemPrice[ds.Pub_ReplyLine - 10]);
         ds.Pub_OfferPrice = price;
         ds.Pub_People[1].Deal = (uint8_t)((ds.Pub_ReplyLine - 9) * 0x14 + ds.Pub_OfferItem);
-        System_StrLong(price, 0, &line, 255);
         ds.Pub_CurMenu.Count = 1;
-        if (System_Random(2) == 0)
-            System_StrLoad(&t, PSTR("09 It will be "));
-        else
-            System_StrLoad(&t, PSTR("09 My work will cost "));
-        System_StrConcat(&t, &line);
-        System_StrConcat(&t, PSTR(" credits"));
-        System_StrStore(&t, &line, 255);
-        System_StrStore(&line, (PString *)ds.Pub_Lines, 255);
+        SDL_snprintf(line, sizeof line, "09 %s%d credits",
+                     System_Random(2) == 0 ? "It will be " : "My work will cost ", (int)price);
+        SDL_strlcpy(line_at(1), line, 256);
     }
     Mouse_HideCursor();
     Blit_FillRect(6, 0x86, 0xD8, 0x3F, 0x40);
     Mouse_ShowCursor();
     // The reply's leading code is the next question menu (0 = leave), MenuIdx
     // (1fd2:075f), not QuestionCode.
-    TextFile_DrawReply(ps(&line), 6, 0x86, 0x24, false, true, &ds.Pub_MenuIdx, &lines);
+    TextFile_DrawReply(line, 6, 0x86, 0x24, false, true, &ds.Pub_MenuIdx, &lines);
 }
 
 // 1fd2:0788
@@ -222,11 +207,9 @@ void Pub_BuildQuestionMenu(void)
     }
     uint16_t n = m->Count;
     for (uint16_t i = 1; i <= n && n != 0; i++) {
-        PString name;
-        System_StrLoad(&name, PSTR("kerdes"));
-        System_StrConcat(&name, (PString *)&ds.Pub_PersonStr);
-        System_StrConcat(&name, PSTR(".loc"));
-        TextFile_ReadTextLine(ps(&name), m->Items[i - 1], line_at(i));
+        char name[32];
+        TextFile_ReadTextLine(person_file(name, "kerdes", ".loc"), m->Items[i - 1], line_at(i),
+                              256);
         lines = TextFile_CountLines(line_at(i));
         for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
             *line_item(j) = (uint8_t)i;
@@ -234,8 +217,7 @@ void Pub_BuildQuestionMenu(void)
     }
     if (ds.Pub_Person == 9 && ds.Pub_MenuIdx == 4) {
         m->Count = 1;
-        TextFile_ReadTextLine(LIT("pirate.txt"), (int16_t)(Pub_FindActiveDeal() + 10),
-                              ds.Pub_Lines);
+        TextFile_ReadTextLine("pirate.txt", (int16_t)(Pub_FindActiveDeal() + 10), line_at(1), 256);
     }
     // BUG? clears as many entries as the last text had lines, not the unused ones.
     for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
@@ -373,11 +355,9 @@ void Pub_PlayRandomPubSound(void)
             n = (int16_t)(System_Random(8) + 1);
         } while (ds.Pub_LastSound == n);
         ds.Pub_LastSound = n;
-        PString num, name;
-        System_StrLong(n, 0, &num, 10);
-        System_StrLoad(&name, PSTR("local"));
-        System_StrConcat(&name, &num);
-        Sound_PlayButtonSfx(ps(&name));
+        char name[16];
+        SDL_snprintf(name, sizeof name, "local%d", n);
+        Sound_PlayButtonSfx(name);
     }
 }
 

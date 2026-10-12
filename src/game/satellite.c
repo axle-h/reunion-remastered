@@ -8,7 +8,7 @@ void PlanetInfo_SelectCurBody(void);                     // 357b:3253
 void PlanetInfo_DrawPlanetInfoText(void);                // 357b:0359
 void PlanetInfo_DrawStoresList(void);                    // 357b:1671
 void Message_ShowMessageLine(int16_t lineNo);            // 34b0:011a
-void Message_ShowMessageNoLog(const uint8_t *text);      // 34b0:0197
+void Message_ShowMessageNoLog(const char *text);      // 34b0:0197
 void Message_PlaySatelliteAnim(int16_t satNo);           // 34b0:0953
 void Intel_OfferInventionForAnalysis(int16_t idea);      // 29b9:1409
 void Intel_ScheduleIdea(int16_t idea, int16_t delayBase, int16_t delayRandom); // 29b9:136e
@@ -85,7 +85,7 @@ void Satellite_DeploySatellite(void)
         CheckStoryLocations();
     } else {
         Satellite_DeductSatellites(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 1, 1);
-        Message_ShowMessageNoLog((const uint8_t *)PSTR("| You lost the contact with your satellite ! |"));
+        Message_ShowMessageNoLog("| You lost the contact with your satellite ! |");
     }
 }
 
@@ -375,11 +375,12 @@ int32_t Satellite_CountSatellites(int16_t system, int16_t planet, int16_t moon, 
     return sum;
 }
 
-// Takes min(amount, *field) off a 16-bit count and returns the rest of amount.
-static int32_t Take(int16_t *field, int32_t amount)
+// Takes min(amount, count) off weapon count w (0-based) of a unit slot and
+// returns the rest of amount.
+static int32_t Take(TGroupSlot *slot, int w, int32_t amount)
 {
-    int32_t n = *field < amount ? *field : amount;
-    *field = (int16_t)(*field - (uint16_t)n);
+    int32_t n = slot->Weapons[w] < amount ? slot->Weapons[w] : amount;
+    slot->Weapons[w] = (int16_t)(slot->Weapons[w] - (uint16_t)n);
     return amount - n;
 }
 
@@ -391,13 +392,13 @@ void Satellite_DeductSatellites(int16_t system, int16_t planet, int16_t moon, in
     if (ds.Game_CurrentScreen == 0x11) {
         TGroup *g = Groups_At(0, ds.Game_SelGroup0);
         if (AtLocation(g, system, planet) && g->Kind == 4)
-            amount = Take(&g->Units[0][0].Weapons[satType - 1], amount);
+            amount = Take(&g->Units[0][0], satType - 1, amount);
     }
     int16_t count = ds.Game_GroupCount;
     for (int16_t i = 1; i <= count; i++) {
         TGroup *g = Groups_At(0, i);
         if (AtLocation(g, system, planet) && g->Kind == 4)
-            amount = Take(&g->Units[0][0].Weapons[satType - 1], amount);
+            amount = Take(&g->Units[0][0], satType - 1, amount);
     }
 }
 
@@ -423,14 +424,14 @@ void Satellite_TakeTradeShips(int16_t system, int16_t planet, int16_t moon, int3
         TGroup *g = Groups_At(0, ds.Game_SelGroup0);
         if (AtLocation(g, system, planet) && g->Kind == 2)
             for (int k = 0; k < 4; k++)
-                amount = Take(&g->Units[0][k].Weapons[3], amount);
+                amount = Take(&g->Units[0][k], 3, amount);
     }
     int16_t count = ds.Game_GroupCount;
     for (int16_t i = 1; i <= count; i++) {
         TGroup *g = Groups_At(0, i);
         if (AtLocation(g, system, planet) && g->Kind == 2)
             for (int k = 0; k < 4; k++)
-                amount = Take(&g->Units[0][k].Weapons[3], amount);
+                amount = Take(&g->Units[0][k], 3, amount);
     }
 }
 

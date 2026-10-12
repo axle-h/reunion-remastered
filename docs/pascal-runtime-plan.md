@@ -1,8 +1,9 @@
 # Plan: retire the Borland Pascal run time
 
-Status: **not started** (written 2026-10-12, from a survey of the code at
-`edd28cf`). Stages 1-4 are ready to start. No open questions.
-Decisions are dated where they are recorded.
+Status: **done** (written 2026-10-12, from a survey of the code at
+`edd28cf`; carried out the same day on top of `c54d7ce`). What each stage
+found is under **Outcome** at its end. Decisions are dated where they are
+recorded.
 
 ## Background
 
@@ -145,6 +146,22 @@ Only two places use it, and both have a small input domain.
    DS field uses it (`grep Real48 src/game/dseg.h`). Leave the typedef if
    removing it complicates the generator.
 
+**Outcome (2026-10-12).** All three switched; no Real48 code is left.
+- Cosine table: the `double` form gives all 361 values (none is closer
+  than 0.003 to a half, so any libm agrees).
+- Normals: on all 254 objects (2,593 faces) of `VECTORS\V*.VEC` the
+  replacement gives the same centroids and normals. 36 faces lie in a plane
+  through the centroid (n . C + d = 0 exactly); Real48 never flipped them,
+  so the port tests the sign exactly in `int64_t` (times the vertex count)
+  and uses `double` only for the rounding. On random inputs the two differ
+  only on such faces (about 3% of random 3-vertex objects) and once in
+  500,000 in a normal's last digit at full int16 range.
+- Taxes: the `int64_t` form matches on every operand combination at edge
+  populations, a 1.5-million population sweep, 20 million random cases and
+  every rounding boundary of the division below 2^40.
+- Found on the way: the sphere of `V34.VEC`/`V35.VEC` overran the C heap
+  (docs/port-bugs.md #34).
+
 ### Stage 2: heap, segments, exits, Ems
 
 1. **Allocation without sizes.** Replace `System_GetMem(size)` /
@@ -207,6 +224,24 @@ Only two places use it, and both have a small input domain.
    bookkeeping is already excluded from the stream, and their contents are
    hashed through `state.c`. Update `state.c` if it reaches the blocks
    through `Ems_*`.
+
+**Outcome (2026-10-12).**
+- `game_alloc`/`game_free` (`src/game/system.c`). No `FreeMem` frees a
+  size other than its `GetMem`'s: checked by reading and, with every block
+  recording its size, on all tests, goldens, the proof and 40 soak seeds.
+- Segments: the advisor's buffer (0FFFFh), ShipInfo's (0FB40h) and the
+  command centre's off-screen copy (64000) have their original sizes. The
+  map layers, the ground battle's unit lists and field, the planet frame,
+  the vector-model buffer and the flight backdrop keep whole segments
+  (`GAME_SEGMENT`), each saying why. `vec3d.c` reads vertices, normals and
+  outlines as packed records; `rdw`/`wrw` remain only for the DS edge
+  tables and `Vec3D_Project`'s wrapping loop. ASan (tests, goldens, 24
+  soak seeds) found nothing new.
+- Exits: `system_exit_hook` replaces the chain; `system_fatal` reports
+  fatal errors as decided. Halt still sets `System_ExitCode`, which the
+  state stream hashes (the proof's end hash), so no re-baseline was needed.
+- Ems: folded into `Game_InitGameData` (`main_program.c`) and `GfxPath_Init`;
+  the `TEmsBlock` fields keep their values.
 
 ### Stage 3: C strings
 
@@ -295,6 +330,20 @@ saves carry those stale tail bytes, and only an in-memory Pascal string
 keeps them for a byte-identical round trip (the `load_*` goldens check
 it). If saves ever stop needing to be byte-identical, revisit this.
 
+**Outcome (2026-10-12).** Game code holds C strings; `PSTR`, the
+`System_Str*` routines, `Copy`, `Delete` and `CharToStr` are gone, and
+`System_ValLong` takes a C string. One fact above turned out false:
+Pascal strings of game data can hold NUL bytes, where the original reads
+past a table. Planet 0's name (a group in a system, not at a planet) starts
+in the system's moon list and runs on into its names, and goes into the
+message log ("... arrived to Sun ...", saved and hashed; the proof caught
+it). `pstr_get` carries a NUL as `PSTR_NUL` (7Fh) and `pstr_set` turns it
+back; both draw as the same glyph, and `test_planetinfo` checks that no
+planet-0 window holds 7Fh. Instrumenting `pstr_get` over all tests, goldens,
+the proof and 40 soak seeds found no other NUL-holding strings. The heap
+blocks of text lines (advisor menu, pub and alien questions) hold C strings
+now; they are neither saved nor hashed.
+
 ### Stage 4: misaligned accesses
 
 `DSeg` and its records are packed (`#pragma pack(1)`): the original's
@@ -329,6 +378,31 @@ access was unavoidable. That reason is gone.
      didn't hit.
    - Report the counts, the per-file breakdown and a few typical sites to
      Alex. Record the numbers here.
+
+   **Result (2026-10-12, at `da8b9d7`).** Unit tests, all goldens, soak
+   seeds 1-20 (30,000 frames) and `golden_proof*` from a RelWithDebInfo
+   build: **75 source lines** report misaligned loads or stores, all in
+   `src/game`, none in (c).
+
+   | File | Lines | Cause |
+   |---|---|---|
+   | `groups.c` | 31 | (b) the unit words at `g + row * 40 + t * 10 - 21`, `planet_force_item`, the slot layout's words (`item + 11`, `ship + 14/17`); (a) `slot_stock`'s `&Product->Stock` |
+   | `cargo.c` | 14 | (a) `Cargo_Stores` / `Cargo_ItemStore` (pointer fields aimed at packed `Stores[]` / `Stock` / `Items[]`); (b) `*(int32_t *)slot` on a `TCargoSlot` |
+   | `gfxpath.c` | 9 | (a) `slot_id`: `&menu_slot(n)->Command` |
+   | `planetinfo.c` | 5 | (a) `&Groups_At(...)->Storage`; (b) `*(uint16_t *)body->_04` |
+   | `message.c` | 3 | (b) the log entry's kind word, `*(int16_t *)e` |
+   | `droids.c`, `satellite.c`, `shipinfo.c`, `sim.c`, `spwar.c` | 2 each | (a) `stores`, `Take(&field)`, `home_stock`, `SpWar_LossPtr`; (b) `shipinfo.c`'s `(int16_t *)&g->Units[0][0]` |
+   | `gfx.c`, `intel.c`, `main_program.c` | 1 each | (a) `uint8_t **buf` at a DS pointer field, `*stock`; (b) `intel.c`'s `group_slot` |
+
+   Roughly half are (a) and half (b), by line. Static view: GCC 16 and
+   Clang give **no** `-Waddress-of-packed-member` warnings at all, because
+   both warn only for `__attribute__((packed))`, not `#pragma pack`, so they
+   can't see (a). `-Wcast-align` gives 54 warnings on 50 lines (31 in
+   `src`, 19 in `tests`). The ones the runtime pass didn't hit:
+   `grwar.c`'s projectile and cell words (486, 751, 859, 1134: even
+   offsets in heap blocks, so aligned in practice), `groups.c:73`,
+   `planetlist.c:14`, and the false positives `system.c:298` (the heap
+   header) and `video.c:158/164` (texture rows).
 2. **Fix the misaligned accesses** (agreed by Alex, 2026-10-12: all of
    them, in the order step 1's breakdown suggests). This doesn't need
    `DSeg` unpacked.
@@ -339,6 +413,16 @@ access was unavoidable. That reason is gone.
    - Goldens must match; they shouldn't change at all.
    - Then remove `-fno-sanitize=alignment` from the presets, so new
      misaligned accesses fail the `asan` and `trap` runs.
+
+**Outcome (2026-10-12).** Fixed in the order of step 1's table, plus the
+tests (whose reports step 1 had filtered out) and the static list's
+projectile and path-queue words (`grwar.c`) and `PlanetListEntry`. Typed
+pointers into packed records became accesses through the record or `ds`;
+byte-offset words go through `src/game/le.h`; `Cargo::Stores` and
+`Cargo::ItemStore` are byte pointers (`symbols.txt`). The presets no longer
+pass `-fno-sanitize=alignment`: the ASan suite, 24 ASan soak seeds and 30
+trap soak seeds run clean. `-Wcast-align=strict` is left with three false
+positives (the heap header, texture rows).
 
 ## Out of scope
 

@@ -58,13 +58,6 @@ static void stop_voice(void)
     ds.Sound_SbStatus = 0;
 }
 
-// Pascal string to a NUL-terminated C string (at most 255 chars).
-static void pstr(const uint8_t *p, char out[256])
-{
-    memcpy(out, p + 1, p[0]);
-    out[p[0]] = '\0';
-}
-
 // 431a:01a8
 void Sound_StopAndFreeSample(void)
 {
@@ -82,17 +75,15 @@ void Sound_FreeSampleIfIdle(void)
 }
 
 // 431a:0209
-void Sound_LoadSample(const uint8_t *name, uint16_t offset, uint16_t size)
+void Sound_LoadSample(const char *name, uint16_t offset, uint16_t size)
 {
     if (!ds.Sound_Enabled)
         return;
     if (sample.samples)
         Sound_StopAndFreeSample();
     // The GUS branch only differed in where the data went; both end up here.
-    char path[256];
-    pstr(name, path);
     size_t total;
-    uint8_t *data = fs_load(path, &total);
+    uint8_t *data = fs_load(name, &total);
     if (!data)
         return;
     size_t len = size ? size : total - SDL_min(total, offset);
@@ -105,27 +96,21 @@ void Sound_LoadSample(const uint8_t *name, uint16_t offset, uint16_t size)
 }
 
 // 431a:031a
-void Sound_PlayButtonSfx(const uint8_t *name)
+void Sound_PlayButtonSfx(const char *name)
 {
     Sound_PlaySfx(name);
     Sound_StartSample();
 }
 
 // 431a:0353
-void Sound_PlaySfx(const uint8_t *name)
+void Sound_PlaySfx(const char *name)
 {
     if (!ds.Sound_Enabled)
         return;
-    // "SOUND\" + name + ".SMP" as a Pascal string
-    uint8_t full[256];
-    unsigned n = 6;
-    memcpy(full + 1, "SOUND\\", 6);
-    memcpy(full + 1 + n, name + 1, name[0]);
-    n += name[0];
-    if (n + 4 > 255)
+    // "SOUND\" + name + ".SMP"; a name too long for a string[255] loads nothing.
+    char full[300];
+    if (SDL_snprintf(full, sizeof full, "SOUND\\%s.SMP", name) > 255)
         return;
-    memcpy(full + 1 + n, ".SMP", 4);
-    full[0] = (uint8_t)(n + 4);
     Sound_LoadSample(full, 0, 0);
 }
 

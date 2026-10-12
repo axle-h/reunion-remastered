@@ -3,11 +3,11 @@
 //
 // Leaving the game: the original ends with Halt, deep inside screen code, and
 // many waiting loops never return. The port unwinds instead of returning:
-// System_Halt (after the ExitProc chain) and a window-close request (seen by
-// timing_wait_retrace at the next retrace, i.e. inside every waiting loop)
-// both longjmp back to main(), and so does the port menu's Restart. Game state
-// lives in DS (game/dseg.h), heap blocks and video memory, which boot()
-// rebuilds from scratch, so nothing on the abandoned C stack matters.
+// System_Halt and fatal errors (after the exit hook) and a window-close
+// request (seen by timing_wait_retrace at the next retrace, i.e. inside every
+// waiting loop) longjmp back to main(), and so does the port menu's Restart.
+// Game state lives in DS (game/dseg.h), heap blocks and video memory, which
+// boot() rebuilds from scratch, so nothing on the abandoned C stack matters.
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <setjmp.h>

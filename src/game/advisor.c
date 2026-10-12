@@ -1,5 +1,6 @@
 #include "game/advisor.h"
 
+#include <SDL3/SDL.h>
 #include <string.h>
 
 #include "game/blit.h"
@@ -11,16 +12,13 @@
 
 #define PRODUCT(k) ds.Research_Products[(k) - 1]
 
-static const uint8_t *ps(const PString *p)
-{
-    return (const uint8_t *)p;
-}
-#define LIT(s) ps(PSTR(s))
+// Menu line i (1..5) of MenuLines: the original's array[1..5] of string[60]
+// on the heap, here C strings of up to 60 characters.
+enum { MENU_LINE = 0x3D };
 
-// Menu line i (1..5) of MenuLines.
-static uint8_t *menu_line(int i)
+static char *menu_line(int i)
 {
-    return ds.Advisor_MenuLines + (i - 1) * 0x3D;
+    return (char *)ds.Advisor_MenuLines + (i - 1) * MENU_LINE;
 }
 
 // Required developer skill k (1..4) of the hired developer at the current story stage.
@@ -145,117 +143,88 @@ int16_t Advisor_FindAdvisorItem(bool flag)
 // 1991:0355
 void Advisor_LoadAdvisorPictures(void)
 {
-    ds.Advisor_MenuLines = System_GetMem(0x131);
-    // GetMem(0FFFFh) in the original; offsets into it wrap inside the
-    // segment.
-    uint8_t *buf = System_GetSegment();
-    Gfx_LoadPic(ps(PSTR("grafika\\you")), buf, 1, 0x6E, 0, 0, 0x140, false,
+    ds.Advisor_MenuLines = game_alloc(0x131);
+    // Two 0x6E-row pictures in turn, read at offsets below 9000h.
+    uint8_t *buf = game_alloc(0xFFFF);
+    Gfx_LoadPic("grafika\\you", buf, 1, 0x6E, 0, 0, 0x140, false,
                 Gfx_PalettePtr(), 0, 0xAF, 0x40, 0, 0xAF);
     // Our own face: hero 2 sits at the left of the sheet, hero 1 further right.
     uint16_t hero_off = ds.Game_Hero == 2 ? 0x141 : 0x1A5;
     Blit_CopyRect(buf + hero_off, gfx_screen() + 0x7159, 0x64, 0x6D);
-    PString name;
-    System_StrLoad(&name, PSTR("grafika\\"));
-    System_StrConcat(&name, (const PString *)&ds.Staff_FacePics[ds.Command_StaffPicked - 1]);
-    Gfx_LoadPic(ps(&name), buf, 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x8F,
+    char face[256], name[256];
+    pstr_get(face, sizeof face, &ds.Staff_FacePics[ds.Command_StaffPicked - 1]);
+    SDL_snprintf(name, sizeof name, "grafika\\%s", face);
+    Gfx_LoadPic(name, buf, 1, 0x6E, 0, 0, 0x140, false, Gfx_PalettePtr(), 0, 0x8F,
                 0x40, 0, 0x8F);
     int16_t col = (int16_t)((int16_t)(ds.Game_StaffHired[ds.Command_StaffPicked - 1] - 1) * 0x6A);
     Blit_CopyRect(buf + (uint16_t)(0x145 + col), gfx_screen() + 0x7085, 0x62, 0x6D);
-    System_FreeSegment(buf);
+    game_free(buf);
 }
 
 // 1991:0487
 void Advisor_DrawAdvisorQuestion(void)
 {
-    PString s;
-    TextFile_ReadTextLine(LIT("kerdes1.sp"), ds.Advisor_Question, (uint8_t *)&s);
-    Gfx_TypeTextFC(ps(&s), 6, 0x36, 0x34);
+    char s[256] = "";
+    TextFile_ReadTextLine("kerdes1.sp", ds.Advisor_Question, s, sizeof s);
+    Gfx_TypeTextFC(s, 6, 0x36, 0x34);
 }
 
-// The name of the invention the advisor wants (hint v), in s2.
-static void hint_name(PString *s2, int16_t v)
+// The name of the invention the advisor wants (hint v).
+static char *hint_name(char *name, size_t cap, int16_t v)
 {
-    System_StrStore((const PString *)&PRODUCT(ds.Advisor_Hints[v - 1].Product).Name, s2, 255);
+    return pstr_get(name, cap, &PRODUCT(ds.Advisor_Hints[v - 1].Product).Name);
 }
 
 // 1991:0580
 void Advisor_ShowAdvisorAnswer(void)
 {
-    PString s1, s2, s3, t, c;
-    TextFile_ReadTextLine(LIT("valasz1.sp"), ds.Advisor_Answer, (uint8_t *)&s1);
-    s2.len = 0;
-    System_StrStore(&s1, &s3, 255);
-    // The first two characters are the number of the next menu.
-    System_CharToStr(&t, s1.s[0]);
-    System_CharToStr(&c, s1.s[1]);
-    System_StrConcat(&t, &c);
-    System_StrStore(&t, &s1, 255);
-    int16_t code;
-    ds.Advisor_MenuNumber = (int16_t)System_ValLong(&s1, &code);
-    System_Delete(&s3, 1, 3);
-    // Text up to the first '|' is the first line, the rest the second.
-    while (s3.len > 0 && s3.s[0] != '|') {
-        System_StrLoad(&t, &s2);
-        System_CharToStr(&c, s3.s[0]);
-        System_StrConcat(&t, &c);
-        System_StrStore(&t, &s2, 255);
-        System_Delete(&s3, 1, 1);
-    }
-    if (s3.len > 0)
-        System_Delete(&s3, 1, 1);
+    char s1[256] = "", s2[256], s3[256], name[256];
+    TextFile_ReadTextLine("valasz1.sp", ds.Advisor_Answer, s1, sizeof s1);
+    // The first two characters are the number of the next menu. After the
+    // third, text up to the first '|' is the first line, the rest the second.
+    ds.Advisor_MenuNumber = TextFile_LineCode(s1);
+    const char *p = s1 + SDL_min(SDL_strlen(s1), (size_t)3);
+    size_t n = strcspn(p, "|");
+    SDL_snprintf(s2, sizeof s2, "%.*s", (int)n, p);
+    SDL_strlcpy(s3, p[n] == '|' ? p + n + 1 : p + n, sizeof s3);
 
     if (ds.Advisor_Answer == 7) {
-        s3.len = 0;
+        s3[0] = '\0';
         int16_t v = Advisor_FindAdvisorItem(false);
         if (v == 0) {
-            System_StrStore(PSTR("I don't need anything right now"), &s2, 255);
+            SDL_strlcpy(s2, "I don't need anything right now", sizeof s2);
         } else {
-            hint_name(&s2, v);
-            if (System_Random(0x32) < 0x19) {
-                System_StrLoad(&t, PSTR("We could develop a "));
-                System_StrConcat(&t, &s2);
-                System_StrConcat(&t, PSTR(""));
-            } else {
-                System_StrLoad(&t, PSTR("The most important thing would be a "));
-                System_StrConcat(&t, &s2);
-            }
-            System_StrStore(&t, &s2, 255);
-            TextFile_ReadTextLine(LIT("ajanlas.sp"), v, (uint8_t *)&s3);
+            hint_name(name, sizeof name, v);
+            if (System_Random(0x32) < 0x19)
+                SDL_snprintf(s2, sizeof s2, "We could develop a %s", name);
+            else
+                SDL_snprintf(s2, sizeof s2, "The most important thing would be a %s", name);
+            TextFile_ReadTextLine("ajanlas.sp", v, s3, sizeof s3);
         }
     }
     if (ds.Advisor_Answer == 8) {
-        s3.len = 0;
+        s3[0] = '\0';
         int16_t v = Advisor_FindAdvisorItem(true);
         if (v == 0) {
-            System_StrStore(PSTR("I don't need anything right now."), &s2, 255);
+            SDL_strlcpy(s2, "I don't need anything right now.", sizeof s2);
         } else {
-            hint_name(&s2, v);
-            if (System_Random(0x32) < 0x19) {
-                System_StrLoad(&t, PSTR("We might need "));
-                System_StrConcat(&t, &s2);
-                System_StrConcat(&t, PSTR("."));
-            } else {
-                System_StrLoad(&t, PSTR("We really need more "));
-                System_StrConcat(&t, &s2);
-                System_StrConcat(&t, PSTR("s"));
-            }
-            System_StrStore(&t, &s2, 255);
-            TextFile_ReadTextLine(LIT("ajanlas.sp"), v, (uint8_t *)&s3);
+            hint_name(name, sizeof name, v);
+            if (System_Random(0x32) < 0x19)
+                SDL_snprintf(s2, sizeof s2, "We might need %s.", name);
+            else
+                SDL_snprintf(s2, sizeof s2, "We really need more %ss", name);
+            TextFile_ReadTextLine("ajanlas.sp", v, s3, sizeof s3);
         }
     }
     if (ds.Advisor_Answer == 10) {
         // Price of the help: (Random(10) + the staff member's experience) * 1000.
         uint16_t exp = ds.Game_StaffExp[ds.Command_StaffPicked - 1];
         ds.Advisor_TrainingPrice = (int32_t)((uint32_t)((uint16_t)System_Random(10) + exp) * 1000u);
-        System_StrLong(ds.Advisor_TrainingPrice, 0, &s2, 255);
-        System_StrLoad(&t, PSTR("It will be "));
-        System_StrConcat(&t, &s2);
-        System_StrConcat(&t, PSTR(" credits"));
-        System_StrStore(&t, &s2, 255);
-        s3.len = 0;
+        SDL_snprintf(s2, sizeof s2, "It will be %d credits", (int)ds.Advisor_TrainingPrice);
+        s3[0] = '\0';
     }
-    Gfx_TypeTextF9(ps(&s2), 0xC, 0x3E, 0x33);
-    Gfx_TypeTextF9(ps(&s3), 0xC, 0x46, 0x33);
+    Gfx_TypeTextF9(s2, 0xC, 0x3E, 0x33);
+    Gfx_TypeTextF9(s3, 0xC, 0x46, 0x33);
 }
 
 // 1991:08de
@@ -264,7 +233,8 @@ void Advisor_LoadAdvisorMenu(void)
     memcpy(&ds.Advisor_CurMenu, &ds.Advisor_Menus[ds.Advisor_MenuNumber - 1], 6);
     uint16_t n = ds.Advisor_CurMenu.Count;
     for (uint16_t i = 1; i <= n && n != 0; i++)
-        TextFile_ReadTextLine(LIT("rkerdes1.sp"), ds.Advisor_CurMenu.Items[i - 1], menu_line((int)i));
+        TextFile_ReadTextLine("rkerdes1.sp", ds.Advisor_CurMenu.Items[i - 1], menu_line((int)i),
+                              MENU_LINE);
 }
 
 // 1991:0946
@@ -278,7 +248,7 @@ void Advisor_DrawAdvisorMenu(void)
             Gfx_DrawTextF9(menu_line(i), 0x70, (int16_t)(i * 9 + 0x54), 0x10);
     }
     for (int16_t i = (int16_t)(ds.Advisor_CurMenu.Count + 1); i <= 5; i++)
-        Gfx_DrawTextF9(LIT(""), 0x70, (int16_t)(i * 9 + 0x54), 0x10);
+        Gfx_DrawTextF9("", 0x70, (int16_t)(i * 9 + 0x54), 0x10);
 }
 
 // 1991:09e8
@@ -313,7 +283,7 @@ void Advisor_SetupAdvisorHotspots(void)
     h->Y = 0x5C;
     h->W = 0x60;
     h->H = 0x2D;
-    System_StrStore(PSTR("Talking"), (PString *)&h->Caption, 0x12);
+    pstr_set(&h->Caption, 0x12, "Talking");
     h->Repeat_ = 0;
     h->_1A = 0;
 }

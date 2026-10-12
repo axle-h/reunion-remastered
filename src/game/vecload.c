@@ -16,7 +16,7 @@ enum : uint16_t {
 };
 
 // The off-screen buffer, addressed by its segment (a whole segment in the
-// port: System_GetSegment).
+// port).
 static inline uint8_t *buffer_base(void)
 {
     return ds.VecLoad_Buffer;
@@ -46,22 +46,16 @@ static void advance_angles(void)
 static struct {
     uint8_t *data;
     size_t size, pos;
+    char name[32];  // for error reports
 } vec_file;
 
 // Assign + Reset(f, 1) + IOResult: false if the file can't be opened.
 static bool file_open(int16_t n)
 {
-    PString num, path;
-    System_StrLong(n, 0, &num, 255);
-    System_StrLoad(&path, PSTR("vectors\\v"));
-    System_StrConcat(&path, &num);
-    System_StrConcat(&path, PSTR(".vec"));
-    char name[256];
-    SDL_memcpy(name, path.s, path.len);
-    name[path.len] = '\0';
     SDL_free(vec_file.data);
     vec_file.pos = 0;
-    vec_file.data = fs_load(name, &vec_file.size);
+    SDL_snprintf(vec_file.name, sizeof vec_file.name, "vectors\\v%d.vec", n);
+    vec_file.data = fs_load(vec_file.name, &vec_file.size);
     return vec_file.data != nullptr;
 }
 
@@ -74,7 +68,7 @@ static void file_close(void)
 static void block_read(uint8_t *dst, uint16_t count)
 {
     if (vec_file.pos + count > vec_file.size)
-        System_RunError(100);
+        System_RunError(100, vec_file.name);
     SDL_memcpy(dst, vec_file.data + vec_file.pos, count);
     vec_file.pos += count;
 }
@@ -296,46 +290,49 @@ void VecLoad_SetWirePalette(void)
 // --- buffers ---------------------------------------------------------------------
 
 // Projected points, projected normals, normals[1..17], vertices[1..17] and
-// edges[1..17], in this order (the allocation order decides where V34/V35's
-// oversized object overflows to).
+// edges[1..17], in this order. The sphere of V34.VEC (object 5) and V35.VEC
+// (object 1) has more edges and faces than its blocks hold, and the reads run
+// on into the next object's blocks, unused in both files (docs/formats/vec.md).
+// The original's heap put the 17 blocks back to back; the port allocates
+// each set of 17 as one block, so the overrun lands in the same place.
 static void alloc_common(void)
 {
-    ds.VecLoad_Projected = System_GetMem(0x4B0);
-    ds.VecLoad_Normals[0] = System_GetMem(0x4B0);
+    ds.VecLoad_Projected = game_alloc(0x4B0);
+    ds.VecLoad_Normals[0] = game_alloc(0x4B0);
     for (int i = 1; i <= 17; i++)
-        ds.VecLoad_Normals[i] = System_GetMem(0x4B0);
+        ds.VecLoad_Normals[i] = game_alloc(0x4B0);
     for (int i = 1; i <= 17; i++)
-        ds.VecLoad_Verts[i - 1] = System_GetMem(0x4B0);
+        ds.VecLoad_Verts[i - 1] = game_alloc(0x4B0);
+    uint8_t *edges = game_alloc(17 * 600);
     for (int i = 1; i <= 17; i++)
-        ds.VecLoad_Edges[i - 1] = System_GetMem(600);
+        ds.VecLoad_Edges[i - 1] = edges + (i - 1) * 600;
 }
 
 static void free_common(void)
 {
-    System_FreeMem(ds.VecLoad_Projected, 0x4B0);
-    System_FreeMem(ds.VecLoad_Normals[0], 0x4B0);
+    game_free(ds.VecLoad_Projected);
+    game_free(ds.VecLoad_Normals[0]);
     for (int i = 1; i <= 17; i++)
-        System_FreeMem(ds.VecLoad_Normals[i], 0x4B0);
+        game_free(ds.VecLoad_Normals[i]);
     for (int i = 1; i <= 17; i++)
-        System_FreeMem(ds.VecLoad_Verts[i - 1], 0x4B0);
-    for (int i = 1; i <= 17; i++)
-        System_FreeMem(ds.VecLoad_Edges[i - 1], 600);
+        game_free(ds.VecLoad_Verts[i - 1]);
+    game_free(ds.VecLoad_Edges[0]);
 }
 
 // 3d38:051c
 void VecLoad_AllocVecBuffers(void)
 {
     alloc_common();
+    uint8_t *faces = game_alloc(17 * 0x960);
     for (int i = 1; i <= 17; i++)
-        ds.VecLoad_Faces[i - 1] = System_GetMem(0x960);
+        ds.VecLoad_Faces[i - 1] = faces + (i - 1) * 0x960;
 }
 
 // 3d38:05d8
 void VecLoad_FreeVecBuffers(void)
 {
     free_common();
-    for (int i = 1; i <= 17; i++)
-        System_FreeMem(ds.VecLoad_Faces[i - 1], 0x960);
+    game_free(ds.VecLoad_Faces[0]);
 }
 
 // 3d38:0a00

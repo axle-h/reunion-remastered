@@ -22,14 +22,14 @@ bool Sound_IsPlaying(void);
 // 431a:01a8 / 431a:01e6: stop the voice and drop the loaded sample.
 void Sound_StopAndFreeSample(void);
 void Sound_FreeSampleIfIdle(void);
-// 431a:0209: name is a Pascal string (DOS path). Loads the .SMP (from offset,
+// 431a:0209: name is a DOS path. Loads the .SMP (from offset,
 // size 0 = whole file) as the current sample; the file offset/size are only
 // ever 0 in the game.
-void Sound_LoadSample(const uint8_t *name, uint16_t offset, uint16_t size);
+void Sound_LoadSample(const char *name, uint16_t offset, uint16_t size);
 // 431a:031a: PlaySfx then StartSample.
-void Sound_PlayButtonSfx(const uint8_t *name);
+void Sound_PlayButtonSfx(const char *name);
 // 431a:0353: loads SOUND\<name>.SMP (does NOT start it; see StartSample).
-void Sound_PlaySfx(const uint8_t *name);
+void Sound_PlaySfx(const char *name);
 // 431a:03a8: starts the loaded sample.
 void Sound_StartSample(void);
 // 431a:03e8 / 431a:0424: war-sound buffer. Alloc waits for playback to end.

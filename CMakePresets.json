@@ -20,7 +20,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize=alignment -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
       }
     },
@@ -30,7 +30,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_FLAGS": "-fsanitize=undefined -fno-sanitize=alignment -fsanitize-trap=all -fno-omit-frame-pointer",
+        "CMAKE_C_FLAGS": "-fsanitize=undefined -fsanitize-trap=all -fno-omit-frame-pointer",
         "CMAKE_PREFIX_PATH": "${sourceDir}/build/sdl3-prefix"
       }
     },

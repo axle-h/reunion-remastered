@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     CHECK(!Sound_IsPlaying());
 
     // PlaySfx only loads; StartSample starts.
-    Sound_PlaySfx((const uint8_t *)"\x07" "SELECT1");
+    Sound_PlaySfx("SELECT1");
     CHECK(!Sound_IsPlaying());
     Sound_StartSample();
     CHECK(Sound_IsPlaying());
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     Sound_StopSbVoice();
     CHECK(!Sound_IsPlaying() && ds.Sound_SbStatus == 0);
 
-    Sound_PlayButtonSfx((const uint8_t *)"\x07" "SELECT2");
+    Sound_PlayButtonSfx("SELECT2");
     CHECK(Sound_IsPlaying());
     Sound_StopAndFreeSample();
 
@@ -72,9 +72,9 @@ int main(int argc, char *argv[])
     CHECK(ds.SoundDrv_ModLoaded);
     Music_StopMusic();
     CHECK(!audio_music_playing());
-    Music_PlayTrack((const uint8_t *)"\x05" "atv1x");
+    Music_PlayTrack("atv1x");
     CHECK(!audio_music_playing() && !ds.Music_MainThemeOn);
-    Music_PlayTrack((const uint8_t *)"\x04" "atv1");
+    Music_PlayTrack("atv1");
     CHECK(audio_music_playing() && !ds.Music_MainThemeOn);
     Music_RestartMainTheme();
     CHECK(audio_music_playing() && ds.Music_MainThemeOn);
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
     // AdLib backend: silent, no crash.
     ds.Music_Backend = 1;
-    Music_PlayTrack((const uint8_t *)"\x05" "main1");
+    Music_PlayTrack("main1");
     CHECK(!audio_music_playing());
 
     audio_shutdown();

@@ -5,7 +5,7 @@
 
 #include "assets/text.h"
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/main_program.h"
 #include "game/gfx.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -49,7 +49,7 @@ static void reset(void)
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
+    Game_InitGameData();
     ds.Gfx_LineStride = 320;
     ds.Gfx_LineStrideCopy = 320;
     ds.Mouse_CursorState = 1;
@@ -120,48 +120,47 @@ static void editing(void)
 
 static void decoding(void)
 {
-    uint8_t s[256];
+    char s[256];
     const char *plain = "Hello, world! 123";
     // Encode: the inverse of s[i] := (s[i] + 5780h - i*4Fh) mod E0h - 20h.
-    set(s, plain);
-    for (int i = 1; i <= (int)SDL_strlen(plain); i++) {
-        int e = ((plain[i - 1] + 0x20) - (0x5780 % 0xE0) + (i * 0x4F) % 0xE0) % 0xE0;
-        s[i] = (uint8_t)((e + 0xE0) % 0xE0);
+    size_t n = SDL_strlen(plain);
+    for (size_t i = 1; i <= n; i++) {
+        int e = ((plain[i - 1] + 0x20) - (0x5780 % 0xE0) + ((int)i * 0x4F) % 0xE0) % 0xE0;
+        s[i - 1] = (char)((e + 0xE0) % 0xE0);
     }
-    TextFile_DecodeLine(s);
-    CHECK(eq(s, plain));
+    TextFile_DecodeLine(s, n);
+    CHECK(SDL_memcmp(s, plain, n) == 0);
 
-    set(s, "");
-    TextFile_DecodeLine(s);
-    CHECK(s[0] == 0);
+    CHECK(TextFile_CountLines("a") == 1);
+    CHECK(TextFile_CountLines("a|bb||c") == 4);
+    CHECK(TextFile_CountLines("") == 1);
 
-    set(s, "a");
-    CHECK(TextFile_CountLines(s) == 1);
-    set(s, "a|bb||c");
-    CHECK(TextFile_CountLines(s) == 4);
-    set(s, "");
-    CHECK(TextFile_CountLines(s) == 1);
+    CHECK(TextFile_LineCode("07 first") == 7 && TextFile_LineCode("12") == 12);
+    CHECK(TextFile_LineCode("7") == 0 && TextFile_LineCode("") == 0);
+    CHECK(TextFile_LineCode("x1 y") == 0 && TextFile_LineCode(" 5x") == 5);
 }
 
 static void reading(void)
 {
-    uint8_t name[32], s[256];
-    set(name, "message.txt");
-    TextFile_ReadTextLine(name, 1, s);
+    char s[256] = "", small[8] = "";
+    TextFile_ReadTextLine("message.txt", 1, s, sizeof s);
     char ref[TEXT_LINE_MAX];
     CHECK(text_read_line("text\\message.txt", 1, ref));
-    CHECK(s[0] == SDL_strlen(ref) && s[0] > 0 && SDL_memcmp(s + 1, ref, s[0]) == 0);
+    CHECK(SDL_strcmp(s, ref) == 0 && s[0] != '\0');
+    // A short destination gets the line's start.
+    TextFile_ReadTextLine("message.txt", 1, small, sizeof small);
+    CHECK(SDL_strncmp(small, ref, sizeof small - 1) == 0 && SDL_strlen(small) == sizeof small - 1);
 }
 
 static void reply(void)
 {
     // "07x" code 7, then lines split at '|'.
-    uint8_t s[256];
     int16_t code, lines;
-    set(s, "07 first|second||fourth");
-    TextFile_DrawReply(s, 0, 100, 20, false, false, &code, &lines);
+    TextFile_DrawReply("07 first|second||fourth", 0, 100, 20, false, false, &code, &lines);
     CHECK(code == 7);
     CHECK(lines == 4);
+    TextFile_DrawReply("5", 0, 100, 20, false, false, &code, &lines);
+    CHECK(code == 0 && lines == 0);
 }
 
 int main(int argc, char *argv[])

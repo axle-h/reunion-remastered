@@ -1148,8 +1148,8 @@ typedef struct DSeg {
     uint8_t *Droids_DigitsPic; // grafika\szamok, 8980h bytes: droid figures, face digits at +5780h, small digits at +5963h (2527:001f)
     uint16_t Cargo_ItemCount; // entries in ItemList (2583:0494)
     uint16_t Cargo_ItemList[13]; // [1..13] Cargo::Items indices of the storable items (product done)
-    int16_t *Cargo_ItemStore[13]; // [1..13] ^integer the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494)
-    int32_t *Cargo_Stores; // ^longint the planet's ore stocks (Game::HomeStock or CurBody^.Stores)
+    uint8_t *Cargo_ItemStore[13]; // [1..13] ^integer, the store of Cargo item i: the product's Stock at home, else the planet force's Items[i] (2583:0494); byte pointers in the port, as they point into packed records
+    uint8_t *Cargo_Stores; // ^longint, the planet's ore stocks (Game::HomeStock or CurBody^.Stores); a byte pointer in the port, as it points into packed records
     int32_t Cargo_ShipUsed; // cargo space used on the ship
     int32_t Cargo_ShipCap; // ship cargo capacity
     int32_t Cargo_PlanetCap; // storage space on the planet (planet force Storage * 1000)

@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// 424a:000f: name is a Pascal string; 'main1', 'main2' and 'no' set MainThemeOn.
-void Music_PlayTrack(const uint8_t *name);
+// 424a:000f: 'main1', 'main2' and 'no' set MainThemeOn.
+void Music_PlayTrack(const char *name);
 // 424a:0095
 void Music_StopMusic(void);
 // 424a:00b2: chooses ds.Music_Backend from ds.Sound_DeviceType (GUS 1 -> modules,

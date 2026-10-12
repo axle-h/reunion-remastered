@@ -17,18 +17,16 @@ enum : uint16_t { TUNE_BUF_SIZE = 0x7BD4 };
 static uint8_t tune_buf[TUNE_BUF_SIZE];
 
 // 4265:000c
-void AdlibMusic_LoadMusicFile(const uint8_t *name)
+void AdlibMusic_LoadMusicFile(const char *name)
 {
     if (!ds.AdlibMusic_Present)
         return;
     char path[6 + 255 + 5];
-    SDL_memcpy(path, "grwar\\", 6);
-    SDL_memcpy(path + 6, name + 1, name[0]);
-    SDL_memcpy(path + 6 + name[0], ".pic", 5);
+    SDL_snprintf(path, sizeof path, "grwar\\%s.pic", name);
     size_t size = 0;
     uint8_t *data = fs_load(path, &size);
     if (data == nullptr)
-        System_RunError(2); // CheckIO after Reset: File not found
+        System_RunError(2, path); // CheckIO after Reset: File not found
     if (size < TUNE_BUF_SIZE + 1) {
         uint8_t *buf = tune_buf;
         SDL_memset(buf, 0, TUNE_BUF_SIZE);
@@ -65,7 +63,7 @@ void AdlibMusic_StopAdlib(void)
 }
 
 // 4265:01d6. The original then counts to 50 in an empty loop.
-void AdlibMusic_PlayMusic(const uint8_t *name)
+void AdlibMusic_PlayMusic(const char *name)
 {
     if (!ds.AdlibMusic_Present)
         return;

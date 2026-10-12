@@ -1,8 +1,8 @@
 // Unit Gfx (405f): VGA palette and fades, retrace waits, file and .PIC
 // loading, ICON.ALL access, 6x8 text, lines, and the fatal-error exit.
 //
-// Untyped Pascal pointers (palettes, buffers), Pascal strings (a length
-// byte followed by the characters) and `var` parameters are host pointers.
+// Untyped Pascal pointers (palettes, buffers) and `var` parameters are host
+// pointers; strings are C strings.
 #pragma once
 
 #include <stdint.h>
@@ -57,17 +57,18 @@ void Gfx_WaitFrames(int32_t n);
 void Gfx_WaitFramesOrClick(int32_t n);
 
 // 405f:0856: reads a whole file into a new heap block (halts if missing).
-void Gfx_LoadFile(const uint8_t *name, uint8_t **buf, uint16_t *size);
+void Gfx_LoadFile(const char *name, uint8_t **buf, uint16_t *size);
 // 405f:095a / 09ce / 09f3 / 0a57: ICON\ICON.ALL through the shared file
-// variable. ReadChunk appends the next chunk at *buf + Gfx_ReadPos and puts
-// its length in *len. (symbols.txt has the two parameter names swapped.)
+// variable. ReadChunk appends the next chunk at buf + Gfx_ReadPos and puts
+// its length in *len (the original takes buf as a var parameter and only
+// reads it). (symbols.txt has the two parameter names swapped.)
 void Gfx_IconAllOpenSize(uint16_t *size);
 void Gfx_IconAllOpen(void);
-void Gfx_IconAllReadChunk(uint8_t *const *buf, uint16_t *len);
+void Gfx_IconAllReadChunk(uint8_t *buf, uint16_t *len);
 void Gfx_IconAllClose(void);
 // 405f:0a78 / 0af8 / 0bd6: chunked data files (word length + data). ReadChunk
 // allocates length + 13 bytes, or returns nil/0 when the heap is too small.
-void Gfx_OpenDataFile(const uint8_t *name);
+void Gfx_OpenDataFile(const char *name);
 void Gfx_ReadChunk(uint8_t **buf, uint16_t *size);
 void Gfx_CloseDataFile(void);
 
@@ -77,14 +78,14 @@ void Gfx_CloseDataFile(void);
 // fadeFirst..colourOffset + fadeLast] fades to black in the DAC while
 // decoding. Afterwards file colours firstColour..lastColour go to
 // pal[colourOffset + i] (not written to the DAC).
-void Gfx_LoadPic(const uint8_t *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
+void Gfx_LoadPic(const char *name, uint8_t *dest, uint16_t unused, uint16_t rows, uint16_t x,
                  uint16_t y, uint16_t stride, bool fade, uint8_t *pal, uint16_t firstColour,
                  uint16_t lastColour, uint16_t colourOffset, uint16_t fadeFirst, uint16_t fadeLast);
 // 405f:0f23: the game's usual options: stride 320, colours 0..B0h at +40h,
 // fading picture colours 0..BEh (DAC 40h..FEh).
-void Gfx_LoadPicScreen(const uint8_t *name, uint8_t *dest, uint16_t rows, uint8_t *pal);
+void Gfx_LoadPicScreen(const char *name, uint8_t *dest, uint16_t rows, uint8_t *pal);
 // 405f:0f7a: grafika\<name> (320x151) to screen row 49, then fades it in.
-void Gfx_ShowGrafikaPic(const uint8_t *name);
+void Gfx_ShowGrafikaPic(const char *name);
 
 // 405f:1014 / 103d
 void Gfx_SetVideoMode13(void);
@@ -92,23 +93,23 @@ void Gfx_SetTextMode(void);
 
 // 405f:1056: 6x8 glyphs from Gfx_Charset, padded with blanks to width
 // cells; each pixel is written as glyph pixel + colour.
-void Gfx_DrawText6x8(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t colour);
+void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour);
 // 405f:11e8 .. 1317: DrawText6x8 with fixed colours (and position).
-void Gfx_DrawStatusText(const uint8_t *s);
-void Gfx_DrawTextF9(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_DrawTextFC(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_DrawTextF1(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_DrawTextF4(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_DrawTextB0(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_DrawTextB3(const uint8_t *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawStatusText(const char *s);
+void Gfx_DrawTextF9(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawTextFC(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawTextF1(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawTextF4(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawTextB0(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_DrawTextB3(const char *s, int16_t x, int16_t y, int16_t width);
 // 405f:134c / 140a / 143a: status bar date and credits.
 void Gfx_DrawGameDate(void);
 void Gfx_DrawCredits(void);
 void Gfx_FlashCredits(void);
 // 405f:14c1 / 17a2 / 17d5: typewriter text with click sounds.
-void Gfx_TypeText(const uint8_t *s, int16_t x, int16_t y, int16_t width, uint8_t colour);
-void Gfx_TypeTextF9(const uint8_t *s, int16_t x, int16_t y, int16_t width);
-void Gfx_TypeTextFC(const uint8_t *s, int16_t x, int16_t y, int16_t width);
+void Gfx_TypeText(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour);
+void Gfx_TypeTextF9(const char *s, int16_t x, int16_t y, int16_t width);
+void Gfx_TypeTextFC(const char *s, int16_t x, int16_t y, int16_t width);
 
 // 405f:1808 / 1836 / 1869: 1-based screen coordinates.
 void Gfx_HLine(int16_t x1, int16_t x2, int16_t y, uint8_t colour);
@@ -119,9 +120,9 @@ void Gfx_DrawDitherRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t 
 
 // 405f:1933: fade out, text mode, Halt.
 void Gfx_FatalExit(void);
-// 405f:1a62 (no symbol yet): the unit's ExitProc. Stops sound, releases
-// buffers and, after a run-time error, shows the error screen and waits
-// for a key.
+// 405f:1a62 (no symbol yet): the unit's ExitProc, the port's exit hook
+// (game/system.h). Stops the music and releases the toolbar and game data
+// buffers.
 void Gfx_ExitHandler(void);
 // 405f:1c21: one frame of the red colour-0 alert flash.
 void Gfx_PaletteFlashTick(void);

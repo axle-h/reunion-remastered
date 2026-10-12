@@ -11,11 +11,11 @@
 // run-time error (File not found, 2) as the CheckIO after Reset would give.
 static uint8_t *load_raw(const char *path, uint16_t size)
 {
-    uint8_t *p = System_GetMem(size);
+    uint8_t *p = game_alloc(size);
     size_t got = 0;
     uint8_t *data = fs_load(path, &got);
     if (data == nullptr)
-        System_RunError(2);
+        System_RunError(2, path);
     SDL_memcpy(p, data, SDL_min(got, (size_t)size));
     SDL_free(data);
     return p;

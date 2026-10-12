@@ -9,6 +9,7 @@
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
+#include "game/system.h"
 #include "platform/config.h"
 
 // Building kinds the daily update counts (Surface_BuildingTypes, 1-based).
@@ -233,13 +234,12 @@ static void pick_colours(uint8_t out[C_COUNT])
 
 static void text(int16_t x, int16_t y, int16_t cols, uint8_t colour, const char *fmt, ...)
 {
-    PString s;
+    char s[255];
     va_list ap;
     va_start(ap, fmt);
-    int len = SDL_vsnprintf(s.s, sizeof s.s, fmt, ap);
+    SDL_vsnprintf(s, sizeof s, fmt, ap);
     va_end(ap);
-    s.len = (uint8_t)SDL_clamp(len, 0, (int)sizeof s.s - 1);
-    Gfx_DrawText6x8(&s.len, x, y, cols, colour);
+    Gfx_DrawText6x8(s, x, y, cols, colour);
 }
 
 // Blit_FillRect leaves the cursor alone. Hiding it only around the whole
@@ -305,8 +305,7 @@ static void demand(const uint8_t *col, int16_t y, const char *label, const Colon
 static const char *kind_name(char *buf, size_t size, int kind)
 {
     const PStr14 *nm = &ds.Surface_BuildingTypes[kind - 1].Name;
-    SDL_snprintf(buf, size, "%.*s", (int)SDL_min(nm->len, sizeof nm->s), nm->s);
-    return buf;
+    return pstr_get(buf, SDL_min(size, sizeof *nm), nm);
 }
 
 void ColonyStats_Draw(void)
@@ -319,12 +318,12 @@ void ColonyStats_Draw(void)
     fill(0, TOP, 320, BOTTOM - TOP + 1, TEXT);
     Gfx_DrawRectOutline(2, TOP + 1, 317, BOTTOM - 1, col[C_FRAME]);
 
-    PString name;
+    char name[256];
     if (moon == 0)
-        PlanetInfo_GetBodyName(&name, system, planet, 0);
+        PlanetInfo_GetBodyName(name, sizeof name, system, planet, 0);
     else
-        PlanetInfo_GetBodyFullName(&name, system, planet, moon);
-    text(LABEL_X, TOP + 5, 26, HIGHLIGHT, "%.*s", (int)name.len, name.s);
+        PlanetInfo_GetBodyFullName(name, sizeof name, system, planet, moon);
+    text(LABEL_X, TOP + 5, 26, HIGHLIGHT, "%s", name);
     text(VALUE_X, TOP + 5, VALUE_COLS, HIGHLIGHT, "%d people", (int)s.population);
 
     int16_t y = ROW_Y;

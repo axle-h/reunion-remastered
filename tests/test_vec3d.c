@@ -1,6 +1,7 @@
 // vec3d: the cosine table, projection of known points (hiword rounding,
 // mode 2), edge tracing, FillPoly on a triangle, PrepareObject's centroid
-// and normals, and (with game data) a whole model through VecLoad.
+// and normals, and (with game data) a whole model through VecLoad and the
+// sphere that overruns its blocks.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
@@ -198,7 +199,7 @@ static void model(void)
     dseg_init();
     system_init();
     VecLoad_Init();
-    ds.VecLoad_Buffer = System_GetSegment();  // GetMem(0xAF00)  // as Shop::ShopScreen
+    ds.VecLoad_Buffer = game_alloc(GAME_SEGMENT);  // GetMem(0xAF00)  // as Shop::ShopScreen
     VecLoad_AllocVecBuffers();
     VecLoad_LoadVec(3);
     int16_t objects = ds.VecLoad_ObjectCount;
@@ -232,6 +233,32 @@ static void model(void)
     VecLoad_FreeVecBuffers();
 }
 
+// V34's object 5 and V35's only object (the same sphere) overrun their edge
+// and face blocks into the next object's; the blocks are one allocation, so
+// the overrun stays inside it (ASan catches it otherwise).
+static void sphere(void)
+{
+    for (int16_t n = 34; n <= 35; n++) {
+        reset();
+        dseg_init();
+        system_init();
+        VecLoad_Init();
+        ds.VecLoad_Buffer = game_alloc(GAME_SEGMENT);
+        size_t used = system_heap_used();
+        VecLoad_AllocVecBuffers();
+        VecLoad_LoadVec(n);
+        int16_t s = n == 34 ? 5 : 1;
+        CHECK(ds.VecLoad_ObjectCount == s);
+        CHECK(ds.VecLoad_EdgeCount[s - 1] == 380 && ds.VecLoad_FaceCount[s - 1] == 200);
+        // The last face is in the next object's block.
+        const uint8_t *last = ds.VecLoad_Faces[s - 1] + 199 * 0x14;
+        CHECK(last >= ds.VecLoad_Faces[s] && last[0] != 0 && last[0] <= 183);
+        VecLoad_DrawFrame();
+        VecLoad_FreeVecBuffers();
+        CHECK(system_heap_used() == used);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     cos_table();
@@ -244,5 +271,6 @@ int main(int argc, char *argv[])
         return ok ? 77 : 1;
     }
     model();
+    sphere();
     return ok ? 0 : 1;
 }

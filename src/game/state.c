@@ -167,7 +167,8 @@ static void put_ds(StateBuf *b)
     b->nparts = plan.nparts;
 }
 
-// The contents of an EMS block (game/ems.h), a heap copy (state 1).
+// The contents of an EMS block: in the port always a heap copy (state 1;
+// Game_InitGameData, GfxPath_Init).
 static void put_ems_block(StateBuf *b, const char *name, const TEmsBlock *blk)
 {
     put_u8(b, name, blk->State != 0);

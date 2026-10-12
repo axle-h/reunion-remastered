@@ -79,6 +79,9 @@ int vid_fullscreen_modes(SDL_DisplayMode *modes, int max);
 // logical presentation (the port menu). nullptr: none.
 void vid_set_overlay(void (*draw)(SDL_Renderer *));
 SDL_Window *vid_window(void);
+// True when a player can see the window: one is open on a video driver
+// other than offscreen and dummy.
+bool vid_visible(void);
 
 // Saves the current frame (framebuffer through the palette, at its native
 // size) as an 8-bit indexed image: PNG if `path` ends in ".png", else BMP.

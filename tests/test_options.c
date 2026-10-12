@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "game/dseg.h"
-#include "game/ems.h"
+#include "game/main_program.h"
 #include "game/fixes.h"
 #include "game/options.h"
 #include "game/saveload.h"
@@ -74,8 +74,8 @@ int main(int argc, char *argv[])
     vid_clear();
     dseg_init();
     system_init();
-    Ems_Init();
-    ds.Message_Log = System_GetMem(0x31B);
+    Game_InitGameData();
+    ds.Message_Log = game_alloc(0x31B);
     config_reset();
     Options_Init();
     CHECK(!Options_GameRunning());

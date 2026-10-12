@@ -28,9 +28,9 @@ int main(int argc, char **argv)
     static uint8_t charset[0x2880];
     ds.Gfx_Charset = charset;
     // The system view's pictures, as PlanetInfo_InitSystemView allocates them.
-    ds.PlanetInfo_Backdrop = System_GetMem(0xBCC0);
-    ds.PlanetInfo_Icons = System_GetMem(24000);
-    ds.PlanetInfo_Sprites = System_GetMem(0x6900);
+    ds.PlanetInfo_Backdrop = game_alloc(0xBCC0);
+    ds.PlanetInfo_Icons = game_alloc(24000);
+    ds.PlanetInfo_Sprites = game_alloc(0x6900);
     ds.Game_CurSystem = 2;
     ds.Game_CurPlanet[1] = 0;
 

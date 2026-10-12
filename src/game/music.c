@@ -1,7 +1,6 @@
 #include "game/music.h"
 
-#include <ctype.h>
-#include <string.h>
+#include <SDL3/SDL.h>
 
 #include "game/adlibmusic.h"
 #include "game/dseg.h"
@@ -9,16 +8,8 @@
 #include "platform/audio.h"
 #include "platform/config.h"
 
-static bool pstr_eq(const uint8_t *p, const char *s)
-{
-    return p[0] == strlen(s) && memcmp(p + 1, s, p[0]) == 0;
-}
-
-// Pascal string literal for the two track names.
-#define PSTR(s) ((const uint8_t *)("\x05" s))
-
 // The last track started, for Music_SwitchDevice.
-static uint8_t last_track[256];
+static char last_track[256];
 // Music_InitMusicDevices has chosen the hardware since Music_Init; until
 // then a switch is left to it.
 static bool devices_chosen;
@@ -38,24 +29,22 @@ void Music_StopMusic(void)
 }
 
 // 424a:000f
-void Music_PlayTrack(const uint8_t *name)
+void Music_PlayTrack(const char *name)
 {
     if (name != last_track)
-        memcpy(last_track, name, name[0] + 1u);
-    ds.Music_MainThemeOn = pstr_eq(name, "main1") || pstr_eq(name, "main2") || pstr_eq(name, "no");
+        SDL_strlcpy(last_track, name, sizeof last_track);
+    ds.Music_MainThemeOn = SDL_strcmp(name, "main1") == 0 || SDL_strcmp(name, "main2") == 0
+                           || SDL_strcmp(name, "no") == 0;
     Music_StopMusic();
     if (ds.Music_Backend == 1)
         AdlibMusic_PlayMusic(name);
     if (ds.Music_Backend == 2) {
         char path[5 + 255 + 5];
-        unsigned n = 0;
-        memcpy(path, "ANIM\\", 5);
-        n = 5;
-        for (unsigned i = 0; i < name[0]; i++)
-            path[n++] = (char)toupper(name[1 + i]);
-        memcpy(path + n, ".SPD", 5);
+        SDL_snprintf(path, sizeof path, "ANIM\\%s.SPD", name);
+        for (char *c = path; *c; c++)
+            *c = (char)SDL_toupper((unsigned char)*c);
         ds.SoundDrv_ModLoaded = audio_play_music(path, true);
-        if (hero_voice_held && pstr_eq(name, "choise"))
+        if (hero_voice_held && SDL_strcmp(name, "choise") == 0)
             audio_music_mute_sample(6, true);
     }
 }
@@ -141,12 +130,12 @@ void Music_ApplyMusicTrack(void)
         if (ds.Music_Backend == 1)
             Music_StopMusic();
         if (ds.Music_Backend == 2)
-            Music_PlayTrack((const uint8_t *)"\x02no");
+            Music_PlayTrack("no");
     }
     if (ds.Game_MusicTrack == 1)
-        Music_PlayTrack(PSTR("main1"));
+        Music_PlayTrack("main1");
     if (ds.Game_MusicTrack == 2)
-        Music_PlayTrack(PSTR("main2"));
+        Music_PlayTrack("main2");
 }
 
 // 424a:017e

@@ -1,6 +1,7 @@
 #include "game/mouse.h"
 
 #include "game/crt.h"
+#include "game/system.h"
 #include "platform/input.h"
 #include "platform/timing.h"
 
@@ -286,7 +287,7 @@ void Mouse_ClearHotspots(int16_t first, int16_t last)
         h->Y = 0;
         h->W = 0;
         h->H = 0;
-        h->Caption.len = 0;
+        pstr_set(&h->Caption, 0x12, "");
         h->Repeat_ = 0;
         h->_1A = 0;
     }
@@ -294,18 +295,14 @@ void Mouse_ClearHotspots(int16_t first, int16_t last)
 
 // 4758:079d
 void Mouse_SetHotspot(int16_t index, int16_t x, uint8_t y, int16_t w, uint8_t h,
-                      const uint8_t *caption, uint8_t repeat_, uint8_t flag)
+                      const char *caption, uint8_t repeat_, uint8_t flag)
 {
     THotspot *s = Mouse_Hotspot(index);
     s->X = x;
     s->Y = y;
     s->W = w;
     s->H = h;
-    // StrStore to string[18]: truncates.
-    uint8_t n = caption[0] > 18 ? 18 : caption[0];
-    s->Caption.len = n;
-    for (int i = 0; i < n; i++)
-        s->Caption.s[i] = (char)caption[1 + i];
+    pstr_set(&s->Caption, 18, caption);
     s->Repeat_ = repeat_;
     s->_1A = flag;
 }

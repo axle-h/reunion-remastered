@@ -5,6 +5,8 @@
 // are static helpers called at the original's place in the dispatch chain.
 #include "game/main_program.h"
 
+#include <SDL3/SDL.h>
+
 #include "game/advisor.h"
 #include "game/alientalk.h"
 #include "game/anim.h"
@@ -15,7 +17,6 @@
 #include "game/credits.h"
 #include "game/droids.h"
 #include "game/dseg.h"
-#include "game/ems.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
@@ -56,12 +57,6 @@
 #define CUR_MOON(s) ds.Game_CurMoon[(s) - 1]
 #define CUR_SYS ds.Game_CurSystem
 
-static inline const uint8_t *ps(const PString *p)
-{
-    return (const uint8_t *)p;
-}
-#define LIT(s) ps(PSTR(s))
-
 // Ui::Screens[screen]: TScreenInfo bytes +09 (show picture), +0A (reload
 // menu bar), +0B (menu command that opens it, shortint).
 static inline uint8_t *screen_info(int16_t screen)
@@ -95,12 +90,46 @@ static void add_credits(int32_t d)
 
 // --- Start-up -------------------------------------------------------------------
 
+enum : uint16_t {
+    GAME_DATA_SIZE = 0x8770,
+    BUILDINGS_OFS = 0x2840,
+    CHARSET_OFS = 0x5EF0,
+};
+
+// 4719:0317 (Ems::RestoreProc, run by Gfx_ExitHandler): 4719:0253 EmsRelease
+// on the game data block.
+static void free_game_data(void)
+{
+    if (ds.Ems_GameData.State == 1)
+        game_free(ds.Ems_GameData.Data);
+    ds.Ems_GameData.State = 0;
+    ds.Ems_GameData.Size = 0;
+}
+
+// 4719:0325
+void Game_InitGameData(void)
+{
+    // 4719:0188 EmsMoveToEms, without an EMM: the block stays the heap copy.
+    ds.Ems_Buffer = game_alloc(GAME_DATA_SIZE);
+    ds.Ems_GameData.State = 1;
+    ds.Ems_GameData.Size = GAME_DATA_SIZE;
+    ds.Ems_GameData.Data = ds.Ems_Buffer;
+    // 4719:02d6 MapGameData. The original maps the block again after every
+    // use of the toolbar block, which shared the EMS page frame; a heap
+    // copy stays where it is.
+    uint8_t *base = ds.Ems_Buffer;
+    ds.Game_Groups = (TGroup (*)[32])base;
+    ds.Game_Buildings = (TBuilding *)(base + BUILDINGS_OFS);
+    ds.Gfx_Charset = base + CHARSET_OFS;
+    ds.Ems_RestoreProc = free_game_data;
+}
+
 void Game_InitUnits(void)
 {
     // System::InitSystem is system_init() (called by the platform start-up);
     // Crt, Gus, SoundDrv and AdlibMusic are replaced by platform code.
     MinMax_Init();
-    Ems_Init();
+    Game_InitGameData();
     Sound_Init();
     Music_Init();
     Gfx_Init();
@@ -328,14 +357,16 @@ static bool hit_pushable(int16_t hit)
 static void draw_hint(int16_t hit)
 {
     uint16_t h = (uint16_t)hit;
+    char caption[256];
     if (h >= 1 && h <= 12)
-        Gfx_DrawStatusText((const uint8_t *)&ds.GfxPath_MenuBar[h - 1].Caption);
+        Gfx_DrawStatusText(pstr_get(caption, sizeof caption, &ds.GfxPath_MenuBar[h - 1].Caption));
     else if (h == 0 || h == 0xD)
-        Gfx_DrawStatusText(LIT(""));
+        Gfx_DrawStatusText("");
     else if (h == 0xE)
-        Gfx_DrawStatusText(LIT("Time"));
+        Gfx_DrawStatusText("Time");
     else
-        Gfx_DrawStatusText((const uint8_t *)&Mouse_Hotspot((int16_t)(h - 0x14))->Caption);
+        Gfx_DrawStatusText(pstr_get(caption, sizeof caption,
+                                    &Mouse_Hotspot((int16_t)(h - 0x14))->Caption));
 }
 
 // The vertical-retrace wait of both frame loops (two spins on port 3DAh).
@@ -403,7 +434,7 @@ static bool wait_for_release(void)
     hit_test(&ds.Game_ReleaseHotspot);
     if (ds.Game_ReleaseHotspot != ds.Game_PressHotspot) {
         ds.Game_HotspotHit = 0;
-        Gfx_DrawStatusText(LIT(""));
+        Gfx_DrawStatusText("");
     }
     return true;
 }
@@ -418,117 +449,113 @@ static bool leaving(int16_t screen)
 static void free_left_screen_buffers(void)
 {
     if (leaving(1) && ds.Command_MainFace != 0) {
-        System_FreeMem(ds.Command_MainFace, 0xE600);
-        System_FreeMem(ds.Command_Heroes, 0x4C40);
-        System_FreeMem(ds.Command_MainA5, 0x5280);
-        System_FreeMem(ds.Command_MainA4, 0x5B00);
+        game_free(ds.Command_MainFace);
+        game_free(ds.Command_Heroes);
+        game_free(ds.Command_MainA5);
+        game_free(ds.Command_MainA4);
         Command_FreeRoomAnim();
     }
     if (leaving(2))
-        System_FreeMem(ds.RawText_SzFace, 0x7B0);
+        game_free(ds.RawText_SzFace);
     if (leaving(3))
-        System_FreeMem(ds.Research_IconBuffer, 0x6901);
+        game_free(ds.Research_IconBuffer);
     if (leaving(4))
-        System_FreeMem(ds.Droids_DigitsPic, 0x8980);
+        game_free(ds.Droids_DigitsPic);
     if (leaving(5)) {
         ds.VecLoad_Spinning = 0;
         VecLoad_FreeVecBuffers();
-        System_FreeSegment(ds.VecLoad_Buffer);
-        System_FreeMem(ds.RawText_SzTalal, 0x1DAB);
+        game_free(ds.VecLoad_Buffer);
+        game_free(ds.RawText_SzTalal);
     }
     if (leaving(7)) {
-        System_FreeMem(ds.PlanetInfo_Sprites, 0x6900);
-        System_FreeMem(ds.PlanetInfo_Backdrop, 0xBCC0);
-        System_FreeMem(ds.PlanetInfo_Icons, 24000);
+        game_free(ds.PlanetInfo_Sprites);
+        game_free(ds.PlanetInfo_Backdrop);
+        game_free(ds.PlanetInfo_Icons);
     }
     if (leaving(8))
-        System_FreeMem(ds.RawText_SzFaj, 0x1440);
+        game_free(ds.RawText_SzFaj);
     if (leaving(12))
-        System_FreeMem(ds.SaveLoad_SlotTable, 0x108);
+        game_free(ds.SaveLoad_SlotTable);
     if (leaving(16)) {
-        System_FreeMem(ds.ShipInfo_Backdrop, 0xBCC0);
-        System_FreeMem(ds.ShipInfo_Sprites, 0x5000);
+        game_free(ds.ShipInfo_Backdrop);
+        game_free(ds.ShipInfo_Sprites);
     }
     if (leaving(12)) {
         Anim_FreeMainAnim(0x11);
-        System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
-        System_FreeMem(ds.Anim_Script, 0x230);
-        System_FreeMem(ds.SaveLoad_BufFrame, 0x1324);
-        System_FreeMem(ds.SaveLoad_BufBack, 0xBCC0);
-        System_FreeMem(ds.SaveLoad_BufButtons, 0x5140);
+        game_free(ds.Anim_Record);
+        game_free(ds.Anim_Script);
+        game_free(ds.SaveLoad_BufFrame);
+        game_free(ds.SaveLoad_BufBack);
+        game_free(ds.SaveLoad_BufButtons);
     }
     if (leaving(17)) {
-        System_FreeMem(ds.ShipMove_AnimSheet, 0x9100);
+        game_free(ds.ShipMove_AnimSheet);
         ShipMove_FreeBackdrop();  // and the star table in its segment
     }
     if (leaving(18)) {
-        System_FreeMem(ds.PlanetInfo_Sprites, 0x6900);
-        System_FreeMem(ds.PlanetInfo_Backdrop, 0xBCC0);
-        System_FreeMem(ds.PlanetInfo_Icons, 24000);
+        game_free(ds.PlanetInfo_Sprites);
+        game_free(ds.PlanetInfo_Backdrop);
+        game_free(ds.PlanetInfo_Icons);
     }
     if (leaving(19)) {
         if (ds.Game_CurrentScreen != 32) {
-            System_FreeSegment(ds.GrWarUnits_UnitLists[0]);
-            System_FreeSegment(ds.GrWarUnits_UnitLists[1]);
+            game_free(ds.GrWarUnits_UnitLists[0]);
+            game_free(ds.GrWarUnits_UnitLists[1]);
         }
-        System_FreeMem(ds.GrWar_UnitIcons, 0x3C00);
+        game_free(ds.GrWar_UnitIcons);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(20)) {
         int16_t t = ds.Surface_TileSet;
-        System_FreeMem(ds.Surface_RadarColors, 0x820);
-        if (ds.Surface_RadarDouble == 0)
-            System_FreeMem(ds.Surface_RadarBuf, (uint16_t)(ds.Surface_MapWidth * ds.Surface_MapHeight));
-        else
-            System_FreeMem(ds.Surface_RadarBuf,
-                           (uint16_t)(ds.Surface_MapWidth * 4 * ds.Surface_MapHeight));
-        System_FreeMem(ds.Surface_BufA, 0x24FF);
-        System_FreeMem(ds.Surface_BufC, 0xF000);
+        game_free(ds.Surface_RadarColors);
+        game_free(ds.Surface_RadarBuf);
+        game_free(ds.Surface_BufA);
+        game_free(ds.Surface_BufC);
         if (ds.Surface_FanimHeight[t - 1] != 0)
-            System_FreeMem(ds.Surface_BufD, (uint16_t)(ds.Surface_FanimHeight[t - 1] * 0x140));
-        System_FreeMem(ds.Surface_BufB, (uint16_t)(ds.Surface_FelszHeight[t - 1] * 0x140));
-        System_FreeSegment(ds.Surface_BuildingLayer);
-        System_FreeSegment(ds.Surface_OccupyLayer);
-        System_FreeSegment(ds.Surface_TileLayer);
+            game_free(ds.Surface_BufD);
+        game_free(ds.Surface_BufB);
+        game_free(ds.Surface_BuildingLayer);
+        game_free(ds.Surface_OccupyLayer);
+        game_free(ds.Surface_TileLayer);
     }
     if (leaving(22))
-        System_FreeMem(ds.Groups_IconBuffer, 0x2300);
+        game_free(ds.Groups_IconBuffer);
     if (leaving(23)) {
-        System_FreeMem(ds.Pub_PiratesSheet, 0xAF00);
-        System_FreeMem(ds.Pub_AnimSheet, 64000);
+        game_free(ds.Pub_PiratesSheet);
+        game_free(ds.Pub_AnimSheet);
     }
     if (leaving(24))
-        System_FreeMem(ds.Advisor_MenuLines, 0x131);
+        game_free(ds.Advisor_MenuLines);
     if (leaving(25))
-        System_FreeMem(ds.Pub_Lines, 0x500);
+        game_free(ds.Pub_Lines);
     if (leaving(29)) {
-        System_FreeMem(ds.SpWar_View, 0x5E60);
-        System_FreeMem(ds.SpWar_Background, 0x5E60);
-        System_FreeMem(ds.SpWar_Sprites, 0xF00);
-        System_FreeMem(ds.SpWar_Face, 0x1180);
-        System_FreeMem(ds.SpWar_AttackerList, 0x177C);
-        System_FreeMem(ds.SpWar_DefenderList, 0x177C);
-        System_FreeMem(ds.Anim_Record, sizeof(TAnimRecord));
-        System_FreeMem(ds.Anim_Script, 0x230);
+        game_free(ds.SpWar_View);
+        game_free(ds.SpWar_Background);
+        game_free(ds.SpWar_Sprites);
+        game_free(ds.SpWar_Face);
+        game_free(ds.SpWar_AttackerList);
+        game_free(ds.SpWar_DefenderList);
+        game_free(ds.Anim_Record);
+        game_free(ds.Anim_Script);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(32)) {
-        System_FreeSegment(ds.GrWarUnits_UnitLists[0]);
-        System_FreeSegment(ds.GrWarUnits_UnitLists[1]);
-        System_FreeMem(ds.GrWar_LostFrames, 0x2860);
+        game_free(ds.GrWarUnits_UnitLists[0]);
+        game_free(ds.GrWarUnits_UnitLists[1]);
+        game_free(ds.GrWar_LostFrames);
         if (ds.Game_CurrentScreen == 7)
             Music_ApplyMusicTrack();
     }
     if (leaving(33))
         Music_RestartMainTheme();
     if (leaving(34)) {
-        System_FreeMem(ds.AlienTalk_QuestionBuf, 0x300);
+        game_free(ds.AlienTalk_QuestionBuf);
         Music_RestartMainTheme();
     }
     if (leaving(37))
-        System_FreeMem(ds.PlanetList_Entries, 0x4B0);
+        game_free(ds.PlanetList_Entries);
 }
 
 // --- Screen 20: planet surface ---------------------------------------------------
@@ -616,7 +643,7 @@ static void surface_map_click(void)
             }
         } else {
             ds.Surface_Mode = 2;
-            Sound_PlayButtonSfx(LIT("hiba"));
+            Sound_PlayButtonSfx("hiba");
             ds.Mouse_HeldPhase = 1;
             Surface_DrawMapView();
         }
@@ -625,11 +652,11 @@ static void surface_map_click(void)
         if (ds.Surface_Mode == 4) {
             if ((ds.Surface_SelKind == 4 || ds.Surface_SelKind == 0x19)
                 && building(ds.Surface_SelBuilding)->Health == 0) {
-                Sound_PlayButtonSfx(LIT("mine"));
+                Sound_PlayButtonSfx("mine");
                 ds.Game_CurrentScreen = 4;
                 ds.Game_ScreenSwitch = 1;
             } else {
-                Sound_PlayButtonSfx(LIT("x"));
+                Sound_PlayButtonSfx("x");
                 Surface_DrawKindArrows();
                 Surface_ShowBuildingInfoView();
                 if (ds.Surface_PrevKind != ds.Surface_SelKind)
@@ -641,7 +668,7 @@ static void surface_map_click(void)
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
         if (ds.Surface_Mode == 6 && ds.Surface_SelKind != 1
             && building(ds.Surface_SelBuilding)->Health == 0) {
-            Sound_PlayButtonSfx(LIT("destruct"));
+            Sound_PlayButtonSfx("destruct");
             Surface_DeleteBuilding(ds.Surface_SelBuilding);
             PlanetInfo_BalanceBuildingPower(CUR_SYS, CUR_PLANET(CUR_SYS), CUR_MOON(CUR_SYS));
             Surface_LoadMap();
@@ -651,7 +678,7 @@ static void surface_map_click(void)
             add_credits(-2000);
             Gfx_DrawCredits();
         } else {
-            Sound_PlayButtonSfx(LIT("x"));
+            Sound_PlayButtonSfx("x");
         }
         ds.Surface_SelKind = ds.Surface_PrevKind;
         ds.Surface_Mode = 1;
@@ -688,7 +715,7 @@ static void surface_build_button(void)
     Surface_DrawModeButtons();
     ds.Game_HotspotHit = 0;
     if (ds.Surface_Mode == 2) {
-        Sound_PlayButtonSfx(LIT("x"));
+        Sound_PlayButtonSfx("x");
         ds.Surface_Mode = 1;
         Surface_DrawModeButtons();
         return;
@@ -697,30 +724,29 @@ static void surface_build_button(void)
     ds.Main_HasBuilderPlant = Surface_CountBuildings(0x16, sys, planet, moon, true) > 0;
     ds.Main_HasVehiclePlant = Surface_CountBuildings(0x17, sys, planet, moon, true) > 0;
     if (bt->Cost > ds.Game_Credits) {
-        Sound_PlayButtonSfx(LIT("hiba"));
+        Sound_PlayButtonSfx("hiba");
         Gfx_FlashCredits();
     } else if (ds.Game_StaffExp[1] == 0) {
-        Message_ShowMessageNoLog(LIT(" You have no builder! "));
+        Message_ShowMessageNoLog(" You have no builder! ");
     } else if (ds.Surface_SelKind == 1) {
-        Message_ShowMessageNoLog(LIT(" You cannot have two command centres built! "));
+        Message_ShowMessageNoLog(" You cannot have two command centres built! ");
     } else if (ds.Surface_SelKind == 0x19) {
-        Message_ShowMessageNoLog(LIT(" You already have a colony! "));
+        Message_ShowMessageNoLog(" You already have a colony! ");
     } else if (bt->_12[0] != 0 && ds.Main_HasBuilderPlant == 0) {
-        Message_ShowMessageNoLog(LIT(" This building needs a builder plant! "));
+        Message_ShowMessageNoLog(" This building needs a builder plant! ");
     } else if (bt->_12[1] != 0 && ds.Main_HasVehiclePlant == 0) {
-        Message_ShowMessageNoLog(LIT(" This building needs a vehicle plant! "));
+        Message_ShowMessageNoLog(" This building needs a vehicle plant! ");
     } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt->_10) {
-        Sound_PlayButtonSfx(LIT("build"));
+        Sound_PlayButtonSfx("build");
         ds.Surface_Mode = 2;
         ds.Surface_BlinkCounter = 0;
         Surface_BlinkModeButton();
     } else {
-        PString msg;
         // Staff::Names[2, StaffHired[2]]; none hired reads Names[1, 3].
-        const PStr18 *name = &ds.Staff_Names[0][0] + 2 + ds.Game_StaffHired[1];
-        System_StrLoad(&msg, (const PString *)name);
-        System_StrConcat(&msg, PSTR(" is not able to construct this building"));
-        Message_ShowMessageNoLog(ps(&msg));
+        char name[256], msg[256];
+        pstr_get(name, sizeof name, &ds.Staff_Names[0][0] + 2 + ds.Game_StaffHired[1]);
+        SDL_snprintf(msg, sizeof msg, "%s is not able to construct this building", name);
+        Message_ShowMessageNoLog(msg);
     }
 }
 
@@ -811,7 +837,7 @@ static void screen_surface(void)
                     ds.Surface_SelKind = (int16_t)ds.Main_I;
         }
         if (ds.Main_PrevKind != ds.Surface_SelKind) {
-            Sound_PlayButtonSfx(LIT("x"));
+            Sound_PlayButtonSfx("x");
             if (ds.Surface_Mode == 2)
                 ds.Surface_Mode = 1;
             if (ds.Surface_Mode == 6)
@@ -825,7 +851,7 @@ static void screen_surface(void)
     }
     if (ds.Game_HotspotHit == 0x19 && ds.Surface_CanBuild) {
         ds.Surface_Mode = 3;
-        Sound_PlayButtonSfx(LIT("x"));
+        Sound_PlayButtonSfx("x");
         Surface_DrawModeButtons();
         Surface_ShowBuildingInfoView();
         Surface_SetupInfoHotspots();
@@ -865,7 +891,7 @@ static void screen_surface(void)
     if (ds.Game_HotspotHit == 0x1F && ds.Surface_CanBuild) {
         Surface_DrawModeButtons();
         ds.Game_HotspotHit = 0;
-        Sound_PlayButtonSfx(LIT("x"));
+        Sound_PlayButtonSfx("x");
         if (ds.Surface_Mode == 6) {
             ds.Surface_Mode = 1;
         } else {
@@ -876,7 +902,7 @@ static void screen_surface(void)
     }
     if ((ds.Game_HotspotHit == 0x15 || ds.Game_HotspotHit == 0x16)
         && (ds.Surface_Mode == 3 || ds.Surface_Mode == 4)) {
-        Sound_PlayButtonSfx(LIT("x"));
+        Sound_PlayButtonSfx("x");
         ds.Surface_BlinkOn = 1;
         Surface_DrawMapView();
         Surface_SetupSurfaceHotspots();
@@ -895,7 +921,7 @@ static void screen_pub(void)
     }
     if ((uint16_t)ds.Game_HotspotHit > 0x14 && (uint16_t)ds.Game_HotspotHit < 0x1F) {
         ds.Pub_Person = (int16_t)(ds.Game_HotspotHit - 0x14);
-        Sound_PlayButtonSfx(LIT("talk"));
+        Sound_PlayButtonSfx("talk");
         ds.Game_CurrentScreen = 25;
         ds.Game_ScreenSwitch = 1;
     }
@@ -966,7 +992,7 @@ static void pub_answer(void)
     if (who == 1) {
         if (a == 1) {
             ds.Pub_StoryFlags[0] = 1;
-            System_StrStore(PSTR("Spy-Hunter   "), (PString *)&p[0].Name, 13);
+            pstr_set(&p[0].Name, 13, "Spy-Hunter   ");
         } else if (a == 2) {
             ds.Pub_ReplyLine = ds.Pub_StoryFlags[1] == 0 ? 4 : 6;
         } else if (a == 4) {
@@ -1024,7 +1050,7 @@ static void pub_answer(void)
                 ds.Galaxy_PlanetStatus[1][4] = 0;
         } else if (a == 5) {
             ds.Pub_StoryFlags[3] = 1;
-            System_StrStore(PSTR("Pirate Leader"), (PString *)&p[8].Name, 13);
+            pstr_set(&p[8].Name, 13, "Pirate Leader");
             add_credits(-500);
         }
     }
@@ -1044,7 +1070,7 @@ static void pub_answer(void)
             ds.Pub_StoryFlags[2] = 1;
         } else if (a == 10) {
             ds.Pub_StoryFlags[2] = 1;
-            System_StrStore(PSTR("Spy          "), (PString *)&p[1].Name, 13);
+            pstr_set(&p[1].Name, 13, "Spy          ");
         } else if (a == 11) {
             ds.Pub_StoryFlags[9] = 1;
         } else if (a == 13) {
@@ -1071,7 +1097,7 @@ static void pub_answer(void)
     }
     if (who == 7) {
         ds.Pub_StoryFlags[10] = 1;
-        System_StrStore(PSTR("Bounty-Hunter"), (PString *)&p[6].Name, 13);
+        pstr_set(&p[6].Name, 13, "Bounty-Hunter");
     }
     if (who == 9) {
         if (a == 2) {
@@ -1166,7 +1192,7 @@ static void screen_space_battle(void)
     if (ds.Game_ScreenEntered) {
         select_battle_body();
         PlanetInfo_SelectCurBody();
-        Music_PlayTrack(LIT("space"));
+        Music_PlayTrack("space");
         Sound_StopAndFreeSample();
         SpWar_InitSpaceFleets();
         SpWar_EnterSpaceBattle();
@@ -1180,7 +1206,7 @@ static void screen_space_battle(void)
     if (ds.Game_MenuCommand == 0x3E) {  // retreat
         SpWar_FreeWarAnims();
         Sound_StopSbVoice();
-        Sound_PlayButtonSfx(LIT("retreat"));
+        Sound_PlayButtonSfx("retreat");
         GfxPath_SetToolbarAndShow(0x1E);
         ds.SpWar_BattleOver = 1;
         ds.SpWar_Retreated = 1;
@@ -1188,7 +1214,7 @@ static void screen_space_battle(void)
     }
     if (ds.Game_MenuCommand == 0x41) {  // battle over
         Sound_FreeWarSndBuf();
-        Sound_PlayButtonSfx(LIT("endbattl"));
+        Sound_PlayButtonSfx("endbattl");
         if (!ds.SpWar_PlayerWon)
             Intel_SpaceBattleLost(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet);
         else
@@ -1238,11 +1264,10 @@ static void ground_battle_won_story(void)
     TBody *body = cur_body();
     if (!(body->_01 == 1 && (int8_t)body->Owner > 1))
         return;
-    PString msg;
-    System_StrLoad(&msg, PSTR(" Your forces have eliminated '"));
-    System_StrConcat(&msg, (const PString *)&Intel_Race((int8_t)body->Owner)->Name);
-    System_StrConcat(&msg, PSTR("' "));
-    Message_ShowMessage(ps(&msg));
+    char race[256], msg[256];
+    pstr_get(race, sizeof race, &Intel_Race((int8_t)body->Owner)->Name);
+    SDL_snprintf(msg, sizeof msg, " Your forces have eliminated '%s' ", race);
+    Message_ShowMessage(msg);
     if (body->Owner == 3) {
         Message_ShowMessageLine(0x23);
         ds.Intel_MorgrulBeaten = 1;
@@ -1382,7 +1407,7 @@ static void screen_ground_battle(void)
     }
     if (ds.Game_MenuCommand == 0x48) {  // retreat
         Sound_StopSbVoice();
-        Sound_PlayButtonSfx(LIT("retreat"));
+        Sound_PlayButtonSfx("retreat");
         GfxPath_SetToolbarAndShow(0x1E);
         ds.GrWar_BattleOver = 1;
         ds.SpWar_Retreated = 1;
@@ -1390,7 +1415,7 @@ static void screen_ground_battle(void)
     }
     if (ds.Game_MenuCommand == 0x41) {  // battle over
         Sound_FreeWarSndBuf();
-        Sound_PlayButtonSfx(LIT("endbattl"));
+        Sound_PlayButtonSfx("endbattl");
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 7;
         select_battle_body();
@@ -1447,22 +1472,14 @@ static void screen_ground_battle(void)
 
 static void screen_story_music(void)
 {
-    PString *track = (PString *)&ds.Main_SceneTrack;
-    track->len = 0;
-    switch (ds.AlienTalk_Scene) {
-    case 1: System_StrStore(PSTR("1"), track, 0x14); break;
-    case 2: System_StrStore(PSTR("5"), track, 0x14); break;
-    case 3: System_StrStore(PSTR("2"), track, 0x14); break;
-    case 4: System_StrStore(PSTR("5"), track, 0x14); break;
-    case 5: System_StrStore(PSTR("4"), track, 0x14); break;
-    case 6: System_StrStore(PSTR("3"), track, 0x14); break;
-    default: break;
-    }
-    if (track->len != 0) {
-        PString name;
-        System_StrLoad(&name, PSTR("atv"));
-        System_StrConcat(&name, track);
-        Music_PlayTrack(ps(&name));
+    static const char *const tracks[7] = {"", "1", "5", "2", "5", "4", "3"};
+    int16_t scene = ds.AlienTalk_Scene;
+    const char *track = scene >= 1 && scene <= 6 ? tracks[scene] : "";
+    pstr_set(&ds.Main_SceneTrack, 0x14, track);
+    if (track[0] != '\0') {
+        char name[32];
+        SDL_snprintf(name, sizeof name, "atv%s", track);
+        Music_PlayTrack(name);
     }
     if (ds.AlienTalk_Scene == 4)
         Message_ShowMessageLine(0x24);
@@ -1512,16 +1529,15 @@ static void alien_talk_answer(void)
         }
     }
     if (race == 7) {
-        int32_t *stock = &ds.Game_HomeStock[1];
         if (q == 5 || q == 8) {
-            ds.Main_I = *stock;
+            ds.Main_I = ds.Game_HomeStock[1];
             if (ds.Main_I > 10000)
                 ds.Main_I = 10000;
-            *stock -= ds.Main_I;
+            ds.Game_HomeStock[1] -= ds.Main_I;
             add_credits(ds.Main_I * (q == 5 ? 10 : 12));
             Gfx_DrawCredits();
         } else if (q == 9) {
-            *stock -= *stock / 2;
+            ds.Game_HomeStock[1] -= ds.Game_HomeStock[1] / 2;
             Intel_GrantInvention(0x15);
         }
     }
@@ -1540,7 +1556,7 @@ static void screen_alien_talk(void)
 {
     ds.Game_ClockRunning = 0;
     if (ds.Game_ScreenEntered) {
-        Music_PlayTrack(LIT("talk"));
+        Music_PlayTrack("talk");
         ds.Command_BackdropShown = 1;
         if (ds.AlienTalk_Race == 6)
             AlienTalk_PlayAlienScene(10);
@@ -1588,10 +1604,10 @@ static void screen_alien_talk(void)
 
 // --- Screen 37: colony list ---------------------------------------------------------
 
-static void list_mode_button(int16_t mode, const uint8_t *sfx)
+static void list_mode_button(int16_t mode, const char *sfx)
 {
     if (ds.PlanetList_Mode == mode) {
-        Sound_PlayButtonSfx(LIT("x"));
+        Sound_PlayButtonSfx("x");
     } else {
         Sound_PlayButtonSfx(sfx);
         ds.PlanetList_Mode = mode;
@@ -1603,7 +1619,7 @@ static void list_mode_button(int16_t mode, const uint8_t *sfx)
 static void screen_planet_list(void)
 {
     if (ds.Game_ScreenEntered) {
-        uint8_t *entries = System_GetMem(0x4B0);
+        uint8_t *entries = game_alloc(0x4B0);
         ds.PlanetList_Top = 1;
         ds.PlanetList_Mode = 1;
         ds.PlanetList_Entries = entries;
@@ -1613,11 +1629,11 @@ static void screen_planet_list(void)
     if (ds.Game_HotspotHit == 0x15)
         PlanetList_DragScrollBar();
     if (ds.Game_MenuCommand == 0x4B)
-        list_mode_button(1, LIT("plyour"));
+        list_mode_button(1, "plyour");
     if (ds.Game_MenuCommand == 0x4C)
-        list_mode_button(2, LIT("pluseful"));
+        list_mode_button(2, "pluseful");
     if (ds.Game_MenuCommand == 0x4D)
-        list_mode_button(3, LIT("plalien"));
+        list_mode_button(3, "plalien");
 }
 
 // --- Dispatch ------------------------------------------------------------------------
@@ -1728,12 +1744,12 @@ static void dispatch(void)
         screen_alien_talk();
     if (on(35) && ds.Game_ScreenEntered) {
         Mouse_HideCursor();
-        Music_PlayTrack(LIT("failure"));
+        Music_PlayTrack("failure");
         Command_ShowDeathEnding();
     }
     if (on(36) && ds.Game_ScreenEntered) {
         Mouse_HideCursor();
-        Music_PlayTrack(LIT("failure"));
+        Music_PlayTrack("failure");
         Command_FadeOutAndHalt();
     }
     if (on(37))
@@ -1778,7 +1794,7 @@ void Game_Main(void)
             Gfx_FatalExit();
 
         if (!ds.Game_ScreenSwitch && ds.Game_HotspotHit == 0xD && ds.GfxPath_PageFlagA) {
-            Sound_PlayButtonSfx(LIT("icon"));
+            Sound_PlayButtonSfx("icon");
             if (ds.GfxPath_PageFlagB == 0)
                 GfxPath_ScrollToolbarPrev();
             else
@@ -1816,21 +1832,23 @@ void Game_Main(void)
             } else {
                 ds.Game_MenuCommand = ds.GfxPath_MenuBar[ds.Game_HotspotHit - 1].Command;
                 if (ds.Game_MenuCommand != 0) {
-                    if (ds.Game_SoundFx == 2)
-                        Sound_PlayButtonSfx(
-                            (const uint8_t *)&ds.Ui_ButtonSounds[ds.Game_MenuCommand - 1]);
-                    else
-                        Sound_PlayButtonSfx(LIT("x"));
+                    char sfx[256];
+                    if (ds.Game_SoundFx == 2) {
+                        pstr_get(sfx, sizeof sfx, &ds.Ui_ButtonSounds[ds.Game_MenuCommand - 1]);
+                        Sound_PlayButtonSfx(sfx);
+                    } else
+                        Sound_PlayButtonSfx("x");
                 }
             }
         }
         if (ds.Game_ScreenEntered) {
-            Gfx_DrawStatusText(LIT(""));
+            Gfx_DrawStatusText("");
             uint8_t *info = screen_info(ds.Game_CurrentScreen);
             if (info[0x0A])
                 GfxPath_SetToolbarAndShow(ds.Game_CurrentScreen);
+            char name[256];
             if (info[0x09])
-                Gfx_ShowGrafikaPic(info);
+                Gfx_ShowGrafikaPic(pstr_get(name, sizeof name, info));
             ds.Game_HotspotHit = 0;
             ds.Game_ScreenSwitch = 0;
         }
