@@ -223,9 +223,41 @@ Improvements section in the port menu, `[improvements]` in `reunion.ini`),
 on by default. The Fixes section's "All off (original)" turns them off
 too. The golden hashes, the playthrough and the DOS-save tests run with
 every improvement off, so the proof of the original's behaviour stands;
-each improvement gets its own test with it on. Saves keep the DOS format:
-an improvement keeps its state in fields the original already has, so a
-save still loads in the original, which then plays it by its own rules.
+each improvement gets its own test with it on.
+
+**Saves.** An improvement keeps its state in fields the original already
+has where it can, so the save stays in the DOS format and still loads in
+the original, which then plays it by its own rules. Trade routes (6.3) and
+the building table past 1,000 (6.5) have no room there, so they break
+with the DOS format:
+
+- **When.** A save is written in the port's own format while
+  `trade_routes` or `no_building_limit` is on, or while the game holds
+  something the DOS format can't (a route, more than 1,000 buildings,
+  e.g. after loading such a save with both switches off). Otherwise it is
+  the DOS format, as now.
+- **A clean break.** The original takes a slot as used if
+  `save\spidysav.<n>` exists and reads it as raw blocks with no checks, so
+  a different layout under that name would load garbage or stop on an I/O
+  error. The port's format therefore goes in `save/reunion.<n>`, which the
+  original never opens: there the slot shows "Empty" and can be saved
+  over. Writing a slot in one format deletes the slot's file in the
+  other, so a slot has one file. The disk screen lists and loads both.
+- **The format.** A magic and a version number, the slot name, the DOS
+  blocks in their order with the building table as its true count and
+  records, then the routes. The version lets later improvements add to
+  it; a newer version than the port knows is listed but refused on load.
+- **Loading** a `reunion.<n>` save works whatever the switches say. With
+  `no_building_limit` off, the buildings past 1,000 stay but no new one
+  is allowed; with `trade_routes` off, routes are kept but not flown.
+- **Warning.** The F1 menu's Improvements section shows, while either switch is on:
+  "Saves made now can't be loaded by the DOS game." The two switches'
+  own descriptions say it too.
+- **Test.** Each switch on writes `reunion.<n>` and deletes
+  `spidysav.<n>`, and both off does the reverse; a save that still holds
+  routes or more than 1,000 buildings is written as `reunion.<n>` with
+  both off; save and load in the port format restores everything; an
+  unknown version is refused; the DOS-save tests are unchanged.
 
 #### 6.1 More Miner stations on a mining-only body
 
@@ -312,9 +344,9 @@ its own.
   why.
 - **Where it lives.** Routes are stepped where groups arrive
   (`Sim_ProcessTravellingGroups`). The DOS records have no room for them,
-  so they go in a file beside the save (`save/spidysav.<n>.routes`) that
-  the original never reads; it must follow the groups when the list
-  shifts after a disband.
+  so they are saved in the port's format (Saves, above); a route names
+  its group by index and must follow it when the list shifts after a
+  disband.
 - **Test.** A route of two stops runs several loops; a full group goes
   home early; New Earth full; each stop condition; save and load keep the
   route.
@@ -338,7 +370,35 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 6.5 Smaller candidates
+#### 6.5 No building limit
+
+All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
+bytes each, in the game data block from 2840h up to the charset at 5EF0h).
+When it is full a new building is refused (`Surface_AddBuilding`,
+`Surface_BuildOnCurrentPlanet`; `fixes.building_limit` keeps it from
+being paid for), and so is every building a new colony would get. A large
+late game runs into it.
+
+Switch `no_building_limit`:
+
+- **The table.** Move it out of the game data block into a heap array
+  that grows as buildings are added; records 1-1,000 stay where they are
+  so the data block keeps its layout. Indices are `int16_t` everywhere
+  (the surface's building layer holds `uint16_t`), so the real cap is
+  32,767; refuse at that as the fix refuses at 1,000. Every `< 1000` /
+  `> 999` test goes through one limit function.
+- **Saves** are in the port's format while the switch is on (Saves,
+  above), with the whole table. The DOS format can't hold more than
+  1,000: its block is 14,000 bytes, and a larger `Game_BuildingCount`
+  would make the original read past the table into the charset.
+- **Check** every loop over the table for a fixed bound, and the code
+  that holds a building index in a byte. Deleting a building
+  (`Surface_DeleteBuilding`) shifts the later records down; the side file
+  needs nothing for that, as it is written from the table.
+- **Test.** Build past 1,000, save, load, and check every building and the
+  count came back; with the switch off, the 1,001st is refused.
+
+#### 6.6 Smaller candidates
 
 Each needs a short spec before work starts.
 
