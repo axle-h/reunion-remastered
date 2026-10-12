@@ -42,7 +42,7 @@ static bool goal_e05(void)
         pol_build(PRI_E5, "Mine", MINE_COST);
         return false;
     }
-    if (ui_droids() < m.finished && ui_droid_stock() > 0)
+    if (ui_droids() < SDL_min(m.finished, UI_MAX_DROIDS) && ui_droid_stock() > 0)
         ui_add_droid();
     return ui_droids() >= 3;
 }
@@ -569,12 +569,12 @@ static bool goal_e21(void)
 {
     pol_new_earth(SCR_SURFACE);
     UiBuildings m = ui_buildings("Mine"), d = ui_buildings("Derrick");
-    int droids = ui_droids(), stock = ui_droid_stock();
-    if (droids < m.finished && stock > 0) {
+    int droids = ui_droids(), stock = ui_droid_stock(), places = SDL_min(m.finished, UI_MAX_DROIDS);
+    if (droids < places && stock > 0) {
         ui_add_droid();
         return false;
     }
-    if (m.finished > droids + stock && pol_stores("Miner droid") == 0) {
+    if (places > droids + stock && pol_stores("Miner droid") == 0) {
         int32_t have[ORES], need[ORES];
         scaled(need, DROID_ORES, 1);
         UiShopQueue q;

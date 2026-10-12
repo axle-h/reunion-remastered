@@ -39,22 +39,22 @@ must also end in exit code 10.
 ### Result: seed 12345
 
 `tests/test_play_game.c` plays one game from "new game" with seed 12345
-through the 76 steps of acts 1-5 and wins: Halt(10) after 3,485,181
-retraces, on 2930-02-29 21:00 (game date), state hash
-`00ac6e5323ddafde`. The recording, 3.2 MB of plain autopilot script, is
+through the 76 steps of acts 1-5 and wins: Halt(10) after 3,504,170
+retraces, on 2930-03-06 09:00 (game date), state hash
+`b3fe94192bcf1188`. The recording, 3.2 MB of plain autopilot script, is
 [tests/play/proof_12345.txt](../tests/play/proof_12345.txt); the fixture
 replays it in-process and `reunion --replay` ends the same way, with exit
 status 10:
 
 ```sh
 build/debug/reunion --replay=tests/play/proof_12345.txt vendor/Reunion_DOS_EN
-# replay: exit 10 after 3485181 frames, hash 00ac6e5323ddafde   (exit status 10)
+# replay: exit 10 after 3504170 frames, hash b3fe94192bcf1188   (exit status 10)
 ```
 
 Milestones: Jade found 2927-08-25, Jaanosian contact 2928-03-02, the
-Galleon invented 2928-07-27, Mirach 3 taken (the Morgruls eliminated)
-2929-04-02, the League's surrender 2929-09-25, Earth 2930-02-29. The Earth
-invasion: in space lost 45H 30SF, destroyed 64H 64SF 7D 5C; on the ground
+Galleon invented 2928-07-26, Mirach 3 taken (the Morgruls eliminated)
+2929-04-05, the League's surrender 2929-09-27, Earth 2930-03-06. The Earth
+invasion: in space lost 47H 36SF, destroyed 64H 64SF 7D 5C; on the ground
 lost 10T 20Air 30ML, destroyed 30Tr 90T 50Air 30ML.
 
 The "as run" dates and losses in the policy below are from earlier
@@ -74,21 +74,31 @@ The same policy, unchanged per seed, from "new game" with `PLAY_SEED`
 
 | Seed | Won | Seed | Won | Seed | Won | Seed | Won |
 |---|---|---|---|---|---|---|---|
-| 1 | 2930-02-21 | 8 | 2930-02-29 | 15 | 2930-03-02 | 22 | 2930-02-25 |
-| 2 | 2930-03-07 | 9 | 2930-02-22 | 16 | 2930-02-30 | 23 | 2930-02-14 |
-| 3 | 2930-02-29 | 10 | 2930-02-20 | 17 | 2930-02-27 | 24 | 2930-02-16 |
-| 4 | 2930-02-23 | 11 | 2930-02-27 | 18 | 2930-03-05 | 25 | 2930-02-21 |
-| 5 | 2930-03-03 | 12 | 2930-02-14 | 19 | 2930-02-24 | 26 | 2930-03-01 |
-| 6 | 2930-02-02 | 13 | 2930-02-24 | 20 | 2930-03-05 | 27 | 2930-02-13 |
-| 7 | 2930-03-09 | 14 | 2930-02-23 | 21 | 2930-02-29 | 28 | 2930-03-11 |
+| 1 | 2930-03-16 | 16 | 2930-03-02 | 31 | 2930-03-23 | 46 | 2930-03-03 |
+| 2 | 2930-03-09 | 17 | 2930-02-21 | 32 | 2930-02-25 | 47 | 2930-02-28 |
+| 3 | 2930-02-18 | 18 | 2930-03-05 | 33 | 2930-02-27 | 48 | 2930-02-15 |
+| 4 | 2930-03-10 | 19 | 2930-03-02 | 34 | 2930-03-02 | 49 | 2930-02-15 |
+| 5 | 2930-02-16 | 20 | 2930-02-14 | 35 | 2930-02-26 | 50 | 2930-02-30 |
+| 6 | 2930-03-02 | 21 | 2930-03-02 | 36 | 2930-03-04 | 51 | 2930-02-29 |
+| 7 | 2930-03-19 | 22 | 2930-02-28 | 37 | 2930-02-22 | 52 | 2930-03-07 |
+| 8 | 2930-03-23 | 23 | 2930-03-19 | 38 | 2930-03-09 | 53 | 2930-03-07 |
+| 9 | 2930-02-09 | 24 | 2930-02-13 | 39 | 2930-03-15 | 54 | 2930-03-06 |
+| 10 | 2930-02-21 | 25 | 2930-03-13 | 40 | 2930-02-23 | 55 | 2930-03-18 |
+| 11 | 2930-03-10 | 26 | 2930-03-23 | 41 | 2930-03-01 | 56 | 2930-03-07 |
+| 12 | 2930-02-23 | 27 | 2930-02-15 | 42 | 2930-02-27 | 57 | 2930-02-26 |
+| 13 | 2930-03-11 | 28 | 2930-02-23 | 43 | 2930-02-30 | 58 | 2930-02-24 |
+| 14 | 2930-03-12 | 29 | 2930-03-02 | 44 | 2930-03-01 | 59 | 2930-02-17 |
+| 15 | 2930-02-29 | 30 | 2930-02-16 | 45 | 2930-02-18 | 60 | 2930-03-02 |
 
-All 28 were run on 2026-10-12, with every fix on and the M5 shuttle as
-described above; each recording replays to the same end. The latest win
-is 2930-03-11. Seed 3 lost at M16 in earlier runs: New Earth stopped at 5
-Derricks (E21) and the Detoxin for the Space station never gathered. Since
-the station storage fix (`fixes.station_storage`) it builds 18 and wins.
-Why it stalled is not known (PLAN.md); E21 now finishes in every seed
-above, between 2928-05-23 and 2928-07-10.
+All 60 were run on 2026-10-12 with every fix on; each recording replays
+to the same end. The wins fall between 2930-02-09 and 03-23; E21 finished
+between 2928-05-23 and 07-01. Each batch of new seeds so far turned up a
+rare failure, fixed in the policy or its drivers: a Mine built twice at
+midnight that left E21 waiting for a 10th droid (seed 3's old loss at
+M16), clicks on bodies that had moved on or hidden behind the sun ("Moving
+bodies"), a message read through the mouse cursor, a battle that came up
+during a step's own navigation, the Phoenix 1 search losing whole
+evenings to the haul (M5), and wave 1 lost with 12 Hunters (J8).
 
 ## The fixture
 
@@ -173,6 +183,14 @@ Steps marked *hard* have a story deadline behind them.
   replaces it, and the talk is lost; before meeting 3 no hostile forces
   exist, so the Jaanosian chain is safe. Never press keys during scenes:
   any key sets `Gfx_KeyAbort` for good and later scenes skip.
+- **Moving bodies.** The planets and moons move on to their next orbit
+  position at each game hour, and the map's hotspots with them, so a click
+  aimed just before the hour can open another body. Every open is checked
+  on screen: planet info by its NAME line, a surface by the clock showing
+  the same hour before and after the click (the surface names no body),
+  a launch by the group's location line ("Fly to ... Mirach 3"). A planet
+  behind the sun is not drawn and a click on it does nothing; it comes out
+  within hours, so the click is tried hourly.
 
 ### Act 1: Economy (new game to Jade, E1–E23)
 
@@ -230,7 +248,13 @@ working and 1 in stock, no staff; New Earth's ore stock starts at 0.
   needs a Medicine plant and a second Hospital before colony day 10. As
   run: Apollo 2927-11-30, Penelope 2928-02-12, Mir 03-28; on 08-01 Apollo
   had 68,000 people, Penelope 52,000, Mir 40,000.
-- **E21. New Earth to 9 Mines and 20 Derricks**, lowest priority.
+- **E21. New Earth to 9 Mines and 20 Derricks**, lowest priority. A body
+  takes at most 9 droids, so a 10th Mine gets none; E21, the colonies'
+  droids (S6) and their loading count Mines up to 9. A 10th Mine once came
+  from a build counted as failed because midnight's taxes outweighed its
+  price, and E21 then waited for its droid for good: no Derrick after 5,
+  and M16 (Space station) never got its Detoxin. The build driver counts
+  the buildings instead.
 - **E22. Jade** (*hard*). Only New Earth's observatory finds it (status
   −3); keep it standing. The port's fix reveals Jade on 2928-04-01 at the
   latest (`fixes.find_jade`), so a timeout at 2928-04-02 is a port bug.
@@ -263,11 +287,11 @@ working and 1 in stock, no staff; New Earth's ore stock starts at 0.
 - **J7. Kyle Douglas** (*hard*): a space attack needs a war commander, and
   damage scales with his experience. Hired 18 h after the S.O.S., course
   2–3 days later.
-- **J8. First army** (*hard*): 12 Hunters with 2 lasers each in "Home
-  Guard", docked at New Earth (a docked Army group defends). No fallback
-  below 12 (12H won wave 1 10/10, 8H only 7/10, "Battles"), and a lost space
-  battle lands the troopers on a New Earth with no tanks: game over. As
-  run: complete 323 h after the S.O.S. (240 h of Hunter line).
+- **J8. First army** (*hard*): 14 Hunters with 2 lasers each in "Home
+  Guard", docked at New Earth (a docked Army group defends). 12H won wave 1
+  199/200 and 14H 200/200 ("Battles"), and a lost space battle lands the
+  troopers on a New Earth with no tanks: game over. As run with 12:
+  complete 323 h after the S.O.S. (240 h of Hunter line).
 - **J9, J10. The base falls; Radio.** Docking at Jade after the fall gives
   MSG 13 (the radio). The arrival is also the first contact with the
   Morgruls, who hold Jade from then on; their force there had no mission
@@ -308,7 +332,11 @@ unlock is the act's gate.
   Galleon was in flight at one midnight in three or four and found nothing
   in 30 days in one run. From 18:00 it is now kept in flight until 0:00,
   and an evening flight starts no earlier than 21:00: a 3-5 h flight
-  started on landing came down again before midnight.
+  started on landing came down again before midnight. The shuttle runs
+  between goals, and also while Trade 1 flies (a haul's round trip took
+  16 h and skipped whole evenings). The search goes on while M8-M10 run;
+  M11 waits for the find before it needs the Galleon. Over 60 seeds
+  Phoenix 1 came 1 to 47 days after M5.
 - **M6, M7. Phelonians, Battle tank.** Phoenix 5 is status −3 too: only
   the Informer finds it (−500), and his Phelonian item is replaced once
   Antares is explored, so M6 must precede L5. The Phelonian deal halves
@@ -726,7 +754,7 @@ are means per run.
 
 | Battle | Enemy | Policy force | Measured | Recommendation |
 |---|---|---|---|---|
-| Morgrul wave 1 (J8) | 6H (+3Tr) | 12H (2L), fallback 8H | 12H: 10/10, lose 1.8H; 10H: 10/10; **8H: 7/10** | ≥ 12H. A lost space battle lands the troopers on a New Earth with no ground units (no tanks yet): game over. **Fallback 8H is insufficient.** |
+| Morgrul wave 1 (J8) | 6H (+3Tr) | 14H (2L) | 200 seeds: **12H 199/200**, lose 1.9H; 14H 200/200, lose 1.4H; 16H 200/200. 10 seeds: 10H 10/10; **8H: 7/10** | 14H. A lost space battle lands the troopers on a New Earth with no ground units (no tanks yet): game over. |
 | Morgrul wave 2 (M8) | 25H (+10Tr) | 24H, 16SF (4T), 20T | space 10/10, lose 2.5H 0.9SF; ground (20T vs 10Tr) 10/10 | as planned |
 | Morgrul wave 3 (M12) | 20H 10SF (+15Tr 2T) | 30H, 24SF, 30T | space 10/10, lose 3.9H 2.6SF; ground (30T) 10/10 | as planned |
 | Mirach 3 (M18) | 20H 20SF 3D; 61Tr 40T | 20H 30SF 5D, 60T; fallback 40T | space 30/30; **ground 60T: 6/10, 40T: 4/10**; 75T 9/10; 90T 20/20 (lose ~29T); 60T + 30Tr 9/10 | **≥ 90 tanks** (or 60T + 30Tr). Plan and fallback are insufficient. |

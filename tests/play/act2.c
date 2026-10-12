@@ -26,10 +26,10 @@ enum : int {
     SATELLITE_PRICE = 780,
     CARRIER_PRICE = 1530,
     RUSSEL_COST = 167000,  // Nuclear Gen., Builder Plant, Mine, Building and the colony
-    // J8 (docs/playthrough.md, "Force sizes": 12 Hunters won wave 1 10/10, 8
-    // only 7/10).
-    ARMY_HUNTERS = 12,
-    ARMY_LASERS = 24,
+    // J8 (docs/playthrough.md, "Force sizes": 12 Hunters won wave 1 199/200,
+    // 14 200/200, 8 only 7/10; a lost wave 1 ends the game).
+    ARMY_HUNTERS = 14,
+    ARMY_LASERS = 28,
     // Trade 1's ships: 500 t and 1 droid per Transfer ship, 2,000 t and 4
     // droids per Trade ship (walkthrough "Groups and travel").
     HAUL_TRANSFER_SHIPS = 3,
@@ -137,6 +137,7 @@ static void trade_1_to(const char *planet, const char *moon)
     trade_1_in_orbit();
     if (!ui_launch("Trade 1", nullptr, planet, moon))
         play_fail("Trade 1 not launched to %s", at);
+    pol_between_point();  // a round trip takes most of a day
     if (!ui_wait_arrival("Trade 1", TRIP_HOURS))
         play_fail("Trade 1 did not reach %s", at);
 }
@@ -180,7 +181,7 @@ static ColonyMines colony_mines(const Place *p)
     m.mining = ui_buildings("Space Port").finished > 0;
     m.droids = ui_droids();
     if (m.mining)
-        m.need = SDL_max(SDL_min(ui_buildings("Mine").finished, 9) - m.droids - ui_droid_stock(), 0);
+        m.need = SDL_max(SDL_min(ui_buildings("Mine").finished, UI_MAX_DROIDS) - m.droids - ui_droid_stock(), 0);
     return m;
 }
 
@@ -188,7 +189,7 @@ static ColonyMines colony_mines(const Place *p)
 static void add_droids(const Place *p)
 {
     ui_open_body(p->planet, p->moon, SCR_SURFACE);
-    while (ui_droids() < SDL_min(ui_droid_slots(), 9) && ui_droid_stock() > 0)
+    while (ui_droids() < SDL_min(ui_droid_slots(), UI_MAX_DROIDS) && ui_droid_stock() > 0)
         if (!ui_add_droid())
             break;
 }
@@ -284,7 +285,7 @@ static void grow_fleet(void)
 static int load_droids(int need, int max)
 {
     pol_new_earth(SCR_SURFACE);
-    bool home_short = ui_droids() < ui_buildings("Mine").finished;
+    bool home_short = ui_droids() < SDL_min(ui_buildings("Mine").finished, UI_MAX_DROIDS);
     int stores = pol_stores("Miner droid");
     if (stores + queued("Miner droid") < need)
         buy_upto(PRI_HAUL, "Miner droid", need - stores - queued("Miner droid"), DROID_PRICE,
@@ -503,7 +504,7 @@ void act2_j07_commander(void)
     pol_hire("FIGHTERS", "Kyle Douglas", PRI_J7, KYLE_PRICE);
 }
 
-// J8: 12 Hunters with 2 Laser cannons each in "Home Guard", docked at New
+// J8: 14 Hunters with 2 Laser cannons each in "Home Guard", docked at New
 // Earth: bought as money and ores allow (Raenium comes from the colonies),
 // put in as they are built.
 static bool army_ready(void *unused)
@@ -539,8 +540,8 @@ static bool army_ready(void *unused)
 
 void act2_j08_army(void)
 {
-    // Wave 1 attacks 800 h or more after the S.O.S.; 240 h of Hunter line.
-    pol_poll_for("J8: 12 Hunters with 24 lasers", army_ready, nullptr, 700, 6);
+    // Wave 1 attacks 800 h or more after the S.O.S.; 280 h of Hunter line.
+    pol_poll_for("J8: 14 Hunters with 28 lasers", army_ready, nullptr, 700, 6);
     play_log("J8: Home Guard ready at %s", pol_date());
 }
 

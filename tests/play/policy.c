@@ -396,11 +396,26 @@ static bool icon_known(void *name)
     return ui_research_icon(name) != UI_RS_UNKNOWN;
 }
 
+typedef struct {
+    const char *name;
+    int state;
+} ResearchState;
+
+static void read_research_state(void *arg)
+{
+    ResearchState *r = arg;
+    ui_goto(SCR_RESEARCH);
+    ui_wait_until(icon_known, (void *)r->name, 200);
+    r->state = ui_research_icon(r->name);
+}
+
 int pol_research_state(const char *name)
 {
-    ui_goto(SCR_RESEARCH);
-    ui_wait_until(icon_known, (void *)name, 200);
-    return ui_research_icon(name);
+    // Steps read it too, outside pol_try: a battle that comes up on the way
+    // is fought and the way taken again.
+    ResearchState r = {name, 0};
+    pol_do(read_research_state, &r);
+    return r.state;
 }
 
 typedef struct {
@@ -905,6 +920,12 @@ static void run_goals(void)
 void pol_between_goals(void (*fn)(void))
 {
     between = fn;
+}
+
+void pol_between_point(void)
+{
+    if (between)
+        order(between, "between goals");
 }
 
 // --- Waiting ---

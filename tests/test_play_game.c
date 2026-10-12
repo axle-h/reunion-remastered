@@ -66,7 +66,7 @@ static const PolStep plan[] = {
     {"M04_kalls", act3_m04_kalls, nullptr},
     {"M06_phelonians", act3_m06_phelonians, nullptr},
     {"M07_tank_deal", act3_m07_tank_deal, nullptr},
-    {"M05_phoenix1", act3_m05_phoenix1, nullptr},
+    {"M05_phoenix1", act3_m05_phoenix1, act3_goals_m05},
     {"M08_wave2_force", act3_m08_wave2_force, act3_goals_m08},
     {"M09_wave2", act3_m09_wave2, nullptr},
     {"M10_course", act3_m10_course, nullptr},

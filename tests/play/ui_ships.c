@@ -19,6 +19,7 @@ enum : int {
     SCR_NEW_GROUP = 21,
     SCR_EQUIP = 22,
     SCREEN_TIMEOUT = 3000,
+    HIDDEN_HOURS = 48,  // launches tried while the target planet is behind the sun
     PANEL_X = 0xC,      // the group's location line on screen 22 (Groups_DrawGroupPanel)
     PANEL_Y = 0x43,
 };
@@ -493,7 +494,9 @@ static void click_destination(const char *name, UiClick how)
     }
 }
 
-static bool pick_destination(const char *system, const char *planet, const char *moon)
+typedef enum { PICK_REFUSED, PICK_DONE, PICK_HIDDEN } PickResult;
+
+static PickResult pick_destination(const char *system, const char *planet, const char *moon)
 {
     if (system && !pstr_is(&ds.Names_Systems[ds.Game_CurSystem - 1], system)) {
         zoom_out();
@@ -505,7 +508,7 @@ static bool pick_destination(const char *system, const char *planet, const char 
             play_fail("ui_launch: system %s not listed", system);
         ui_click_hotspot(j, UI_CLICK);
         if (destination_refused(play_frame()))
-            return false;
+            return PICK_REFUSED;
     }
     if (!planet) {  // the sun: explore the system
         zoom_out();
@@ -514,22 +517,22 @@ static bool pick_destination(const char *system, const char *planet, const char 
             play_log("ui_launch: the sun is not offered (system explored)");
             ui_toolbar("ABORT MOVE");
             ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
-            return false;
+            return PICK_REFUSED;
         }
         ui_click_hotspot(BODY_FIRST, UI_CLICK);
-        return true;
+        return PICK_DONE;
     }
     bool on_planet = zoomed() && body_hotspot(planet) == BODY_FIRST;
     if (!moon) {
         if (on_planet) {
             ui_click_hotspot(BODY_FIRST, UI_CLICK);
-            return true;
+            return PICK_DONE;
         }
         zoom_out();
         if (body_hotspot(planet) == 0)
             play_fail("ui_launch: planet %s not on the map", planet);
         click_destination(planet, UI_CLICK_RIGHT);
-        return true;
+        return PICK_DONE;
     }
     // The planets move every game hour: a click aimed just before one can
     // zoom in on another, so the zoom is checked and tried again.
@@ -544,13 +547,16 @@ static bool pick_destination(const char *system, const char *planet, const char 
     }
     int j = body_hotspot(moon);
     if (j == 0 || j == BODY_FIRST) {
-        play_log("ui_launch: moon %s of %s not on the map", moon, planet);
+        // A planet behind the sun isn't drawn, and a click on its hotspot
+        // (where it was last drawn) does nothing.
+        play_log("ui_launch: moon %s of %s not on the map%s", moon, planet,
+                 on_planet ? "" : " (no zoom on the planet)");
         ui_toolbar("ABORT MOVE");
         ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
-        return false;
+        return on_planet ? PICK_REFUSED : PICK_HIDDEN;
     }
     click_destination(moon, UI_CLICK);
-    return true;
+    return PICK_DONE;
 }
 
 // The destination screen opened, or a box (closed by the wait) refused it.
@@ -559,31 +565,53 @@ static bool destination_or_box(void *arg)
     return ui_screen() == SCR_DESTINATION || ui_box_seen("", *(const uint64_t *)arg);
 }
 
-typedef enum { LAUNCH_FLYING, LAUNCH_REFUSED, LAUNCH_MISSED } LaunchResult;
+typedef enum { LAUNCH_FLYING, LAUNCH_REFUSED, LAUNCH_MISSED, LAUNCH_HIDDEN } LaunchResult;
 
-static LaunchResult launch_once(const char *group, const char *move, const char *system,
-                                const char *planet, const char *moon);
+static bool not_yet(void *unused)
+{
+    (void)unused;
+    return false;
+}
+
+static LaunchResult launch_once(const char *group, const char *system, const char *planet,
+                                const char *moon);
 
 bool ui_launch(const char *group, const char *system, const char *planet, const char *moon)
 {
     ui_open_group(group, SCR_GROUP);
-    const char *move = ui_group_status(group) == SHIP_FLYING ? "Change destination" : "Move";
     if (ui_group_status(group) == SHIP_DOCKED)
         play_fail("ui_launch: '%s' is docked", group);
     // The bodies move on at each game hour: a click aimed just before can
-    // pick the body the group is at, and nothing changes; tried again.
-    for (int tries = 1; tries < 3; tries++) {
-        LaunchResult r = launch_once(group, move, system, planet, moon);
-        if (r != LAUNCH_MISSED)
+    // pick the body the group is at, and nothing changes, or another body;
+    // tried again. A planet behind the sun isn't drawn and a click on it does
+    // nothing: it comes out within hours.
+    for (int tries = 1, hidden = 0;; tries++) {
+        LaunchResult r = launch_once(group, system, planet, moon);
+        if (r == LAUNCH_FLYING || r == LAUNCH_REFUSED)
             return r == LAUNCH_FLYING;
-        play_log("ui_launch: '%s' did not leave, again", group);
+        if (r == LAUNCH_MISSED && tries < 3) {
+            play_log("ui_launch: '%s' did not leave for the place aimed at, again", group);
+            continue;
+        }
+        if (++hidden == HIDDEN_HOURS)
+            return false;
+        play_log("ui_launch: '%s' found no way there, again in an hour", group);
+        ui_open_group(group, SCR_EQUIP);  // its clock runs
+        ui_wait_hours(not_yet, nullptr, 1);
+        ui_open_group(group, SCR_GROUP);
     }
-    return launch_once(group, move, system, planet, moon) == LAUNCH_FLYING;
 }
 
-static LaunchResult launch_once(const char *group, const char *move, const char *system,
-                                const char *planet, const char *moon)
+static bool ends_with(const char *s, const char *end)
 {
+    size_t n = SDL_strlen(s), m = SDL_strlen(end);
+    return n >= m && SDL_strcmp(s + n - m, end) == 0;
+}
+
+static LaunchResult launch_once(const char *group, const char *system, const char *planet,
+                                const char *moon)
+{
+    const char *move = ui_group_status(group) == SHIP_FLYING ? "Change destination" : "Move";
     char before[128];
     ui_group_location(group, before, sizeof before);
     click(move, "ui_launch");
@@ -601,8 +629,9 @@ static LaunchResult launch_once(const char *group, const char *move, const char 
         SDL_snprintf(line + SDL_strlen(line), sizeof line - SDL_strlen(line), "%s'%s'", i ? " " : "",
                      bodies[i]);
     play_log("destination map: %s", line);
-    if (!pick_destination(system, planet, moon))
-        return LAUNCH_REFUSED;
+    PickResult pick = pick_destination(system, planet, moon);
+    if (pick != PICK_DONE)
+        return pick == PICK_HIDDEN ? LAUNCH_HIDDEN : LAUNCH_REFUSED;
     if (!ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT))
         play_fail("ui_launch: no way back to the control panel");
     char loc[128];
@@ -610,9 +639,11 @@ static LaunchResult launch_once(const char *group, const char *move, const char 
     play_log("launch '%s': %s", group, loc);
     // Gone, or there already: a pilot at experience 90 covers the 80-99
     // legs to a moon of the same planet within the hour the control panel
-    // ran (sim.c ProcessTravellingGroups).
-    return ui_group_status(group) == SHIP_FLYING || SDL_strcmp(loc, before) != 0 ? LAUNCH_FLYING
-                                                                                : LAUNCH_MISSED;
+    // ran (sim.c ProcessTravellingGroups). Sent to a body, the location
+    // line ends with its name ("Fly to Mirach system Mirach 3").
+    bool left = ui_group_status(group) == SHIP_FLYING || SDL_strcmp(loc, before) != 0;
+    const char *body = moon ? moon : planet;
+    return left && (!body || ends_with(loc, body)) ? LAUNCH_FLYING : LAUNCH_MISSED;
 }
 
 int32_t ui_cargo(const char *group, const char *item, int32_t amount)

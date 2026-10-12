@@ -476,14 +476,19 @@ static bool box_gone(void *arg)
     return !find_box(&b) || SDL_strcmp(b.text, c->box->text) != 0 || Game_EventWaitFrames != c->ewf;
 }
 
-static void close_box(const UiBox *b)
+static void close_box(UiBox *b)
 {
-    note_box(b);
     int x, y;
     ui_inert_point(0, &x, &y);
-    // message.c: waits for the button to be up, down, then up again.
+    // message.c: waits for the button to be up, down, then up again. The
+    // text is read once the cursor is off the box: a cell it mostly hides
+    // can match another character ("scient? t" for "scientist").
     play_mouse(x, y, 0);
     play_wait(2);
+    UiBox now;
+    if (find_box(&now))
+        *b = now;
+    note_box(b);
     play_mouse(x, y, 1);
     play_wait(4);
     play_mouse(x, y, 0);

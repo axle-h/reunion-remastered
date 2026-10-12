@@ -53,7 +53,7 @@ The port is complete and the game can be won in it.
 - **Playable start to finish:** the playthrough fixture wins a new game
   with seed 12345 using only clicks, keys and what is on screen (Halt(10),
   2930-02-29). Its recording replays to the same end in the plain binary.
-  Seeds 1-28 win too (docs/playthrough.md).
+  Seeds 1-60 win too (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
   music, display, skip intro, colony stats, fix switches, import, restart,
   quit), `reunion.ini`, screenshots, headless autopilot, `--replay` and soak
@@ -86,12 +86,12 @@ In rough priority order.
 
 ### 1. Playthrough robustness
 
-Seeds 1-28 win (2026-10-12). Seed 3 used to lose at M16 because New Earth
-stopped at 5 Derricks (E21) and the Detoxin for the Space station never
-gathered; since `fixes.station_storage` it builds 18 and wins. Why it
-stalled was never found. E21 now finishes in all 28 seeds, by 2928-07-10
-at the latest, but another seed may hit it again (docs/playthrough.md,
-"Robustness").
+Seeds 1-60 win (2026-10-12). Each policy fix moves every run, so after one
+run a batch of seeds (`PLAY_SEED`, docs/playthrough.md "Robustness"): so
+far each batch has turned up the next rare failure, most of them clicks on
+bodies that had moved or were hidden. Wave 1 comes before New Earth has
+any ground units, so losing it in space ends the game; the policy's 14
+Hunters won it 200/200 (12 lost one in 200).
 
 ### 2. Bugs of the original still open
 

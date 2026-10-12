@@ -25,6 +25,8 @@ void ui_command_centre(void);
 // GALACTIC MAP button and uses the system shown there. On the map a right
 // click on a body opens its info, a left click on a planet zooms in to it
 // and its moons (ZOOM OUT goes back), a left click there opens the surface.
+// The info's NAME line must name the body; the surface must show the hour
+// of the click (the bodies move on at each hour).
 void ui_open_body(const char *planet, const char *moon, int screen);
 // The name of the body shown on screen 8 (after "PLANET'S NAME:", or "MOON'S
 // NAME:" where it reads "<planet> <moon>", e.g. "New Earth Apollo"), or ""
@@ -100,8 +102,9 @@ bool ui_demolish(const char *kind);
 // Droids working on the body shown (the droid figures on screen 4 and the
 // "n Miner Droid" line on screen 8), droids in stock for it (the big digits
 // on screen 4) and places for droids (finished Mines and Miner stations: the
-// small digits on screen 4). ADD DROIDS works while droids < places, < 9,
-// and stock > 0.
+// small digits on screen 4). ADD DROIDS works while droids < places,
+// < UI_MAX_DROIDS, and stock > 0: further Mines get none.
+enum : int { UI_MAX_DROIDS = 9 };
 int ui_droids(void);
 int ui_droid_stock(void);
 int ui_droid_slots(void);

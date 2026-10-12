@@ -221,6 +221,9 @@ bool pol_check(bool (*check)(void *arg), void *arg);
 // two idle hours, under pol_try: a step's chore that must not wait for the
 // next pass (M5 keeps a group flying).
 void pol_between_goals(void (*fn)(void));
+// Runs that fn() now: for a goal that spends hours in one pass (the haul's
+// flights), which would otherwise hold it off that long.
+void pol_between_point(void);
 // S8: a box announced a wave at New Earth and its space battle has not
 // come yet. Trade and carrier groups are then sent to Penelope (once per
 // box) and no goal may send one to New Earth or Apollo.

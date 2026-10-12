@@ -26,6 +26,7 @@ void act3_m17_spy_on_mirach(void);
 void act3_m18_mirach(void);
 
 void act3_goals_m02(void);
+void act3_goals_m05(void);
 void act3_goals_m08(void);
 void act3_goals_m14(void);
 void act3_goals_m16(void);

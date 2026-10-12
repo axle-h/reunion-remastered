@@ -12,6 +12,7 @@
 enum : int {
     SETTLE = 30,                     // retraces for fades after a screen is set up
     TIMEOUT = 3000,
+    ZOOM_HOURS = 48,                 // tries of a zoom on a planet hidden behind the sun
     MAP_X = 0x5D, MAP_Y = 0x35,      // the surface map window: 14 x 9 cells of 16 pixels
     MAP_COLS = 14, MAP_ROWS = 9,
     OUTLINE_FREE = 0x0A,             // Surface_DrawMapView: cursor footprint on free ground
@@ -73,6 +74,12 @@ static bool click_body(const char *name, bool right)
     play_fail("no %s on the galactic map", name);
 }
 
+static bool not_yet(void *unused)
+{
+    (void)unused;
+    return false;
+}
+
 static bool zoomed_on(void *planet)
 {
     // The zoomed view: the planet is hotspot 13h, its moons follow.
@@ -81,12 +88,17 @@ static bool zoomed_on(void *planet)
 
 void ui_open_body(const char *planet, const char *moon, int screen)
 {
+    char want[40];
+    SDL_snprintf(want, sizeof want, "%s%s%s", planet, moon ? " " : "", moon ? moon : "");
     if (ui_screen() != 7)
         ui_open_screen("GALACTIC MAP", 7);
     // The bodies move on to their next orbit position at each game hour: a
-    // click aimed just before may miss (or zoom in on another planet), so
-    // each click is tried again.
-    for (int tries = 1;; tries++) {
+    // click aimed just before may miss, or open another body. The info's
+    // NAME line names the body; the surface doesn't, but a clock that shows
+    // the same hour before and after the click means the hotspots didn't
+    // move under it. A miss is tried again; an open that can't be told is
+    // not counted as one.
+    for (int tries = 1, unsure = 0, hidden = 0;;) {
         // A story scene that came between returns to the command centre.
         if (ui_screen() != 7)
             ui_open_screen("GALACTIC MAP", 7);
@@ -95,7 +107,7 @@ void ui_open_body(const char *planet, const char *moon, int screen)
         bool keep = (moon || screen != 8) && zoomed_on((void *)planet);
         if (!keep && ui_toolbar("ZOOM OUT"))
             play_wait(SETTLE);
-        bool clicked;
+        bool clicked, stable = true;
         if (!moon && screen == 8) {
             clicked = click_body(planet, true);
         } else {
@@ -103,9 +115,16 @@ void ui_open_body(const char *planet, const char *moon, int screen)
             if (!zoomed_on((void *)planet)) {
                 clicked = click_body(planet, false);
                 if (!clicked || !ui_wait_until(zoomed_on, (void *)planet, 200)) {
-                    if (tries < 3)
+                    if (tries++ < 3)
                         continue;
-                    play_fail("the galactic map did not zoom in on %s", planet);
+                    // A planet behind the sun isn't drawn, and its hotspot
+                    // stays where it was last drawn: the click does nothing
+                    // until it comes out, hours later.
+                    if (++hidden == ZOOM_HOURS)
+                        play_fail("the galactic map did not zoom in on %s", planet);
+                    play_log("%s: no zoom, again in an hour", planet);
+                    ui_wait_hours(not_yet, nullptr, 1);
+                    continue;
                 }
             }
             if (moon && !ui_wait_hotspot(moon, 500) && ui_screen() == 7) {
@@ -114,15 +133,27 @@ void ui_open_body(const char *planet, const char *moon, int screen)
                 play_fail("no moon %s around %s", moon, planet);
             }
             play_wait(SETTLE);
+            int64_t aimed = ui_clock_hours();
             clicked = click_body(moon ? moon : planet, screen == 8);
+            stable = ui_clock_hours() == aimed;
         }
-        if (clicked && ui_wait_screen(screen, 300))
+        bool opened = clicked && ui_wait_screen(screen, 300);
+        if (opened && screen == 8 && SDL_strcmp(ui_body_name(), want) != 0) {
+            play_log("%s: opened '%s' instead", want, ui_body_name());
+            opened = false;
+        } else if (opened && screen == 20 && !stable) {
+            if (++unsure == 10)
+                play_fail("%s: the hour kept turning during the click", want);
+            play_log("%s: the hour turned during the click, again", want);
+            continue;
+        }
+        if (opened)
             break;
-        if (tries == 3)
-            play_fail("%s/%s did not open screen %d", planet, moon ? moon : "-", screen);
-        play_log("%s/%s: the click missed, again", planet, moon ? moon : "-");
+        if (tries++ == 3)
+            play_fail("%s did not open screen %d", want, screen);
+        play_log("%s: the click missed, again", want);
     }
-    play_log("opened %s%s%s on screen %d", planet, moon ? "/" : "", moon ? moon : "", screen);
+    play_log("opened %s on screen %d", want, screen);
 }
 
 static char body_name[32];
@@ -562,10 +593,15 @@ UiBuildResult ui_build(const char *kind)
             ui_hotspot("Build");  // cancel
             continue;
         }
+        // Placed if the map shows one more of the kind, or paid for: the
+        // credits can rise meanwhile (midnight's taxes), and at 1,000
+        // buildings the original takes the money and builds nothing
+        // (fixes.building_limit off).
+        int before = ui_buildings(kind).total;
         ui_click(cell_px(x), cell_py(y));
         play_wait(10);
         ui_settle();
-        if (ds.Game_Credits >= credits) {
+        if (ui_buildings(kind).total == before && ds.Game_Credits >= credits) {
             play_log("build %s: the click at (%d,%d) didn't place it", kind, x, y);
             if (build_blinks(nullptr))
                 ui_hotspot("Build");  // cancel

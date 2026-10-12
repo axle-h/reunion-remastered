@@ -251,15 +251,27 @@ static bool phoenix_1_found(void *unused)
     return planet_on_map("Phoenix", "Phoenix 1");
 }
 
+// The shuttle until the rename prompt has named Phoenix 1.
+static void search_phoenix_1(void)
+{
+    if (seen_or_logged("Phoenix system? Phoenix 1"))
+        pol_between_goals(nullptr);
+    else
+        shuttle();
+}
+
 void act3_m05_phoenix1(void)
 {
     // Before MSG 17 (the Phoenix S.O.S.), so selecting Phoenix 1 is harmless;
-    // after it the drifting ship's trigger is armed.
+    // after it the drifting ship's trigger is armed. The search goes on
+    // while the next steps run; M11 waits for its find.
     if (seen_or_logged("S.O.S. signal has been decoded"))
         play_fail("M5: the Phoenix S.O.S. came first");
-    pol_between_goals(shuttle);
-    pol_poll_for("M5: Phoenix 1 found", phoenix_1_found, nullptr, 30 * POL_DAY, 24);
-    pol_between_goals(nullptr);
+}
+
+void act3_goals_m05(void)
+{
+    pol_between_goals(search_phoenix_1);
 }
 
 // --- M8-M10: wave 2 --------------------------------------------------------------------
@@ -429,6 +441,10 @@ void act3_m11_drifting_ship(void)
         return;
     pol_wait_for("M11: MSG 17, the Phoenix S.O.S.", sos_seen, nullptr, 1000);
     pol_poll_for("M11: the Kalls' fleet 2 at Phoenix 5", kall_fleet_at_phoenix_5, nullptr, 1500, 24);
+    // M5's search, if it has not found Phoenix 1 yet; then the Galleon is
+    // free for the flight there.
+    pol_poll_for("M11: Phoenix 1 found", phoenix_1_found, nullptr, 30 * POL_DAY, 24);
+    pol_between_goals(nullptr);
     // No first arrival while a wave is announced (its attack would
     // replace the talk).
     pol_wait_for("M11: no wave due", no_wave_due, nullptr, 150);
