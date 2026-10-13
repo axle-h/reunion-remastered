@@ -418,8 +418,7 @@ void ui_on_interrupt_screen(void (*fn)(void))
 
 void ui_screen_lost(const char *what)
 {
-    play_log("%s: screen %d shown instead (a story scene ends on the command centre)", what,
-             ui_screen());
+    play_log("%s: screen %d shown instead", what, ui_screen());
     if (screen_hook)
         screen_hook();
     play_fail("%s: the screen was replaced", what);

@@ -294,7 +294,7 @@ void act5_x04_rigel2(void)
     if (pol_seen("talk 10") >= 0 || pol_check(sun_listed, nullptr))
         return;
     if (!pol_check(rigel2_on_map, nullptr))
-        pol_wait_for("X4: the Psy radar finds Rigel 2", event_or_logged, "Psy-radar radar found", 60 * POL_DAY);
+        pol_wait_for("X4: the Psy radar finds Rigel 2", event_or_logged, "Psy-radar radar found", 200 * POL_DAY);
     pol_wait_for("X4: no wave due", no_wave_due, nullptr, 150);
     go_to("Galleon 1", "Rigel", "Rigel 2");
     pol_wait_for("X4: talk 10 with the Syonians", event_seen, "talk 10", 2 * POL_DAY);

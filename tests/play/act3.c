@@ -289,6 +289,15 @@ static bool wave2_force(void *arg)
     return ready || pol_s8_active() || seen_or_logged("Morgrul invasion forces are defeated");
 }
 
+// Read through the ship info screen: wave 2 may come up meanwhile (the poll
+// below also ends on its box).
+static void log_home_guard(void *unused)
+{
+    (void)unused;
+    play_log("M8: Home Guard %d H, %d SF, %d T at %s", home_guard("Hunter", nullptr),
+             home_guard("Starfighter", nullptr), home_guard("Battle tank", nullptr), pol_date());
+}
+
 void act3_m08_wave2_force(void)
 {
     // 24 Hunters (2L+1T), 16 Starfighters (4T) and 20 tanks (3L) by wave
@@ -297,8 +306,7 @@ void act3_m08_wave2_force(void)
     pol_research("Starfighter", 20 * POL_DAY);
     ForceWait w = {20};
     pol_poll_for("M8: the wave-2 force", wave2_force, &w, 1500, 12);
-    play_log("M8: Home Guard %d H, %d SF, %d T at %s", home_guard("Hunter", nullptr),
-             home_guard("Starfighter", nullptr), home_guard("Battle tank", nullptr), pol_date());
+    pol_do(log_home_guard, nullptr);
 }
 
 static bool wave2_beaten(void *unused)

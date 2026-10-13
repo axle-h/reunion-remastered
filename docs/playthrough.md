@@ -92,13 +92,20 @@ The same policy, unchanged per seed, from "new game" with `PLAY_SEED`
 
 All 60 were run on 2026-10-12 with every fix on; each recording replays
 to the same end. The wins fall between 2930-02-09 and 03-23; E21 finished
-between 2928-05-23 and 07-01. Each batch of new seeds so far turned up a
-rare failure, fixed in the policy or its drivers: a Mine built twice at
-midnight that left E21 waiting for a 10th droid (seed 3's old loss at
-M16), clicks on bodies that had moved on or hidden behind the sun ("Moving
-bodies"), a message read through the mouse cursor, a battle that came up
-during a step's own navigation, the Phoenix 1 search losing whole
-evenings to the haul (M5), and wave 1 lost with 12 Hunters (J8).
+between 2928-05-23 and 07-01. Seeds 61-240 (2026-10-13, not listed) win
+too, between 2930-02-14 and 04-07, with E21 finished between 2928-03-28
+and 07-08.
+
+Each batch of new seeds so far turned up a rare failure, fixed in the
+policy or its drivers: a Mine built twice at midnight that left E21
+waiting for a 10th droid (seed 3's old loss at M16), clicks on bodies
+that had moved on or hidden behind the sun ("Moving bodies"), a message
+read through the mouse cursor, a battle that came up during a step's own
+navigation, the Phoenix 1 search losing whole evenings to the haul (M5),
+wave 1 lost with 12 Hunters (J8), an alien talk that came up while a
+driver read the surface (the game frees its map layers on leaving it;
+seed 113), wave 2 attacking during M8's last look at the Home Guard (seed
+79), and the Psy radar taking 65 days to find Rigel 2 (seed 207, X4).
 
 ## The fixture
 
@@ -848,7 +855,8 @@ trooper, t tank, a aircraft, m launcher).
   survivors go home and the units in reserve survive: rebuild to target
   +25% and retry.
 - **Random finds.** Phoenix 1 (M5) and the Psy-radar's Rigel 2 (X4, 1/10
-  a day; a 60-day timeout fails with p ≈ 0.2%) depend on daily rolls.
+  a day; it waits up to 200 days, as 60 failed with p ≈ 0.2%) depend on
+  daily rolls.
   Spy prices and reports are fixed; pirate deals succeed with their chance
   (40–100%) and each window comes once, so the policy never depends on
   one.

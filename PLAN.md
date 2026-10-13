@@ -27,7 +27,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since |
 | Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The first launch imports the player's copy (README, "Running") |
 | Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
-| Editions | English floppy and the English folder of the CD; strict | The port is the floppy's `REUNION.PRG`. The CD's English data differs only in its font sheet (docs/versions.md). An import accepts only files whose checksums are known. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The CD's other three languages are a possible later addition |
+| Editions | English floppy and the English folder of the CD; strict | The port is the floppy's `REUNION.PRG`. The CD's English data differs only in its font sheet (docs/versions.md). An import accepts only files whose checksums are known. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The CD's other three languages are planned (Remaining work, 3) |
 
 ## Source
 
@@ -39,7 +39,7 @@ segments (813 functions), plus
 How the port cites the original's addresses: docs/port.md, "Addresses".
 The file formats are described in the loaders, `src/assets/*.h`.
 
-## Where we stand (2026-10-12)
+## Where we stand (2026-10-13)
 
 The port is complete and the game can be won in it.
 
@@ -52,8 +52,8 @@ The port is complete and the game can be won in it.
   off) catch any change in behaviour.
 - **Playable start to finish:** the playthrough fixture wins a new game
   with seed 12345 using only clicks, keys and what is on screen (Halt(10),
-  2930-02-29). Its recording replays to the same end in the plain binary.
-  Seeds 1-60 win too (docs/playthrough.md).
+  2930-03-06). Its recording replays to the same end in the plain binary.
+  Seeds 1-240 win too (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
   music, display, skip intro, colony stats, fix switches, import, restart,
   quit), `reunion.ini`, screenshots, headless autopilot, `--replay` and soak
@@ -78,7 +78,7 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(mostly done, see 6 below).
+(mostly done, see 7 below).
 
 ## Remaining work
 
@@ -86,10 +86,12 @@ In rough priority order.
 
 ### 1. Playthrough robustness
 
-Seeds 1-60 win (2026-10-12). Each policy fix moves every run, so after one
-run a batch of seeds (`PLAY_SEED`, docs/playthrough.md "Robustness"): so
-far each batch has turned up the next rare failure, most of them clicks on
-bodies that had moved or were hidden. Wave 1 comes before New Earth has
+Seeds 1-240 win (2026-10-13). After a policy fix that can move every run,
+run a batch of new seeds (`PLAY_SEED`, docs/playthrough.md "Robustness"):
+so far each batch has turned up the next rare failure, most of them clicks
+on bodies that had moved or were hidden, or a screen that came up during a
+driver's sequence. Seeds 121-240 had one failure in 120 (the Psy radar's
+timeout, X4); the next batch starts at 241. Wave 1 comes before New Earth has
 any ground units, so losing it in space ends the game; the policy's 14
 Hunters won it 200/200 (12 lost one in 200).
 
@@ -148,7 +150,7 @@ the OPL, slide up without carry. This is how the original's music sounds.
   sound cuts it off at once.
 - `planetinfo.c` `DrawStoresList` reads race bytes 13h..1Ah as flags: they
   are the race's weapon flags, read the same way by the spy reports (see
-  3), and alien mode opens only for owners above 1.
+  4), and alien mode opens only for owners above 1.
 - `research.c` `ResetSelectionFrame` doesn't hide the cursor: at worst two
   pixels of a frame keep the other frame colour until redrawn.
 - `command.c` calls `StartMainAnim` for the ground battle: it reads the war
@@ -167,7 +169,37 @@ the OPL, slide up without carry. This is how the original's music sounds.
   `Bodies[sys][-1]`: that flag is drawn only for an eighth moon, and the
   planet view sets its moons' flags before drawing them.
 
-### 3. Reverse-engineering loose ends
+### 3. The CD's other languages
+
+After the CD's `REUNION.PRG` has been compared (2): the CD has complete
+French, German and Italian games next to the English one
+(`REUNION.DEU`, `.FRA`, `.ITA`; docs/versions.md, "The languages"). Add
+them as editions of the CD, so a player with the CD can play in any of
+the four.
+
+- **What differs.** All four folders share one `REUNION.PRG` and
+  `CHARSET1.PIC`, so the texts compiled into the executable (`dsinit.c`)
+  are English in every language. Each other language changes about 160
+  files: `TEXT\`, the speech in `SOUND\`, and stills with text in
+  `INTRO\`, `INTROP\`, `GRAFIKA\`, `WAR\` and `VICTORY\`. `VICTORY.PRG`
+  differs per language at the same size: find what changed (probably
+  its texts) and compile in each language's version, as the English one
+  is.
+- **The font.** The CD's executable maps 87 characters (`ÄÖÜäöüß` among
+  them) and its sheet has 20 accented glyphs; the port keeps the floppy's
+  78 (`gfx_set_cd_charset`). Take the CD's character table for every
+  language, and check how French and Italian text reaches the accented
+  glyphs the table doesn't name.
+- **Import.** The import takes `REUNION.ENG` only (`source.c`). Let it take
+  any of the four language folders (checksums for each language's files in
+  `gamefiles.c`), and decide between importing one language (asked on
+  import) or all four with a language switch in the F1 menu and
+  `reunion.ini`. Update the Editions decision above.
+- **Test.** Import each language from the ISO, check its texts and font
+  draw, and run the playthrough on each. Its waits read the screen, so
+  any that match English text need a per-language form.
+
+### 4. Reverse-engineering loose ends
 
 These matter only for reading the code; nothing depends on them:
 
@@ -180,7 +212,7 @@ These matter only for reading the code; nothing depends on them:
   1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
   typed constants.
 
-### 4. Licence and publication
+### 5. Licence and publication
 
 The game is still under copyright. Decided (2026-10-12): release builds
 ship without the art and carry the data taken from the executables
@@ -190,7 +222,7 @@ supplies the rest (the import, README). Still open: whether to publish the repos
 Until then keep it private, or publish only the code (no assets, no raw
 decompiler dumps).
 
-### 5. Improvements
+### 6. Improvements
 
 Changes to the game's design rather than its bugs: quality of life first,
 then mechanics that don't do what the game seems to mean. Each one is a
@@ -203,8 +235,8 @@ each improvement gets its own test with it on.
 
 **Saves.** An improvement keeps its state in fields the original already
 has where it can, so the save stays in the DOS format and still loads in
-the original, which then plays it by its own rules. Trade routes (5.3) and
-the building table past 1,000 (5.5) have no room there, so they break
+the original, which then plays it by its own rules. Trade routes (6.3) and
+the building table past 1,000 (6.5) have no room there, so they break
 with the DOS format:
 
 - **When.** A save is written in the port's own format while
@@ -235,7 +267,7 @@ with the DOS format:
   both off; save and load in the port format restores everything; an
   unknown version is refused; the DOS-save tests are unchanged.
 
-#### 5.1 More Miner stations on a mining-only body
+#### 6.1 More Miner stations on a mining-only body
 
 A body with only a Miner station is barely worth the station. It mines
 with one "droid" (`TBody._0A` = 1) in 30% of hours (`Sim_MineBody`), so
@@ -278,7 +310,7 @@ Switch `more_stations`:
   adds them unplaced if not). Then update docs/walkthrough.md's Storage and
   Mining notes.
 
-#### 5.2 Build the same building again
+#### 6.2 Build the same building again
 
 Placing many copies of one building (the guide builds 20, then 60
 Derricks on New Earth) means going back to the build menu for each one.
@@ -289,7 +321,7 @@ places as today and ends the mode. The repeat stops by itself when money
 runs out or the spot is taken (`Surface_UpdateModeForCell` drops to mode
 1 as now). Check first what a right click does on the surface today.
 
-#### 5.3 Trade routes
+#### 6.3 Trade routes
 
 Ore is hauled home by hand, group by group, for the whole game. Switch
 `trade_routes`: a trade group can be given a route and then flies it on
@@ -306,7 +338,7 @@ its own.
   screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
   Start and Stop. The groups list marks a group on a route. Decide
   whether the editor is a game screen in the original's style or a port
-  panel like the F1 menu (simpler, and the keyboard work in 5.4 gets it
+  panel like the F1 menu (simpler, and the keyboard work in 6.4 gets it
   for free).
 - **Rules stay the game's:** the group needs a hired pilot whose tier
   reaches every stop, a Galleon to leave a system, and travel takes the
@@ -327,7 +359,7 @@ its own.
   home early; New Earth full; each stop condition; save and load keep the
   route.
 
-#### 5.4 Playing with the keyboard only
+#### 6.4 Playing with the keyboard only
 
 The original is played with the mouse; the keyboard is used only for
 typing names. Switch `keyboard_play`: every screen can be played with
@@ -346,7 +378,7 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 5.5 No building limit
+#### 6.5 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -374,7 +406,7 @@ Switch `no_building_limit`:
 - **Test.** Build past 1,000, save, load, and check every building and the
   count came back; with the switch off, the 1,001st is refused.
 
-#### 5.6 Smaller candidates
+#### 6.6 Smaller candidates
 
 Each needs a short spec before work starts.
 
@@ -385,7 +417,7 @@ Each needs a short spec before work starts.
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
 
-### 6. Checks against the DOS game
+### 7. Checks against the DOS game
 
 Both need DOSBox-X driven by a script, too much work for now.
 

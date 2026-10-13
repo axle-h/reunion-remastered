@@ -299,6 +299,15 @@ static bool kind_changed(void *arg)
     return SDL_strcmp(ui_surface_kind(), (const char *)arg) != 0;
 }
 
+// The surface is still up: the game frees its layers on leaving it, so a
+// screen that came up in between (an alien talk while a driver re-read the
+// screen) is left as an interrupt before they are read.
+static void surface_still_up(const char *what)
+{
+    if (ui_screen() != 20 || ds.Game_ScreenSwitch)
+        ui_screen_lost(what);
+}
+
 bool ui_select_kind(const char *kind)
 {
     int want = kind_index(kind);
@@ -321,6 +330,9 @@ bool ui_select_kind(const char *kind)
             SDL_strlcpy(now, ui_surface_kind(), sizeof now);
             at = kind_index(now);
         }
+        // The re-reads above gave the game retraces: what they read may be
+        // the last of a surface that has just been left.
+        surface_still_up("ui_select_kind");
         if (at == want)
             return true;
         if (at == 0)
@@ -474,6 +486,7 @@ static bool green(void *arg)
 // stay near the colony.
 static bool find_spot(int kind, int *x, int *y)
 {
+    surface_still_up("find_spot");
     int best = 1 << 30;
     for (int j = 1; j <= MAP_ROWS; j++) {
         for (int i = 1; i <= MAP_COLS; i++) {
@@ -689,6 +702,7 @@ int ui_droid_slots(void)
 // A finished mine in the window: its cells draw the mine, not a site.
 static bool find_mine(int *x, int *y)
 {
+    surface_still_up("find_mine");
     for (int j = 1; j <= MAP_ROWS; j++) {
         for (int i = 1; i <= MAP_COLS; i++) {
             int b = building_under(i, j);
@@ -708,6 +722,7 @@ static bool find_mine(int *x, int *y)
 // A finished building of kind `k` in the window.
 static bool find_kind(int k, int *x, int *y)
 {
+    surface_still_up("find_kind");
     for (int j = 1; j <= MAP_ROWS; j++) {
         for (int i = 1; i <= MAP_COLS; i++) {
             int b = building_under(i, j);
