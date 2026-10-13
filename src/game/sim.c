@@ -408,7 +408,7 @@ void Sim_ProgressProduction(void)
             }
         }
     }
-    // BUG? The original also draws while the switch to the cargo screen is
+    // The original also draws while the switch to the cargo screen is
     // pending (an hour struck between the Transfer click and the screen's
     // set-up), through Cargo::Stores before it is set: nil on the first
     // visit, garbage over the ship screen. Skipped here; the screen draws

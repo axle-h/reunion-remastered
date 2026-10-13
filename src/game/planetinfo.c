@@ -528,9 +528,11 @@ void PlanetInfo_DrawStoresList(void)
 {
     const TBody *b = ds.Game_CurBody;
     if (b->_09 != 0 || ((int8_t)b->Owner > 1 && ds.Races_Hostile[b->Owner - 1] == 2)) {
-        // BUG? Bytes 13h..1Ah of the race record (typed as KnownSystems) are
-        // read as "has this resource / product" flags, also for owners 0
-        // and 1 when there is a spy ship (_09).
+        // Bytes 13h..1Ah of the race record are its weapon flags (ship
+        // classes, then ground units), read as the spy reports read them. A
+        // body whose race was eliminated keeps its spy ship (_09) with owner
+        // 0, and then the bytes below Races_Races may add lines of 0; kept as
+        // in the original.
         const uint8_t *race = race_bytes((int8_t)b->Owner);
         char s[16], name[256];
         for (int16_t k = 1; k <= 4; k++) {
@@ -911,9 +913,10 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &ds.Names_Systems[sys - 1]));
             h->Repeat_ = 0;
             h->_1A = 5;
-            // BUG? k is 8 here, so this writes record 8's flag; and the body
-            // is Bodies[sys][CurPlanet - 1] = Bodies[sys][-1] as CurPlanet is
-            // 0 in this branch.
+            // k is 8 here, so this writes record 8's flag, and the body is
+            // Bodies[sys][CurPlanet - 1] = Bodies[sys][-1] as CurPlanet is 0 in
+            // this branch. As in the original: the flag is drawn only for an
+            // eighth moon, and the planet view sets its moons' flags first.
             const TBody *b = body_at(sys, cur_planet());
             orbit(8)->Flag = 0;
             if (b->Owner > 1 && b->InfoLevel > 0x1D)

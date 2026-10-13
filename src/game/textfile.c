@@ -63,13 +63,13 @@ void TextFile_InputLine(uint8_t *s, int16_t x, int16_t y, int16_t width, bool ca
 void TextFile_BeginInput(uint8_t *s, int16_t x, int16_t y, int16_t width)
 {
     TextFile_EndInput();
-    ds.TextFile_InputBackup = game_alloc(0x3C);
+    // The original stores the string (up to 256 bytes) into a 60-byte block;
+    // the strings edited are at most 19 characters. The block here holds any.
+    ds.TextFile_InputBackup = game_alloc(0x100);
     ds.TextFile_InputX = x;
     ds.TextFile_InputY = y;
     ds.TextFile_InputWidth = width;
     ds.TextFile_InputStr = s;
-    // BUG? StrStore(…, 255) into a 60-byte block: longer strings overrun it
-    // (the strings edited are at most 19 characters).
     SDL_memmove(ds.TextFile_InputBackup, s, (size_t)s[0] + 1);
     ds.TextFile_InputBlink = 0;
     ds.TextFile_InputCanCancel = 0;

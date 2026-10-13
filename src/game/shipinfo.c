@@ -105,9 +105,9 @@ void ShipInfo_ShipInfoScreen(void)
         }
     }
 
-    // "Change mode". BUG?: on list 0 the first test plays the error sound and the
+    // "Change mode". On list 0 the first test plays the error sound and the
     // second one then switches to list 1 anyway (the first test clears HotspotHit
-    // only when it switches).
+    // only when it switches); the "change" sound cuts the error sound off at once.
     if (ds.Game_HotspotHit == 0x15) {
         if (ds.Game_GroupList == 0) {
             Sound_PlayButtonSfx("hiba");

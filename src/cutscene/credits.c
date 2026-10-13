@@ -61,7 +61,7 @@ static void run(void)
     cs_fade_out(5, cs.pal, 1, 255);
     cs_fill_screen(1);
     cs_show_buf();
-    // BUG? Whitened and at once overwritten by the picture's palette.
+    // Whitened and at once overwritten by the picture's palette, as in the original.
     for (int c = 1; c <= 255; c++)
         cs.pal[c][0] = cs.pal[c][1] = cs.pal[c][2] = 0xff;
     cs_use_target();

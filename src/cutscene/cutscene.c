@@ -510,8 +510,8 @@ void cs_strips(int fade_in, int in_row, int in_order, int fade_out, int out_row,
     if (fade_in > 0)
         cs_fade_in(fade_in, cs.pal, 0, 255);
     if (fade_in == -1) {
-        // BUG? The white target palette is never used: the fades below work
-        // on the current one.
+        // The white target palette is never used, as in the original: the
+        // fades below work on the current one.
         for (int c = 1; c <= 255; c++)
             cs.target[c][0] = cs.target[c][1] = cs.target[c][2] = 0xff;
         cs_fade_in(5, cs.pal, 0, 255);

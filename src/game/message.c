@@ -109,7 +109,8 @@ void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t
     int16_t editCol = 0, editLine = 0;
     for (size_t i = 0; text[i] != '\0' && i < 255; i++) {
         if (text[i] != '|') {
-            // BUG? more lines overflow the original's array; the port drops them.
+            // More lines would overflow the original's array; none of its texts
+            // has them, and the port drops them.
             if (lineCount <= maxLines && len[lineCount] < 54)
                 lines[lineCount][len[lineCount]++] = text[i];
         } else {
@@ -187,7 +188,8 @@ void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t
                 count++;
         }
         if (ds.Message_LogCount + count > LOG_MAX) {
-            // BUG? with count > LogCount the count goes negative.
+            // With count > LogCount the count would go negative, but that needs
+            // a box of 8 lines (boxes have at most 7, the log holds 15).
             int16_t keep = (int16_t)(ds.Message_LogCount - count);
             for (int16_t i = 1; i <= keep; i++)
                 SDL_memcpy(log_entry(i), log_entry((int16_t)(i + count)), LOG_ENTRY);

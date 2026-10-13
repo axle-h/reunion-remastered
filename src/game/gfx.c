@@ -595,8 +595,8 @@ static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
 void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
 {
     // The original pads in a 256-byte stack copy of the string (length byte
-    // first); widths over 255 would run off its end. BUG? Here the padding
-    // is clipped to the buffer.
+    // first); widths over 255 would run off its end. No caller passes one;
+    // here the padding is clipped to the buffer.
     uint8_t str[512] = {0};
     str[0] = (uint8_t)SDL_min(SDL_strlen(s), (size_t)255);
     SDL_memcpy(str + 1, s, str[0]);
@@ -748,7 +748,7 @@ void Gfx_TypeText(const char *s, int16_t x, int16_t y, int16_t width, uint8_t co
         str[0] = (uint8_t)(idx - 1);
     if ((uint16_t)width >= 1) {
         for (uint16_t i = 1;; i++) {
-            uint8_t ch = str[(uint8_t)i];  // BUG? the original reads past the 256-byte buffer for width > 255
+            uint8_t ch = str[(uint8_t)i];  // the original reads past its 256-byte buffer for width > 255; none is
             uint8_t g = (uint8_t)(charset_pos((char)ch) - 1);
             Mouse_HideCursor();
             type_glyph(x, y, i, g, colour);

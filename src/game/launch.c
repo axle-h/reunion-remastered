@@ -214,7 +214,7 @@ void Launch_MapScreen(void)
         } else {
             CUR_MOON = Groups_At(0, ds.Game_SelGroup)->Moon;
             PlanetInfo_SelectCurBody();
-            RACE_STATE(ds.Game_CurBody->Owner) = 2; // BUG? Owner as a signed char in the original
+            RACE_STATE(ds.Game_CurBody->Owner) = 2; // the original reads Owner signed; owners are at most 12
             ds.SpWar_BattleSystem = ds.Game_CurSystem;
             ds.SpWar_BattlePlanet = CUR_PLANET;
             ds.SpWar_BattleMoon = CUR_MOON;

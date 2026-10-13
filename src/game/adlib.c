@@ -134,8 +134,9 @@ static void OplWrite(uint8_t reg, uint8_t value)
     audio_opl_write(reg, value);
 }
 
-// 40h value scaled by the master attenuation. BUG? The KSL bits come from
-// 3Fh - value, so KSL 1 and 3 swap (and the effects' levels clear KSL).
+// 40h value scaled by the master attenuation. The KSL bits come from
+// 3Fh - value, so KSL 1 and 3 swap (and the effects' levels clear KSL); kept,
+// as that is how the original's music sounds.
 static uint8_t scale_level(uint8_t level)
 {
     uint8_t al = (uint8_t)(0x3F - level);
@@ -208,10 +209,10 @@ static void SetInstrument(uint8_t ins, uint8_t ch)
 static void NoteOn(uint8_t note, uint8_t ch)
 {
     if (note == 0x7F) {
-        // 428e:04d5, key off. BUG? It clears the key-on bit at CS:097D+2*ch
-        // and flags CS:098F+2*ch, 156h past ChanFreq / ChanFreqDirty: the key
-        // off never reaches the OPL and bytes of 431a:00BD.. (LoadSbDriver,
-        // already run) are patched instead.
+        // 428e:04d5, key off. It clears the key-on bit at CS:097D+2*ch and
+        // flags CS:098F+2*ch, 156h past ChanFreq / ChanFreqDirty: the key off
+        // never reaches the OPL and bytes of 431a:00BD.. (LoadSbDriver, already
+        // run) are patched instead. Kept, as that is how the music sounds.
         uint16_t off = (uint16_t)(0x097D + ch * 2);
         cs_set_word(off, cs_word(off) & 0xDFFF);
         cs_set_word((uint16_t)(off + 0x12), 1);
@@ -247,7 +248,7 @@ static uint16_t ReadCell(uint16_t si, uint8_t ch)
     }
     uint8_t param = al & 0x0F;
     switch (al >> 4) {
-    case 0x1: // slide up; BUG? only the low byte of the F-number, no carry
+    case 0x1: // slide up; only the low byte of the F-number, no carry (kept)
         cs->ChanFreq[ch] = (uint16_t)((cs->ChanFreq[ch] & 0xFF00) | (uint8_t)(cs->ChanFreq[ch] + param + 1));
         cs->ChanFreqDirty[ch] = 1;
         break;

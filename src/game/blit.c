@@ -251,12 +251,11 @@ void Blit_BlitAntiTranspose(const uint8_t *src, uint8_t *dest, int16_t size, uin
 // 47da:05d1
 void Blit_FillBytes(uint8_t *dest, uint16_t count, uint8_t value)
 {
+    // The original's `inc cx` after an odd byte fills count + 2 bytes; every
+    // caller passes an even count. This fills count.
     uint16_t words = count >> 1;
-    if (count & 1) {
+    if (count & 1)
         *dest++ = value;
-        // BUG? `inc cx` after the odd byte: an odd count fills count + 2 bytes.
-        words++;
-    }
     for (; words != 0; words--) {
         *dest++ = value;
         *dest++ = value;

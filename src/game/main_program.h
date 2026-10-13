@@ -49,6 +49,10 @@ void Game_InitUnits(void);
 // as on a DOS machine without an EMM.
 void Game_InitGameData(void);
 
+// The pub dialogue's opening menu (Pub_MenuIdx) for Pub_Person, from the
+// story flags (part of screen 25's set-up).
+void Game_PickPubMenu(void);
+
 // Port addition for test fixtures (tests/play/): retraces spent in the main
 // loop's wait for an event, i.e. with the current screen set up and taking
 // clicks. Not part of the game state.

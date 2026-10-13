@@ -31,10 +31,29 @@ Only these differ:
 The floppy rip also has `CRACK\` and a few loose DOS tools; the CD has the
 installer files above.
 
-**The CD's executable** is a rebuild of the same program: the functions are
-the same, but its data segment is laid out slightly differently, so almost
-every variable address in the code changes. The claim that it fixes many
-stability issues is not verified (PLAN.md).
+**The CD's executable** is a rebuild of the same program. Its data segment is
+laid out slightly differently (variables move by 0 to -51 bytes), so almost
+every variable address in the code changes, and byte locals are packed
+without padding. Compared function by function (2026-10-13; all 813 of the
+floppy's are accounted for), the only changes are:
+
+- Four of the port's fixes (`src/game/fixes.h`): mining reads each system's
+  own bodies (`mine_all_systems`); a body without a colony stores 10,000 t,
+  in mining and on the cargo screen (`station_storage`, which the port
+  applies to bodies without a planet force); loading ore no longer caps the
+  ship's load at the colony's storage (`cargo_planet_cap`); the bartender
+  keeps offering the League tip after the League's first attack
+  (`league_tip`, taken from the CD).
+- No copy protection: "the date" is never armed (`2693:0000` and its call
+  are gone), nor is "page N" (`357b:3d77` and its call are gone, as is a
+  small routine after `264a:034a` that draws `Random(14)`). The floppy's
+  `REUNION.PRG` is a cracked copy: `Protect::CheckToken` has its test
+  (`cmp ax,0D80h / je`, `24eb:0100`) replaced by NOPs.
+- The font (below), and `Gfx_DrawText6x8` turns character 1 into `ß` (E1h)
+  before drawing.
+- The credits name a second musician, Krisztian Kornyei.
+
+Nothing else changed: the CD's claimed stability fixes are not there.
 
 **The CD's font** has the floppy's 78 glyphs, pixel for pixel, but packs them
 40 to a row, 8 pixels apart, where the floppy's sheet has 20 to a row, 16

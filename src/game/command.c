@@ -427,7 +427,7 @@ void Command_TickGrAnim(void)
         if (ds.Command_AnimRepeat < 1) {
             Command_StopGrAnim();
             int16_t anim = GrWar_PickBattleAnim();
-            Command_StartMainAnim(anim); // BUG? not a StartGrAnim; the original calls 0c05
+            Command_StartMainAnim(anim); // not StartGrAnim, as in the original (0c05): it reads the war table too
         }
         ds.Command_AnimTick = 1;
         ds.Command_AnimFrame = 0;

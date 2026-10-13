@@ -132,7 +132,9 @@ Standing orders for the whole game:
    Orionis or Lyrae. Hire **Klaatoo** (250,000) and send him on courses: you
    need Physics 8+ for Plasma gun and 8/5/8/9 for Mental radar.
 2. Buy the bartender's **League tip** (5,000) as soon as it is offered, which
-   happens once Orionis or Lyrae is opened. Optionally pay the Informer 500
+   happens once Orionis or Lyrae is opened. The original withdraws it when the
+   League's first attack force launches; the port keeps offering it, as the CD
+   release does (`fixes.league_tip`). Optionally pay the Informer 500
    about the Morgrul to use the **Pirate Leader**: the cargo-raid table
    brings free ore, tanks, aircraft and missile launchers.
 3. **Antares.**
@@ -455,10 +457,11 @@ are there from the start; the rest appear on story events. All **[src]**
   - When the spy is present: ask "Who is that suspicious character?", then
     "How dangerous is he?" or "Could you terminate him?". The bartender
     answers "I'll speak to him", which makes the spy hireable.
-  - **League tip (5,000)** is offered once Orionis or Lyrae is opened. It is
-    withdrawn for good when the League's first attack force launches, 200–249
-    hours after first contact with any League race (`Intel_FirstContact`). The
-    Eran job is impossible without it. **Buy it as soon as it appears.**
+  - **League tip (5,000)** is offered once Orionis or Lyrae is opened. The
+    original withdraws it for good when the League's first attack force
+    launches, 200–249 hours after first contact with any League race
+    (`Intel_FirstContact`), and the Eran job is impossible without it. The
+    port, like the CD release, keeps offering it (`fixes.league_tip`).
 - **Informer.** Each item costs 500 and depends on the story state:
   - Beware of the Morgruls.
   - Morgruls massing near you (after the Jaanosian base falls).

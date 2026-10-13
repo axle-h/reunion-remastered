@@ -254,7 +254,9 @@ void Research_ResetSelectionFrame(void)
     }
     ds.Research_FrameCounter = 0x14;
     uint16_t off = frame_offset(ds.Game_SelInvention, row);
-    // BUG? unlike AnimateSelectionFrame this does not hide the mouse cursor.
+    // Unlike AnimateSelectionFrame this does not hide the mouse cursor, as in the
+    // original: under the cursor the two pixels keep the old colour until the
+    // next animation step redraws them.
     gfx_screen()[off] = colour;
     gfx_screen()[(uint16_t)(off + 1)] = colour;
 }

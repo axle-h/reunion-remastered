@@ -150,8 +150,9 @@ static void play_numbered(int16_t n, const char *prefix)
 {
     if (!ds.Sound_Enabled)
         return;
-    // BUG? The cache key is shared by WARSND and GRSND, so GrSnd n right
-    // after WarSnd n replays the war sample. Kept as in the original.
+    // The cache key is shared by WARSND and GRSND, so GrSnd n right after
+    // WarSnd n would replay the war sample. Both battles reset it on entry
+    // (AllocWarSndBuf) and each plays only its own kind, so that never happens.
     // The extra !warsnd.samples test covers n == 0 right after AllocWarSndBuf,
     // where the original played an uninitialised buffer.
     if (n < 0 || ds.Sound_LastWarSnd != n || !warsnd.samples) {

@@ -276,7 +276,8 @@ static void fix_centroid(int16_t model, int16_t slot, int16_t *c)
         if (slot <= 8 && abs16(*y) == 0x43) *y = (int16_t)(sign_div(*y) * 20);
         if (slot == 10) *x = -120;
         if (slot == 11) *x = 120;
-        // BUG? Run-time error 200 if one of these centroids has x = 0.
+        // Run-time error 200 if one of these centroids had x = 0; V24.VEC's
+        // objects 1-8 have x = ±105 or ±120.
         if (slot <= 8) *x = (int16_t)(sign_div(*x) * 100 + *x);
     }
     if (model == 25)

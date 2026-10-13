@@ -250,7 +250,7 @@ void AlienTalk_BuildQuestionMenu(void)
     const uint8_t *menu = ds.Alien_MenuLists[ds.AlienTalk_Race - 2] + ds.AlienTalk_MenuNumber * 4;
     memcpy(ds.Alien_CurMenu, menu, 4);
     uint16_t count = ds.Alien_CurMenu[0];
-    int16_t lines = 0; // BUG?: the final clearing loop reuses the last question's line count
+    int16_t lines = 0; // the final clearing loop reuses it, as in pub.c
     char name[32];
     for (uint16_t k = 1; k <= count; k++) {
         TextFile_ReadTextLine(text_name(name, "kerdes", ".at"), (int8_t)ds.Alien_CurMenu[k],

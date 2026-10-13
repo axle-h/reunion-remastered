@@ -1306,7 +1306,7 @@ typedef struct DSeg {
     uint8_t PlanetInfo_HasBase; // the planet has a base/colony the player can see (357b:18cc)
     uint8_t TextFile_InputActive; // an input line is being edited (398f:0059)
     uint8_t TextFile_InputEscaped; // set by InputLine (Esc restores the backup); afterwards 1 if Esc ended it (398f:0179), checked by 1a3e:0008
-    uint8_t *TextFile_InputBackup; // GetMem(3Ch) copy of the string, restored by Esc
+    uint8_t *TextFile_InputBackup; // copy of the string (GetMem(3Ch) in the original), restored by Esc
     uint8_t *TextFile_InputStr; // the edited string
     uint16_t TextFile_InputBlink; // cursor blink counter 1..20 (398f:0179)
     uint8_t TextFile_InputCanCancel; // Esc allowed

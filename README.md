@@ -84,7 +84,7 @@ backtraces.
 
 ## Documentation
 
-- [PLAN.md](PLAN.md): status, remaining work and open bugs
+- [PLAN.md](PLAN.md): status and remaining work
 - [docs/port.md](docs/port.md): how the port is put together (addresses,
   the data segment, memory, start-up, deliberate deviations, port
   additions). The code's header comments document each part, file formats

@@ -219,8 +219,8 @@ void Surface_RegisterBuildingAnims(int16_t system, int16_t planet, int16_t moon)
         int16_t x = 0, y = 0;
         bool found = false;
         Surface_FindBuildSpot(0x19, system, planet, moon, &x, &y, &found);
-        // BUG? The original marks the footprint even when no spot was found
-        // (x and y are then uninitialised); skipped here.
+        // The original marks the footprint even when no spot was found (x and
+        // y are then uninitialised); skipped here.
         if (found)
             Surface_MarkFootprint(1, 0x19, x, y, 0);
     }

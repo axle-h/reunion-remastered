@@ -9,8 +9,9 @@
 // same moments, as the port did while it still answered for the player:
 // the game's random numbers stay what they were. For "the date" that is
 // the original's path for a player who types the right date. For "page N"
-// the shipped game differs: its prompt is dead code, so it never gets an
-// answer and takes the "unanswered" branch instead (it scribbles over
+// the floppy's executable differs: it is a cracked copy whose prompt is
+// dead code (CheckToken's test is NOPed out; docs/versions.md), so it never
+// gets an answer and takes the "unanswered" branch instead (it scribbles over
 // memory once), so once "page N" arms (FrameCount > 30000, a 1-in-200 draw
 // per frame) the port's random numbers are no longer the shipped game's.
 // Each routine says which of the original's it stands for.

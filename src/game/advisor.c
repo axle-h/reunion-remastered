@@ -254,7 +254,7 @@ void Advisor_DrawAdvisorMenu(void)
 // 1991:09e8
 void Advisor_PollAdvisorMenu(void)
 {
-    int16_t last_col = 0, last_row = 0; // BUG? uninitialised in the original for the first pass
+    int16_t last_col = 0, last_row = 0; // uninitialised in the original for the first pass
     int16_t row, col;
     do {
         Mouse_Poll();

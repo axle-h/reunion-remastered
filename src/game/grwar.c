@@ -1172,7 +1172,8 @@ void GrWar_FindPath(int16_t sx, int16_t sy, int16_t a, int16_t b, int16_t c, int
     // The goal cell, if free (the second test reads (a,b) again in the original).
     if (a >= 0 && b >= 0 && a < 16 && b < 9 && g[a * GRID_STRIDE + b + GRID_ORG] == 0)
         g[a * GRID_STRIDE + b + GRID_ORG] = 0xFE;
-    // BUG? tests cell (a,b), not (c,d), so (c,d) is only marked if (a,b) was out of range.
+    // Tests cell (a,b), not (c,d), as the original does; both callers pass the
+    // same cell twice.
     if (c >= 0 && d >= 0 && c < 16 && d < 9 && g[(uint16_t)(a * GRID_STRIDE + b + GRID_ORG)] == 0)
         g[c * GRID_STRIDE + d + GRID_ORG] = 0xFE;
 

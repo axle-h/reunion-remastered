@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "game/dseg.h"
+#include "game/fixes.h"
+#include "game/main_program.h"
 #include "game/mouse.h"
 #include "game/pub.h"
 #include "game/system.h"
@@ -105,6 +107,27 @@ int main(int argc, char *argv[])
         CHECK(ds.Pub_MenuIdx == want);
         CHECK(ds.Pub_QuestionCode == 0x55);
     }
+
+    // The bartender's League tip (menu 4) once Orionis or Lyrae is opened:
+    // the original withdraws it when the League's first force launches
+    // (Intel_Race7to10Done), the fix keeps it (game/fixes.h).
+    memset(ds.Pub_StoryFlags, 0, sizeof ds.Pub_StoryFlags);
+    memset(ds.Pub_People, 0, sizeof ds.Pub_People);
+    ds.Pub_Person = 6;
+    ds.Galaxy_SystemStatus[4] = 1;
+    for (int fix = 0; fix <= 1; fix++) {
+        fixes.league_tip = fix;
+        ds.Intel_Race7to10Done = 0;
+        Game_PickPubMenu();
+        CHECK(ds.Pub_MenuIdx == 4);
+        ds.Intel_Race7to10Done = 1;
+        Game_PickPubMenu();
+        CHECK(ds.Pub_MenuIdx == (fix ? 4 : 1));
+    }
+    ds.Pub_StoryFlags[4] = 1;                                      // bought
+    Game_PickPubMenu();
+    CHECK(ds.Pub_MenuIdx == 1);
+    fixes.league_tip = true;
 
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

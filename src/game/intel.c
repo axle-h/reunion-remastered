@@ -263,12 +263,13 @@ void Intel_ClaimBodyForRace(int16_t owner, int16_t system, int16_t planet, int16
             b->Stores[k - 1] = (int32_t)stock(ds.Intel_Race7Stores, ds.Intel_Race7StoresRange, k);
     }
     if (owner == 8) {
-        // BUG?: every pass writes Stores[1]; the other seven are left alone.
+        // Every pass writes Stores[1] and the other seven are left alone, as in
+        // the original; no caller passes owner 8 or 12.
         for (int k = 1; k <= 8; k++)
             b->Stores[0] = (int32_t)stock(ds.Intel_Race8Stores, ds.Intel_Race8StoresRange, k);
     }
     if (owner == 0xC) {
-        // BUG?: same as for owner 8.
+        // The same as for owner 8.
         for (int k = 1; k <= 8; k++)
             b->Stores[0] = (int32_t)stock(ds.Intel_Race12Stores, ds.Intel_Race12StoresRange, k);
     }

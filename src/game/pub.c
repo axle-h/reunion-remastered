@@ -219,7 +219,8 @@ void Pub_BuildQuestionMenu(void)
         m->Count = 1;
         TextFile_ReadTextLine("pirate.txt", (int16_t)(Pub_FindActiveDeal() + 10), line_at(1), 256);
     }
-    // BUG? clears as many entries as the last text had lines, not the unused ones.
+    // Clears as many entries as the last text had lines, not the unused ones, as
+    // the original does: the hover is capped at the line count, so the rest are never read.
     for (int16_t j = (int16_t)(ds.Pub_LineCount + 1); j <= ds.Pub_LineCount + lines; j++)
         *line_item(j) = 0;
 }

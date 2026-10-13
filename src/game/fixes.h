@@ -1,6 +1,7 @@
-// Fixes to the original game's bugs (the open ones are in PLAN.md). Each fix is
-// a switch so the original behaviour stays reproducible: all are on unless
-// the port menu's config (platform/config.h) turns one off.
+// Fixes to the original game's bugs. Each fix is a switch so the original
+// behaviour stays reproducible: all are on unless the port menu's config
+// (platform/config.h) turns one off. The bugs that are kept are described
+// where the code reproduces them.
 #pragma once
 
 typedef struct Fixes {
@@ -76,6 +77,10 @@ typedef struct Fixes {
     // which race they are about. The fix keeps it (a garrison report then
     // has 7 lines, and message boxes take up to 7).
     bool spy_reports;
+    // The bartender's League tip is withdrawn for good when the League's
+    // first attack force launches, and the Eran's job needs it. The fix
+    // keeps offering it, as the CD release does.
+    bool league_tip;
 } Fixes;
 
 extern Fixes fixes;

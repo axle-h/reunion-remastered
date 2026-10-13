@@ -812,7 +812,8 @@ battle's loss table, read off the result picture, showed "lost 50–58H
 5SF: `SpWar_ApplySpaceLosses` adds the losses of the ships stored on the
 planet and its moons to the side its pointer was left at by the last race of
 the force loop with status 2 or 6 (allied Undorlings, race 8: the player's
-side), as the original does (a bug of the original, PLAN.md). The policy
+side), as the original does; `fixes.garrison_losses` now books them on the
+body owner's side. The policy
 reads the grids for the forces. Each home world taken becomes a colony of
 the player (`Intel_ClaimBodyForPlayer`).
 

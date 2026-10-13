@@ -22,6 +22,7 @@ static constexpr Fixes ALL = {
     .demolish_droids = true,
     .building_limit = true,
     .spy_reports = true,
+    .league_tip = true,
 };
 
 Fixes fixes = ALL;
@@ -69,6 +70,8 @@ const FixInfo Fixes_List[] = {
      "At 1,000 buildings a new one is refused before it is paid for.", &fixes.building_limit},
     {"spy_reports", "Spy reports",
      "Spy reports on armies, garrisons and weapons name the race.", &fixes.spy_reports},
+    {"league_tip", "League tip",
+     "The bartender still sells the League tip after the League attacks.", &fixes.league_tip},
 };
 
 const int Fixes_Count = (int)SDL_arraysize(Fixes_List);

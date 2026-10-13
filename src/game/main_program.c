@@ -234,8 +234,8 @@ static void startup(void)
     ds.Advisor_TrainingCourse = 0;
     for (int i = 0; i < 4; i++)
         ds.Game_StaffExp[i] = 0;
-    // BUG? i runs to 5 over DevSkill[1..4]; the fifth word is ProductionRate,
-    // set just below.
+    // i runs to 5 over DevSkill[1..4]; the fifth word is ProductionRate, set
+    // just below.
     for (ds.Main_I = 1; ds.Main_I <= 5; ds.Main_I++)
         *(ds.Main_I <= 4 ? &ds.Game_DevSkill[ds.Main_I - 1] : &ds.Game_ProductionRate) = 0;
     for (int i = 0; i < 4; i++)
@@ -961,7 +961,7 @@ static void screen_pub(void)
     }
 }
 
-static void pub_dialog_enter(void)
+void Game_PickPubMenu(void)
 {
     TPubPerson *p = ds.Pub_People;
     ds.Pub_MenuIdx = 1;
@@ -986,9 +986,11 @@ static void pub_dialog_enter(void)
         ds.Pub_MenuIdx = 2;
     if (who == 6 && p[1].State == 2 && !ds.Pub_StoryFlags[2])
         ds.Pub_MenuIdx = 2;
+    // The League tip. Port fix (game/fixes.h): still offered once the
+    // League's first attack force has launched.
     if (who == 6 && !ds.Pub_StoryFlags[4]
         && (ds.Galaxy_SystemStatus[4] == 1 || ds.Galaxy_SystemStatus[5] == 1)
-        && ds.Intel_Race7to10Done == 0)
+        && (fixes.league_tip || ds.Intel_Race7to10Done == 0))
         ds.Pub_MenuIdx = 4;
     if (who == 6 && p[8].State == 2 && !ds.Pub_StoryFlags[3] && !ds.Pub_StoryFlags[9])
         ds.Pub_MenuIdx = 3;
@@ -1002,6 +1004,11 @@ static void pub_dialog_enter(void)
         else
             ds.Pub_MenuIdx = Pub_FindActiveDeal() < 1 ? 6 : 3;
     }
+}
+
+static void pub_dialog_enter(void)
+{
+    Game_PickPubMenu();
     Pub_LoadPersonPortrait();
     Pub_BuildQuestionMenu();
     Pub_DrawQuestionMenu();
@@ -1495,8 +1502,11 @@ static void screen_ground_battle(void)
             Intel_ClaimBodyForPlayer(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet,
                                      ds.SpWar_BattleMoon);
         if (!ds.GrWar_PlayerWon && ds.Sim_PlayerAttacks == 0)
-            // BUG? the arguments are pushed as (system, planet, moon, owner)
-            // against ClaimBodyForRace(owner, system, planet, moon).
+            // The arguments are pushed as (system, planet, moon, owner) against
+            // ClaimBodyForRace(owner, system, planet, moon), so it clears 65 bytes
+            // around Antares' last body and gives them to owner 1. Kept: every
+            // enemy force lands on New Earth, whose loss ends the game
+            // (Command_ShowDeathEnding).
             Intel_ClaimBodyForRace(ds.SpWar_BattleSystem, ds.SpWar_BattlePlanet,
                                    ds.SpWar_BattleMoon, ds.SpWar_EnemyRace);
     }

@@ -169,10 +169,10 @@ static void fills(void)
     reset();
     Blit_FillBytes(DST, 4, 7);
     CHECK(*px(DST, 3, 0) == 7 && *px(DST, 4, 0) == 0);
-    // Odd counts fill two bytes too many (inc cx after the odd byte).
+    // An odd count fills count bytes (the original filled two more).
     reset();
     Blit_FillBytes(DST, 5, 7);
-    CHECK(*px(DST, 6, 0) == 7 && *px(DST, 7, 0) == 0);
+    CHECK(*px(DST, 4, 0) == 7 && *px(DST, 5, 0) == 0);
 
     reset();
     Blit_FillRect(10, 20, 3, 2, 0x33);

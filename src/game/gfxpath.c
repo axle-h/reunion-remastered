@@ -153,7 +153,8 @@ void GfxPath_AddToolbarIcon(int16_t id)
     while (slot_id(slot) != 0)
         slot++;
     if (slot < 13) {
-        // BUG? clears slot[slot] 13 - slot times instead of the slots after it.
+        // Clears slot[slot] 13 - slot times instead of the slots after it, as the
+        // original does; toolbars fill without gaps, so those are empty anyway.
         for (uint16_t j = slot; j <= 12; j++)
             set_slot_id(slot, 0);
     }
