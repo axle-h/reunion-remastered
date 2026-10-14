@@ -27,6 +27,9 @@ typedef struct Improvements {
     // then hauls the ore home on its own (game/routes.h): ROUTE on its
     // control panel opens the editor.
     bool trade_routes;
+    // Every screen played with keys alone (game/keyplay.h): the keys move
+    // and click the mouse.
+    bool keyboard_play;
 } Improvements;
 
 extern Improvements improvements;

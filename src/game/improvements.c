@@ -16,6 +16,9 @@ const SwitchInfo Improvements_List[] = {
     {"trade_routes", "Trade routes",
      "Trade groups haul ore home on routes. Saves then won't load in DOS.",
      &improvements.trade_routes},
+    {"keyboard_play", "Keyboard play",
+     "Tab, arrows and Enter play every screen; shortcuts in Keys.",
+     &improvements.keyboard_play},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);

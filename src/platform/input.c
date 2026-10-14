@@ -18,6 +18,10 @@ static bool quit;
 static bool restart;
 static bool menu_request;
 static bool shift;
+static bool (*key_hook)(const SDL_KeyboardEvent *e);
+// The hook took the last key press: its typed text is dropped too.
+static bool drop_text;
+static bool mouse_moved;
 static int queue[QUEUE_SIZE];
 static int queue_head, queue_count;
 
@@ -79,6 +83,10 @@ static void key_down(const SDL_KeyboardEvent *e)
             menu_request = true;
         return;
     }
+    if (key_hook && key_hook(e)) {
+        drop_text = true;
+        return;
+    }
     if (e->mod & SDL_KMOD_ALT) {
         int scan = alt_scan(key);
         if (scan)
@@ -127,11 +135,13 @@ void input_pump(void)
             break;
         case SDL_EVENT_MOUSE_MOTION:
             set_position(e.motion.x, e.motion.y);
+            mouse_moved = true;
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_BUTTON_UP: {
             uint8_t down = e.button.down;
             set_position(e.button.x, e.button.y);
+            mouse_moved = true;
             if (e.button.button == SDL_BUTTON_LEFT)
                 mouse.left = down;
             else if (e.button.button == SDL_BUTTON_RIGHT)
@@ -142,12 +152,19 @@ void input_pump(void)
         }
         case SDL_EVENT_KEY_DOWN:
             shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
+            drop_text = false;
             key_down(&e.key);
             break;
         case SDL_EVENT_KEY_UP:
             shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
+            if (key_hook)
+                key_hook(&e.key);
             break;
         case SDL_EVENT_TEXT_INPUT:
+            if (drop_text) {
+                drop_text = false;
+                break;
+            }
             for (const char *p = e.text.text; *p; p++)
                 if ((uint8_t)*p >= 32 && (uint8_t)*p < 127)
                     push_key(*p);
@@ -209,6 +226,18 @@ InputMouse input_mouse(void) { return mouse; }
 bool input_shift(void) { return shift; }
 
 void input_set_shift(bool held) { shift = held; }
+
+void input_set_key_hook(bool (*hook)(const SDL_KeyboardEvent *e))
+{
+    key_hook = hook;
+}
+
+bool input_take_mouse_moved(void)
+{
+    bool r = mouse_moved;
+    mouse_moved = false;
+    return r;
+}
 
 bool input_key_pressed(void) { return queue_count > 0; }
 

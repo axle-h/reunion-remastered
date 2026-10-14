@@ -75,6 +75,16 @@ Improvements change the game's design where it falls short
   New Earth to unload it. Started, the group flies the loop on its own,
   docking 5 game hours at each stop and at home, until you end it or give
   the group another order.
+- Keyboard play: every screen can be played with keys alone. Tab and
+  Shift+Tab move the pointer from one clickable thing to the next, with a
+  frame around it; Enter clicks there and Space right-clicks (held, the
+  button is held). On a map or a list the arrow keys go one cell at a time
+  (off the surface map's edge they scroll it); elsewhere they go to the
+  nearest thing that way, and Shift+arrows move the pointer a little.
+  1-6 press the toolbar's buttons and 7 turns its page, Escape leaves the
+  screen, H held runs the clock, F2 opens the command centre and F3-F10
+  its rooms. The port menu (Keys) lists them; `[keys]` in `reunion.ini`
+  changes them. The mouse works alongside.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play

@@ -9,6 +9,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/improvements.h"
+#include "game/keyplay.h"
 #include "game/gfx.h"
 #include "game/lang.h"
 #include "game/main_program.h"
@@ -205,6 +206,7 @@ static PlayResult boot_and_run(const char *script)
     timing_reset();
     Fixes_Init();
     Improvements_Init(true);
+    KeyPlay_Init();
     autopilot_set_script(script);
     system_exit_handler = on_halt;
     timing_set_quit_handler(on_quit);

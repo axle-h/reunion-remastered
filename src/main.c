@@ -17,6 +17,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/improvements.h"
+#include "game/keyplay.h"
 #include "game/gfx.h"
 #include "game/lang.h"
 #include "game/main_program.h"
@@ -258,6 +259,9 @@ static void setup_config(void)
         config_set_improvement(Improvements_List[i].key, config_improvement(Improvements_List[i].key));
     Fixes_Init();
     Improvements_Init(scripted);
+    for (int i = 0; i < KEY_ACTION_COUNT; i++)
+        config_set_binding(KeyPlay_Actions[i].key, KeyPlay_Keys((KeyAction)i));
+    KeyPlay_Init();
     audio_set_user_volumes(config.music_volume / 100.0f,
                            config.effects ? config.effects_volume / 100.0f : 0.0f);
     skip_intro |= config.skip_intro;
@@ -270,6 +274,9 @@ static void setup_config(void)
     for (int i = 0; i < m; i++)
         improvements[i] = (MenuSwitch){Improvements_List[i].key, Improvements_List[i].label,
                                        Improvements_List[i].help, Improvements_NeedsPortSaves(i)};
+    static MenuKey keys[KEY_ACTION_COUNT];
+    for (int i = 0; i < KEY_ACTION_COUNT; i++)
+        keys[i] = (MenuKey){KeyPlay_Actions[i].label, KeyPlay_Keys((KeyAction)i)};
     menu_set_hooks(&(MenuHooks){
         .game_running = Options_GameRunning,
         .changed = menu_changed,
@@ -279,6 +286,8 @@ static void setup_config(void)
         .fix_count = n,
         .improvements = improvements,
         .improvement_count = m,
+        .keys = keys,
+        .key_count = KEY_ACTION_COUNT,
         .languages = data_languages,
     });
 }
@@ -374,6 +383,7 @@ int main(int argc, char *argv[])
             Game_Main();
             exit_code = 0;
         }
+        KeyPlay_Stop();
         if (replay) {
             // The state as the game left it, before any restart or VICTORY.
             uint64_t frames = timing_frames() - replay_start;

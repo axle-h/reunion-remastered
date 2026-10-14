@@ -78,6 +78,10 @@ int vid_fullscreen_modes(SDL_DisplayMode *modes, int max);
 // Drawn over every presented frame, in render output pixels with no
 // logical presentation (the port menu). nullptr: none.
 void vid_set_overlay(void (*draw)(SDL_Renderer *));
+// A frame drawn around the rectangle (game pixels of mode 13h) on every
+// presented frame, over the game and under the overlay: the keyboard's
+// focus (game/keyplay.h). nullptr: none.
+void vid_set_focus(const SDL_Rect *r);
 SDL_Window *vid_window(void);
 // True when a player can see the window: one is open on a video driver
 // other than offscreen and dummy.

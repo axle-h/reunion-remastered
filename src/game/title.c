@@ -6,6 +6,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/keyplay.h"
 #include "game/mouse.h"
 #include "game/music.h"
 #include "game/sound.h"
@@ -39,8 +40,10 @@ void Title_HeroSelect(void)
     uint8_t *pal = Gfx_PalettePtr();
 
     Mouse_ShowCursor();
+    KeyPlay_SetContext(KEYPLAY_HERO);  // port addition
     wait_button_release();
     wait_button_press();
+    KeyPlay_SetContext(KEYPLAY_SCREENS);
     Mouse_HideCursor();
     ds.Game_Hero = (uint16_t)ds.Mouse_X < 0xA0 ? 2 : 1;
     ds.Game_HeroSpriteX = ds.Game_Hero == 1 ? 0x45 : 1;
@@ -79,6 +82,7 @@ void Title_StartMenu(void)
                 0, 0xFF, 0, 0, 0xFF);
     Gfx_FadeIn(0, 0xFF, pal);
     Mouse_ShowCursor();
+    KeyPlay_SetContext(KEYPLAY_START_MENU);  // port addition
     ds.Game_StartChoice = 0;
     while (ds.Game_StartChoice == 0) {
         wait_button_release();
@@ -93,6 +97,7 @@ void Title_StartMenu(void)
         if (y >= 0x69 && y < 0x85)
             ds.Game_StartChoice = 3;
     }
+    KeyPlay_SetContext(KEYPLAY_SCREENS);
     Mouse_HideCursor();
 }
 

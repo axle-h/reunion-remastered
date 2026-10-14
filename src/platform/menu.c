@@ -33,13 +33,14 @@ typedef enum : int {
     SEC_VIDEO,
     SEC_GAME,
     SEC_IMPROVEMENTS,
+    SEC_KEYS,
     SEC_FIXES,
     SEC_SYSTEM,
     SECTIONS,
 } Section;
 
 static const char *const SECTION_NAMES[SECTIONS] = {"Cheats", "Sound", "Video", "Game",
-                                                    "Improvements", "Fixes", "System"};
+                                                    "Improvements", "Keys", "Fixes", "System"};
 
 typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION, ROW_NOTE } RowKind;
 
@@ -66,6 +67,7 @@ typedef enum : int {
     R_RESTART,
     R_QUIT,
     R_NOTE,
+    R_KEY,
     R_IMPROVEMENT,  // + the improvement's index
     R_FIX = R_IMPROVEMENT + CONFIG_MAX_SWITCHES,  // + the fix's index
 } RowId;
@@ -247,6 +249,15 @@ static void build_rows(void)
             add(ROW_NOTE, R_NOTE, "loaded by the DOS game.", warning)->enabled = false;
         }
         break;
+    case SEC_KEYS: {
+        static const char help_keys[] =
+            "Keyboard play (Improvements). Change the keys in reunion.ini, [keys].";
+        for (int i = 0; i < hooks.key_count && row_count < MAX_ROWS; i++) {
+            r = add(ROW_NOTE, R_KEY, hooks.keys[i].label, help_keys);
+            SDL_strlcpy(r->value, hooks.keys[i].keys, sizeof r->value);
+        }
+        break;
+    }
     case SEC_FIXES:
         add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
         add(ROW_ACTION, R_FIXES_OFF, "All off (original)",
@@ -642,6 +653,7 @@ static void draw_row(SDL_Renderer *r, const Row *row, float y, bool focused)
         break;
     case ROW_NOTE:
         panel_text(r, ROW_X, y, row->label);
+        panel_text(r, ROW_X + ROW_W - (float)SDL_strlen(row->value) * CHAR, y, row->value);
         break;
     case ROW_CHOICE:
         panel_text(r, ROW_X, y, row->label);
@@ -727,6 +739,8 @@ const char *menu_row_text(int row)
         SDL_snprintf(row_text, sizeof row_text, "[%c] %s", r->on ? 'x' : ' ', r->label);
     else if (r->kind == ROW_CHOICE)
         SDL_snprintf(row_text, sizeof row_text, "%s <%s>", r->label, r->value);
+    else if (r->kind == ROW_NOTE && r->value[0])
+        SDL_snprintf(row_text, sizeof row_text, "%s %s", r->label, r->value);
     else if (r->kind == ROW_NOTE)
         SDL_strlcpy(row_text, r->label, sizeof row_text);
     else

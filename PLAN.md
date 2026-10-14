@@ -72,7 +72,9 @@ The port is complete and the game can be won in it.
   to four on a body, mining every hour and kept by a colony founded there;
   Repeat build, Shift+click on the surface places a building and stays in
   build mode; Trade routes, a trade group hauls ore home on its own along
-  up to six stops (`src/game/routes.h`), edited on a screen of the port's.
+  up to six stops (`src/game/routes.h`), edited on a screen of the port's;
+  Keyboard play, every screen played with keys that drive the mouse
+  (`src/game/keyplay.h`), remappable in `[keys]`.
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -82,7 +84,7 @@ The port is complete and the game can be won in it.
   the 34 bugs found in the port while playing it, 33 are fixed and one
   turned out to be the original's behaviour; their write-ups are in git
   history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 92 ctest tests pass on the release build, the full
+- **Tests:** all 93 ctest tests pass on the release build, the full
   playthrough (`test_play_game`, and `_german`, `_french`, `_italian` from
   the CD's ISO), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -105,26 +107,7 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-#### 1.1 Playing with the keyboard only
-
-The original is played with the mouse; the keyboard is used only for
-typing names. Switch `keyboard_play`: every screen can be played with
-keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
-
-- **Hotspots.** Every screen registers its clickable areas
-  (`Mouse_SetHotspot`, up to 66, with a caption). Tab and Shift+Tab move
-  between them (in screen order, top to bottom), with a frame drawn
-  around the current one and its caption shown; Enter is a left click and
-  Space a right click on it.
-- **Grids and maps.** Where a click lands on a cell rather than a hotspot
-  (the surface map, the star map, the cargo rows, the battle map), the
-  arrow keys move the cursor one cell and Enter/Space click there.
-- **Shortcuts** for the main screens and for leaving one (Escape), and
-  for the game date (speed), shown in the port menu's help.
-- **Test.** Drive a screen of each kind (a menu, the surface, the star
-  map, a battle) with key events alone.
-
-#### 1.2 No building limit
+#### 1.1 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -159,7 +142,7 @@ Switch `no_building_limit`:
   count came back; with the switch off, the 1,001st is refused; a save
   holding more than 1,000 is written as `reunion.<n>` with the switch off.
 
-#### 1.3 Smaller candidates
+#### 1.2 Smaller candidates
 
 Each needs a short spec before work starts.
 

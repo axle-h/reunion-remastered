@@ -63,7 +63,9 @@ int main(void)
                      "no equals sign\n"
                      "[improvements]\n"
                      "more_stations = off\n"
-                     "find_jade = on\n");
+                     "find_jade = on\n"
+                     "[keys]\n"
+                     "next = Shift+N, Tab\n");
     config_reset();
     config_load(path);
     CHECK(config.freeze_money && !config.freeze_ore);
@@ -76,6 +78,7 @@ int main(void)
     CHECK(!config_fix("find_jade") && config_fix("mine_all_systems") && config_fix("unlisted"));
     CHECK(!config_improvement("more_stations") && config_improvement("unlisted"));
     CHECK(config_fix("more_stations") && config.improvements.count == 2);
+    CHECK(SDL_strcmp(config_binding("next"), "Shift+N, Tab") == 0 && !config_binding("previous"));
 
     // Saved and loaded back unchanged.
     config_set_fix("drifting_ship", false);
@@ -93,6 +96,7 @@ int main(void)
     CHECK(SDL_fabsf(config.fullscreen_refresh - before.fullscreen_refresh) < 0.001f);
     CHECK(config.fixes.count == 3 && !config_fix("drifting_ship") && !config_fix("find_jade"));
     CHECK(config.improvements.count == 2 && !config_improvement("more_stations"));
+    CHECK(config.keys.count == 1 && SDL_strcmp(config_binding("next"), "Shift+N, Tab") == 0);
 
     // "setup" is not something the menu offers: it reads as Sound Blaster.
     write_file(path, "[sound]\nmusic = setup\n");

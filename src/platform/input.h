@@ -2,6 +2,7 @@
 // state and the Borland Crt ReadKey/KeyPressed key queue.
 #pragma once
 
+#include <SDL3/SDL_events.h>
 #include <stdint.h>
 
 // Mouse position in game pixels, clamped to the driver range set at startup
@@ -47,6 +48,15 @@ bool input_shift(void);
 // Sets the Shift state as if the user pressed or released it (test
 // autopilot). It holds until the next real key event or the next call.
 void input_set_shift(bool held);
+
+// Sees every key press and release before the game does, after the
+// port's own keys (Alt+Enter, F1, F12); returns true when it took the key,
+// which then reaches neither the key queue nor, for a press, as typed text
+// (game/keyplay.h). nullptr: none.
+void input_set_key_hook(bool (*hook)(const SDL_KeyboardEvent *e));
+// The mouse was moved or clicked since the last call (a real one, not
+// input_set_mouse).
+bool input_take_mouse_moved(void);
 
 // Crt.KeyPressed.
 bool input_key_pressed(void);

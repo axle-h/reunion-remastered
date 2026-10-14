@@ -189,7 +189,8 @@ the original in a few places, each commented in the code:
   format, `save/reunion.<n>` (`src/game/saveload.h`); otherwise saves are
   byte for byte the original's. The route editor is the port's own screen
   39, with toolbar commands past the original's 77
-  (`src/game/portcmd.h`).
+  (`src/game/portcmd.h`). Keyboard play (`src/game/keyplay.h`) changes no
+  screen: an input hook turns keys into the mouse the game reads.
 - **Importing the game data** (`src/platform/import.h`): the player's copy
   (a folder, a ZIP or an ISO image, `src/platform/source.h`) is checked
   against the list of files the port loads (`src/platform/gamedata.h`)

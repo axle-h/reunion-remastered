@@ -1,6 +1,7 @@
 #include "game/mouse.h"
 
 #include "game/crt.h"
+#include "game/keyplay.h"
 #include "game/system.h"
 #include "platform/input.h"
 #include "platform/timing.h"
@@ -85,6 +86,7 @@ static void retrace_hook(void)
 {
     if (!ds.Mouse_Present)
         return;
+    KeyPlay_Frame();  // port addition: keyboard play
     InputMouse m = input_mouse();
     if (m.x != ds.Mouse_X || m.y != ds.Mouse_Y || m.left != ds.Mouse_BtnLeft
         || m.right != ds.Mouse_BtnRight)
@@ -174,6 +176,7 @@ void Mouse_InitMouse(void)
     Mouse_CursorSaveBackground();
     ds.Blit_CursorHook = Mouse_CursorBlitHook;
     ds.Mouse_CursorHidden = 0;
+    KeyPlay_Start();  // port addition
     timing_set_mouse_hook(retrace_hook);
 }
 

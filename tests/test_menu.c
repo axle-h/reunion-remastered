@@ -12,7 +12,7 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_IMPROVEMENTS, SEC_FIXES, SEC_SYSTEM };
+enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_IMPROVEMENTS, SEC_KEYS, SEC_FIXES, SEC_SYSTEM };
 
 static int changes[8];
 static bool running;
@@ -69,6 +69,7 @@ int main(void)
         {"more_stations", "More Miner stations", "help", false},
         {"trade_routes", "Trade routes", "help", true},
     };
+    static const MenuKey keys[] = {{"Next", "Tab"}, {"Click", "Return, Keypad Enter"}};
     MenuHooks hooks = {
         .game_running = game_running,
         .changed = changed,
@@ -78,6 +79,8 @@ int main(void)
         .fix_count = 2,
         .improvements = improvements,
         .improvement_count = 2,
+        .keys = keys,
+        .key_count = 2,
         .languages = languages,
     };
     menu_set_hooks(&hooks);
@@ -224,6 +227,12 @@ int main(void)
     SDL_Event shift_tab = {.key = {.type = SDL_EVENT_KEY_DOWN, .key = SDLK_TAB, .mod = SDL_KMOD_SHIFT, .down = true}};
     menu_handle_event(&shift_tab);
     CHECK(menu_section() == SEC_FIXES);
+
+    // Keys lists the keys of keyboard play; Enter on one changes nothing.
+    go_to(SEC_KEYS);
+    CHECK(menu_row_count() == 2 && row_is(0, "Next Tab") && row_is(1, "Click Return, Keypad Enter"));
+    press(SDLK_RETURN);
+    CHECK(menu_row_count() == 2 && row_is(0, "Next Tab"));
 
     // Escape closes.
     press(SDLK_ESCAPE);

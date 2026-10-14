@@ -87,6 +87,32 @@ void config_set_improvement(const char *key, bool on)
     set_switch(&config.improvements, key, on);
 }
 
+static int binding_index(const char *action)
+{
+    for (int i = 0; i < config.keys.count; i++)
+        if (SDL_strcmp(config.keys.actions[i], action) == 0)
+            return i;
+    return -1;
+}
+
+const char *config_binding(const char *action)
+{
+    int i = binding_index(action);
+    return i < 0 ? nullptr : config.keys.keys[i];
+}
+
+void config_set_binding(const char *action, const char *keys)
+{
+    int i = binding_index(action);
+    if (i < 0) {
+        if (config.keys.count == CONFIG_MAX_BINDINGS || SDL_strlen(action) >= CONFIG_KEY_SIZE)
+            return;
+        i = config.keys.count++;
+        SDL_strlcpy(config.keys.actions[i], action, CONFIG_KEY_SIZE);
+    }
+    SDL_strlcpy(config.keys.keys[i], keys, CONFIG_BINDING_SIZE);
+}
+
 // --- Reading ------------------------------------------------------------------
 
 static char *trim(char *s)
@@ -142,6 +168,10 @@ static void set_value(const char *section, const char *key, const char *v)
     if (SDL_strcasecmp(section, "improvements") == 0) {
         if (parse_bool(v, &b))
             config_set_improvement(key, b);
+        return;
+    }
+    if (SDL_strcasecmp(section, "keys") == 0) {
+        config_set_binding(key, v);
         return;
     }
 #define IS(s, k) (SDL_strcasecmp(section, s) == 0 && SDL_strcasecmp(key, k) == 0)
@@ -279,6 +309,9 @@ bool config_save(void)
     ok = ok && SDL_IOprintf(io, "\n[fixes]\n") > 0;
     for (int i = 0; ok && i < config.fixes.count; i++)
         ok = SDL_IOprintf(io, "%s = %s\n", config.fixes.keys[i], on_off(config.fixes.on[i])) > 0;
+    ok = ok && SDL_IOprintf(io, "\n[keys] ; keyboard play: SDL key names, Shift+ Ctrl+ Alt+, a comma between two\n") > 0;
+    for (int i = 0; ok && i < config.keys.count; i++)
+        ok = SDL_IOprintf(io, "%s = %s\n", config.keys.actions[i], config.keys.keys[i]) > 0;
     ok = SDL_CloseIO(io) && ok;
     ok = ok && SDL_RenamePath(tmp, path);
     if (!ok) {

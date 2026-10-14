@@ -24,6 +24,8 @@ typedef enum : int {
 enum : int {
     CONFIG_MAX_SWITCHES = 32,
     CONFIG_KEY_SIZE = 40,
+    CONFIG_MAX_BINDINGS = 48,
+    CONFIG_BINDING_SIZE = 64,
 };
 
 // A section of on/off switches by key, in the order first set.
@@ -32,6 +34,14 @@ typedef struct ConfigSwitches {
     char keys[CONFIG_MAX_SWITCHES][CONFIG_KEY_SIZE];
     bool on[CONFIG_MAX_SWITCHES];
 } ConfigSwitches;
+
+// [keys]: an action's keys as written ("Shift+Tab", "Return, Keypad
+// Enter"; game/keyplay.h reads them), in the order first set.
+typedef struct ConfigBindings {
+    int count;
+    char actions[CONFIG_MAX_BINDINGS][CONFIG_KEY_SIZE];
+    char keys[CONFIG_MAX_BINDINGS][CONFIG_BINDING_SIZE];
+} ConfigBindings;
 
 typedef struct Config {
     // [cheats]
@@ -55,6 +65,7 @@ typedef struct Config {
     // [fixes] and [improvements]: a switch not listed is on.
     ConfigSwitches fixes;
     ConfigSwitches improvements;
+    ConfigBindings keys;
 } Config;
 
 extern Config config;
@@ -76,6 +87,10 @@ bool config_fix(const char *key);
 void config_set_fix(const char *key, bool on);
 bool config_improvement(const char *key);
 void config_set_improvement(const char *key, bool on);
+
+// An action's keys as the file says, or nullptr if it doesn't list it.
+const char *config_binding(const char *action);
+void config_set_binding(const char *action, const char *keys);
 
 // Names as written in the file.
 const char *config_music_name(ConfigMusic music);

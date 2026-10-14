@@ -27,6 +27,8 @@ static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static void (*overlay)(SDL_Renderer *);
+static SDL_Rect focus;
+static bool have_focus;
 // What Alt+Enter goes back to from a window.
 static ConfigDisplay last_fullscreen = CONFIG_DESKTOP;
 
@@ -144,6 +146,21 @@ void vid_shutdown(void)
     window = nullptr;
 }
 
+// In the logical 320x240: game lines are 1.2 lines high. A light frame
+// one pixel outside the rectangle with a dark one around it, so it shows
+// on any background.
+static void draw_focus(void)
+{
+    const float sy = (float)(VID_WIDTH * 3 / 4) / VID_HEIGHT;
+    SDL_FRect r = {(float)focus.x - 1, ((float)focus.y - 1) * sy, (float)focus.w + 2,
+                   ((float)focus.h + 2) * sy};
+    SDL_SetRenderDrawColor(renderer, 255, 230, 0, 255);
+    SDL_RenderRect(renderer, &r);
+    r = (SDL_FRect){r.x - 1, r.y - 1, r.w + 2, r.h + 2};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderRect(renderer, &r);
+}
+
 void vid_present(void)
 {
     uint32_t lut[256];
@@ -180,6 +197,8 @@ void vid_present(void)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+    if (have_focus && mode == VID_MODE_13H)
+        draw_focus();
     if (overlay) {
         int w, h;
         SDL_RendererLogicalPresentation lp;
@@ -189,6 +208,13 @@ void vid_present(void)
         SDL_SetRenderLogicalPresentation(renderer, w, h, lp);
     }
     SDL_RenderPresent(renderer);
+}
+
+void vid_set_focus(const SDL_Rect *r)
+{
+    have_focus = r != nullptr;
+    if (r)
+        focus = *r;
 }
 
 void vid_set_overlay(void (*draw)(SDL_Renderer *))

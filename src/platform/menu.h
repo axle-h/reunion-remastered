@@ -1,7 +1,7 @@
 // The port menu (F1): settings drawn over the game, which waits inside
 // timing_wait_retrace while it is open. Sections: Cheats, Sound, Video,
-// Game (with the language of the CD's games), Improvements, Fixes and
-// System (import game data, restart, quit). Every change goes to the config file at once.
+// Game (with the language of the CD's games), Improvements, Keys (those of
+// keyboard play, changed in reunion.ini), Fixes and System (import game data, restart, quit). Every change goes to the config file at once.
 //
 // The menu knows nothing of the game. Settings of the platform layer
 // (volumes, display) apply at once; for the rest it calls hooks.changed and
@@ -31,6 +31,12 @@ typedef struct MenuSwitch {
     bool port_saves;
 } MenuSwitch;
 
+// A key of keyboard play (game/keyplay.h), as the Keys section lists it.
+typedef struct MenuKey {
+    const char *label;  // at most 20 characters
+    const char *keys;   // as in reunion.ini
+} MenuKey;
+
 typedef struct MenuHooks {
     // A game is being played (the add cheats are usable).
     bool (*game_running)(void);
@@ -40,6 +46,8 @@ typedef struct MenuHooks {
     int fix_count;
     const MenuSwitch *improvements;
     int improvement_count;
+    const MenuKey *keys;
+    int key_count;
     // IN_* of the languages the game data has (platform/gamedata.h).
     unsigned (*languages)(void);
 } MenuHooks;
