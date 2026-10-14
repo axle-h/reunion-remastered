@@ -384,11 +384,11 @@ UiBuildings ui_buildings(const char *kind)
         if (!on_cur_body(b) || b->Kind != k)
             continue;
         n.total++;
-        if (b->Health != 0) {
+        if (b->BuildLeft != 0) {
             n.building++;
         } else {
             n.finished++;
-            n.active += b->Flag != 0;
+            n.active += b->Powered != 0;
         }
     }
     return n;
@@ -681,7 +681,7 @@ static TBody *cur_body(void)
 
 int ui_droids(void)
 {
-    return cur_body()->_0A;
+    return cur_body()->Droids;
 }
 
 int ui_droid_stock(void)
@@ -714,7 +714,7 @@ static bool find_mine(int *x, int *y)
             if (b == 0)
                 continue;
             const TBuilding *bl = building(b);
-            if ((bl->Kind == 4 || bl->Kind == 0x19) && bl->Health == 0) {
+            if ((bl->Kind == 4 || bl->Kind == 0x19) && bl->BuildLeft == 0) {
                 *x = i;
                 *y = j;
                 return true;
@@ -731,7 +731,7 @@ static bool find_kind(int k, int *x, int *y)
     for (int j = 1; j <= MAP_ROWS; j++) {
         for (int i = 1; i <= MAP_COLS; i++) {
             int b = building_under(i, j);
-            if (b != 0 && building(b)->Kind == k && building(b)->Health == 0) {
+            if (b != 0 && building(b)->Kind == k && building(b)->BuildLeft == 0) {
                 *x = i;
                 *y = j;
                 return true;

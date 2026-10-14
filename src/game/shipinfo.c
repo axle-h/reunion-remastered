@@ -375,7 +375,7 @@ void ShipInfo_DrawGroupInfo(void)
             int n = layout[0];
             for (int j = 1; j <= n; j++) {
                 const uint8_t *entry = layout + j * 0x19 + 0x21;
-                int16_t count = units[j - 1].ShipType;
+                int16_t count = units[j - 1].Count;
                 if (count > 0) {
                     Gfx_DrawTextF9(pstr_get(name, sizeof name, entry + 2), 0xCC, y, 0xB);
                     Gfx_DrawTextF9(":", 0x112, y, 1);
@@ -498,7 +498,7 @@ void ShipInfo_SetupShipInfoHotspots(void)
             pstr_get(name, sizeof name, &Groups_At(ds.Game_GroupList, i)->Name);
         pstr_set(&h->Caption, 0x12, name);
         h->Repeat_ = 0;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
     for (int16_t i = 1; i <= ds.Game_ShownGroupCount; i++) {
         THotspot *h = Mouse_Hotspot((int16_t)(i + 0x22));
@@ -510,6 +510,6 @@ void ShipInfo_SetupShipInfoHotspots(void)
         pstr_get(name, sizeof name, &Groups_At(ds.Game_GroupList, i)->Name);
         pstr_set(&h->Caption, 0x12, name);
         h->Repeat_ = 0;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }

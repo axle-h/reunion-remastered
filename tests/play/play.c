@@ -8,6 +8,7 @@
 
 #include "game/dseg.h"
 #include "game/fixes.h"
+#include "game/improvements.h"
 #include "game/gfx.h"
 #include "game/lang.h"
 #include "game/main_program.h"
@@ -193,8 +194,8 @@ static void yield(void)
         longjmp(ctl.top, 1);
 }
 
-// Boots as src/main.c does for a scripted run (no intro, fixes on) and plays
-// until the game halts or quits.
+// Boots as src/main.c does for a scripted run (no intro, fixes on,
+// improvements off) and plays until the game halts or quits.
 static PlayResult boot_and_run(const char *script)
 {
     run_id++;
@@ -203,6 +204,7 @@ static PlayResult boot_and_run(const char *script)
     input_set_mouse(0, 0, 0, 0);  // as a fresh process starts
     timing_reset();
     Fixes_Init();
+    Improvements_Init(true);
     autopilot_set_script(script);
     system_exit_handler = on_halt;
     timing_set_quit_handler(on_quit);

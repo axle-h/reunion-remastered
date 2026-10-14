@@ -139,24 +139,24 @@ int main(int argc, char *argv[])
     const int race = 3, force = 1;
     TRaceForce *f = Intel_Force(race, force);
     f->System = 2; f->Body = 4; f->Moon = 0;
-    f->Active = 1; f->Timer = 99; f->NextMission = 5; f->_03 = 0;
+    f->Active = 1; f->Timer = 99; f->NextMission = 5; f->TravelTime = 0;
     ds.System_RandSeed = 1000;
     Intel_SetForceTarget(race, force, 2, 4, 0);
-    CHECK(f->Active == 1 && f->Timer == 99 && f->NextMission == 5 && f->_03 == 0);
+    CHECK(f->Active == 1 && f->Timer == 99 && f->NextMission == 5 && f->TravelTime == 0);
     int32_t seed = 1000;
     int expect = rnd(seed, 5, 6);
     ds.System_RandSeed = seed;
     Intel_SetForceTarget(race, force, 2, 4, 1);     // same body, other moon
-    CHECK(f->_03 == expect && f->_03 >= 6 && f->_03 <= 10);
+    CHECK(f->TravelTime == expect && f->TravelTime >= 6 && f->TravelTime <= 10);
     CHECK(f->Moon == 1 && f->Active == 2 && f->Timer == 0 && f->NextMission == 0);
     expect = rnd(seed, 10, 0x14);
     ds.System_RandSeed = seed;
     Intel_SetForceTarget(race, force, 2, 6, 0);     // same system
-    CHECK(f->_03 == expect && f->_03 >= 20 && f->_03 <= 29 && f->Body == 6);
+    CHECK(f->TravelTime == expect && f->TravelTime >= 20 && f->TravelTime <= 29 && f->Body == 6);
     expect = rnd(seed, 0x14, 0x32);
     ds.System_RandSeed = seed;
     Intel_SetForceTarget(race, force, 5, 1, 0);     // other system
-    CHECK(f->_03 == expect && f->_03 >= 50 && f->_03 <= 69 && f->System == 5);
+    CHECK(f->TravelTime == expect && f->TravelTime >= 50 && f->TravelTime <= 69 && f->System == 5);
 
     // DispatchForce: arrival timer Random(100 - Speed) + 5, NextMission stored.
     Intel_Race(race)->Speed = 40;
@@ -258,13 +258,13 @@ int main(int argc, char *argv[])
     for (int i = 1; i <= 3; i++) {
         TGroup *gr = Groups_At(0, i);
         gr->Kind = 1; gr->System = 2; gr->Planet = 3; gr->Moon = 0; gr->Status = 1;
-        gr->Units[0][0].ShipType = (int16_t)(10 * i);
+        gr->Units[0][0].Count = (int16_t)(10 * i);
         gr->Units[0][0].Weapons[0] = (int16_t)i;
         gr->Units[1][3].Weapons[3] = 5;
     }
     TGroup *pf = Groups_At(1, 1);
     pf->Kind = 5; pf->System = 2; pf->Planet = 3; pf->Moon = 0;
-    pf->Units[0][0].ShipType = 1;
+    pf->Units[0][0].Count = 1;
     pf->Units[1][3].Weapons[3] = 1;
     TGroup *g1 = Groups_At(0, 1);
     seed = 4000;
@@ -286,9 +286,9 @@ int main(int argc, char *argv[])
     Intel_DisbandGroup(0, 2);
     CHECK(ds.Game_GroupCount == 2 && ds.Game_ShownGroupCount == 2);
     CHECK(ds.Game_SelGroup == 0 && ds.Game_SelGroup0 == 0 && ds.Game_SelGroup1 == 0);
-    CHECK(pf->Units[0][0].ShipType == 1 + 20 && pf->Units[0][0].Weapons[0] == 2);
+    CHECK(pf->Units[0][0].Count == 1 + 20 && pf->Units[0][0].Weapons[0] == 2);
     CHECK(pf->Units[1][3].Weapons[3] == 1 + 5);
-    CHECK(Groups_At(0, 2)->Units[0][0].ShipType == 30);   // old group 3 moved up
+    CHECK(Groups_At(0, 2)->Units[0][0].Count == 30);   // old group 3 moved up
     // A planet-force disband only shifts and counts.
     Intel_DisbandGroup(1, 1);
     CHECK(ds.Game_PlanetForceCount == 0 && ds.Game_ShownGroupCount == 2);
@@ -393,7 +393,7 @@ int main(int argc, char *argv[])
     reset();
     Intel_ClaimBodyForRace(7, 3, 2, 0);
     Intel_ClaimBodyForRace(7, 3, 3, 0);
-    body(3, 3)->_01 = 1;
+    body(3, 3)->MainPlanet = 1;
     messages = 0;
     Intel_ShowRaceIntel(7, 1);
     CHECK(messages > 0);

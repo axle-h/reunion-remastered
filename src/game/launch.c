@@ -272,9 +272,9 @@ void Launch_DestinationScreen(void)
         && (ds.Game_CurSystem < 0 || ds.Game_CurSystem != ds.Game_HotspotHit - 0x14)
         && CUR_PLANET == 0) {
         TGroup *g = Groups_At(0, ds.Game_SelGroup);
-        if ((g->Kind == 1 && (g->Units[0][2].ShipType > 0 || g->Units[0][3].ShipType > 0))
-            || (g->Kind == 2 && g->Units[0][3].ShipType > 0)
-            || (g->Kind == 3 && (g->Units[0][2].ShipType > 0 || g->Units[0][3].ShipType > 0))
+        if ((g->Kind == 1 && (g->Units[0][2].Count > 0 || g->Units[0][3].Count > 0))
+            || (g->Kind == 2 && g->Units[0][3].Count > 0)
+            || (g->Kind == 3 && (g->Units[0][2].Count > 0 || g->Units[0][3].Count > 0))
             || (g->Kind == 4
                 && (ds.Research_Products[0xD].State == 5 || ds.Research_Products[0xE].State == 5))) {
             if ((ds.Game_StaffHired[0] == 2 && ds.Game_CurSystem < 4

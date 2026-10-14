@@ -59,11 +59,10 @@
 #define CUR_MOON(s) ds.Game_CurMoon[(s) - 1]
 #define CUR_SYS ds.Game_CurSystem
 
-// Ui::Screens[screen]: TScreenInfo bytes +09 (show picture), +0A (reload
-// menu bar), +0B (menu command that opens it, shortint).
-static inline uint8_t *screen_info(int16_t screen)
+// Ui::Screens[screen].
+static inline TScreenInfo *screen_info(int16_t screen)
 {
-    return (uint8_t *)&ds.Ui_Screens[screen - 1];
+    return &ds.Ui_Screens[screen - 1];
 }
 
 static inline TBody *cur_body(void)
@@ -77,9 +76,7 @@ static inline TBuilding *building(int16_t i)
     return ds.Game_Buildings + (i - 1);
 }
 
-// Surface::BuildingTypes[k]. Of the unnamed bytes, _10 is the builder skill
-// needed, _12[0] needs a builder plant, _12[1] needs a vehicle plant and
-// _12[1 + SurfaceType] allows that surface.
+// Surface::BuildingTypes[k].
 static inline TBuildingType *building_type(int16_t k)
 {
     return &ds.Surface_BuildingTypes[k - 1];
@@ -605,7 +602,7 @@ static void surface_enter(void)
     GfxPath_ShowToolbar();
     body = cur_body();
     ds.Surface_TileSet = ds.Surface_Tileset[(int8_t)body->SurfaceType - 1];
-    ds.Surface_MapVariant = (int8_t)body->_16;
+    ds.Surface_MapVariant = (int8_t)body->MapVariant;
     ds.Surface_CanBuild = ds.Galaxy_SurfaceColonisable[ds.Surface_TileSet - 1] != 0
                           && body->Colony != 0 && cur_body()->Owner == 1;
     ds.Surface_FelszTiles = (uint16_t)ds.Surface_FelszTileCount[ds.Surface_TileSet - 1];
@@ -639,9 +636,9 @@ static void return_spare_droid(void)
     TBody *b = cur_body();
     int16_t places = (int16_t)(Surface_CountBuildings(0x19, sys, planet, moon, false)
                                + Surface_CountBuildings(4, sys, planet, moon, false));
-    if (b->_0A <= places)
+    if (b->Droids <= places)
         return;
-    b->_0A--;
+    b->Droids--;
     int16_t force = Groups_FindPlanetForce(sys, planet, moon);
     if (sys == 1 && planet == 5 && moon == 0)
         ds.Research_Products[1].Stock++;
@@ -684,7 +681,7 @@ static void surface_map_click(void)
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
         if (ds.Surface_Mode == 4) {
             if ((ds.Surface_SelKind == 4 || ds.Surface_SelKind == 0x19)
-                && building(ds.Surface_SelBuilding)->Health == 0) {
+                && building(ds.Surface_SelBuilding)->BuildLeft == 0) {
                 Sound_PlayButtonSfx("mine");
                 ds.Game_CurrentScreen = 4;
                 ds.Game_ScreenSwitch = 1;
@@ -700,7 +697,7 @@ static void surface_map_click(void)
     } else if (ds.Surface_Mode == 6) {
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
         if (ds.Surface_Mode == 6 && ds.Surface_SelKind != 1
-            && building(ds.Surface_SelBuilding)->Health == 0) {
+            && building(ds.Surface_SelBuilding)->BuildLeft == 0) {
             Sound_PlayButtonSfx("destruct");
             Surface_DeleteBuilding(ds.Surface_SelBuilding);
             if (fixes.demolish_droids)
@@ -729,19 +726,19 @@ static void surface_map_click(void)
 static bool kind_selectable(int16_t k)
 {
     TBody *body = cur_body();
-    if (k == 4 && body->_03 == 0)
+    if (k == 4 && body->Mineable == 0)
         return false;
-    if (k == 5 && (body->_03 == 0 || body->Deposits[0] < 10))
+    if (k == 5 && (body->Mineable == 0 || body->Deposits[0] < 10))
         return false;
     const TBuildingType *bt = building_type(k);
     if (bt->NeedProduct == 0) {
-        if ((int32_t)ds.Game_StaffExp[1] < (int32_t)(int8_t)bt->_10)
+        if ((int32_t)ds.Game_StaffExp[1] < (int32_t)(int8_t)bt->NeedBuilder)
             return false;  // falls into the product check with product 0
     } else if ((int8_t)bt->NeedProduct < 1
                || ds.Research_Products[(int8_t)bt->NeedProduct - 1].State != 5) {
         return false;
     }
-    return bt->_12[1 + (int8_t)body->SurfaceType] != 0;
+    return bt->Surfaces[(int8_t)body->SurfaceType - 1] != 0;
 }
 
 static void surface_build_button(void)
@@ -767,11 +764,11 @@ static void surface_build_button(void)
         Message_ShowMessageNoLog(Lang_Text(" You cannot have two command centres built! "));
     } else if (ds.Surface_SelKind == 0x19) {
         Message_ShowMessageNoLog(Lang_Text(" You already have a colony! "));
-    } else if (bt->_12[0] != 0 && ds.Main_HasBuilderPlant == 0) {
+    } else if (bt->NeedPlant[0] != 0 && ds.Main_HasBuilderPlant == 0) {
         Message_ShowMessageNoLog(Lang_Text(" This building needs a builder plant! "));
-    } else if (bt->_12[1] != 0 && ds.Main_HasVehiclePlant == 0) {
+    } else if (bt->NeedPlant[1] != 0 && ds.Main_HasVehiclePlant == 0) {
         Message_ShowMessageNoLog(Lang_Text(" This building needs a vehicle plant! "));
-    } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt->_10) {
+    } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt->NeedBuilder) {
         Sound_PlayButtonSfx("build");
         ds.Surface_Mode = 2;
         ds.Surface_BlinkCounter = 0;
@@ -1304,7 +1301,7 @@ static uint8_t *gw_unit_record(void)
 static void ground_battle_won_story(void)
 {
     TBody *body = cur_body();
-    if (!(body->_01 == 1 && (int8_t)body->Owner > 1))
+    if (!(body->MainPlanet == 1 && (int8_t)body->Owner > 1))
         return;
     char race[256], msg[256];
     pstr_get(race, sizeof race, &Intel_Race((int8_t)body->Owner)->Name);
@@ -1338,10 +1335,10 @@ static void ground_battle_won_story(void)
     uint8_t o = body->Owner;
     const TRace *r = ds.Races_Races;
     if ((o == 7 || o == 8 || o == 9 || o == 10)
-        && (r[5]._0F == 0 || r[5].Status == 6 || o == 7)
-        && (r[6]._0F == 0 || r[6].Status == 6 || o == 8)
-        && (r[7]._0F == 0 || r[7].Status == 6 || o == 9)
-        && (r[8]._0F == 0 || r[8].Status == 6 || o == 10)) {
+        && (r[5].Alive == 0 || r[5].Status == 6 || o == 7)
+        && (r[6].Alive == 0 || r[6].Status == 6 || o == 8)
+        && (r[7].Alive == 0 || r[7].Status == 6 || o == 9)
+        && (r[8].Alive == 0 || r[8].Status == 6 || o == 10)) {
         Message_ShowMessageLine(0x20);
         AlienTalk_StartAlienScene(5);
         ds.Game_StoryStage = 6;
@@ -1858,7 +1855,7 @@ void Game_Main(void)
             ds.Game_MenuCommand = ds.GfxPath_MenuBar[ds.Game_HotspotHit - 1].Command;
             // Last match wins (command 7 opens screen 9, not 6).
             for (ds.Main_I = 1; ds.Main_I <= 38; ds.Main_I++) {
-                int16_t cmd = (int8_t)screen_info((int16_t)ds.Main_I)[0x0B];
+                int16_t cmd = screen_info((int16_t)ds.Main_I)->Command;
                 if (cmd >= 0 && cmd == ds.Game_MenuCommand) {
                     ds.Game_CurrentScreen = (int16_t)ds.Main_I;
                     ds.Game_ScreenEntered = 1;
@@ -1889,12 +1886,12 @@ void Game_Main(void)
         }
         if (ds.Game_ScreenEntered) {
             Gfx_DrawStatusText("");
-            uint8_t *info = screen_info(ds.Game_CurrentScreen);
-            if (info[0x0A])
+            const TScreenInfo *info = screen_info(ds.Game_CurrentScreen);
+            if (info->SetToolbar)
                 GfxPath_SetToolbarAndShow(ds.Game_CurrentScreen);
             char name[256];
-            if (info[0x09])
-                Gfx_ShowGrafikaPic(pstr_get(name, sizeof name, info));
+            if (info->ShowPic)
+                Gfx_ShowGrafikaPic(pstr_get(name, sizeof name, &info->Name));
             ds.Game_HotspotHit = 0;
             ds.Game_ScreenSwitch = 0;
         }

@@ -18,7 +18,7 @@ void Sim_AdvanceHour(void);
 void Sim_ProcessPubTimers(void);
 // 1b8a:04d8: development progress of the inventions in state 2 or 4.
 void Sim_ProgressResearch(void);
-// 1b8a:0705: production queues (TProduct._1D items of _1F work each, _21 left).
+// 1b8a:0705: production queues (TProduct Queued, WorkPerPiece, WorkLeft).
 void Sim_ProgressProduction(void);
 // 1b8a:206e: daily events of every body in the open systems (colony growth and
 // taxes, disease, meteorites, revolts, satellite/observatory discoveries).

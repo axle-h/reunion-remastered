@@ -1,6 +1,7 @@
 // surface: map loading into the three layers, footprint placement checks,
 // building counts / deletion, the Detoxin rate and the tile blits, on
 // hand-made state.
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include "game/blit.h"
 #include "game/dseg.h"
 #include "game/fixes.h"
+#include "game/improvements.h"
 #include "game/mouse.h"
 #include "game/surface.h"
 #include "game/system.h"
@@ -95,7 +97,7 @@ static int pick_kind(int surface)
 {
     for (int k = 1; k <= 25; k++) {
         const TBuildingType *bt = &ds.Surface_BuildingTypes[k - 1];
-        if (bt->Width >= 2 && bt->Height >= 2 && ((const uint8_t *)bt)[0x13 + surface] != 0)
+        if (bt->Width >= 2 && bt->Height >= 2 && bt->Surfaces[surface - 1] != 0)
             return k;
     }
     return 0;
@@ -124,7 +126,7 @@ static void placement(void)
     Surface_AddBuilding((uint8_t)kind, 1, 1, 0, (uint8_t)x1, (uint8_t)y1);
     CHECK(ds.Game_BuildingCount == 1);
     CHECK(bld(1)->Kind == kind && bld(1)->X == x1 && bld(1)->Y == y1);
-    CHECK(bld(1)->Health >= 100 && bld(1)->Health < 160);
+    CHECK(bld(1)->BuildLeft >= 100 && bld(1)->BuildLeft < 160);
 
     Surface_MarkFootprint(1, kind, x1, y1, 0);
     for (int j = 0; j < bt->Height; j++) {
@@ -167,7 +169,7 @@ static void placement(void)
     // A kind that isn't allowed on this surface is not added.
     int bad = 0;
     for (int k = 1; k <= 25; k++)
-        if (((const uint8_t *)&ds.Surface_BuildingTypes[k - 1])[0x13 + 1] == 0) {
+        if (ds.Surface_BuildingTypes[k - 1].Surfaces[0] == 0) {
             bad = k;
             break;
         }
@@ -192,7 +194,7 @@ static void counting(void)
     };
     for (int i = 0; i < 5; i++) {
         *bld(i + 1) = (TBuilding){.Kind = rec[i].kind, .System = 1, .Planet = rec[i].planet,
-                                  .Moon = 0, .Health = rec[i].health, .Flag = rec[i].flag};
+                                  .Moon = 0, .BuildLeft = rec[i].health, .Powered = rec[i].flag};
     }
     ds.Game_BuildingCount = 5;
     CHECK(Surface_CountBuildings(4, 1, 1, 0, false) == 2);
@@ -209,7 +211,7 @@ static void counting(void)
 
     Surface_DeleteBuilding(2);
     CHECK(ds.Game_BuildingCount == 4);
-    CHECK(bld(2)->Kind == 4 && bld(2)->Health == 40 && bld(3)->Kind == 17 && bld(3)->Planet == 2);
+    CHECK(bld(2)->Kind == 4 && bld(2)->BuildLeft == 40 && bld(3)->Kind == 17 && bld(3)->Planet == 2);
     CHECK(Surface_CountBuildings(4, 1, 1, 0, false) == 1);
     Surface_DeleteBuilding(4);
     CHECK(ds.Game_BuildingCount == 3);
@@ -228,7 +230,7 @@ static void derrick_rate(void)
     };
     for (int i = 0; i < 7; i++) {
         *bld(i + 1) = (TBuilding){.Kind = rec[i].kind, .System = 1, .Planet = rec[i].planet,
-                                  .Moon = 0, .Health = rec[i].health, .Flag = rec[i].flag};
+                                  .Moon = 0, .BuildLeft = rec[i].health, .Powered = rec[i].flag};
     }
     ds.Game_BuildingCount = 7;
     body(1)->Deposits[0] = 75;
@@ -287,6 +289,49 @@ static void autoplace_when_full(void)
     fixes.autoplace_when_full = true;
 }
 
+// Improvement (game/improvements.h, more_stations): every body of the
+// initial galaxy a Miner station can be set up on (mineable, the station
+// allowed on its surface type) has room for MAX_STATIONS on its map.
+static void stations_fit(void)
+{
+    static const struct { TBody *bodies; int count; } systems[] = {
+        {ds.Galaxy_AmnestyBodies, 32}, {ds.Galaxy_PhoenixBodies, 12}, {ds.Galaxy_MirachBodies, 18},
+        {ds.Galaxy_AntaresBodies, 7},  {ds.Galaxy_OrionisBodies, 13}, {ds.Galaxy_LyraeBodies, 23},
+        {ds.Galaxy_RigelBodies, 5},    {ds.Galaxy_SunBodies, 32},
+    };
+    bool seen[11][8] = {};
+    int maps = 0;
+    for (size_t s = 0; s < SDL_arraysize(systems); s++) {
+        for (int i = 0; i < systems[s].count; i++) {
+            const TBody *b = &systems[s].bodies[i];
+            int type = (int8_t)b->SurfaceType, variant = (int8_t)b->MapVariant;
+            if (b->Mineable == 0 || type < 1 || type > 10 || variant < 0 || variant > 7
+                || ds.Surface_BuildingTypes[0x19 - 1].Surfaces[type - 1] == 0 || seen[type][variant])
+                continue;
+            seen[type][variant] = true;
+            maps++;
+            setup(type, variant);
+            body(1)->Colony = 0;
+            Surface_LoadMap();
+            for (int k = 1; k <= MAX_STATIONS; k++) {
+                int16_t x = 0, y = 0;
+                bool found = false;
+                Surface_FindBuildSpot(0x19, 1, 1, 0, &x, &y, &found);
+                CHECK(found);
+                if (!found)
+                    printf("  surface %d variant %d: room for %d stations\n", type, variant, k - 1);
+                if (!found)
+                    break;
+                Surface_AddBuilding(0x19, 1, 1, 0, (uint8_t)x, (uint8_t)y);
+                Surface_MarkFootprint(ds.Game_BuildingCount, 0x19, x, y, 3);
+            }
+            CHECK(ds.Game_BuildingCount == MAX_STATIONS);
+        }
+    }
+    CHECK(maps > 0);
+    printf("%d stations fit on %d maps\n", MAX_STATIONS, maps);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -308,6 +353,7 @@ int main(int argc, char *argv[])
     counting();
     derrick_rate();
     autoplace_when_full();
+    stations_fit();
     hotspots_and_blits();
     printf(ok ? "surface: ok\n" : "surface: FAILED\n");
     return ok ? 0 : 1;

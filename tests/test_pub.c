@@ -46,14 +46,14 @@ int main(int argc, char *argv[])
     for (int k = 0; k < 10; k++) {
         TPubDeal *dl = &ds.Pub_Deals[k];
         dl->Year = 0; dl->Month = 0; dl->Day = 0; dl->Hour = 0;
-        dl->Active = 0; dl->_15[0] = 0; dl->_15[1] = 0; dl->_15[2] = 0;
+        dl->EndYear = 0; dl->EndMonth = 0; dl->EndDay = 0; dl->EndHour = 0;
     }
     // Deal 3: starts in 2 hours, ends in 5 hours; deal 6: starts now, ends in 1 hour.
-    ds.Pub_Deals[2].Hour = 2;  ds.Pub_Deals[2]._15[2] = 5;
-    ds.Pub_Deals[5].Hour = 0;  ds.Pub_Deals[5]._15[2] = 1;
+    ds.Pub_Deals[2].Hour = 2;  ds.Pub_Deals[2].EndHour = 5;
+    ds.Pub_Deals[5].Hour = 0;  ds.Pub_Deals[5].EndHour = 1;
     Pub_StartPubDealWindows();
     CHECK(ds.Pub_Deals[2].Year == 3000 && ds.Pub_Deals[2].Month == 2 && ds.Pub_Deals[2].Day == 3 && ds.Pub_Deals[2].Hour == 6);
-    CHECK(ds.Pub_Deals[2].Active == 3000 && ds.Pub_Deals[2]._15[0] == 2 && ds.Pub_Deals[2]._15[1] == 3 && ds.Pub_Deals[2]._15[2] == 9);
+    CHECK(ds.Pub_Deals[2].EndYear == 3000 && ds.Pub_Deals[2].EndMonth == 2 && ds.Pub_Deals[2].EndDay == 3 && ds.Pub_Deals[2].EndHour == 9);
     CHECK(Pub_FindActiveDeal() == 0);          // now (4h) is before 6h and not after deal 6's start
     ds.Game_Hour = 7;
     CHECK(Pub_FindActiveDeal() == 3);          // inside [6h, 9h)

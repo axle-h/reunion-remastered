@@ -41,30 +41,50 @@ char *config_default_path(void)
     return playerdir_path("reunion.ini");
 }
 
-static int fix_index(const char *key)
+static int switch_index(const ConfigSwitches *sw, const char *key)
 {
-    for (int i = 0; i < config.fix_count; i++)
-        if (SDL_strcmp(config.fix_keys[i], key) == 0)
+    for (int i = 0; i < sw->count; i++)
+        if (SDL_strcmp(sw->keys[i], key) == 0)
             return i;
     return -1;
 }
 
+static bool switch_on(const ConfigSwitches *sw, const char *key)
+{
+    int i = switch_index(sw, key);
+    return i < 0 || sw->on[i];
+}
+
+static void set_switch(ConfigSwitches *sw, const char *key, bool on)
+{
+    int i = switch_index(sw, key);
+    if (i < 0) {
+        if (sw->count == CONFIG_MAX_SWITCHES || SDL_strlen(key) >= CONFIG_KEY_SIZE)
+            return;
+        i = sw->count++;
+        SDL_strlcpy(sw->keys[i], key, CONFIG_KEY_SIZE);
+    }
+    sw->on[i] = on;
+}
+
 bool config_fix(const char *key)
 {
-    int i = fix_index(key);
-    return i < 0 || config.fix_on[i];
+    return switch_on(&config.fixes, key);
 }
 
 void config_set_fix(const char *key, bool on)
 {
-    int i = fix_index(key);
-    if (i < 0) {
-        if (config.fix_count == CONFIG_MAX_FIXES || SDL_strlen(key) >= CONFIG_KEY_SIZE)
-            return;
-        i = config.fix_count++;
-        SDL_strlcpy(config.fix_keys[i], key, CONFIG_KEY_SIZE);
-    }
-    config.fix_on[i] = on;
+    set_switch(&config.fixes, key, on);
+}
+
+bool config_improvement(const char *key)
+{
+    return switch_on(&config.improvements, key);
+}
+
+void config_set_improvement(const char *key, bool on)
+{
+    set_switch(&config.improvements, key, on);
 }
 
 // --- Reading ------------------------------------------------------------------
@@ -117,6 +137,11 @@ static void set_value(const char *section, const char *key, const char *v)
     if (SDL_strcasecmp(section, "fixes") == 0) {
         if (parse_bool(v, &b))
             config_set_fix(key, b);
+        return;
+    }
+    if (SDL_strcasecmp(section, "improvements") == 0) {
+        if (parse_bool(v, &b))
+            config_set_improvement(key, b);
         return;
     }
 #define IS(s, k) (SDL_strcasecmp(section, s) == 0 && SDL_strcasecmp(key, k) == 0)
@@ -239,7 +264,7 @@ bool config_save(void)
                            "colony_stats = %s\n"
                            "detoxin_rate = %s\n"
                            "language = %s ; english | german | french | italian (the CD's)\n"
-                           "\n[fixes]\n",
+                           "\n[improvements]\n",
                            on_off(config.freeze_money), on_off(config.freeze_ore),
                            MUSIC_NAMES[config.music], on_off(config.effects), config.music_volume,
                            config.effects_volume, DISPLAY_NAMES[config.display],
@@ -248,8 +273,12 @@ bool config_save(void)
                            on_off(config.skip_intro), on_off(config.colony_stats),
                            on_off(config.detoxin_rate),
                            gamedata_language_name(config.language)) > 0;
-    for (int i = 0; ok && i < config.fix_count; i++)
-        ok = SDL_IOprintf(io, "%s = %s\n", config.fix_keys[i], on_off(config.fix_on[i])) > 0;
+    for (int i = 0; ok && i < config.improvements.count; i++)
+        ok = SDL_IOprintf(io, "%s = %s\n", config.improvements.keys[i],
+                          on_off(config.improvements.on[i])) > 0;
+    ok = ok && SDL_IOprintf(io, "\n[fixes]\n") > 0;
+    for (int i = 0; ok && i < config.fixes.count; i++)
+        ok = SDL_IOprintf(io, "%s = %s\n", config.fixes.keys[i], on_off(config.fixes.on[i])) > 0;
     ok = SDL_CloseIO(io) && ok;
     ok = ok && SDL_RenamePath(tmp, path);
     if (!ok) {

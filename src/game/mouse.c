@@ -46,7 +46,7 @@ static void callback(void)
     if (ds.Mouse_HotspotUnder < 20)
         ds.Mouse_CursorShape = 0;
     else
-        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(ds.Mouse_HotspotUnder - 20))->_1A;
+        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(ds.Mouse_HotspotUnder - 20))->Cursor;
 
     // 999 (end of blit) never overlaps, so this also unfreezes the cursor.
     if (hook_row_overlaps()) {
@@ -289,7 +289,7 @@ void Mouse_ClearHotspots(int16_t first, int16_t last)
         h->H = 0;
         pstr_set(&h->Caption, 0x12, "");
         h->Repeat_ = 0;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }
 
@@ -304,5 +304,5 @@ void Mouse_SetHotspot(int16_t index, int16_t x, uint8_t y, int16_t w, uint8_t h,
     s->H = h;
     pstr_set(&s->Caption, 18, caption);
     s->Repeat_ = repeat_;
-    s->_1A = flag;
+    s->Cursor = flag;
 }

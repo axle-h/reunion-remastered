@@ -53,7 +53,7 @@ static void reset(void)
 static void add_building(uint8_t kind, int16_t planet, bool powered)
 {
     ds.Game_Buildings[ds.Game_BuildingCount++] =
-        (TBuilding){.Kind = kind, .System = 1, .Planet = (uint8_t)planet, .Flag = powered};
+        (TBuilding){.Kind = kind, .System = 1, .Planet = (uint8_t)planet, .Powered = powered};
 }
 
 static TBody *colony(int16_t planet)
@@ -69,7 +69,7 @@ static void test_capacities(void)
     reset();
     TBody *b = colony(NEW_EARTH);
     b->Population = 30000;
-    b->_14 = -1;
+    b->Hazard = -1;
     for (int i = 0; i < 4; i++)
         add_building(7, NEW_EARTH, true);  // Building
     add_building(16, NEW_EARTH, true);     // Farm
@@ -86,16 +86,16 @@ static void test_capacities(void)
     CHECK(s.sick == 1 && s.disease_days == -1 && !s.meteor_world && !s.radiation);
 
     // The disease timer counts down at the start of the day's update.
-    b->_14 = 2;
+    b->Hazard = 2;
     ColonyStats_Compute(1, NEW_EARTH, 0, &s);
     CHECK(s.disease_days == 2 && s.sick == 1);
-    b->_14 = 1;
+    b->Hazard = 1;
     ColonyStats_Compute(1, NEW_EARTH, 0, &s);
     CHECK(s.disease_days == 1 && s.sick == 2);
-    b->_14 = 0;
+    b->Hazard = 0;
     ColonyStats_Compute(1, NEW_EARTH, 0, &s);
     CHECK(s.disease_days == 0 && s.sick == 2);
-    b->_14 = 100;
+    b->Hazard = 100;
     ColonyStats_Compute(1, NEW_EARTH, 0, &s);
     CHECK(s.disease_days == -1 && s.sick == 1 && s.meteor_world);
 
@@ -162,7 +162,7 @@ static void test_cross_check(void)
         b->Population = hot ? 4000 + roll(4000) : some_population();
         b->TechLevel = (uint8_t)roll(8);
         b->Attitude = (int8_t)roll(70);
-        b->_14 = timers[roll((int)SDL_arraysize(timers))];
+        b->Hazard = timers[roll((int)SDL_arraysize(timers))];
         b->Resistance = 40;
 
         ColonyStats s;
@@ -171,7 +171,7 @@ static void test_cross_check(void)
         bool same = b->Attitude == s.attitude_tomorrow && (hot || b->Population == s.population_tomorrow);
         if (!same) {
             printf("case %d: planet %d, pop %d, tax %d, timer %d: attitude %d (stats %d), population %d (stats %d)\n",
-                   i, planet, (int)s.population, b->TechLevel, b->_14, b->Attitude, s.attitude_tomorrow,
+                   i, planet, (int)s.population, b->TechLevel, b->Hazard, b->Attitude, s.attitude_tomorrow,
                    (int)b->Population, (int)s.population_tomorrow);
             ok = false;
         }

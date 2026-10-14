@@ -1,11 +1,10 @@
 // Unit Shop (32b4): the production orders screen (screen 5, INFO-BUY). A list
 // of the inventions that are done (Research State 5), each with a picture or
 // an info text, the ore it needs per piece, and a quantity editor that buys
-// pieces with Credits and queues them in TProduct._1D.
+// pieces with Credits and queues them in TProduct.Queued.
 //
-// Product fields as used here (TProduct): _1D = queued pieces, _1F = hours
-// per piece, _21 = hours left on the piece in progress (0 = none started),
-// Produced / SpaceBuilt = where it can be built, Ores[k] = ore k per piece.
+// Product fields as used here (TProduct): Queued, WorkPerPiece and WorkLeft
+// (game/dseg.h), Produced / SpaceBuilt = where it can be built, Ores[k] = ore k per piece.
 //
 // State: the Shop_* fields of DS (game/dseg.h).
 #pragma once
@@ -50,7 +49,7 @@ void Shop_HandleListClick(void);
 // Hours needed to build `qty` pieces from scratch or from the piece in
 // progress: (qty * time + rate - 1) div ProductionRate (DrawOrderSummary).
 int32_t Shop_OrderHours(const TProduct *p, int32_t qty);
-// The same for what is already queued (_1D pieces; DrawQueueSummary).
+// The same for what is already queued (Queued pieces; DrawQueueSummary).
 int32_t Shop_QueueHours(const TProduct *p);
 // Total price of qty pieces.
 int32_t Shop_OrderPrice(const TProduct *p, int32_t qty);

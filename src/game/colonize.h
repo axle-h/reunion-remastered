@@ -21,6 +21,5 @@ void Colonize_DrawColonizeScreen(void);
 // enough builder experience (a negative requirement is always met), or the
 // required invention is developed (State 5).
 bool Colonize_TypeAvailable(const TBuildingType *bt);
-// ... and the surface type of the body allows it (TBuildingType._12 holds one
-// flag per surface type, from byte 13h on).
+// ... and the surface type of the body allows it (TBuildingType.Surfaces).
 bool Colonize_SuitsSurface(const TBuildingType *bt, int8_t surfaceType);

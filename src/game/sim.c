@@ -16,6 +16,7 @@
 #include "game/droids.h"
 #include "game/dseg.h"
 #include "game/fixes.h"
+#include "game/improvements.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
@@ -265,7 +266,7 @@ void Sim_ProcessPubTimers(void)
             } else {
                 Message_ShowMessageLine(0x2A);
             }
-            deal->Active = 0;
+            deal->EndYear = 0;
         }
         person->Deal = 0;
         if (ds.Game_CurrentScreen == 0x17) {
@@ -283,7 +284,7 @@ void Sim_ProcessPubTimers(void)
                 TextFile_ReadTextLine("pirate.txt", k, line, sizeof line);
                 Message_ShowMessage(line);
             } else {
-                deal->Active = 0;
+                deal->EndYear = 0;
             }
         }
     }
@@ -369,23 +370,23 @@ void Sim_ProgressProduction(void)
     bool completed = false;
     for (int16_t k = 1; k <= 35; k++) {
         TProduct *p = product(k);
-        if ((ds.Game_CurrentScreen == 5 && ds.Shop_QtyEdit != 0) || p->_1D == 0)
+        if ((ds.Game_CurrentScreen == 5 && ds.Shop_QtyEdit != 0) || p->Queued == 0)
             continue;
-        p->_21 -= ds.Game_ProductionRate;
+        p->WorkLeft -= ds.Game_ProductionRate;
         // Shop::List[Shop::Sel]: the product selected in the shop's list.
-        if ((int16_t)p->_21 <= 0) {
+        if ((int16_t)p->WorkLeft <= 0) {
             completed = true;
-            p->_21 = 0;
+            p->WorkLeft = 0;
             p->Stock++;
-            p->_1D--;
-            if ((int16_t)p->_1D > 0)
-                p->_21 = p->_1F;
+            p->Queued--;
+            if ((int16_t)p->Queued > 0)
+                p->WorkLeft = p->WorkPerPiece;
             if (ds.Game_CurrentScreen == 5 && ds.Shop_List[ds.Shop_Sel - 1] == k
-                && (int16_t)p->_1D > 0)
+                && (int16_t)p->Queued > 0)
                 Shop_DrawQueueNumbers();
         }
         if (ds.Game_CurrentScreen == 5 && ds.Shop_List[ds.Shop_Sel - 1] == k) {
-            if (p->_1D == 0)
+            if (p->Queued == 0)
                 Shop_DrawNotProducible();
             else
                 Shop_DrawQueueTime();
@@ -445,10 +446,10 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         int32_t food = lmul(kind_count(21), 20000) + lmul(kind_count(16), 8000) + 20000;
         int32_t medicine = kind_count(24);
         int32_t hospital = lmul(kind_count(15), 20000) + 20000;
-        if (b->_14 > 0 && b->_14 < 100)
-            b->_14--;
-        int16_t sick = b->_14 == 0 ? 2 : 1;
-        if (b->_14 == 0 && medicine == 0) {
+        if (b->Hazard > 0 && b->Hazard < 100)
+            b->Hazard--;
+        int16_t sick = b->Hazard == 0 ? 2 : 1;
+        if (b->Hazard == 0 && medicine == 0) {
             if (System_Random(5) == 0)
                 show3(Lang_Text("Because of disease your people need a medicine plant|  on "), name, end);
             target -= 10;
@@ -502,14 +503,14 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             }
             target -= 40;
         }
-        if (b->_14 == 100 && product(28)->State < 5 && ds.Game_CurrentScreen != 0x14
+        if (b->Hazard == 100 && product(28)->State < 5 && ds.Game_CurrentScreen != 0x14
             && System_Random(10) == 0) {
             int16_t hit = -1;
             int16_t count = ds.Game_BuildingCount;
             for (int16_t i = 1; i <= count; i++) {
                 TBuilding *bl = building(i);
                 if (bl->System == system && bl->Planet == planet && bl->Moon == moon
-                    && bl->Health == 0 && bl->Kind != 1 && System_Random(10) == 0)
+                    && bl->BuildLeft == 0 && bl->Kind != 1 && System_Random(10) == 0)
                     hit = i;
             }
             if (hit == -1) {
@@ -522,8 +523,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 // The original decrements the droids of CurBody, not of this
                 // body. Port fix (game/fixes.h): this body's.
                 TBody *cur = fixes.meteorite_droids ? b : ds.Game_CurBody;
-                if (cur->_0A > n)
-                    cur->_0A--;
+                if (cur->Droids > n)
+                    cur->Droids--;
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 20));
                 b->Population -= r;
                 Intel_ScheduleIdea(0x1C, 0xFA, 100);
@@ -635,7 +636,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
     int16_t gain = 0;
     if ((int8_t)b->Satellite > 0)
         gain = (int16_t)(System_Random(5) + 2);
-    if (b->_0A != 0 && b->Owner == 1)
+    if (b->Droids != 0 && b->Owner == 1)
         gain = (int16_t)(System_Random(5) + 3);
     if (b->Colony != 0 && b->Owner == 1)
         gain = (int16_t)(System_Random(5) + 4);
@@ -646,9 +647,9 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         b->InfoLevel = 60;
 
     if (b->InfoLevel - gain < 10 && b->InfoLevel >= 10 && (int8_t)b->Owner < 2) {
-        show3(end, name, Lang_Text(b->_03 != 0 ? " |    is ready for mining "
+        show3(end, name, Lang_Text(b->Mineable != 0 ? " |    is ready for mining "
                                                : " |    is not suitable for mining "));
-        if (product(5)->State == 0 && ds.Game_IdeaTimer[4] == -1 && b->_03 != 0) {
+        if (product(5)->State == 0 && ds.Game_IdeaTimer[4] == -1 && b->Mineable != 0) {
             Intel_ScheduleIdea(5, 0x14, 0x28);
             Message_ShowMessageLine(2);
         }
@@ -680,8 +681,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             PlanetInfo_LoadPlanetFajPic((int8_t)b->Owner, true);
     }
 
-    // Miner counts down the hours until a bought colony gets built.
-    if (b->Colony == 0 && b->Miner > 0 && ds.Game_CurrentScreen != 0x1C && --b->Miner <= 0) {
+    // ColonyTimer counts down the days until a bought colony gets built.
+    if (b->Colony == 0 && b->ColonyTimer > 0 && ds.Game_CurrentScreen != 0x1C && --b->ColonyTimer <= 0) {
         int16_t count = ds.Game_ColonySetupCount;
         for (int16_t k = 1; k <= count; k++) {
             TColonySetup *s = colony_setup(k);
@@ -698,7 +699,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             }
         }
         show3(Lang_Text("  The building of a colony started  | on "), name, Lang_TextAt(0x1b8a1beb, end));
-        b->Miner = 0;
+        b->ColonyTimer = 0;
         b->Colony = 1;
         b->Population += (uint16_t)(System_Random(3000) + 2000);
         b->Resistance = 20;
@@ -838,34 +839,34 @@ void Sim_UpdateBuildings(void)
     int16_t count = ds.Game_BuildingCount;
     for (int16_t i = 1; i <= count; i++) {
         TBuilding *bl = building(i);
-        if (bl->Health == 0) {
+        if (bl->BuildLeft == 0) {
             if (bl->Kind == 0xD)
                 ds.Sim_UniversityCount++;
             if (bl->Kind == 6)
                 (*observatories(bl->System))++;
         }
-        // Health > 0: still being built; the builder's work brings it down.
-        if (bl->Health > 0) {
+        // BuildLeft > 0: still being built; the builder's work brings it down.
+        if (bl->BuildLeft > 0) {
             // The original picks planet or moon by the system's CurMoon. Port
             // fix (game/fixes.h): the building's own body.
             TBody *bd = fixes.build_on_moons || cur_moon_of(bl->System) != 0
                             ? body_at(bl->System, bl->Planet, bl->Moon)
                             : body(bl->System, bl->Planet);
-            int16_t w4 = (int16_t)(bd->_04[0] | bd->_04[1] << 8);
-            int32_t work = (int32_t)(int16_t)(w4 + 4000) + (uint16_t)(ds.Game_StaffExp[1] * 100);
+            int32_t work = (int32_t)(int16_t)(bd->BuildPower + 4000)
+                           + (uint16_t)(ds.Game_StaffExp[1] * 100);
             work = ldiv32(work, 1500);
             if (ds.Game_StaffHired[1] == 1)
                 work = ldiv32(work, 2);
             if (ds.Game_StaffHired[1] == 3)
                 work = lmul(work, 2);
-            uint8_t old = bl->Health;
-            if (System_Random(ds.Surface_BuildingTypes[bl->Kind - 1]._2C) < 10) {
-                if ((int32_t)bl->Health > work)
-                    bl->Health -= (uint8_t)work;
+            uint8_t old = bl->BuildLeft;
+            if (System_Random(ds.Surface_BuildingTypes[bl->Kind - 1].BuildChance) < 10) {
+                if ((int32_t)bl->BuildLeft > work)
+                    bl->BuildLeft -= (uint8_t)work;
                 else
-                    bl->Health = 0;
+                    bl->BuildLeft = 0;
             }
-            if (bl->Health == 0 || (bl->Health < 40 && old >= 40) || (bl->Health < 80 && old >= 80)) {
+            if (bl->BuildLeft == 0 || (bl->BuildLeft < 40 && old >= 40) || (bl->BuildLeft < 80 && old >= 80)) {
                 PlanetInfo_BalanceBuildingPower(bl->System, bl->Planet, bl->Moon);
                 if (ds.Game_CurrentScreen == 0x14 && at_current_body(bl->System, bl->Planet, bl->Moon)) {
                     Surface_RegisterBuildingAnims(ds.Game_CurSystem, *cur_planet(), *cur_moon());
@@ -877,10 +878,10 @@ void Sim_UpdateBuildings(void)
                 }
             }
         }
-        if (bl->Health == 0)
+        if (bl->BuildLeft == 0)
             Protect_AskDateQuestion();
-        // Kind 5 with Flag set mines ore 1 into the body's store.
-        if (bl->Health == 0 && bl->Flag != 0 && bl->Kind == 5) {
+        // A Powered kind 5 mines ore 1 into the body's store.
+        if (bl->BuildLeft == 0 && bl->Powered != 0 && bl->Kind == 5) {
             // The original picks planet or moon by the current system's
             // CurMoon. Port fix (game/fixes.h): the building's own body.
             TBody *bd = fixes.derricks_on_moons || *cur_moon() != 0
@@ -935,19 +936,21 @@ static void Sim_MineBody(int16_t system, int16_t planet, int16_t moon, int16_t b
     // The original reads the body from the current system's table, not
     // `system`'s. Port fix (game/fixes.h): `system`'s own table.
     TBody *b = body(fixes.mine_all_systems ? system : ds.Game_CurSystem, bodyIdx);
-    if (!(b->Owner == 1 && (b->Colony != 0 || b->_0A != 0)))
+    if (!(b->Owner == 1 && (b->Colony != 0 || b->Droids != 0)))
         return;
     int32_t cap = lmul((uint16_t)Groups_PlanetStorage(system, planet, moon), 1000);
-    // Ores 2..6; without a colony only the droids (_0A) mine, 30% of the time.
+    // Ores 2..6; without a colony only the Droids mine, 30% of the
+    // time, or every hour with improvements.more_stations.
+    bool every_hour = b->Colony != 0 || improvements.more_stations;
     if (system == 1 && planet == 5 && moon == 0) {
         for (int16_t j = 2; j <= 6; j++) {
-            if (ds.Game_HomeStock[j - 1] < cap && (b->Colony != 0 || System_Random(100) < 0x1E))
-                ds.Game_HomeStock[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->_0A) / 10;
+            if (ds.Game_HomeStock[j - 1] < cap && (every_hour || System_Random(100) < 0x1E))
+                ds.Game_HomeStock[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->Droids) / 10;
         }
     } else {
         for (int16_t j = 2; j <= 6; j++) {
-            if (b->Stores[j - 1] < cap && (b->Colony != 0 || System_Random(100) < 0x1E))
-                b->Stores[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->_0A) / 10;
+            if (b->Stores[j - 1] < cap && (every_hour || System_Random(100) < 0x1E))
+                b->Stores[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->Droids) / 10;
         }
     }
 }
@@ -1208,19 +1211,19 @@ void Sim_CheckEnemyAttacks(void)
     char where[51];  // string[50]
     for (int16_t r = 2; r <= 12; r++) {
         TRace *rc = race(r);
-        // Forces with Active = 2 are on their way; _03 counts down the hours.
+        // Forces with Active = 2 are on their way; TravelTime counts down the hours.
         int16_t forces = rc->ForceCount;
         for (int16_t f = 1; f <= forces; f++) {
             TRaceForce *fc = (TRaceForce *)((uint8_t *)rc + 0xC + f * 0x1B);
             if (fc->Active != 2)
                 continue;
             PlanetInfo_GetBodyLongName(where, sizeof where, fc->System, fc->Body, fc->Moon);
-            fc->_03--;
-            if ((int16_t)fc->_03 < 0)
-                fc->_03 = 0;
-            if (fc->_03 == 0)
+            fc->TravelTime--;
+            if ((int16_t)fc->TravelTime < 0)
+                fc->TravelTime = 0;
+            if (fc->TravelTime == 0)
                 fc->Active = 1;
-            if (fc->_03 != 0)
+            if (fc->TravelTime != 0)
                 continue;
             bool hostile = false;
             int16_t n = ds.Game_PlanetForceCount;

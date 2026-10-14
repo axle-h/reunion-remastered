@@ -1,7 +1,7 @@
 // The port menu (F1): settings drawn over the game, which waits inside
 // timing_wait_retrace while it is open. Sections: Cheats, Sound, Video,
-// Game (with the language of the CD's games), Fixes and System (import
-// game data, restart, quit). Every change goes to the config file at once.
+// Game (with the language of the CD's games), Improvements, Fixes and
+// System (import game data, restart, quit). Every change goes to the config file at once.
 //
 // The menu knows nothing of the game. Settings of the platform layer
 // (volumes, display) apply at once; for the rest it calls hooks.changed and
@@ -18,22 +18,25 @@ typedef enum : int {
     MENU_ADD_MONEY,
     MENU_ADD_ORE,
     MENU_CHANGED_MUSIC,   // config.music
-    MENU_CHANGED_FIXES,   // config_fix()
+    MENU_CHANGED_SWITCHES,  // config_fix(), config_improvement()
 } MenuChange;
 
-typedef struct MenuFix {
+// A fix or an improvement.
+typedef struct MenuSwitch {
     const char *key;    // config key
     const char *label;  // at most 20 characters
     const char *help;   // at most 2 lines of 36 characters
-} MenuFix;
+} MenuSwitch;
 
 typedef struct MenuHooks {
     // A game is being played (the add cheats are usable).
     bool (*game_running)(void);
     void (*changed)(MenuChange change);
     int add_money, add_ore;  // the add cheats' amounts, for their labels
-    const MenuFix *fixes;
+    const MenuSwitch *fixes;
     int fix_count;
+    const MenuSwitch *improvements;
+    int improvement_count;
     // IN_* of the languages the game data has (platform/gamedata.h).
     unsigned (*languages)(void);
 } MenuHooks;

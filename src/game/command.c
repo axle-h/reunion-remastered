@@ -269,7 +269,7 @@ void Command_SetupCommandHotspots(void)
             h->Repeat_ = 1;
             ds.Command_StaffHotspotCount++;
             ds.Command_StaffHotspotKind[ds.Command_StaffHotspotCount - 1] = s;
-            h->_1A = 0;
+            h->Cursor = 0;
         }
     }
     for (int16_t j = (int16_t)(ds.Command_StaffHotspotCount + 1); j < 5; j++) {
@@ -280,7 +280,7 @@ void Command_SetupCommandHotspots(void)
         h->H = 0;
         pstr_set(&h->Caption, 0x12, "");
         h->Repeat_ = 1;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
     Mouse_SetHotspot(5, 0x2A, 0x47, 0x26, 0x3C, Lang_Text("RESEARCH-DESIGN"), 1, 0);
     Mouse_SetHotspot(6, 0, 0x47, 0x2A, 0x4F, Lang_Text("MESSAGE"), 1, 0);

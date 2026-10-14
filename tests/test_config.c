@@ -26,7 +26,7 @@ int main(void)
     CHECK(config.display == CONFIG_WINDOWED && config.window_width == 1280 && config.window_height == 960);
     CHECK(!config.freeze_money && !config.skip_intro && config.colony_stats && config.detoxin_rate);
     CHECK(config.language == LANGUAGE_ENGLISH);
-    CHECK(config_fix("anything"));
+    CHECK(config_fix("anything") && config_improvement("anything"));
     CHECK(config_save());  // no path: nothing written
     CHECK(!SDL_GetPathInfo(path, nullptr));
 
@@ -60,7 +60,10 @@ int main(void)
                      "[fixes]\n"
                      "find_jade = off\n"
                      "mine_all_systems = on\n"
-                     "no equals sign\n");
+                     "no equals sign\n"
+                     "[improvements]\n"
+                     "more_stations = off\n"
+                     "find_jade = on\n");
     config_reset();
     config_load(path);
     CHECK(config.freeze_money && !config.freeze_ore);
@@ -71,6 +74,8 @@ int main(void)
     CHECK(config.skip_intro && !config.colony_stats && !config.detoxin_rate);
     CHECK(config.language == LANGUAGE_ITALIAN);
     CHECK(!config_fix("find_jade") && config_fix("mine_all_systems") && config_fix("unlisted"));
+    CHECK(!config_improvement("more_stations") && config_improvement("unlisted"));
+    CHECK(config_fix("more_stations") && config.improvements.count == 2);
 
     // Saved and loaded back unchanged.
     config_set_fix("drifting_ship", false);
@@ -86,7 +91,8 @@ int main(void)
     CHECK(config.fullscreen_width == 1920 && config.fullscreen_height == 1080);
     CHECK(!config.colony_stats && !config.detoxin_rate && config.language == LANGUAGE_ITALIAN);
     CHECK(SDL_fabsf(config.fullscreen_refresh - before.fullscreen_refresh) < 0.001f);
-    CHECK(config.fix_count == 3 && !config_fix("drifting_ship") && !config_fix("find_jade"));
+    CHECK(config.fixes.count == 3 && !config_fix("drifting_ship") && !config_fix("find_jade"));
+    CHECK(config.improvements.count == 2 && !config_improvement("more_stations"));
 
     // "setup" is not something the menu offers: it reads as Sound Blaster.
     write_file(path, "[sound]\nmusic = setup\n");

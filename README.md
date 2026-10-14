@@ -53,8 +53,8 @@ import (`DEU`, `FRA`, `ITA` next to `GRAFIKA`) has its languages too.
 
 F1 opens the port menu over the game: cheats, music (None, Sound Blaster,
 UltraSound), effects and volumes, display mode and size, skipping the
-intro, the colony stats, the Detoxin rate, the language, the fixes,
-importing game data, restart and quit. Its settings are kept in `reunion.ini`.
+intro, the colony stats, the Detoxin rate, the language, the improvements,
+the fixes, importing game data, restart and quit. Its settings are kept in `reunion.ini`.
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to
 `screenshots/`.
 
@@ -62,6 +62,14 @@ The port fixes bugs in the original, from ones that can make the game
 unwinnable to ones that unbalance colonies and battles
 (`src/game/fixes.h`); each can be switched off in the port menu (Fixes), or
 all of them at once.
+
+Improvements change the game's design where it falls short
+(`src/game/improvements.h`). So far there is one: More Miner stations,
+up to four Miner stations on a body, mining every hour and kept when a
+colony is founded there.
+Each can be switched off in the port menu (Improvements); the Fixes
+section's "All off (original)" turns them off too. Scripted runs play
+without them. Saves stay in the DOS game's format.
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

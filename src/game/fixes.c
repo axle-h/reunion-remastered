@@ -27,7 +27,7 @@ static constexpr Fixes ALL = {
 
 Fixes fixes = ALL;
 
-const FixInfo Fixes_List[] = {
+const SwitchInfo Fixes_List[] = {
     {"find_jade", "Jade found in time",
      "Jade is found by 1 April 2928 at the latest, so the game can be won.", &fixes.find_jade},
     {"mine_all_systems", "All systems mine",

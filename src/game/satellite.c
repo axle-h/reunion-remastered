@@ -1,6 +1,7 @@
 #include "game/satellite.h"
 
 #include "game/groups.h"
+#include "game/improvements.h"
 #include "game/lang.h"
 #include "game/system.h"
 
@@ -107,7 +108,7 @@ void Satellite_DeploySpyShip(void)
     PlanetInfo_SelectCurBody();
     TBody *b = CurBody();
     Message_PlaySatelliteAnim(3);
-    b->_09 = 1;
+    b->SpyShip = 1;
     Satellite_DeductSatellites(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 3, 1);
     CheckStoryLocations();
 }
@@ -116,7 +117,7 @@ void Satellite_DeploySpyShip(void)
 void Satellite_DeploySolarSat(void)
 {
     PlanetInfo_SelectCurBody();
-    CurBody()->_0B++;
+    CurBody()->SolarSats++;
     Satellite_DeductSatellites(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 4, 1);
 }
 
@@ -129,7 +130,7 @@ void Satellite_ColonizeBody(void)
     if (b->InfoLevel > 60)
         b->InfoLevel = 60;
     b->Owner = 1;
-    b->_0A = 1;
+    b->Droids = 1;
     Satellite_TakeTradeShips(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 1);
     if (ds.Research_Products[6].State == 0 && ds.Game_IdeaTimer[6] == -1) {
         if (b->Surveyed != 0 && Colonisable(b)) {
@@ -138,6 +139,15 @@ void Satellite_ColonizeBody(void)
             Message_ShowMessageLine(4);
         }
     }
+}
+
+// Port improvement (game/improvements.h, more_stations): one more Miner
+// station on a body that has some and no colony, from a trade group there.
+// Its building is placed as the first one's is.
+static void AddMinerStation(void)
+{
+    CurBody()->Droids++;
+    Satellite_TakeTradeShips(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 1);
 }
 
 // 28cd:02ec: after paying in screen 0x3b
@@ -149,7 +159,7 @@ void Satellite_AcquireBody(void)
     b->InfoLevel += 10;
     if (b->InfoLevel > 60)
         b->InfoLevel = 60;
-    b->Miner = (int8_t)(System_Random(2) + 1);
+    b->ColonyTimer = (int8_t)(System_Random(2) + 1);
     // Galaxy::Bodies[1] + 0x186: the 7th body of system 1, field +0x0C.
     if (ds.Game_CurSystem == 1 && ds.Game_CurPlanet[0] == 7 && ds.Game_CurMoon[0] == 0
         && ds.Galaxy_Bodies[0][6].InfoLevel != 2 && ds.Research_Products[0xB].State == 0) {
@@ -266,38 +276,45 @@ void Satellite_AddBodyActionItems(int16_t system, int16_t planet, int16_t moon, 
 
     *any = false;
     if ((ds.Intel_SatTheftDone == 0 || (system == 1 && planet == 5)) && b->Satellite == 0
-        && ((b->Colony == 0 && b->_0A == 0) || b->Owner >= 2)
+        && ((b->Colony == 0 && b->Droids == 0) || b->Owner >= 2)
         && ds.Research_Products[2].Stock > 0 && !GfxPath_ToolbarHasIcon(0x46)) {
         GfxPath_AddToolbarIcon(0x46);
         *any = true;
     }
-    if (b->Satellite == 0 && ((b->Colony == 0 && b->_0A == 0) || b->Owner >= 2)
+    if (b->Satellite == 0 && ((b->Colony == 0 && b->Droids == 0) || b->Owner >= 2)
         && Satellite_CountSatellites(cs, cp, cm, 1) > 0 && !GfxPath_ToolbarHasIcon(0x14)
         && !GfxPath_ToolbarHasIcon(0x46)) {
         GfxPath_AddToolbarIcon(0x14);
         *any = true;
     }
-    if (b->Satellite == 0 && ((b->Colony == 0 && b->_0A == 0) || b->Owner >= 2)
+    if (b->Satellite == 0 && ((b->Colony == 0 && b->Droids == 0) || b->Owner >= 2)
         && Satellite_CountSatellites(cs, cp, cm, 2) > 0 && !GfxPath_ToolbarHasIcon(0x43)) {
         GfxPath_AddToolbarIcon(0x43);
         *any = true;
     }
-    if (b->_09 == 0 && b->Owner >= 2 && b->InfoLevel > 29
+    if (b->SpyShip == 0 && b->Owner >= 2 && b->InfoLevel > 29
         && Satellite_CountSatellites(cs, cp, cm, 3) > 0 && !GfxPath_ToolbarHasIcon(0x44)) {
         GfxPath_AddToolbarIcon(0x44);
         *any = true;
     }
-    if (b->Owner == 1 && b->Colony != 0 && b->_0B < 5
+    if (b->Owner == 1 && b->Colony != 0 && b->SolarSats < 5
         && Satellite_CountSatellites(cs, cp, cm, 4) > 0 && !GfxPath_ToolbarHasIcon(0x45)) {
         GfxPath_AddToolbarIcon(0x45);
         *any = true;
     }
-    if (b->Owner == 0 && b->Colony == 0 && b->_0A == 0 && b->InfoLevel > 9 && b->Miner == 0
-        && Satellite_CountTradeShips(cs, cp, cm) > 0 && b->_03 != 0 && !GfxPath_ToolbarHasIcon(10)) {
+    if (b->Owner == 0 && b->Colony == 0 && b->Droids == 0 && b->InfoLevel > 9 && b->ColonyTimer == 0
+        && Satellite_CountTradeShips(cs, cp, cm) > 0 && b->Mineable != 0 && !GfxPath_ToolbarHasIcon(10)) {
         GfxPath_AddToolbarIcon(10);
         *any = true;
     }
-    if (ds.Research_Products[6].State == 5 && b->Colony == 0 && b->Miner == 0 && b->InfoLevel > 29
+    // Port improvement (game/improvements.h): another Miner station.
+    if (improvements.more_stations && b->Owner == 1 && b->Colony == 0 && b->Droids != 0
+        && b->Droids < MAX_STATIONS && Satellite_CountTradeShips(cs, cp, cm) > 0
+        && !GfxPath_ToolbarHasIcon(10)) {
+        GfxPath_AddToolbarIcon(10);
+        *any = true;
+    }
+    if (ds.Research_Products[6].State == 5 && b->Colony == 0 && b->ColonyTimer == 0 && b->InfoLevel > 29
         && b->Surveyed != 0 && b->Owner < 2 && Colonisable(b)
         && ds.Game_ColonySetupCount < 10 && !GfxPath_ToolbarHasIcon(5)) {
         GfxPath_AddToolbarIcon(5);
@@ -310,7 +327,11 @@ void Satellite_HandleBodyActions(void)
 {
     ds.Satellite_ActionDone = 0;
     if (ds.Game_MenuCommand == 10) {
-        Satellite_ColonizeBody();
+        PlanetInfo_SelectCurBody();
+        if (improvements.more_stations && CurBody()->Owner == 1)
+            AddMinerStation();
+        else
+            Satellite_ColonizeBody();
         ds.Satellite_ActionDone = 1;
         Surface_AutoPlaceBuilding(0x19, ds.Game_CurSystem, CUR_PLANET, CUR_MOON);
     }

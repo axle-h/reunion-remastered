@@ -51,7 +51,7 @@ static void set_rect(int16_t pascalIndex, int16_t x, uint8_t y, int16_t w, uint8
     h->Y = y;
     h->W = w;
     h->H = hgt;
-    h->_1A = 0;
+    h->Cursor = 0;
 }
 
 // 22ca:0105

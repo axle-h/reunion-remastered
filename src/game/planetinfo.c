@@ -8,7 +8,6 @@
 #include "game/gfx.h"
 #include "game/groups.h"
 #include "game/lang.h"
-#include "game/le.h"
 #include "game/mouse.h"
 #include "game/rawtext.h"
 #include "game/scale.h"
@@ -281,7 +280,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
     else
         SDL_snprintf(text, TEXT60, "%d", (int)b->Population);
     if (b->Surveyed != 0 && colonisable(b) && b->InfoLevel > 0x1D
-        && (b->Owner == 0 || (b->Owner == 1 && b->Colony == 0 && b->Miner == 0)))
+        && (b->Owner == 0 || (b->Owner == 1 && b->Colony == 0 && b->ColonyTimer == 0)))
         set60(text, Lang_Text("Empty planet, ready for colonysation"));
     if ((int8_t)b->Owner > 1) {
         if (b->InfoLevel < 0x1E)
@@ -352,7 +351,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
         if (b->Owner == 1) {
             if (b->Colony != 0)
                 set60(desc, Lang_Text("colony"));
-            if (b->Colony == 0 && b->Miner > 0)
+            if (b->Colony == 0 && b->ColonyTimer > 0)
                 set60(desc, Lang_Text("under colonization"));
         } else if ((int8_t)b->Owner > 1 && (int8_t)b->Owner < 0x15 && b->Colony != 0) {
             set60(desc, Lang_Text("Alien colony"));
@@ -369,7 +368,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
         int16_t y = (int16_t)((k - 1) * 8 + 0x95);
         if (b->InfoLevel < 10)
             Gfx_DrawTextF9("???", 0xA0, y, 3);
-        else if (b->Deposits[k - 1] < 10 || b->_03 == 0)
+        else if (b->Deposits[k - 1] < 10 || b->Mineable == 0)
             Gfx_DrawTextF9(Lang_Text("NO "), 0xA0, y, 3);
         else
             Gfx_DrawTextF9(Lang_Text("YES"), 0xA0, y, 3);
@@ -409,16 +408,18 @@ void PlanetInfo_DrawPlanetInfoText(void)
             SDL_snprintf(lines[n], LINE40, "%d%s", ds.Research_Products[0x17].Stock,
                          Lang_Text(" Space Station"));
         }
-        if (b->_0A != 0) {
+        if (b->Droids != 0) {
             n++;
-            if (b->Colony == 0)
+            if (b->Colony == 0 && b->Droids > 1)  // improvements.more_stations
+                SDL_snprintf(lines[n], LINE40, "%d%s", b->Droids, Lang_Text(" Miner Stations"));
+            else if (b->Colony == 0)
                 LINE("Miner Station");
             else
-                SDL_snprintf(lines[n], LINE40, "%d%s", b->_0A, Lang_Text(" Miner Droid"));
+                SDL_snprintf(lines[n], LINE40, "%d%s", b->Droids, Lang_Text(" Miner Droid"));
         }
-        if (b->_0B != 0 && b->Colony != 0) {
+        if (b->SolarSats != 0 && b->Colony != 0) {
             n++;
-            SDL_snprintf(lines[n], LINE40, "%d%s", b->_0B, Lang_Text(" Solar Sat"));
+            SDL_snprintf(lines[n], LINE40, "%d%s", b->SolarSats, Lang_Text(" Solar Sat"));
         }
         if ((int8_t)b->Satellite > 0) {
             n++;
@@ -433,7 +434,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
             n++;
             LINE("Colony");
         }
-        if (b->InfoLevel > 0x28 && b->_0A != 0 && b->Colony == 0) {
+        if (b->InfoLevel > 0x28 && b->Droids != 0 && b->Colony == 0) {
             n++;
             LINE("Miner Station");
         }
@@ -449,7 +450,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
             else
                 LINE("Spy Satellite");
         }
-        if (b->_09 != 0) {
+        if (b->SpyShip != 0) {
             n++;
             LINE("Spy Ship");
         }
@@ -564,17 +565,16 @@ void PlanetInfo_DrawAlienInfoScreen(void)
 void PlanetInfo_DrawStoresList(void)
 {
     const TBody *b = ds.Game_CurBody;
-    if (b->_09 != 0 || ((int8_t)b->Owner > 1 && ds.Races_Hostile[b->Owner - 1] == 2)) {
-        // Bytes 13h..1Ah of the race record are its weapon flags (ship
-        // classes, then ground units), read as the spy reports read them. A
-        // body whose race was eliminated keeps its spy ship (_09) with owner
-        // 0, and then the bytes below Races_Races may add lines of 0; kept as
-        // in the original.
+    if (b->SpyShip != 0 || ((int8_t)b->Owner > 1 && ds.Races_Hostile[b->Owner - 1] == 2)) {
+        // The race record's Weapons flags (ship classes, then ground units),
+        // read as the spy reports read them. A body whose race was eliminated
+        // keeps its SpyShip with owner 0, and then the bytes below Races_Races
+        // may add lines of 0; kept as in the original.
         const uint8_t *race = race_bytes((int8_t)b->Owner);
         char s[16], name[256];
         for (int16_t k = 1; k <= 4; k++) {
             int16_t y = (int16_t)((k - 1) * 9 + 0x9C);
-            if (race[k + 0x12] != 0) {
+            if (race[offsetof(TRace, Weapons) + k - 1] != 0) {
                 const TProduct *p = &ds.Research_Products[ds.Research_ShipProduct[k - 1] - 1];
                 SDL_snprintf(s, sizeof s, "%d", (int)b->Stores[k - 1]);
                 Gfx_DrawTextF9(pstr_get(name, sizeof name, &p->Name), 0x68, y, 0x10);
@@ -584,7 +584,7 @@ void PlanetInfo_DrawStoresList(void)
         }
         for (int16_t k = 1; k <= 4; k++) {
             int16_t y = (int16_t)((k - 1) * 9 + 0x9C);
-            if (race[k + 0x16] != 0) {
+            if (race[offsetof(TRace, Weapons) + k + 3] != 0) {
                 const TProduct *p = &ds.Research_Products[ds.Research_GroundProduct[k - 1] - 1];
                 SDL_snprintf(s, sizeof s, "%d", (int)b->Stores[k + 3]);
                 Gfx_DrawTextF9(pstr_get(name, sizeof name, &p->Name), 0xC5, y, 0x10);
@@ -611,6 +611,11 @@ void PlanetInfo_DrawPlanetSurfaceBackdrop(void)
 // ---------------------------------------------------------------------------
 // Current body and names
 // ---------------------------------------------------------------------------
+TBody *PlanetInfo_BodyAt(int16_t sys, int16_t planet, int16_t moon)
+{
+    return body_at(sys, moon == 0 ? planet : moon_body(sys, planet, moon));
+}
+
 // 357b:3253
 void PlanetInfo_SelectCurBody(void)
 {
@@ -704,7 +709,7 @@ typedef struct PowerCtx {
     int32_t demand;   // total of the powered buildings' Workers, at least pop
     int32_t supply;   // weighted production of the powered buildings (+ solar satellites)
     int32_t energy;   // weighted Energy of the powered buildings, at least supply
-    int32_t shields;  // output total of kind 16h, goes to body bytes 4..5
+    int32_t build_power;  // output total of kind 16h (Builder Plants), to the body's BuildPower
 } PowerCtx;
 
 static TBuilding *building_at(int16_t i)
@@ -722,11 +727,11 @@ static const TBuildingType *kind_type(uint8_t kind)
 
 static bool on_body(const PowerCtx *c, const TBuilding *b)
 {
-    return b->System == c->sys && b->Planet == c->planet && b->Moon == c->moon && b->Health == 0;
+    return b->System == c->sys && b->Planet == c->planet && b->Moon == c->moon && b->BuildLeft == 0;
 }
 
 // 357b:3644: every intact building is switched on, and the planet force's
-// Storage (its energy supply) gets the kind-specific total.
+// Storage (its ore storage space) gets the kind-specific total.
 static void power_all_buildings(PowerCtx *c)
 {
     int16_t force = Groups_FindPlanetForce(c->sys, c->planet, c->moon);
@@ -736,7 +741,7 @@ static void power_all_buildings(PowerCtx *c)
         TBuilding *b = building_at(i);
         if (!on_body(c, b))
             continue;
-        b->Flag = 1;
+        b->Powered = 1;
         if (b->Kind == 0x0B)
             pf->Storage = (int16_t)(pf->Storage + 0x14);
         if (b->Kind == 0x04)
@@ -754,7 +759,7 @@ static void sum_energy_demand(PowerCtx *c)
     c->demand = 0;
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = building_at(i);
-        if (on_body(c, b) && b->Flag != 0)
+        if (on_body(c, b) && b->Powered != 0)
             c->demand = (int32_t)((uint32_t)c->demand + (uint32_t)(int32_t)kind_type(b->Kind)->Workers);
     }
     if (c->pop == 0)
@@ -771,7 +776,7 @@ static void sum_outputs(PowerCtx *c)
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = building_at(i);
         const TBuildingType *t = kind_type(b->Kind);
-        if (!on_body(c, b) || b->Flag == 0)
+        if (!on_body(c, b) || b->Powered == 0)
             continue;
         if (t->Category == 1 || t->Category == 8) {
             int32_t share = long_div(long_mul(t->Production, c->pop), c->demand);
@@ -781,7 +786,7 @@ static void sum_outputs(PowerCtx *c)
         int32_t e = long_div(long_mul(t->Energy, c->pop), c->demand);
         c->energy = (int32_t)((uint32_t)c->energy + (uint32_t)e);
     }
-    c->supply = (int32_t)((uint32_t)c->supply + (uint32_t)long_mul(c->body->_0B, 10000));
+    c->supply = (int32_t)((uint32_t)c->supply + (uint32_t)long_mul(c->body->SolarSats, 10000));
     if (c->supply == 0)
         c->supply = 1;
     if (c->energy < c->supply)
@@ -789,45 +794,45 @@ static void sum_outputs(PowerCtx *c)
 }
 
 // 357b:3a05: switches off the powered building with the lowest priority
-// (type byte 2Bh; the last one wins a tie).
+// (PowerPriority; the last one wins a tie).
 static void unpower_building(PowerCtx *c)
 {
     uint8_t best = 0;
     int16_t which = 0;
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = building_at(i);
-        uint8_t prio = kind_type(b->Kind)->_2B;
-        if (on_body(c, b) && b->Flag != 0 && (which == 0 || prio <= best)) {
+        uint8_t prio = kind_type(b->Kind)->PowerPriority;
+        if (on_body(c, b) && b->Powered != 0 && (which == 0 || prio <= best)) {
             best = prio;
             which = i;
         }
     }
     if (which > 0)
-        building_at(which)->Flag = 0;
+        building_at(which)->Powered = 0;
 }
 
 // 357b:3ae5
 static void apply_building_efficiency(PowerCtx *c)
 {
-    c->shields = 0;
+    c->build_power = 0;
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         TBuilding *b = building_at(i);
         const TBuildingType *t = kind_type(b->Kind);
-        if (!on_body(c, b) || b->Flag == 0)
+        if (!on_body(c, b) || b->Powered == 0)
             continue;
-        b->W9 = (int16_t)long_div(long_mul(t->Workers, c->pop), c->demand);
-        b->WB = (int16_t)long_div(long_mul(t->Energy, c->supply), c->energy);
+        b->Workers = (int16_t)long_div(long_mul(t->Workers, c->pop), c->demand);
+        b->Energy = (int16_t)long_div(long_mul(t->Energy, c->supply), c->energy);
         if (t->Category == 1 || t->Category == 8) {
-            b->BD = (uint8_t)long_div(long_mul(c->pop, 100), c->demand);
+            b->Working = (uint8_t)long_div(long_mul(c->pop, 100), c->demand);
         } else {
             int32_t ratio = long_div(long_mul(c->supply, 100), c->energy);
-            b->BD = (uint8_t)long_div(long_mul(ratio, c->pop), c->demand);
+            b->Working = (uint8_t)long_div(long_mul(ratio, c->pop), c->demand);
         }
         if (b->Kind == 0x16) {
             // 16-bit arithmetic throughout.
             int16_t a = (int16_t)((int16_t)(b->Output * t->Production) / 100);
-            int16_t v = (int16_t)((int16_t)(a * b->BD) / 100);
-            c->shields += v;
+            int16_t v = (int16_t)((int16_t)(a * b->Working) / 100);
+            c->build_power += v;
         }
     }
 }
@@ -847,7 +852,7 @@ void PlanetInfo_BalanceBuildingPower(int16_t sys, int16_t planet, int16_t moon)
         sum_outputs(&c);
     }
     apply_building_efficiency(&c);
-    wr16le(c.body->_04, (int16_t)c.shields);
+    c.body->BuildPower = (int16_t)c.build_power;
 }
 
 // ---------------------------------------------------------------------------
@@ -874,9 +879,9 @@ static void note_base(const TBody *b)
         ds.PlanetInfo_HasBase = 1;
     if (b->Owner == 1 && b->Colony != 0)
         ds.PlanetInfo_HasBase = 1;
-    if (b->Owner == 1 && b->_0A != 0)
+    if (b->Owner == 1 && b->Droids != 0)
         ds.PlanetInfo_HasBase = 1;
-    if (b->_09 != 0)
+    if (b->SpyShip != 0)
         ds.PlanetInfo_HasBase = 1;
 }
 
@@ -892,7 +897,7 @@ static void body_hotspot(int16_t j, const TBodyName *nm, int16_t size, int16_t s
     PlanetInfo_GetBodyName(name, sizeof name, sys, planet, moon);
     pstr_set(&h->Caption, 0x12, name);
     h->Repeat_ = 0;
-    h->_1A = 5;
+    h->Cursor = 5;
 }
 
 // 357b:18cc
@@ -914,7 +919,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             h->H = 0x13;
             pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &ds.Names_Systems[k - 1]));
             h->Repeat_ = 1;
-            h->_1A = 0;
+            h->Cursor = 0;
         } else {
             h->X = 1000;
             h->Y = 0xDE;
@@ -922,7 +927,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             h->H = 0;
             pstr_set(&h->Caption, 0x12, "");
             h->Repeat_ = 1;
-            h->_1A = 1;
+            h->Cursor = 1;
         }
     }
 
@@ -951,7 +956,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
             h->H = 0x40;
             pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &ds.Names_Systems[sys - 1]));
             h->Repeat_ = 0;
-            h->_1A = 5;
+            h->Cursor = 5;
             // k is 8 here, so this writes record 8's flag, and the body is
             // Bodies[sys][CurPlanet - 1] = Bodies[sys][-1] as CurPlanet is 0 in
             // this branch. As in the original: the flag is drawn only for an
@@ -979,7 +984,7 @@ void PlanetInfo_SetupSystemViewHotspots(void)
     PlanetInfo_GetBodyName(name, sizeof name, sys, planet, 0);
     pstr_set(&h->Caption, 0x12, name);
     h->Repeat_ = 0;
-    h->_1A = 5;
+    h->Cursor = 5;
     const TBody *pb = body_at(sys, planet);
     note_base(pb);
     orbit(0)->Flag = body_flag(pb);
@@ -1098,7 +1103,7 @@ void PlanetInfo_LoadSystemViewAssets(void)
             o->RX = nm->X;
             o->RY = nm->Y;
             o->Angle = (int16_t)System_Random(0xE10);
-            o->Speed = nm->Size;
+            o->Speed = nm->OrbitSpeed;
             o->Icon = ds.Galaxy_BodyIcon[sys - 1][k - 1];
         }
     } else {
@@ -1109,7 +1114,7 @@ void PlanetInfo_LoadSystemViewAssets(void)
             o->RX = nm->X;
             o->RY = nm->Y;
             o->Angle = (int16_t)System_Random(0xE10);
-            o->Speed = nm->Size;
+            o->Speed = nm->OrbitSpeed;
         }
     }
     ds.PlanetInfo_BlinkTimer = 0;
@@ -1289,7 +1294,7 @@ void PlanetInfo_RenderSystemView(void)
     if (hit < 0x14)
         ds.Mouse_CursorShape = 0;
     else
-        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(hit - 0x14))->_1A;
+        ds.Mouse_CursorShape = Mouse_Hotspot((int16_t)(hit - 0x14))->Cursor;
     game_free(ds.PlanetInfo_Frame);
     game_free(ds.PlanetInfo_MoonSprite);
     game_free(ds.PlanetInfo_PlanetSprite);

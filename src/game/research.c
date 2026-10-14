@@ -134,7 +134,7 @@ void Research_SetupResearchHotspots(void)
         if (j == 14 && ds.Intel_Invention14Revealed == 0)
             pstr_set(&h->Caption, 0x12, Lang_Text("Unknown"));
         h->Repeat_ = 1;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }
 

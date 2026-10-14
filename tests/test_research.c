@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     CHECK(h1->Caption.len == ds.Research_Products[0].Name.len && h1->Caption.len > 0);
     CHECK(Mouse_Hotspot(2)->Caption.len == 0);
     CHECK(h14->Caption.len == 7 && SDL_memcmp(h14->Caption.s, "Unknown", 7) == 0);
-    CHECK(h14->Repeat_ == 1 && h14->_1A == 0);
+    CHECK(h14->Repeat_ == 1 && h14->Cursor == 0);
 
     fs_shutdown();
     printf("%s\n", ok ? "ok" : "FAILED");

@@ -191,9 +191,9 @@ void SpWar_InitSpaceFleets(void)
                     dmg = lmul(dmg, 2) / 3;
                 else
                     dmg = lmul((uint16_t)(ds.Game_StaffExp[2] + 200), dmg) / 0xDC;
-                int32_t per = sl->ShipType < 1 ? 0 : dmg / sl->ShipType;
+                int32_t per = sl->Count < 1 ? 0 : dmg / sl->Count;
                 if ((uint16_t)ds.SpWar_AttackerShipCount < 500) {
-                    for (int16_t a = 1; a <= sl->ShipType; a++)
+                    for (int16_t a = 1; a <= sl->Count; a++)
                         add_ship(ds.SpWar_AttackerList, &ds.SpWar_AttackerShipCount,
                                  (uint8_t)(li * 100 + g), (uint8_t)j, (uint16_t)per,
                                  (uint16_t)ds.SpWar_ClassA[j - 1], false);
@@ -619,10 +619,10 @@ void SpWar_ApplySpaceLosses(void)
                 TGroupSlot *sl = &grp->Units[0][j - 1];
                 int32_t alive =
                     count_alive(ds.SpWar_AttackerList, ds.SpWar_AttackerShipCount, li * 100 + g, j);
-                int32_t orig = sl->ShipType;
+                int32_t orig = sl->Count;
                 // A fifth of the destroyed ships survive.
                 int32_t now = alive + (orig - alive) / 5;
-                if (sl->ShipType < 1) {
+                if (sl->Count < 1) {
                     for (int w = 0; w < 4; w++)
                         sl->Weapons[w] = 0;
                 } else {
@@ -630,7 +630,7 @@ void SpWar_ApplySpaceLosses(void)
                         sl->Weapons[w] = (int16_t)(lmul(sl->Weapons[w], now) / orig);
                 }
                 ds.SpWar_AttackerLosses[j - 1] += orig - now;
-                sl->ShipType = (int16_t)now;
+                sl->Count = (int16_t)now;
             }
         }
     }

@@ -24,7 +24,7 @@ static void hotspots(void)
     CHECK(Mouse_Hotspot(1) == &ds.Mouse_Hotspots[0]);
     CHECK(ds.Mouse_Hotspots[0].X == 100 && ds.Mouse_Hotspots[0].Y == 50);
     CHECK(ds.Mouse_Hotspots[0].Caption.len == 3 && ds.Mouse_Hotspots[0].Repeat_ == 1
-          && ds.Mouse_Hotspots[0]._1A == 4);
+          && ds.Mouse_Hotspots[0].Cursor == 4);
     // Overlapping hotspot 2 covers hotspot 1's right half; lowest index wins.
     Mouse_SetHotspot(2, 110, 50, 20, 10, "ABCDEFGHIJKLMNOPQRST", 0, 2);
     CHECK(ds.Mouse_Hotspots[1].Caption.len == 18);
@@ -81,7 +81,7 @@ static void hotspots(void)
 
     Mouse_ClearHotspots(1, 2);
     CHECK(ds.Mouse_Hotspots[0].W == 0 && ds.Mouse_Hotspots[1].Caption.len == 0
-          && ds.Mouse_Hotspots[1]._1A == 0);
+          && ds.Mouse_Hotspots[1].Cursor == 0);
 }
 
 static void cursor(void)

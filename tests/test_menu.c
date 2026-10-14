@@ -1,6 +1,7 @@
 // menu: the port menu's model driven by key events, without a window:
 // sections and rows, changes to the config, requests to the game, the
-// languages, the fixes' rows, and the System section's Restart / Quit.
+// languages, the improvements' and the fixes' rows, and the System
+// section's Restart / Quit.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -11,7 +12,7 @@
 static bool ok = true;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); ok = false; } } while (0)
 
-enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_FIXES, SEC_SYSTEM };
+enum { SEC_CHEATS, SEC_SOUND, SEC_VIDEO, SEC_GAME, SEC_IMPROVEMENTS, SEC_FIXES, SEC_SYSTEM };
 
 static int changes[8];
 static bool running;
@@ -60,9 +61,12 @@ static bool row_is(int row, const char *text)
 
 int main(void)
 {
-    static const MenuFix fixes[] = {
+    static const MenuSwitch fixes[] = {
         {"find_jade", "Jade found in time", "help"},
         {"mine_all_systems", "All systems mine", "help"},
+    };
+    static const MenuSwitch improvements[] = {
+        {"more_stations", "More Miner stations", "help"},
     };
     MenuHooks hooks = {
         .game_running = game_running,
@@ -71,6 +75,8 @@ int main(void)
         .add_ore = 10000,
         .fixes = fixes,
         .fix_count = 2,
+        .improvements = improvements,
+        .improvement_count = 1,
         .languages = languages,
     };
     menu_set_hooks(&hooks);
@@ -165,7 +171,25 @@ int main(void)
     langs = 0;
     config.language = LANGUAGE_ENGLISH;
 
-    // Fixes: a row per fix, all on; one off, then all on again.
+    // Improvements: a row each, on; off and on again, all off and all on.
+    go_to(SEC_IMPROVEMENTS);
+    CHECK(menu_row_count() == 3 && row_is(2, "[x] More Miner stations"));
+    press(SDLK_DOWN);
+    press(SDLK_DOWN);
+    press(SDLK_RETURN);
+    CHECK(!config_improvement("more_stations") && changes[MENU_CHANGED_SWITCHES] == 1);
+    press(SDLK_RETURN);
+    CHECK(config_improvement("more_stations"));
+    press(SDLK_UP);
+    press(SDLK_RETURN);  // All off
+    CHECK(!config_improvement("more_stations") && config_fix("find_jade"));
+    press(SDLK_UP);
+    press(SDLK_RETURN);  // All on
+    CHECK(config_improvement("more_stations"));
+    changes[MENU_CHANGED_SWITCHES] = 0;
+
+    // Fixes: a row per fix, all on; one off, then all on again. All off
+    // (original) turns the improvements off too, All on leaves them.
     go_to(SEC_FIXES);
     CHECK(menu_row_count() == 4);
     CHECK(row_is(2, "[x] Jade found in time") && row_is(3, "[x] All systems mine"));
@@ -173,13 +197,15 @@ int main(void)
     press(SDLK_DOWN);
     press(SDLK_RETURN);
     CHECK(!config_fix("find_jade") && config_fix("mine_all_systems"));
-    CHECK(changes[MENU_CHANGED_FIXES] == 1);
+    CHECK(changes[MENU_CHANGED_SWITCHES] == 1);
     press(SDLK_UP);
     press(SDLK_RETURN);  // All off (original)
     CHECK(!config_fix("find_jade") && !config_fix("mine_all_systems"));
+    CHECK(!config_improvement("more_stations"));
     press(SDLK_UP);
     press(SDLK_RETURN);  // All on
     CHECK(config_fix("find_jade") && config_fix("mine_all_systems"));
+    CHECK(!config_improvement("more_stations"));
 
     // Tab moves between sections and keeps the focus on the rows.
     press(SDLK_TAB);

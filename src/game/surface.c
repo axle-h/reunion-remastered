@@ -83,8 +83,8 @@ static TBody *body_of(int16_t system, int16_t planet, int16_t moon)
 // satellite or a base, as 357b:3253 and the screen code see it.
 static bool body_shown(const TBody *b)
 {
-    return (b->Owner == 1 && (b->Colony != 0 || b->_0A != 0)) || (int8_t)b->Satellite > 0
-        || b->_09 != 0;
+    return (b->Owner == 1 && (b->Colony != 0 || b->Droids != 0)) || (int8_t)b->Satellite > 0
+        || b->SpyShip != 0;
 }
 
 static void screen_blit_rect(const uint8_t *src, uint16_t dest_ofs, int16_t w, int16_t h,
@@ -209,7 +209,7 @@ void Surface_RegisterBuildingAnims(int16_t system, int16_t planet, int16_t moon)
             if (b->X == 0xFF && b->Y == 0xFF)
                 Surface_PlaceBuilding(i);
             if (b->X < 0xFF && b->Y < 0xFF) {
-                int16_t stage = (int16_t)((b->Health + 0x27) / 0x28);
+                int16_t stage = (int16_t)((b->BuildLeft + 0x27) / 0x28);
                 if (stage > 3)
                     stage = 3;
                 Surface_MarkFootprint(i, b->Kind, b->X, b->Y, stage);
@@ -317,14 +317,14 @@ void Surface_DrawBuildingInfo(void)
 
     if (ds.Surface_Mode == 4) {
         const TBuilding *b = bldg(ds.Surface_SelBuilding);
-        info_line(Lang_Text("Status     : "), Lang_Text(b->Flag != 0 ? "Active" : "Passive"), "", 0);
+        info_line(Lang_Text("Status     : "), Lang_Text(b->Powered != 0 ? "Active" : "Passive"), "", 0);
 
         int16_t row = rows[0];
         if (row > 0) {
-            // Output% of the nominal production, scaled by the power efficiency BD%.
+            // Output% of the nominal production, scaled by Working%.
             int32_t v = (int32_t)b->Output * (int32_t)bt->Production;
             v = v / 100;
-            v = (int32_t)((uint32_t)v * b->BD);
+            v = (int32_t)((uint32_t)v * b->Working);
             v = v / 100;
             SDL_snprintf(s, sizeof s, "%d kwh", (int)v);
             if (cat == 2) {
@@ -333,21 +333,21 @@ void Surface_DrawBuildingInfo(void)
                 if (body->Deposits[0] < 10)
                     SDL_strlcpy(s, Lang_Text("NONE"), sizeof s);
             }
-            if (b->Flag == 0)
+            if (b->Powered == 0)
                 SDL_strlcpy(s, Lang_Text("NONE"), sizeof s);
             info_line(Lang_Text("Production : "), s, "", row);
         }
 
         row = rows[1];
         if (row > 0) {
-            SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->W9);
+            SDL_snprintf(s, sizeof s, "%u", b->Powered == 0 ? 0u : (uint16_t)b->Workers);
             SDL_snprintf(tmp, sizeof tmp, "/%d", bt->Workers);
             info_line(Lang_Text("Workers    : "), s, tmp, row);
         }
 
         row = rows[2];
         if (row > 0) {
-            SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->WB);
+            SDL_snprintf(s, sizeof s, "%u", b->Powered == 0 ? 0u : (uint16_t)b->Energy);
             info_line(Lang_Text("Energy     : "), s, " kwh", row);
         }
 
@@ -358,7 +358,7 @@ void Surface_DrawBuildingInfo(void)
             row = rows[0];
         if (row < 0)
             row = 0;
-        SDL_snprintf(s, sizeof s, "%d", b->Flag == 0 ? 0 : b->BD);
+        SDL_snprintf(s, sizeof s, "%d", b->Powered == 0 ? 0 : b->Working);
         info_line(Lang_Text("Working    : "), s, "%", (int16_t)(row + 1));
 
         if (config.detoxin_rate && b->Kind == 5) {
@@ -645,7 +645,7 @@ void Surface_DrawMapView(void)
                     int16_t bi = (int16_t)*building_at(ax, ay);
                     const TBuilding *b = bldg(bi);
                     Surface_BlitTile(ds.Surface_BufC, (uint16_t)(occ - 1), sx, sy);
-                    if (b->Flag == 0 && b->Health == 0 && ds.Surface_BlinkOn != 0) {
+                    if (b->Powered == 0 && b->BuildLeft == 0 && ds.Surface_BlinkOn != 0) {
                         // Three nested outlines flash on finished but unpowered buildings.
                         Gfx_DrawRectOutline((int16_t)((x - 1) * 16 + 0x61), (int16_t)((y - 1) * 16 + 0x39),
                                             (int16_t)(x * 16 + 0x5A), (int16_t)(y * 16 + 0x32), 0x11);
@@ -733,9 +733,8 @@ void Surface_AddBuilding(uint8_t kind, uint8_t system, uint8_t planet, uint8_t m
 {
     int16_t idx = ds.Game_BuildingCount;
     int8_t surface = (int8_t)body_of(system, planet, moon)->SurfaceType;
-    // TBuildingType._12 flags (+12h..+1Eh), indexed from +13h by surface type:
-    // nonzero = allowed there, and the value scales the Output.
-    int8_t factor = (int8_t)((const uint8_t *)btype(kind))[0x13 + surface];
+    // Nonzero = allowed there, and the value scales the Output.
+    int8_t factor = (int8_t)btype(kind)->Surfaces[surface - 1];
     if (factor != 0 && ds.Game_BuildingCount < 1000) {
         TBuilding *b = ds.Game_Buildings + idx;
         ds.Game_BuildingCount++;
@@ -743,14 +742,14 @@ void Surface_AddBuilding(uint8_t kind, uint8_t system, uint8_t planet, uint8_t m
         b->System = system;
         b->Planet = planet;
         b->Moon = moon;
-        b->Health = (uint8_t)(System_Random(0x3C) + 100);
+        b->BuildLeft = (uint8_t)(System_Random(0x3C) + 100);
         b->X = x;
         b->Y = y;
         b->Output = (uint8_t)(factor * 40 + System_Random(0x50));
-        b->Flag = 0;
-        b->W9 = 0;
-        b->WB = 0;
-        b->BD = 0;
+        b->Powered = 0;
+        b->Workers = 0;
+        b->Energy = 0;
+        b->Working = 0;
         PlanetInfo_BalanceBuildingPower(system, planet, moon);
     }
 }
@@ -919,7 +918,7 @@ int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet, int
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = bldg(i);
         if (b->System == system && b->Planet == planet && b->Moon == moon && b->Kind == kind
-            && b->Health == 0 && (!activeOnly || b->Flag != 0))
+            && b->BuildLeft == 0 && (!activeOnly || b->Powered != 0))
             n++;
     }
     return n;
@@ -939,8 +938,8 @@ void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon)
             ds.Surface_KindCounts[flag][kind - 1] = 0;
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *b = bldg(i);
-        if (b->System == system && b->Planet == planet && b->Moon == moon && b->Health == 0)
-            ds.Surface_KindCounts[(int8_t)b->Flag][b->Kind - 1]++;
+        if (b->System == system && b->Planet == planet && b->Moon == moon && b->BuildLeft == 0)
+            ds.Surface_KindCounts[(int8_t)b->Powered][b->Kind - 1]++;
     }
 }
 

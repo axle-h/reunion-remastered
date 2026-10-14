@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     ds.SpWar_BattleMoon = 0;
     TGroup *g = Groups_At(0, 1);
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
-    g->Units[1][0] = (TGroupSlot){.ShipType = 100, .Weapons = {10, 20, 30, 0}};
+    g->Units[1][0] = (TGroupSlot){.Count = 100, .Weapons = {10, 20, 30, 0}};
     TBody body = {0}; // owner 0: stores ignored
     ds.Game_CurBody = game_alloc(sizeof(TBody));
     memcpy(ds.Game_CurBody, &body, sizeof body);

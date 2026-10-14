@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     Groups_At(0, 1)->Kind = 1;
     ds.Game_MenuCommand = 0x38;
     // Non-empty docked-in-orbit group goes to the destination screen.
-    Groups_At(0, 1)->Units[0][0].ShipType = 1;
+    Groups_At(0, 1)->Units[0][0].Count = 1;
     Groups_At(0, 1)->Status = 2;
     Launch_MapScreen();
     CHECK(ds.Game_ScreenSwitch && ds.Game_CurrentScreen == 0x12);

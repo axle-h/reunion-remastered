@@ -95,7 +95,7 @@ static void enter_command_centre(void)
     THotspot *h = Mouse_Hotspot(1);
     CHECK(h->X == (int16_t)(ds.Command_StaffX[0] + 1));
     CHECK(h->W == (int16_t)(ds.Command_StaffW[0] - 2));
-    CHECK(h->Caption.len > 0 && h->Caption.len <= 18 && h->Repeat_ == 1 && h->_1A == 0);
+    CHECK(h->Caption.len > 0 && h->Caption.len <= 18 && h->Repeat_ == 1 && h->Cursor == 0);
     // Pilot candidate 1's name (Staff::Names[0][0]).
     CHECK(SDL_memcmp(h->Caption.s, ds.Staff_Names[0][0].s, h->Caption.len) == 0);
     h = Mouse_Hotspot(2);
@@ -111,7 +111,7 @@ static void enter_command_centre(void)
     CHECK(h->X == 0x49 && h->Y == 0x9D && h->W == 0xBE && h->H == 0x2B);
     CHECK(h->Caption.len == 11 && SDL_memcmp(h->Caption.s, "PLANET MAIN", 11) == 0);
     for (int j = 5; j <= 12; j++)
-        CHECK(Mouse_Hotspot(j)->Repeat_ == 1 && Mouse_Hotspot(j)->_1A == 0);
+        CHECK(Mouse_Hotspot(j)->Repeat_ == 1 && Mouse_Hotspot(j)->Cursor == 0);
 
     // A room animation is running, with its random start delay of 100..299.
     int16_t anim = ds.Command_AnimId, delay = ds.Command_AnimDelay;

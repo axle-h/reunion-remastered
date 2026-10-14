@@ -191,7 +191,7 @@ void GrWarUnits_CollectAvailableForces(void)
                         ADD32(ds.GrWarUnits_Attack[0][t - 1], atk);
                         ADD32(ds.GrWarUnits_Defence[0][t - 1],
                               s->Weapons[2] * ds.GrWarUnits_WeaponWeight[2]);
-                        ADD32(ds.GrWarUnits_Totals[0][t - 1], s->ShipType);
+                        ADD32(ds.GrWarUnits_Totals[0][t - 1], s->Count);
                     }
                 }
             }
@@ -267,7 +267,7 @@ void GrWarUnits_SetupUnitHotspots(void)
         h->H = 0x10;
         pstr_set(&h->Caption, 0x12, Lang_Text(remove ? "Remove unit" : "Add/sub ??"));
         h->Repeat_ = remove;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }
 

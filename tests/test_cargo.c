@@ -33,7 +33,7 @@ static int32_t load_ore(void)
     int32_t carried = 1000;
     SDL_memcpy(&g->Cargo[1], &carried, 4);
     body.Owner = 1;
-    body._0A = 1;
+    body.Droids = 1;
     ds.Game_CurBody = &body;
     stores[1] = 1500;
     ds.Cargo_Stores = (uint8_t *)stores;
@@ -67,13 +67,13 @@ int main(int argc, char *argv[])
 
     TGroup g;
     SDL_memset(&g, 0, sizeof g);
-    g.Units[0][0].ShipType = 3;
-    g.Units[0][1].ShipType = 2;
-    g.Units[0][3].ShipType = 1;
+    g.Units[0][0].Count = 3;
+    g.Units[0][1].Count = 2;
+    g.Units[0][3].Count = 1;
     CHECK(Cargo_ShipCapacity(&g) == 3 * 500 + 2 * 2000 + 8000);
 
     // Capacity wraps like the original's 32-bit LongMul sum.
-    g.Units[0][3].ShipType = 32000;
+    g.Units[0][3].Count = 32000;
     CHECK(Cargo_ShipCapacity(&g) == (int32_t)(3u * 500 + 2u * 2000 + 32000u * 8000));
 
     g.Items[0] = 4;

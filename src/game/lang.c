@@ -38,6 +38,11 @@ static const LangTextAt manual[] = {
      {nullptr, nullptr, "Non sono all'altezza di questo lavoro."}},
 };
 
+// The port's own texts (game/improvements.h).
+static const LangText port_texts[] = {
+    {" Miner Stations", {" Bergbaustationen", " stations mini\212res", " stazioni minerarie"}},
+};
+
 // printf formats where a translation changes the order of the pieces.
 static const LangTextAt formats[] = {
     {0x28410228, "%s forces", {"%s Garnison", "Force %s", "Forze %s"}},
@@ -99,7 +104,12 @@ static int text_cmp(const void *key, const void *entry)
 
 static const LangText *find_text(const char *english)
 {
-    return SDL_bsearch(english, lang_texts, (size_t)lang_text_count, sizeof *lang_texts, text_cmp);
+    const LangText *t =
+        SDL_bsearch(english, lang_texts, (size_t)lang_text_count, sizeof *lang_texts, text_cmp);
+    for (size_t i = 0; !t && i < SDL_arraysize(port_texts); i++)
+        if (SDL_strcmp(port_texts[i].english, english) == 0)
+            t = &port_texts[i];
+    return t;
 }
 
 const char *Lang_Text(const char *english)

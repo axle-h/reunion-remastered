@@ -23,8 +23,7 @@ void PlanetInfo_SelectCurBody(void);                                            
 // The values the screen moves between ship and planet, in packed records:
 // the planet's ore stock i (a longint of Game::HomeStock or the body's
 // Stores, through Cargo::Stores), item i's store (an integer: the product's
-// Stock or the planet force's Items[i]) and the ship's cargo slot i (a
-// TCargoSlot, whose two words the original uses as one longint).
+// Stock or the planet force's Items[i]) and the ship's Cargo[i].
 static int32_t store_of(int16_t i)
 {
     return rd32le(ds.Cargo_Stores + (i - 1) * 4);
@@ -47,19 +46,19 @@ static void add_item_store(int16_t i, int16_t amount)
 
 static int32_t cargo_of(const TGroup *g, int i)
 {
-    return rd32le(&g->Cargo[i - 1]);
+    return g->Cargo[i - 1];
 }
 
 static void add_cargo(TGroup *g, int i, int32_t amount)
 {
-    wr32le(&g->Cargo[i - 1], (int32_t)((uint32_t)cargo_of(g, i) + (uint32_t)amount));
+    g->Cargo[i - 1] = (int32_t)((uint32_t)cargo_of(g, i) + (uint32_t)amount);
 }
 
 int32_t Cargo_ShipCapacity(const TGroup *g)
 {
     uint32_t sum = 0;
     for (int i = 1; i <= 4; i++)
-        sum += (uint32_t)((int32_t)g->Units[0][i - 1].ShipType * ds.Cargo_UnitSpace[i - 1]);
+        sum += (uint32_t)((int32_t)g->Units[0][i - 1].Count * ds.Cargo_UnitSpace[i - 1]);
     return (int32_t)sum;
 }
 
@@ -75,7 +74,7 @@ int32_t Cargo_ItemsSpace(const TGroup *g)
 static bool at_own_colony(const TGroup *g)
 {
     const TBody *b = ds.Game_CurBody;
-    return g->Status == 1 && b->Owner == 1 && (b->Colony != 0 || b->_0A != 0);
+    return g->Status == 1 && b->Owner == 1 && (b->Colony != 0 || b->Droids != 0);
 }
 
 // 2583:0029

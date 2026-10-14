@@ -46,12 +46,12 @@ static void fill_slots(TGroup *g, const Force *f, Kit kit, bool space, bool grou
 {
     for (int t = 0; t < 4; t++) {
         if (space) {
-            g->Units[0][t].ShipType = (int16_t)f->space[t];
+            g->Units[0][t].Count = (int16_t)f->space[t];
             for (int w = 0; w < 4; w++)
                 g->Units[0][t].Weapons[w] = (int16_t)(f->space[t] * space_kit[kit][t][w]);
         }
         if (ground) {
-            g->Units[1][t].ShipType = (int16_t)f->ground[t];
+            g->Units[1][t].Count = (int16_t)f->ground[t];
             for (int w = 0; w < 4; w++)
                 g->Units[1][t].Weapons[w] = (int16_t)(f->ground[t] * ground_kit[t][w]);
         }
@@ -197,7 +197,7 @@ static void setup_defence(const Scenario *s)
     fc->Body = 5;
     fc->Moon = 0;
     fc->Active = 1;
-    fc->_03 = 0;
+    fc->TravelTime = 0;
     fc->Mission = 2;
     fc->NextMission = 2;
     fc->Timer = 1;

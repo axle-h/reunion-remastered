@@ -96,13 +96,13 @@ void Intel_ClearBody(int16_t system, int16_t planet, int16_t moon, bool full)
 {
     TBody *b = body_at(system, planet, moon);
     b->Owner = 0;
-    b->_01 = 0;
-    b->_04[0] = b->_04[1] = 0;
+    b->MainPlanet = 0;
+    b->BuildPower = 0;
     b->Colony = 0;
-    b->Miner = 0;
+    b->ColonyTimer = 0;
     if (full) {
-        b->_0A = 0;
-        b->_0B = 0;
+        b->Droids = 0;
+        b->SolarSats = 0;
         b->Population = 0;
         b->Resistance = 0;
         b->TechLevel = 0;
@@ -244,7 +244,7 @@ void Intel_ClaimBodyForRace(int16_t owner, int16_t system, int16_t planet, int16
     b->Owner = (uint8_t)owner;
     b->Colony = 1;
     b->Satellite = 0;
-    b->_09 = 0;
+    b->SpyShip = 0;
     b->Population = System_Random(3000) + 2000;
     b->Resistance = 0x14;
     b->TechLevel = 3;
@@ -283,7 +283,7 @@ void Intel_ClaimBodyForPlayer(int16_t system, int16_t planet, int16_t moon)
     TBody *b = body_at(system, planet, moon);
     b->Owner = 1;
     b->Colony = 1;
-    b->_09 = 0;
+    b->SpyShip = 0;
     b->Population = System_Random(3000) + 2000;
     b->Resistance = 0x14;
     b->TechLevel = 3;
@@ -320,7 +320,7 @@ void Intel_ForceLands(int16_t race, int16_t force)
     f->Active = 0;
 }
 
-// Slot (row t = 1..2, unit u = 1..4) of a group: ShipType and Weapons[1..4] as five words.
+// Slot (row t = 1..2, unit u = 1..4) of a group: Count and Weapons[1..4] as five words.
 static uint8_t *group_slot(TGroup *g, int t, int u)
 {
     return (uint8_t *)g + t * 40 + u * 10 - 21;
@@ -385,11 +385,11 @@ void Intel_SetForceTarget(int16_t race, int16_t force, int16_t system, int16_t p
         return;
     if (f->System == system) {
         if (f->Body == planet)
-            f->_03 = (uint16_t)(System_Random(5) + 6);
+            f->TravelTime = (uint16_t)(System_Random(5) + 6);
         else
-            f->_03 = (uint16_t)(System_Random(10) + 0x14);
+            f->TravelTime = (uint16_t)(System_Random(10) + 0x14);
     } else {
-        f->_03 = (uint16_t)(System_Random(0x14) + 0x32);
+        f->TravelTime = (uint16_t)(System_Random(0x14) + 0x32);
     }
     f->System = (uint8_t)system;
     f->Body = (uint8_t)planet;
@@ -437,7 +437,7 @@ void Intel_ClearForce(int16_t race, int16_t force)
 void Intel_EliminateRace(int16_t race)
 {
     TRace *r = Intel_Race(race);
-    r->_0F = 0;
+    r->Alive = 0;
     r->Speed = 0;
     r->HomeSystem = 0;
     r->HomeBody = 0;
@@ -609,7 +609,7 @@ static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int1
     if (kind == 1) {
         SDL_snprintf(msg, sizeof msg, "%s%s%s%s%s", Lang_TextAt(0x29b91573, "    Information on: "),
                      name, Lang_TextAt(0x29b91591, "|"),
-                     Lang_Text(b->_01 != 0 ? "  Their main planet is | " : "    Their colony is on| "),
+                     Lang_Text(b->MainPlanet != 0 ? "  Their main planet is | " : "    Their colony is on| "),
                      title);
         Message_ShowMessage(msg);
     }
@@ -679,7 +679,7 @@ static void show_race_army_info(int16_t race)
 static void show_race_weapon_info(int16_t race)
 {
     const TRace *r = Intel_Race(race);
-    const uint8_t *flags = (const uint8_t *)r->KnownSystems; // [0..3] ship classes, [4..7] ground units
+    const uint8_t *flags = r->Weapons; // [0..3] ship classes, [4..7] ground units
     // The original builds " Information on: <race>" and then replaces it
     // with this. Port fix (game/fixes.h): keeps it, on the same line.
     char msg[256] = "", name[256];

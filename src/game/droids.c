@@ -53,9 +53,9 @@ void Droids_DroidsScreen(void)
         TBody *body = ds.Game_CurBody;
         int16_t a = Surface_CountBuildings(0x19, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
         int16_t b = Surface_CountBuildings(4, ds.Game_CurSystem, cur_planet(), cur_moon(), false);
-        if (body->_0A < b + a && body->Colony != 0 && body->Owner == 1 && body->_0A < 9) {
+        if (body->Droids < b + a && body->Colony != 0 && body->Owner == 1 && body->Droids < 9) {
             Sound_PlayButtonSfx("addroid");
-            body->_0A++;
+            body->Droids++;
             if (at_home_planet())
                 ds.Research_Products[1].Stock--;
             else
@@ -74,7 +74,7 @@ void Droids_DroidsScreen(void)
 void Droids_DrawDroidsScreen(void)
 {
     const TBody *body = ds.Game_CurBody;
-    uint16_t droids = body->_0A;
+    uint16_t droids = body->Droids;
     int16_t stock;
     const uint8_t *stores;  // six longints in a packed record
     if (at_home_planet()) {
@@ -109,10 +109,10 @@ void Droids_DrawDroidsScreen(void)
             SDL_strlcpy(s, "     -", sizeof s);
         Gfx_DrawTextF9(s, 0x3B, (int16_t)((k - 1) * 8 + 0x39), 6);
     }
-    if (body->Owner == 1 && (body->Colony != 0 || body->_0A != 0)) {
+    if (body->Owner == 1 && (body->Colony != 0 || body->Droids != 0)) {
         for (int16_t k = 1; k <= 6; k++) {
             uint8_t deposit = body->Deposits[k - 1];
-            SDL_snprintf(s, sizeof s, "%2d", (int16_t)(deposit * body->_0A) / 10);
+            SDL_snprintf(s, sizeof s, "%2d", (int16_t)(deposit * body->Droids) / 10);
             if (k == 1 && config.detoxin_rate)
                 SDL_snprintf(s, sizeof s, "%2d", SDL_min(Surface_DerrickRate(), 99));
             else if (k == 1)

@@ -107,7 +107,7 @@ typedef struct THotspot {
     uint8_t H;
     PStr18 Caption; // status-line text, shown by 405f:11e8
     uint8_t Repeat_; // nonzero: a button, one handler pass per press; 0: passes repeat while held (main_program.c, wait_for_event)
-    uint8_t _1A;
+    uint8_t Cursor; // mouse cursor shape over the hotspot (Mouse_CursorShape)
 } THotspot;
 static_assert(sizeof(THotspot) == 27);
 static_assert(offsetof(THotspot, X) == 0x00);
@@ -116,7 +116,7 @@ static_assert(offsetof(THotspot, W) == 0x03);
 static_assert(offsetof(THotspot, H) == 0x05);
 static_assert(offsetof(THotspot, Caption) == 0x06);
 static_assert(offsetof(THotspot, Repeat_) == 0x19);
-static_assert(offsetof(THotspot, _1A) == 0x1A);
+static_assert(offsetof(THotspot, Cursor) == 0x1A);
 
 // menu bar at DS:7C51
 typedef struct TMenuButton {
@@ -128,20 +128,12 @@ static_assert(offsetof(TMenuButton, Caption) == 0x00);
 static_assert(offsetof(TMenuButton, Command) == 0x13);
 
 typedef struct TGroupSlot {
-    int16_t ShipType; // ? (name guessed)
-    int16_t Weapons[4]; // [1..4] ? (name guessed)
+    int16_t Count; // units in the slot
+    int16_t Weapons[4]; // [1..4] weapon pieces fitted; carriers: satellites; trade groups: [4] Miner stations
 } TGroupSlot;
 static_assert(sizeof(TGroupSlot) == 10);
-static_assert(offsetof(TGroupSlot, ShipType) == 0x00);
+static_assert(offsetof(TGroupSlot, Count) == 0x00);
 static_assert(offsetof(TGroupSlot, Weapons) == 0x02);
-
-typedef struct TCargoSlot {
-    int16_t A; // ? (name guessed)
-    int16_t B; // ? (name guessed)
-} TCargoSlot;
-static_assert(sizeof(TCargoSlot) == 4);
-static_assert(offsetof(TCargoSlot, A) == 0x00);
-static_assert(offsetof(TCargoSlot, B) == 0x02);
 
 // fleets and planet forces
 typedef struct TGroup {
@@ -150,14 +142,14 @@ typedef struct TGroup {
     uint8_t System; // location
     uint8_t Planet;
     uint8_t Moon; // 0 = the planet itself
-    uint8_t Status; // ? 1 for a new group; travel state
-    int16_t Leg1; // ? distance left to leave the system
-    int16_t Jump; // ? hyperspace hours left
-    int16_t Leg2; // ? distance left to arrive
-    TGroupSlot Units[2][4]; // [1..2,1..4] ? [1] space fleet, [2] ground forces
-    TCargoSlot Cargo[6]; // [1..6] ? (name guessed)
-    int16_t Items[13]; // [1..13] ? cargo item counts (2583)
-    int16_t Storage; // planet forces: storage capacity / 1000 ?
+    uint8_t Status; // 1 docked, 2 in orbit, 4 to target (Leg2), 5 jump, 6 leaving (Leg1), 7 planet force
+    int16_t Leg1; // distance to the jump point; less pilot experience + 1 an hour
+    int16_t Jump; // hours in hyperspace
+    int16_t Leg2; // distance to the target, as Leg1
+    TGroupSlot Units[2][4]; // [1..2,1..4] [1] ships by class, [2] ground units by type
+    int32_t Cargo[6]; // [1..6] ore carried, t
+    int16_t Items[13]; // [1..13] pieces of the Cargo_Items products carried; planet forces: the colony's store
+    int16_t Storage; // planet forces: ore storage space, thousands of t (storage buildings; PlanetInfo_BalanceBuildingPower)
 } TGroup;
 static_assert(sizeof(TGroup) == 161);
 static_assert(offsetof(TGroup, Kind) == 0x00);
@@ -181,12 +173,12 @@ typedef struct TBuilding {
     uint8_t Moon;
     uint8_t X; // map position
     uint8_t Y;
-    uint8_t Health; // ? 100..159 when built, 0 = destroyed/inactive
-    uint8_t Output; // ? (name guessed)
-    uint8_t Flag; // cleared by 357b:3a05
-    int16_t W9;
-    int16_t WB;
-    uint8_t BD;
+    uint8_t BuildLeft; // work left: 100..159 when placed, 0 = built
+    uint8_t Output; // % of the type's Production: surface factor * 40 + Random(80)
+    uint8_t Powered; // 1 active, 0 passive: switched off for lack of energy
+    int16_t Workers; // the type's Workers, scaled by population / demand
+    int16_t Energy; // energy it gets, kwh
+    uint8_t Working; // % working
 } TBuilding;
 static_assert(sizeof(TBuilding) == 14);
 static_assert(offsetof(TBuilding, Kind) == 0x00);
@@ -195,12 +187,12 @@ static_assert(offsetof(TBuilding, Planet) == 0x02);
 static_assert(offsetof(TBuilding, Moon) == 0x03);
 static_assert(offsetof(TBuilding, X) == 0x04);
 static_assert(offsetof(TBuilding, Y) == 0x05);
-static_assert(offsetof(TBuilding, Health) == 0x06);
+static_assert(offsetof(TBuilding, BuildLeft) == 0x06);
 static_assert(offsetof(TBuilding, Output) == 0x07);
-static_assert(offsetof(TBuilding, Flag) == 0x08);
-static_assert(offsetof(TBuilding, W9) == 0x09);
-static_assert(offsetof(TBuilding, WB) == 0x0B);
-static_assert(offsetof(TBuilding, BD) == 0x0D);
+static_assert(offsetof(TBuilding, Powered) == 0x08);
+static_assert(offsetof(TBuilding, Workers) == 0x09);
+static_assert(offsetof(TBuilding, Energy) == 0x0B);
+static_assert(offsetof(TBuilding, Working) == 0x0D);
 
 // a colony under construction
 typedef struct TColonySetup {
@@ -220,49 +212,49 @@ static_assert(offsetof(TColonySetup, Timers) == 0x04);
 // a planet or moon
 typedef struct TBody {
     uint8_t Owner; // 0 none, 1 player, 2..12 race
-    uint8_t _01;
+    uint8_t MainPlanet; // 1 the owner's main planet: winning it eliminates the race
     uint8_t Surveyed; // needed for "Empty planet, ready for colonisation"
-    uint8_t _03;
-    uint8_t _04[2]; // [4..5]
+    uint8_t Mineable; // nonzero: has ore to mine
+    int16_t BuildPower; // Builder Plant output, speeds construction (PlanetInfo_BalanceBuildingPower)
     uint8_t Colony; // player colony
-    int8_t Miner; // miner station / droids (the globals agent saw +0A tested instead; check)
+    int8_t ColonyTimer; // days until a bought colony starts building, 0 none
     uint8_t Satellite; // set to 1 or E2h by Satellite (28cd)
-    uint8_t _09;
-    uint8_t _0A; // compared with counts in 1b8a:0cba
-    uint8_t _0B;
+    uint8_t SpyShip; // nonzero: a spy ship is deployed here
+    uint8_t Droids; // miner droids at work; on a body with only Miner stations, one per station
+    uint8_t SolarSats; // solar satellites, 10,000 supply each
     int8_t InfoLevel; // how much is known; landing sets 6
     int32_t Population; // Earth 143000, New Earth 30000
     int8_t Resistance; // 0..69 -> None .. Very difficult
     uint8_t TechLevel; // 0..7 -> Oppressing .. Super tech
     int8_t Attitude; // 0..69 -> revolting .. loyal
-    int8_t _14; // usually FFh
+    int8_t Hazard; // -1 none, 1..99 days to disease, 0 disease, 100 meteorites
     uint8_t SurfaceType; // 1 Earth-like, 2 Gaseous, 3 Icy, 4 Watery, 5 Tropical, 6 Desert, 7 Swampy, 8 Rocky, 9 Too hot, 10 No atmosphere
-    uint8_t _16;
+    uint8_t MapVariant; // surface map variant (Surface_MapVariant)
     uint16_t Diameter; // tens of km
     int16_t Temperature; // kelvin
-    int32_t Stores[8]; // [1..8] 1..6 = ores
+    int32_t Stores[8]; // [1..8] player: [1..6] ore t, [7] revolt days 0..5, [8] unused; race: garrison, [1..4] ship classes, [5..8] ground units
     uint8_t Deposits[6]; // [1..6] ore richness
 } TBody;
 static_assert(sizeof(TBody) == 65);
 static_assert(offsetof(TBody, Owner) == 0x00);
-static_assert(offsetof(TBody, _01) == 0x01);
+static_assert(offsetof(TBody, MainPlanet) == 0x01);
 static_assert(offsetof(TBody, Surveyed) == 0x02);
-static_assert(offsetof(TBody, _03) == 0x03);
-static_assert(offsetof(TBody, _04) == 0x04);
+static_assert(offsetof(TBody, Mineable) == 0x03);
+static_assert(offsetof(TBody, BuildPower) == 0x04);
 static_assert(offsetof(TBody, Colony) == 0x06);
-static_assert(offsetof(TBody, Miner) == 0x07);
+static_assert(offsetof(TBody, ColonyTimer) == 0x07);
 static_assert(offsetof(TBody, Satellite) == 0x08);
-static_assert(offsetof(TBody, _09) == 0x09);
-static_assert(offsetof(TBody, _0A) == 0x0A);
-static_assert(offsetof(TBody, _0B) == 0x0B);
+static_assert(offsetof(TBody, SpyShip) == 0x09);
+static_assert(offsetof(TBody, Droids) == 0x0A);
+static_assert(offsetof(TBody, SolarSats) == 0x0B);
 static_assert(offsetof(TBody, InfoLevel) == 0x0C);
 static_assert(offsetof(TBody, Population) == 0x0D);
 static_assert(offsetof(TBody, Resistance) == 0x11);
 static_assert(offsetof(TBody, TechLevel) == 0x12);
 static_assert(offsetof(TBody, Attitude) == 0x13);
-static_assert(offsetof(TBody, _14) == 0x14);
+static_assert(offsetof(TBody, Hazard) == 0x14);
 static_assert(offsetof(TBody, SurfaceType) == 0x15);
-static_assert(offsetof(TBody, _16) == 0x16);
+static_assert(offsetof(TBody, MapVariant) == 0x16);
 static_assert(offsetof(TBody, Diameter) == 0x17);
 static_assert(offsetof(TBody, Temperature) == 0x19);
 static_assert(offsetof(TBody, Stores) == 0x1B);
@@ -311,8 +303,10 @@ typedef struct TPubDeal {
     uint8_t Month;
     uint8_t Day;
     uint8_t Hour;
-    uint16_t Active;
-    uint8_t _15[3];
+    uint16_t EndYear; // end of the deal's window; 0 = over
+    uint8_t EndMonth;
+    uint8_t EndDay;
+    uint8_t EndHour;
 } TPubDeal;
 static_assert(sizeof(TPubDeal) == 24);
 static_assert(offsetof(TPubDeal, Items) == 0x00);
@@ -323,8 +317,10 @@ static_assert(offsetof(TPubDeal, Year) == 0x0E);
 static_assert(offsetof(TPubDeal, Month) == 0x10);
 static_assert(offsetof(TPubDeal, Day) == 0x11);
 static_assert(offsetof(TPubDeal, Hour) == 0x12);
-static_assert(offsetof(TPubDeal, Active) == 0x13);
-static_assert(offsetof(TPubDeal, _15) == 0x15);
+static_assert(offsetof(TPubDeal, EndYear) == 0x13);
+static_assert(offsetof(TPubDeal, EndMonth) == 0x15);
+static_assert(offsetof(TPubDeal, EndDay) == 0x16);
+static_assert(offsetof(TPubDeal, EndHour) == 0x17);
 
 // ambient pub animation
 typedef struct TPubAnim {
@@ -367,13 +363,13 @@ static_assert(offsetof(TMoonList, Moons) == 0x01);
 
 typedef struct TBodyName {
     PStr9 Name;
-    uint8_t Size; // icon size on the system map?
+    uint8_t OrbitSpeed; // system-map orbit speed (TOrbit.Speed)
     uint8_t X; // system-map hotspot
     uint8_t Y;
 } TBodyName;
 static_assert(sizeof(TBodyName) == 13);
 static_assert(offsetof(TBodyName, Name) == 0x00);
-static_assert(offsetof(TBodyName, Size) == 0x0A);
+static_assert(offsetof(TBodyName, OrbitSpeed) == 0x0A);
 static_assert(offsetof(TBodyName, X) == 0x0B);
 static_assert(offsetof(TBodyName, Y) == 0x0C);
 
@@ -385,9 +381,9 @@ typedef struct TProduct {
     int16_t Progress; // /100 = % completed
     int32_t Price;
     int16_t Stock; // pieces in store
-    uint16_t _1D;
-    uint16_t _1F; // 50..2000: build time or storage size?
-    uint16_t _21;
+    uint16_t Queued; // pieces ordered and not yet built
+    uint16_t WorkPerPiece; // hours per piece at production rate 1
+    uint16_t WorkLeft; // on the piece in progress, 0 none
     uint8_t Produced;
     uint8_t SpaceBuilt; // Destroyer and Cruiser only
     uint16_t Ores[6]; // [1..6] ore needed
@@ -400,9 +396,9 @@ static_assert(offsetof(TProduct, DevTime) == 0x13);
 static_assert(offsetof(TProduct, Progress) == 0x15);
 static_assert(offsetof(TProduct, Price) == 0x17);
 static_assert(offsetof(TProduct, Stock) == 0x1B);
-static_assert(offsetof(TProduct, _1D) == 0x1D);
-static_assert(offsetof(TProduct, _1F) == 0x1F);
-static_assert(offsetof(TProduct, _21) == 0x21);
+static_assert(offsetof(TProduct, Queued) == 0x1D);
+static_assert(offsetof(TProduct, WorkPerPiece) == 0x1F);
+static_assert(offsetof(TProduct, WorkLeft) == 0x21);
 static_assert(offsetof(TProduct, Produced) == 0x23);
 static_assert(offsetof(TProduct, SpaceBuilt) == 0x24);
 static_assert(offsetof(TProduct, Ores) == 0x25);
@@ -411,15 +407,16 @@ static_assert(offsetof(TProduct, Skills) == 0x31);
 typedef struct TBuildingType {
     PStr14 Name;
     uint8_t NeedProduct; // product that must be done
-    uint8_t _10;
+    uint8_t NeedBuilder; // builder (Game_StaffHired[2]) needed to build it; with NeedProduct 0 also the experience needed to offer it
     uint8_t Category; // 1 power, 2 mine, 3 civil, 4 radar, 5 defence, 6 industry, 7 housing, 8 command centre, 9 miner station
-    uint8_t _12[13]; // 0/1 flags: allowed surface types?
+    uint8_t NeedPlant[2]; // [1..2] nonzero: needs [1] a builder plant, [2] a vehicle plant
+    uint8_t Surfaces[11]; // [1..11] by SurfaceType: 0 not allowed, else the Output factor
     int16_t Workers;
     int32_t Energy; // consumption, kwh
     int16_t Production;
     int32_t Cost; // credits
-    uint8_t _2B;
-    uint8_t _2C;
+    uint8_t PowerPriority; // lowest is switched off first; 255 power plants
+    uint8_t BuildChance; // construction works in an hour when Random(BuildChance) < 10; all 10
     uint8_t Width; // in tiles
     uint8_t Height;
     uint8_t Tiles[4][4]; // [1..4,1..4]
@@ -427,15 +424,16 @@ typedef struct TBuildingType {
 static_assert(sizeof(TBuildingType) == 63);
 static_assert(offsetof(TBuildingType, Name) == 0x00);
 static_assert(offsetof(TBuildingType, NeedProduct) == 0x0F);
-static_assert(offsetof(TBuildingType, _10) == 0x10);
+static_assert(offsetof(TBuildingType, NeedBuilder) == 0x10);
 static_assert(offsetof(TBuildingType, Category) == 0x11);
-static_assert(offsetof(TBuildingType, _12) == 0x12);
+static_assert(offsetof(TBuildingType, NeedPlant) == 0x12);
+static_assert(offsetof(TBuildingType, Surfaces) == 0x14);
 static_assert(offsetof(TBuildingType, Workers) == 0x1F);
 static_assert(offsetof(TBuildingType, Energy) == 0x21);
 static_assert(offsetof(TBuildingType, Production) == 0x25);
 static_assert(offsetof(TBuildingType, Cost) == 0x27);
-static_assert(offsetof(TBuildingType, _2B) == 0x2B);
-static_assert(offsetof(TBuildingType, _2C) == 0x2C);
+static_assert(offsetof(TBuildingType, PowerPriority) == 0x2B);
+static_assert(offsetof(TBuildingType, BuildChance) == 0x2C);
 static_assert(offsetof(TBuildingType, Width) == 0x2D);
 static_assert(offsetof(TBuildingType, Height) == 0x2E);
 static_assert(offsetof(TBuildingType, Tiles) == 0x2F);
@@ -443,9 +441,9 @@ static_assert(offsetof(TBuildingType, Tiles) == 0x2F);
 // garrison or fleet
 typedef struct TRaceForce {
     uint8_t Mission; // 2 stationed, > 1 hostile
-    uint8_t _01;
+    uint8_t _01; // unused: initialised, never read
     uint8_t Active;
-    uint16_t _03;
+    uint16_t TravelTime; // hours until it arrives (Active 2)
     int16_t Timer;
     uint8_t NextMission;
     uint8_t System;
@@ -457,7 +455,7 @@ static_assert(sizeof(TRaceForce) == 27);
 static_assert(offsetof(TRaceForce, Mission) == 0x00);
 static_assert(offsetof(TRaceForce, _01) == 0x01);
 static_assert(offsetof(TRaceForce, Active) == 0x02);
-static_assert(offsetof(TRaceForce, _03) == 0x03);
+static_assert(offsetof(TRaceForce, TravelTime) == 0x03);
 static_assert(offsetof(TRaceForce, Timer) == 0x05);
 static_assert(offsetof(TRaceForce, NextMission) == 0x07);
 static_assert(offsetof(TRaceForce, System) == 0x08);
@@ -467,26 +465,26 @@ static_assert(offsetof(TRaceForce, Units) == 0x0B);
 
 typedef struct TRace {
     PStr13 Name;
-    uint8_t _0E;
-    uint8_t _0F;
+    uint8_t _0E; // unused: never read
+    uint8_t Alive; // 1 until eliminated
     uint8_t Speed; // 20..95
     uint8_t HomeSystem;
     uint8_t HomeBody;
-    uint8_t KnownSystems[8]; // [1..8] the Intel port reads [1..4] as ship-class and [5..8] as ground-unit weapon flags
-    int8_t Status; // contact state 0/2/4/6
+    uint8_t Weapons[8]; // [1..8] nonzero: has it; [1..4] ship classes, [5..8] ground units
+    int8_t Status; // -1 eliminated, 0 not met, 2 hostile, 4 neutral, 6 allied
     int32_t Credits;
-    int8_t _20[6]; // [1..6]
+    int8_t _20[6]; // [1..6] unused: set to -1, never read
     int8_t ForceCount;
     TRaceForce Forces[7]; // [1..7]
 } TRace;
 static_assert(sizeof(TRace) == 228);
 static_assert(offsetof(TRace, Name) == 0x00);
 static_assert(offsetof(TRace, _0E) == 0x0E);
-static_assert(offsetof(TRace, _0F) == 0x0F);
+static_assert(offsetof(TRace, Alive) == 0x0F);
 static_assert(offsetof(TRace, Speed) == 0x10);
 static_assert(offsetof(TRace, HomeSystem) == 0x11);
 static_assert(offsetof(TRace, HomeBody) == 0x12);
-static_assert(offsetof(TRace, KnownSystems) == 0x13);
+static_assert(offsetof(TRace, Weapons) == 0x13);
 static_assert(offsetof(TRace, Status) == 0x1B);
 static_assert(offsetof(TRace, Credits) == 0x1C);
 static_assert(offsetof(TRace, _20) == 0x20);
@@ -496,11 +494,19 @@ static_assert(offsetof(TRace, Forces) == 0x27);
 // Ui::Screens
 typedef struct TScreenInfo {
     PStr8 Name; // GRAFIKA\<name>.PIC
-    uint8_t _09[16]; // [1..16]
+    uint8_t ShowPic; // nonzero: show the picture on entry
+    uint8_t SetToolbar; // nonzero: set the toolbar on entry
+    int8_t Command; // menu command that opens the screen, -1 none
+    uint8_t IconCount; // toolbar icons
+    int8_t Icons[12]; // [1..12] toolbar icon ids
 } TScreenInfo;
 static_assert(sizeof(TScreenInfo) == 25);
 static_assert(offsetof(TScreenInfo, Name) == 0x00);
-static_assert(offsetof(TScreenInfo, _09) == 0x09);
+static_assert(offsetof(TScreenInfo, ShowPic) == 0x09);
+static_assert(offsetof(TScreenInfo, SetToolbar) == 0x0A);
+static_assert(offsetof(TScreenInfo, Command) == 0x0B);
+static_assert(offsetof(TScreenInfo, IconCount) == 0x0C);
+static_assert(offsetof(TScreenInfo, Icons) == 0x0D);
 
 typedef struct TSatStep {
     uint8_t DX;
@@ -869,7 +875,7 @@ typedef struct DSeg {
     int8_t GfxPath_CommandIcon[78]; // icon number (ICON.ALL) per menu command id, 0 = none (3a1b:00bf)
     uint8_t _pad_4E54[0xB];
     PStr8 Ui_ButtonSounds[77]; // [1..77] folded 4e56; Main passes 95ea*9+4e56 to 431a:031a; 'disk','maincpu' = SOUND\DISK.SMP, MAINCPU.SMP
-    TScreenInfo Ui_Screens[38]; // [1..38] folded 50fb; Name string[8] ('main','faces','research'.. 'colinfo' = GRAFIKA\*.PIC) + 16 bytes; +9/+A/+B read with 95e6 (Main 1000:0733)
+    TScreenInfo Ui_Screens[38]; // [1..38] folded 50fb; Name string[8] ('main','faces','research'.. 'colinfo' = GRAFIKA\*.PIC) (Main 1000:0733)
     uint16_t GfxPath_IconAllSize; // Size of ICON\ICON.ALL
     uint16_t GfxPath_CellsSize; // 1E00h: the 240x32 cell backgrounds after the two bar pages in the toolbar block (3a1b:09b2)
     uint16_t Command_StaffX[4]; // [1..4] command centre: staff figure of kind 1..4, window x (3abd:16bc, hotspots 3abd:08e0)
@@ -1190,7 +1196,7 @@ typedef struct DSeg {
     int16_t Groups_SlotShip; // ship slot of the clicked button (2b8d:0002)
     int16_t Groups_SlotWeapon; // weapon column of the clicked button
     int16_t Groups_SlotAvail; // stock the unit would come from
-    uint8_t Groups_CanChangeSlots; // ? body is a colony and group Status is 1 or 7 (set in 2b8d:11bf)
+    uint8_t Groups_CanChangeSlots; // the slots can be refitted: the body is a colony and the group docked (Status 1) or a planet force (7) (2b8d:11bf)
     uint8_t Groups_AtHomePlanet; // group is at system 1 planet 5 moon 0 (set in 2b8d:11bf)
     TGroup *Groups_PlanetForceList; // ^TGroup ^TGroup: the planet force at the shown group's location (2b8d:11bf)
     uint8_t _pad_78A0[0x2];
@@ -1226,7 +1232,7 @@ typedef struct DSeg {
     int16_t Surface_MapVariant; // N in MAP\MAP<type>_<N>.MAP (LoadMap)
     int16_t Surface_AnimTileFrame;
     uint16_t Surface_AnimTileOffset; // Offset of the animated-tile frame in BufD
-    uint8_t Surface_CanBuild; // ? 0 = hotspot captions 'No effect'; set = Invention up/down/Info and Build live
+    uint8_t Surface_CanBuild; // the body is the player's colony on a colonisable surface: the building controls are live; 0 = their captions read 'No effect'
     uint8_t Surface_Scrolled; // the view scrolled this pass: redraw the map and the radar (Main 1000:1e03)
     uint8_t *Surface_TileLayer; // 60x60 bytes, [x*3Ch+y-3Dh]: terrain tile number (LoadMap)
     uint8_t *Surface_OccupyLayer; // bytes: 0 free, tile+1 = building cell, FFh blocked terrain
@@ -1251,7 +1257,7 @@ typedef struct DSeg {
     uint16_t Surface_BlinkCounter; // 0..19, the Build/Destroy button blinks at 1 and 11 (2ef2:15de)
     uint8_t Surface_BlinkOn;
     uint8_t _pad_791F[0x1];
-    int32_t Surface_KindCounts[2][25]; // [0..1,1..25] [Building.Flag][Kind]: finished buildings on a body (2ef2:2b9e)
+    int32_t Surface_KindCounts[2][25]; // [0..1,1..25] [Building.Powered][Kind]: finished buildings on a body (2ef2:2b9e)
     int16_t Shop_Sel; // Selected position in the product list
     int16_t Shop_Top; // First visible list position
     int32_t Shop_Qty; // Quantity being ordered (+/-1, +/-10 buttons)

@@ -230,7 +230,7 @@ void GrWar_SetupBattleHotspots(void)
     h->H = 0x90;
     pstr_set(&h->Caption, 0x12, "");
     h->Repeat_ = false;
-    h->_1A = 0;
+    h->Cursor = 0;
 
     h = Mouse_Hotspot(2);
     h->X = 0;
@@ -239,7 +239,7 @@ void GrWar_SetupBattleHotspots(void)
     h->H = 0x10;
     pstr_set(&h->Caption, 0x12, Lang_TextAt(0x1537057d, "Move"));
     h->Repeat_ = true;
-    h->_1A = 0;
+    h->Cursor = 0;
 
     h = Mouse_Hotspot(3);
     h->X = 0;
@@ -248,7 +248,7 @@ void GrWar_SetupBattleHotspots(void)
     h->H = 0x10;
     pstr_set(&h->Caption, 0x12, Lang_Text("Attack"));
     h->Repeat_ = true;
-    h->_1A = 0;
+    h->Cursor = 0;
 
     h = Mouse_Hotspot(5);
     h->X = 0;
@@ -257,14 +257,14 @@ void GrWar_SetupBattleHotspots(void)
     h->H = 0x77;
     pstr_set(&h->Caption, 0x12, "");
     h->Repeat_ = true;
-    h->_1A = 0;
+    h->Cursor = 0;
 }
 
 // 1537:05ee
 void GrWar_SetHotspotFlags(uint8_t flag)
 {
     for (int j = 1; j <= ds.Mouse_HotspotCount; j++)
-        Mouse_Hotspot((int16_t)j)->_1A = flag;
+        Mouse_Hotspot((int16_t)j)->Cursor = flag;
     ds.Game_HotspotHit = 0;
 }
 
@@ -996,7 +996,7 @@ void GrWar_ApplyGroundLosses(void)
                 for (int t = 1; t <= 4; t++) {
                     TGroupSlot *slot = &grp->Units[1][t - 1];
                     int32_t surv = ds.GrWar_Survivors[0][t - 1], all = total(1, t);
-                    slot->ShipType = (int16_t)scale(slot->ShipType, surv, all);
+                    slot->Count = (int16_t)scale(slot->Count, surv, all);
                     for (int w = 1; w <= 3; w++)
                         slot->Weapons[w - 1] = (int16_t)scale(slot->Weapons[w - 1], surv, all);
                 }

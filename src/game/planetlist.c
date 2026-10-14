@@ -31,13 +31,13 @@ void PlanetList_AddListEntry(int16_t sys, int16_t planet, int16_t moon, int16_t 
 
     // The original's flags, in the order it computes them.
     bool colony = b->Owner == 1 && b->Colony != 0;
-    bool miner = b->Owner == 1 && b->Colony == 0 && b->_0A != 0;
+    bool miner = b->Owner == 1 && b->Colony == 0 && b->Droids != 0;
     // Surface::Tileset[SurfaceType] indexes SurfaceColonisable (both 1-based).
     int16_t tileset = ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
-    bool accomodable = b->Colony == 0 && b->Miner == 0 && b->InfoLevel > 0x1D && b->Surveyed != 0
+    bool accomodable = b->Colony == 0 && b->ColonyTimer == 0 && b->InfoLevel > 0x1D && b->Surveyed != 0
                        && b->Owner < 2 && ds.Galaxy_SurfaceColonisable[tileset - 1] != 0;
-    bool mineable = b->Owner == 0 && b->Colony == 0 && b->Miner == 0 && b->_0A == 0
-                    && b->InfoLevel > 9 && b->_03 != 0;
+    bool mineable = b->Owner == 0 && b->Colony == 0 && b->ColonyTimer == 0 && b->Droids == 0
+                    && b->InfoLevel > 9 && b->Mineable != 0;
     if (accomodable)
         mineable = false;
     bool notAlien = b->Owner < 2;

@@ -44,19 +44,19 @@ int main(int argc, char *argv[])
     Shop_BuildProductList();
     CHECK(ds.Shop_Sel == 1);
 
-    // Times: (qty * hours + rate - 1) div rate; with a piece in progress the first one costs _21.
+    // Times: (qty * hours + rate - 1) div rate; with a piece in progress the first one costs WorkLeft.
     TProduct p;
     SDL_memset(&p, 0, sizeof p);
-    p._1F = 10;
+    p.WorkPerPiece = 10;
     p.Price = 250;
     ds.Game_ProductionRate = 4;
     CHECK(Shop_OrderHours(&p, 1) == 3);      // (10 + 3) / 4
     CHECK(Shop_OrderHours(&p, 3) == 8);      // (30 + 3) / 4
     CHECK(Shop_OrderHours(&p, 0) == 0);
-    p._21 = 6;                               // first piece has 6 hours left
+    p.WorkLeft = 6;                               // first piece has 6 hours left
     CHECK(Shop_OrderHours(&p, 1) == 2);      // (6 + 3) / 4
     CHECK(Shop_OrderHours(&p, 3) == 7);      // (2*10 + 6 + 3) / 4
-    p._1D = 3;
+    p.Queued = 3;
     CHECK(Shop_QueueHours(&p) == 7);
     CHECK(Shop_OrderPrice(&p, 12) == 3000);
 

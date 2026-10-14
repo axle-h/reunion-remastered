@@ -632,8 +632,9 @@ University thresholds, target mood and growth (port menu, Game).
 
   An unpowered building counts for nothing. A shortage therefore hits morale
   first (the guide said Radar goes first **[fixed]**).
-- **Storage** (per ore). Mine 10,000, Miner station 10,000, Derrick 5,000,
-  Storage bay 20,000. The Command centre gives none. Production stops when
+- **Storage** (per ore). Mine 10,000, Miner station 10,000 (a body with
+  only stations: 10,000 in all, or per station with More Miner stations),
+  Derrick 5,000, Storage bay 20,000. The Command centre gives none. Production stops when
   storage is full. Mines beyond the ninth still add storage, which makes them
   cheaper storage than bays.
 - **Mining.**
@@ -644,7 +645,14 @@ University thresholds, target mood and growth (port menu, Game).
     per hour to make deposit / 10. There is no derrick limit and no droid is
     needed, so build all Derricks on New Earth (Detoxin 7).
   - A body with only a Miner station mines in 30% of hours and can't take
-    more droids.
+    more droids. With the port's More Miner stations (port menu,
+    Improvements; `improvements.more_stations`), a trade group carrying
+    stations adds more through the body menu's Miner station action, up to
+    4 per body. Each mines as a droid does and stores 10,000 t, and the
+    body mines every hour: 4 stations on Gallilei (Kalium 7) make 28 t/h of
+    Kalium into 40,000 t. A colony founded there keeps the stations mining
+    as its first droids (the original does so with one), and while it
+    waits to be set up they keep their storage.
 - **Moving goods.** Moving droids or other items to or from a colony needs a
   Spaceport at that colony; ore doesn't. New Earth has a Spaceport.
 - **Observatory.** Each day there is a 1-in-50 chance it reveals one hidden

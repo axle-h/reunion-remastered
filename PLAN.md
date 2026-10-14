@@ -29,6 +29,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
 | Bugs of the original | A bug that changes play gets a switch in `src/game/fixes.h` (all on by default); a harmless one is kept and described where the code reproduces it | With every fix off the port plays like the original, which the golden hashes check |
+| Improvements | Changes to the game's design are switches in `src/game/improvements.h` (port menu, Improvements; `[improvements]` in `reunion.ini`), on by default. The Fixes section's "All off (original)" turns them off too | Scripted runs (autopilot, `--replay`, the tests) play with every improvement off, so the golden hashes, the playthrough and the DOS-save tests still prove the original's behaviour; a test of one switches it on |
 
 ## Source
 
@@ -40,13 +41,15 @@ segments (813 functions), plus
 How the port cites the original's addresses: docs/port.md, "Addresses".
 The file formats are described in the loaders, `src/assets/*.h`.
 
-## Where we stand (2026-10-13)
+## Where we stand (2026-10-14)
 
 The port is complete and the game can be won in it.
 
 - **Ported:** every unit of `REUNION.PRG` and the three cut-scene programs,
   about 37,000 lines of C in `src/`. The game needs only the data files, no
   executable. Real-mode memory, EMS and the Borland run time are gone.
+  Every record field the code uses is named; the few nobody reads are
+  marked unused.
 - **Matches the original:** every unit matched the original routine for
   routine under the differential tests before they were retired. Since
   then, golden state hashes (`tests/golden/`, every fix on and every fix
@@ -57,13 +60,16 @@ The port is complete and the game can be won in it.
   Seeds 1-240 win too, and so do the CD's German, French and Italian games,
   the program's own texts translated as well (docs/playthrough.md).
 - **Port additions:** the F1 port menu (cheats, Sound Blaster/UltraSound
-  music, display, skip intro, colony stats, language, fix switches,
-  import, restart, quit), `reunion.ini`, screenshots, headless autopilot,
+  music, display, skip intro, colony stats, language, improvement and fix
+  switches, import, restart, quit), `reunion.ini`, screenshots, headless autopilot,
   `--replay` and soak runs.
 - **Ships without the game data:** release builds have none built in. The
   first start imports the player's copy (a folder, a ZIP or the CD's ISO;
   the floppy release, and the CD with its four languages) into the
   player's folder, checked against the list of files the port loads.
+- **Improvements:** one so far, More Miner stations: up to four on a body,
+  mining every hour and kept by a colony founded there
+  (`src/game/improvements.h`).
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -83,26 +89,13 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(mostly done, see 4 below).
+(mostly done, see 3 below).
 
 ## Remaining work
 
 In rough priority order.
 
-### 1. Reverse-engineering loose ends
-
-These matter only for reading the code; nothing depends on them:
-
-- record fields that are still `_xx` fillers or marked `?` in
-  `src/game/dseg.h`: `TGroup`'s travel and cargo fields, and bytes of
-  `TBody`, `TProduct`, `TBuilding` and `TRace` (`TRace.Status` 0/2/4/6,
-  what `TBody.Stores[7..8]` hold; `TRace.KnownSystems` is the race's
-  weapon flags, ship classes then ground units);
-- DS bytes nobody references, `_pad_XXXX` in `src/game/dseg.h`: the
-  1,535 bytes at `9C03–A201`, `A212–A219`, and a few small gaps in the
-  typed constants.
-
-### 2. Licence and publication
+### 1. Licence and publication
 
 The game is still under copyright. Decided (2026-10-12): release builds
 ship without the art and carry the data taken from the executables
@@ -112,21 +105,17 @@ supplies the rest (the import, README). Still open: whether to publish the repos
 Until then keep it private, or publish only the code (no assets, no raw
 decompiler dumps).
 
-### 3. Improvements
+### 2. Improvements
 
 Changes to the game's design rather than its bugs: quality of life first,
 then mechanics that don't do what the game seems to mean. Each one is a
-switch like the fixes, in its own struct (`src/game/improvements.h`, an
-Improvements section in the port menu, `[improvements]` in `reunion.ini`),
-on by default. The Fixes section's "All off (original)" turns them off
-too. The golden hashes, the playthrough and the DOS-save tests run with
-every improvement off, so the proof of the original's behaviour stands;
-each improvement gets its own test with it on.
+switch in `src/game/improvements.h` (see Decisions), with its own test with
+it on.
 
 **Saves.** An improvement keeps its state in fields the original already
 has where it can, so the save stays in the DOS format and still loads in
-the original, which then plays it by its own rules. Trade routes (3.3) and
-the building table past 1,000 (3.5) have no room there, so they break
+the original, which then plays it by its own rules. Trade routes (2.2) and
+the building table past 1,000 (2.4) have no room there, so they break
 with the DOS format:
 
 - **When.** A save is written in the port's own format while
@@ -157,50 +146,7 @@ with the DOS format:
   both off; save and load in the port format restores everything; an
   unknown version is refused; the DOS-save tests are unchanged.
 
-#### 3.1 More Miner stations on a mining-only body
-
-A body with only a Miner station is barely worth the station. It mines
-with one "droid" (`TBody._0A` = 1) in 30% of hours (`Sim_MineBody`), so
-deposit / 10 × 0.3 t per hour per ore: 2.1 t/h of Kalium on Gallilei (K7),
-where a colony's 9 mines on the same deposit make 63 t/h. Its 10,000 t
-would take about 200 days to fill.
-
-Switch `more_stations`:
-
-- **Adding.** A body the player owns with no colony and 1-4 stations
-  gets an "Add Miner station" action in the body menu when a trade group
-  there carries one (the same check as the first station's icon in
-  `Satellite_SetupGroupScreenMenu`). It takes one station from the group
-  (`Satellite_TakeTradeShips`), adds 1 to `_0A` and places a Miner station
-  building (19h) as the first one does (`Satellite_HandleBodyActions`). At
-  5 the action goes away. A Galleon carries 5 stations, so one trip can
-  fill a body.
-- **Storage.** 10,000 t per ore per station, so 50,000 t at 5
-  (`Groups_PlanetStorage` without a planet force returns 10 × `_0A`
-  instead of `fixes.station_storage`'s 10; the improvement uses that path
-  whatever the fix's switch says).
-- **Output.** Each station mines as one droid does, deposit × stations /
-  10 t per hour per ore. **Recommendation: drop the 30% roll** for
-  station-only bodies while the switch is on. With the roll, 5 stations
-  on K7 give 10.5 t/h, still a sixth of a colony; without it they give
-  35 t/h, about half a full colony for ~48,500 credits of stations and
-  no colony to run. (Dropping the roll changes the random stream, which is
-  why the golden runs pin the improvement off.)
-- **Display.** Planet info shows "*n* Miner stations" for such a body
-  instead of "*n* Miner Droid"; the droids screen's output column already
-  uses `_0A`.
-- **Later.** Founding a colony on the body keeps the station buildings,
-  each a mine slot with 10,000 t, as the single station is today. Check
-  what the colony founding does with `_0A` (the stations would become that
-  many droids). A body taken by an enemy loses its stations, as today.
-- **Test.** Add stations up to 5 and check the sixth is refused, the
-  storage is 10,000 t per station and the output is deposit × n / 10 every
-  hour; with the switch off nothing changes. Check that 5 station buildings
-  fit on the smallest mining-only surface (`fixes.autoplace_when_full`
-  adds them unplaced if not). Then update docs/walkthrough.md's Storage and
-  Mining notes.
-
-#### 3.2 Build the same building again
+#### 2.1 Build the same building again
 
 Placing many copies of one building (the guide builds 20, then 60
 Derricks on New Earth) means going back to the build menu for each one.
@@ -211,7 +157,7 @@ places as today and ends the mode. The repeat stops by itself when money
 runs out or the spot is taken (`Surface_UpdateModeForCell` drops to mode
 1 as now). Check first what a right click does on the surface today.
 
-#### 3.3 Trade routes
+#### 2.2 Trade routes
 
 Ore is hauled home by hand, group by group, for the whole game. Switch
 `trade_routes`: a trade group can be given a route and then flies it on
@@ -228,7 +174,7 @@ its own.
   screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
   Start and Stop. The groups list marks a group on a route. Decide
   whether the editor is a game screen in the original's style or a port
-  panel like the F1 menu (simpler, and the keyboard work in 3.4 gets it
+  panel like the F1 menu (simpler, and the keyboard work in 2.3 gets it
   for free).
 - **Rules stay the game's:** the group needs a hired pilot whose tier
   reaches every stop, a Galleon to leave a system, and travel takes the
@@ -249,7 +195,7 @@ its own.
   home early; New Earth full; each stop condition; save and load keep the
   route.
 
-#### 3.4 Playing with the keyboard only
+#### 2.3 Playing with the keyboard only
 
 The original is played with the mouse; the keyboard is used only for
 typing names. Switch `keyboard_play`: every screen can be played with
@@ -268,7 +214,7 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 3.5 No building limit
+#### 2.4 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -296,7 +242,7 @@ Switch `no_building_limit`:
 - **Test.** Build past 1,000, save, load, and check every building and the
   count came back; with the switch off, the 1,001st is refused.
 
-#### 3.6 Smaller candidates
+#### 2.5 Smaller candidates
 
 Each needs a short spec before work starts.
 
@@ -307,7 +253,7 @@ Each needs a short spec before work starts.
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
 
-### 4. Checks against the DOS game
+### 3. Checks against the DOS game
 
 Both need DOSBox-X driven by a script, too much work for now.
 

@@ -24,7 +24,7 @@ typedef enum : int {
     OPTIONS_CHEATS,     // config.freeze_money / freeze_ore changed
     OPTIONS_ADD_MONEY_ONCE,
     OPTIONS_ADD_ORE_ONCE,
-    OPTIONS_FIXES,      // the fixes' switches changed
+    OPTIONS_SWITCHES,   // the fixes' or the improvements' switches changed
 } OptionsRequest;
 
 // At boot, after dseg_init: no requests, the frozen values to be taken.

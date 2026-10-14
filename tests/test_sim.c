@@ -5,13 +5,17 @@
 #include <stdio.h>
 
 #include "game/cargo.h"
+#include "game/colonize.h"
 #include "game/dseg.h"
 #include "game/main_program.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/gfxpath.h"
 #include "game/groups.h"
+#include "game/improvements.h"
 #include "game/intel.h"
 #include "game/message.h"
+#include "game/satellite.h"
 #include "game/sim.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -102,7 +106,7 @@ static void clear_products(void)
 {
     for (int k = 0; k < 35; k++) {
         ds.Research_Products[k].State = 0;
-        ds.Research_Products[k]._1D = 0;
+        ds.Research_Products[k].Queued = 0;
     }
 }
 
@@ -159,21 +163,21 @@ static void test_production(void)
     clear_products();
     TProduct *p = &ds.Research_Products[2];  // product 3
     int16_t stock = p->Stock;
-    p->_1D = 2;   // two queued
-    p->_1F = 25;  // work per item
-    p->_21 = 25;  // work left on the current one
+    p->Queued = 2;   // two queued
+    p->WorkPerPiece = 25;  // work per item
+    p->WorkLeft = 25;  // work left on the current one
     ds.Game_ProductionRate = 10;
     Sim_ProgressProduction();
-    CHECK(p->_21 == 15 && p->Stock == stock);
+    CHECK(p->WorkLeft == 15 && p->Stock == stock);
     Sim_ProgressProduction();
-    CHECK(p->_21 == 5);
+    CHECK(p->WorkLeft == 5);
     Sim_ProgressProduction();  // 5 - 10 < 1: done, the next one starts
-    CHECK(p->Stock == stock + 1 && p->_1D == 1 && p->_21 == 25);
+    CHECK(p->Stock == stock + 1 && p->Queued == 1 && p->WorkLeft == 25);
     for (int i = 0; i < 3; i++)
         Sim_ProgressProduction();
-    CHECK(p->Stock == stock + 2 && p->_1D == 0 && p->_21 == 0);
+    CHECK(p->Stock == stock + 2 && p->Queued == 0 && p->WorkLeft == 0);
     Sim_ProgressProduction();  // empty queue: untouched
-    CHECK(p->Stock == stock + 2 && p->_1D == 0 && p->_21 == 0);
+    CHECK(p->Stock == stock + 2 && p->Queued == 0 && p->WorkLeft == 0);
 }
 
 // An hour that strikes between a ship's Transfer click and the cargo
@@ -186,7 +190,7 @@ static void test_cargo_switch_pending(void)
     ds.Game_GroupList = 0;
     ds.Game_SelGroup = 1;
     TGroup *g = Groups_Selected();
-    *g = (TGroup){.Kind = 2, .System = 1, .Planet = 5, .Status = 1, .Units = {{{.ShipType = 1}}}};
+    *g = (TGroup){.Kind = 2, .System = 1, .Planet = 5, .Status = 1, .Units = {{{.Count = 1}}}};
     ds.Game_CurrentScreen = 0xD;
     ds.Game_ScreenSwitch = 1;
     CHECK(ds.Cargo_Stores == nullptr);
@@ -273,7 +277,7 @@ static void test_mine_all_systems(void)
     TBody *b = ds.Galaxy_Bodies[sys - 1];
     b->Owner = 1;
     b->Colony = 1;
-    b->_0A = 2;
+    b->Droids = 2;
     b->Deposits[1] = 50;  // ore 2
     ds.Game_PlanetForceCount = 1;
     TGroup *g = Groups_At(1, 1);
@@ -315,7 +319,7 @@ static TBuilding *add_building(uint8_t kind, int16_t planet, int16_t moon, uint8
 {
     TBuilding *bl = &ds.Game_Buildings[ds.Game_BuildingCount++];
     *bl = (TBuilding){.Kind = kind, .System = 1, .Planet = (uint8_t)planet,
-                      .Moon = (uint8_t)moon, .Health = health, .Flag = 1};
+                      .Moon = (uint8_t)moon, .BuildLeft = health, .Powered = 1};
     return bl;
 }
 
@@ -349,8 +353,8 @@ static void test_derricks_on_moons(void)
     fixes.derricks_on_moons = true;
 }
 
-// Fix (game/fixes.h): building on a moon goes at the moon's speed (body
-// bytes 4..5); with the fix off, at the planet's while a planet is selected.
+// Fix (game/fixes.h): building on a moon goes at the moon's speed (its
+// BuildPower); with the fix off, at the planet's while a planet is selected.
 static void test_build_on_moons(void)
 {
     uint8_t left[2];
@@ -359,16 +363,15 @@ static void test_build_on_moons(void)
         int16_t p = planet_with_moon();
         TBody *planet = &ds.Galaxy_AmnestyBodies[p - 1];
         TBody *moon = &ds.Galaxy_AmnestyBodies[ds.Galaxy_AmnestyMoons[p - 1].Moons[0] - 1];
-        planet->_04[0] = planet->_04[1] = 0;
-        moon->_04[0] = 0x30;  // 30,000
-        moon->_04[1] = 0x75;
+        planet->BuildPower = 0;
+        moon->BuildPower = 30000;
         TBuilding *bl = add_building(5, p, 1, 250);
         ds.Game_CurSystem = 1;
         ds.Game_CurMoon[0] = 0;
         fixes.build_on_moons = fix;
-        for (int i = 0; i < 1000 && bl->Health == 250; i++)
+        for (int i = 0; i < 1000 && bl->BuildLeft == 250; i++)
             Sim_UpdateBuildings();
-        left[fix] = bl->Health;
+        left[fix] = bl->BuildLeft;
     }
     CHECK(left[0] < 250);
     CHECK(left[1] < left[0]);
@@ -385,19 +388,19 @@ static void test_meteorite_droids(void)
         TBody *hit = &ds.Galaxy_AmnestyBodies[4];  // New Earth
         TBody *shown = &ds.Galaxy_AmnestyBodies[0];
         CHECK(hit->Owner == 1 && hit->Colony != 0);
-        hit->_0A = shown->_0A = 5;
+        hit->Droids = shown->Droids = 5;
         ds.Game_CurBody = shown;
         for (int k = 0; k < 20; k++)
             add_building(2, 5, 0, 0);
         fixes.meteorite_droids = fix;
         int16_t before = ds.Game_BuildingCount;
         for (int i = 0; i < 5000 && ds.Game_BuildingCount == before; i++) {
-            hit->_14 = 100;  // meteorites hit only at 100
+            hit->Hazard = 100;  // meteorites hit only at 100
             Sim_ProcessAllBodyEvents();
         }
         CHECK(ds.Game_BuildingCount == before - 1);
-        CHECK((fix ? hit : shown)->_0A == 4);
-        CHECK((fix ? shown : hit)->_0A == 5);
+        CHECK((fix ? hit : shown)->Droids == 4);
+        CHECK((fix ? shown : hit)->Droids == 5);
     }
     fixes.meteorite_droids = true;
 }
@@ -413,7 +416,7 @@ static void test_station_storage(void)
         TBody *b = &ds.Galaxy_AmnestyBodies[2];  // Amnesty 3, as Satellite_ColonizeBody leaves it
         b->Owner = 1;
         b->Colony = 0;
-        b->_0A = 1;
+        b->Droids = 1;
         b->Deposits[1] = 50;  // ore 2
         b->Stores[1] = 0;
         Groups_At(1, 0)->Storage = 10;
@@ -430,6 +433,155 @@ static void test_station_storage(void)
         CHECK(fix ? b->Stores[1] > before : b->Stores[1] == before);
     }
     fixes.station_storage = true;
+}
+
+// An Amnesty planet that can be mined, take a Miner station and be colonised.
+static int16_t station_planet(void)
+{
+    for (int16_t p = 1; p <= ds.Galaxy_PlanetCount[0]; p++) {
+        const TBody *b = &ds.Galaxy_AmnestyBodies[p - 1];
+        int8_t type = (int8_t)b->SurfaceType;
+        if (p != 5 && b->Mineable != 0 && ds.Surface_BuildingTypes[0x19 - 1].Surfaces[type - 1] != 0
+            && ds.Galaxy_SurfaceColonisable[ds.Surface_Tileset[type - 1] - 1] != 0)
+            return p;
+    }
+    return 0;
+}
+
+// The body menu (screen 11h) offers the Miner station action there.
+static bool station_offered(int16_t planet)
+{
+    bool any;
+    GfxPath_SetToolbar(0x11);
+    Satellite_AddBodyActionItems(1, planet, 0, &any);
+    return GfxPath_ToolbarHasIcon(10);
+}
+
+static void station_action(void)
+{
+    ds.Game_MenuCommand = 10;
+    Satellite_HandleBodyActions();
+    ds.Game_MenuCommand = 0;
+}
+
+// Ores 2..6 of the body after an hour of mining from empty stores: deposit
+// x droids / 10 each.
+static bool mines_hourly(TBody *b, int droids)
+{
+    for (int k = 0; k < 6; k++)
+        b->Stores[k] = 0;
+    Sim_MineAllBodies();
+    bool same = true;
+    for (int k = 1; k < 6; k++)
+        same = same && b->Stores[k] == b->Deposits[k] * droids / 10;
+    return same;
+}
+
+// Improvement (game/improvements.h): a trade group carrying Miner stations
+// sets up the first one as the original does, then adds up to MAX_STATIONS;
+// storage and output grow with them and mining needs no roll. A colony
+// bought there keeps them mining throughout. Off, a body with a station is
+// offered no other.
+static void test_more_stations(void)
+{
+    for (int on = 0; on <= 1; on++) {
+        reset();
+        // The toolbar, as Main sets it up.
+        ds.GfxPath_IconScratch = game_alloc(0x3C0);
+        GfxPath_Init();
+        GfxPath_IconAllIndex();
+        improvements.more_stations = on;
+        int16_t planet = station_planet();
+        CHECK(planet != 0);
+        TBody *b = &ds.Galaxy_AmnestyBodies[planet - 1];
+        b->Owner = 0;
+        b->Colony = 0;
+        b->Droids = 0;
+        b->ColonyTimer = 0;
+        b->InfoLevel = 30;
+        b->Surveyed = 1;
+        for (int k = 0; k < 6; k++)
+            b->Deposits[k] = (uint8_t)(20 + 10 * k);
+        ds.Game_CurSystem = 1;
+        ds.Game_CurPlanet[0] = planet;
+        ds.Game_CurMoon[0] = 0;
+        ds.Game_CurrentScreen = 0x11;
+        ds.Game_GroupCount = 1;
+        ds.Game_SelGroup0 = 1;
+        TGroup *g = Groups_At(0, 1);
+        SDL_memset(g, 0, sizeof *g);
+        g->Kind = 2;
+        g->System = 1;
+        g->Planet = (uint8_t)planet;
+        g->Status = 1;
+        g->Units[0][0].Weapons[3] = 6;  // Miner stations
+        int16_t buildings = ds.Game_BuildingCount;
+
+        CHECK(station_offered(planet));
+        station_action();
+        CHECK(b->Owner == 1 && b->Droids == 1 && ds.Game_BuildingCount == buildings + 1);
+        CHECK(Groups_PlanetStorage(1, planet, 0) == 10);
+        CHECK(station_offered(planet) == on);
+        if (!on) {
+            improvements.more_stations = true;
+            CHECK(station_offered(planet));
+            improvements.more_stations = false;
+            GfxPath_FreeToolbarBuffer();
+            continue;
+        }
+        for (int n = 2; n <= MAX_STATIONS; n++) {
+            station_action();
+            CHECK(b->Droids == n && ds.Game_BuildingCount == buildings + n);
+            CHECK(Groups_PlanetStorage(1, planet, 0) == 10 * n);
+            CHECK(station_offered(planet) == (n < MAX_STATIONS));
+        }
+        CHECK(g->Units[0][0].Weapons[3] == 6 - MAX_STATIONS);
+        for (int16_t i = buildings + 1; i <= ds.Game_BuildingCount; i++)
+            CHECK(ds.Game_Buildings[i - 1].Kind == 0x19 && ds.Game_Buildings[i - 1].X == 0xFF);
+
+        // Every hour, with no draw on the random numbers, up to 10,000 t a
+        // station.
+        int32_t seed = ds.System_RandSeed;
+        CHECK(mines_hourly(b, MAX_STATIONS));
+        CHECK(ds.System_RandSeed == seed);
+        b->Stores[1] = 10000 * MAX_STATIONS - 1;
+        Sim_MineAllBodies();
+        CHECK(b->Stores[1] == 10000 * MAX_STATIONS - 1 + b->Deposits[1] * MAX_STATIONS / 10);
+        int32_t full = b->Stores[1];
+        Sim_MineAllBodies();
+        CHECK(b->Stores[1] == full);
+
+        // The stations get built, as any building does.
+        for (int hour = 0; hour < 500; hour++)
+            Sim_UpdateBuildings();
+        for (int16_t i = buildings + 1; i <= ds.Game_BuildingCount; i++)
+            CHECK(ds.Game_Buildings[i - 1].BuildLeft == 0);
+
+        // A colony bought there (the colonise screen's Buy, then the daily
+        // update sets it up): the stations mine on while it waits, and
+        // after as its first droids, each with its 10,000 t.
+        TColonySetup *cs = &ds.Game_ColonySetups[ds.Game_ColonySetupCount++];
+        SDL_memset(cs, 0, sizeof *cs);
+        cs->System = 1;
+        cs->Planet = (uint8_t)planet;
+        ds.Colonize_ColonyCost = 100000;
+        ds.Game_Credits = 200000;
+        ds.Game_ScreenEntered = false;
+        ds.Surface_BufC = game_alloc(16);  // the screen's, freed on leaving
+        ds.Game_MenuCommand = 0x3B;
+        Colonize_ColonizeScreen();
+        ds.Game_MenuCommand = 0;
+        ds.Game_CurrentScreen = 0x11;
+        CHECK(b->ColonyTimer > 0 && Groups_FindPlanetForce(1, planet, 0) != 0);
+        CHECK(mines_hourly(b, MAX_STATIONS));
+        for (int day = 0; day < 3 && b->Colony == 0; day++)
+            Sim_ProcessAllBodyEvents();
+        CHECK(b->Colony == 1 && b->Droids == MAX_STATIONS);
+        CHECK(Groups_PlanetStorage(1, planet, 0) >= 10 * MAX_STATIONS);
+        CHECK(mines_hourly(b, MAX_STATIONS));
+    }
+    GfxPath_FreeToolbarBuffer();
+    improvements.more_stations = false;
 }
 
 // Fix (game/fixes.h): New Earth's set-up places its last starter building
@@ -498,6 +650,7 @@ int main(int argc, char *argv[])
     test_build_on_moons();
     test_meteorite_droids();
     test_station_storage();
+    test_more_stations();
     test_colony_setups();
     test_golden();
     fs_shutdown();

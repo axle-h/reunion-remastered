@@ -107,18 +107,17 @@ void GfxPath_SetToolbarAndShow(int16_t screen)
     ds.Game_HotspotHit = 0;
 }
 
-// 3a1b:0030: the screen record (Ui::Screens) has the slot count at +0Ch and
-// the ids after it.
+// 3a1b:0030: the screen record's (Ui::Screens) IconCount and Icons.
 void GfxPath_SetToolbar(int16_t screen)
 {
     if (screen == 1)
         ds.GfxPath_PageFlagB = ds.GfxPath_SavedPage;
     else
         ds.GfxPath_PageFlagB = 1;
-    const int8_t *rec = (const int8_t *)&ds.Ui_Screens[screen - 1];
-    int16_t count = rec[0x0C];
+    const TScreenInfo *rec = &ds.Ui_Screens[screen - 1];
+    int16_t count = (int8_t)rec->IconCount;
     for (int16_t i = 1; i <= count; i++)
-        set_slot_id(i, rec[0x0C + i]);
+        set_slot_id(i, rec->Icons[i - 1]);
     for (int16_t i = (int16_t)(count + 1); i <= 12; i++)
         set_slot_id(i, 0);
     GfxPath_RedrawToolbar();

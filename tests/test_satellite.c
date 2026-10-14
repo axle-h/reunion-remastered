@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     CHECK(ds.Research_Products[2].Stock == 0 && ds.Research_Products[1].Stock == 7);
     // No satellites left: no 0x46 item even with droids in stock.
     TBody *other = ds.Galaxy_Bodies[0] + 1; // planet 2
-    other->Satellite = 0; other->Colony = 0; other->_0A = 0; other->Owner = 0; other->InfoLevel = 0;
+    other->Satellite = 0; other->Colony = 0; other->Droids = 0; other->Owner = 0; other->InfoLevel = 0;
     bool any = true;
     Satellite_AddBodyActionItems(1, 2, 0, &any);
     CHECK(!any);

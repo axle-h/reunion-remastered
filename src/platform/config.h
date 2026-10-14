@@ -22,9 +22,16 @@ typedef enum : int {
 } ConfigDisplay;
 
 enum : int {
-    CONFIG_MAX_FIXES = 32,
+    CONFIG_MAX_SWITCHES = 32,
     CONFIG_KEY_SIZE = 40,
 };
+
+// A section of on/off switches by key, in the order first set.
+typedef struct ConfigSwitches {
+    int count;
+    char keys[CONFIG_MAX_SWITCHES][CONFIG_KEY_SIZE];
+    bool on[CONFIG_MAX_SWITCHES];
+} ConfigSwitches;
 
 typedef struct Config {
     // [cheats]
@@ -45,10 +52,9 @@ typedef struct Config {
     bool colony_stats;  // planet info: the POP row opens the colony's stats
     bool detoxin_rate;  // droids screen and Derrick info: the Derricks' Detoxin rate
     Language language;  // of the CD's games imported, from the next restart (platform/import.h)
-    // [fixes]: switched off ones; a fix not listed is on.
-    int fix_count;
-    char fix_keys[CONFIG_MAX_FIXES][CONFIG_KEY_SIZE];
-    bool fix_on[CONFIG_MAX_FIXES];
+    // [fixes] and [improvements]: a switch not listed is on.
+    ConfigSwitches fixes;
+    ConfigSwitches improvements;
 } Config;
 
 extern Config config;
@@ -65,9 +71,11 @@ bool config_save(void);
 // Back to the built-in defaults; forgets the path (tests).
 void config_reset(void);
 
-// A fix's switch: on unless the file says off.
+// A fix's or an improvement's switch: on unless the file says off.
 bool config_fix(const char *key);
 void config_set_fix(const char *key, bool on);
+bool config_improvement(const char *key);
+void config_set_improvement(const char *key, bool on);
 
 // Names as written in the file.
 const char *config_music_name(ConfigMusic music);

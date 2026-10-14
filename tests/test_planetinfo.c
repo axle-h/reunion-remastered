@@ -11,7 +11,6 @@
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/groups.h"
-#include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
 #include "game/planetlist.h"
@@ -152,7 +151,7 @@ static void test_list(void)
     // Miner stations: Owner 1, no colony, a droid on it.
     TBody *b = body(1, 3);
     b->Owner = 1;
-    b->_0A = 2;
+    b->Droids = 2;
     PlanetList_BuildList();
     CHECK(ds.PlanetList_Count == 2);
     CHECK(e[0].Planet == 3 && e[0].Kind == 2 && e[1].Planet == 5 && e[1].Kind == 1);
@@ -166,7 +165,7 @@ static void test_list(void)
     PlanetList_BuildList();
     CHECK(ds.PlanetList_Count == 1 && e[0].Planet == 4 && e[0].Kind == 1);
     b->SurfaceType = 9;  // too hot: not colonisable
-    b->_03 = 1;
+    b->Mineable = 1;
     b->InfoLevel = 12;
     b->Surveyed = 0;
     PlanetList_BuildList();
@@ -245,7 +244,7 @@ static void place(const uint8_t *kinds, const uint8_t *outputs, int n)
         b->Planet = 5;
         b->Moon = 0;
         b->Output = outputs[i];
-        b->Flag = 0xEE;  // reset by the balancing
+        b->Powered = 0xEE;  // reset by the balancing
     }
     ds.Game_BuildingCount = (int16_t)n;
 }
@@ -265,7 +264,7 @@ static void test_power(void)
     pf->Storage = 77;
     TBody *b = body(1, 5);
     b->Population = 30000;
-    b->_0B = 0;
+    b->SolarSats = 0;
 
     // Nuclear gen. (2: prod 3000), Radar (17: energy 750, prio 2), Stadium
     // (9: energy 445, prio 1), Miner station (25: adds 10 to the supply), a
@@ -275,40 +274,40 @@ static void test_power(void)
     static const uint8_t outs[] = {20, 0, 0, 0, 0};
     place(kinds, outs, 5);
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(1)->Flag == 1 && bld(2)->Flag == 1 && bld(3)->Flag == 1 && bld(4)->Flag == 1);
-    CHECK(bld(5)->Flag == 0);
+    CHECK(bld(1)->Powered == 1 && bld(2)->Powered == 1 && bld(3)->Powered == 1 && bld(4)->Powered == 1);
+    CHECK(bld(5)->Powered == 0);
     CHECK(pf->Storage == 10);  // the miner station
-    CHECK(bld(1)->W9 == 120 && bld(1)->WB == 0 && bld(1)->BD == 100);
+    CHECK(bld(1)->Workers == 120 && bld(1)->Energy == 0 && bld(1)->Working == 100);
     // supply 600, energy 1195, demand = population.
-    CHECK(bld(2)->W9 == 0 && bld(2)->WB == 376 && bld(2)->BD == 50);
-    CHECK(bld(3)->W9 == 73 && bld(3)->WB == 223 && bld(3)->BD == 50);
-    CHECK((uint16_t)rd16le(body(1, 5)->_04) == 0);
+    CHECK(bld(2)->Workers == 0 && bld(2)->Energy == 376 && bld(2)->Working == 50);
+    CHECK(bld(3)->Workers == 73 && bld(3)->Energy == 223 && bld(3)->Working == 50);
+    CHECK((uint16_t)body(1, 5)->BuildPower == 0);
 
     // With a lower output everything but the plant and the miner station
     // has to go: lowest priority first (stadiums 1, radar 2).
     place(kinds, (const uint8_t[]){10, 0, 0, 0, 0}, 5);
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(1)->Flag == 1 && bld(2)->Flag == 0 && bld(3)->Flag == 0 && bld(4)->Flag == 1
-          && bld(5)->Flag == 0);
+    CHECK(bld(1)->Powered == 1 && bld(2)->Powered == 0 && bld(3)->Powered == 0 && bld(4)->Powered == 1
+          && bld(5)->Powered == 0);
 
     // Buildings elsewhere or damaged are not touched / not powered.
     place(kinds, outs, 5);
     bld(2)->Planet = 4;
-    bld(3)->Health = 5;
+    bld(3)->BuildLeft = 5;
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(2)->Flag == 0xEE && bld(3)->Flag == 0xEE);
-    CHECK(bld(1)->Flag == 1 && bld(5)->Flag == 1);
+    CHECK(bld(2)->Powered == 0xEE && bld(3)->Powered == 0xEE);
+    CHECK(bld(1)->Powered == 1 && bld(5)->Powered == 1);
 
     // Builder plant (22: work 120, energy 890, prod 780): kind 16h adds
-    // Output * Production / 100 * BD / 100 in 16-bit arithmetic to the body.
+    // Output * Production / 100 * Working / 100 in 16-bit arithmetic to BuildPower.
     static const uint8_t k2[] = {2, 22};
     static const uint8_t o2[] = {100, 50};
     place(k2, o2, 2);
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(1)->Flag == 1 && bld(2)->Flag == 1);
-    CHECK(bld(2)->WB == 890 && bld(2)->BD == 100);
+    CHECK(bld(1)->Powered == 1 && bld(2)->Powered == 1);
+    CHECK(bld(2)->Energy == 890 && bld(2)->Working == 100);
     // 50 * 780 = 39000 wraps to -26536; / 100 = -265, * 100 / 100.
-    CHECK((uint16_t)rd16le(body(1, 5)->_04) == (uint16_t)-265);
+    CHECK((uint16_t)body(1, 5)->BuildPower == (uint16_t)-265);
 
     // A lone consumer cannot run: supply is 0 (made 1), 2 < energy.
     static const uint8_t k3[] = {22};
@@ -316,16 +315,16 @@ static void test_power(void)
     place(k3, o3, 1);
     b->Population = 0;  // treated as 1
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(1)->Flag == 0);
-    CHECK((uint16_t)rd16le(body(1, 5)->_04) == 0);
+    CHECK(bld(1)->Powered == 0);
+    CHECK((uint16_t)body(1, 5)->BuildPower == 0);
 
     // Solar satellites add 10000 each to the supply.
     b->Population = 30000;
-    b->_0B = 1;
+    b->SolarSats = 1;
     place(k3, o3, 1);
     PlanetInfo_BalanceBuildingPower(1, 5, 0);
-    CHECK(bld(1)->Flag == 1);
-    b->_0B = 0;
+    CHECK(bld(1)->Powered == 1);
+    b->SolarSats = 0;
 
     // A moon: Earth's Moon (8:3:1) has its own Population.
     ds.Game_PlanetForceCount = 2;
@@ -343,12 +342,12 @@ static void test_power(void)
     mb->System = 8;
     mb->Planet = 3;
     mb->Moon = 1;
-    mb->Flag = 0;
+    mb->Powered = 0;
     ds.Game_BuildingCount = 1;
     PlanetInfo_BalanceBuildingPower(8, 3, 1);
     CHECK(pf->Storage == 20);  // kind 0Bh adds 20 to the force's supply
-    CHECK(mb->Flag == 0);  // no production: switched off
-    CHECK(mb->W9 == 0);
+    CHECK(mb->Powered == 0);  // no production: switched off
+    CHECK(mb->Workers == 0);
 }
 
 static void test_colonize(void)
@@ -357,14 +356,14 @@ static void test_colonize(void)
     TBuildingType t;
     memset(&t, 0, sizeof t);
     ds.Game_StaffExp[1] = 4;
-    t._10 = 5;
+    t.NeedBuilder = 5;
     CHECK(!Colonize_TypeAvailable(&t));
     ds.Game_StaffExp[1] = 5;
     CHECK(Colonize_TypeAvailable(&t));
-    t._10 = (uint8_t)-1;  // negative requirement: always met
+    t.NeedBuilder = (uint8_t)-1;  // negative requirement: always met
     ds.Game_StaffExp[1] = 0;
     CHECK(Colonize_TypeAvailable(&t));
-    t._10 = 0;
+    t.NeedBuilder = 0;
     t.NeedProduct = 3;
     ds.Research_Products[2].State = 4;
     CHECK(!Colonize_TypeAvailable(&t));
@@ -373,7 +372,7 @@ static void test_colonize(void)
     t.NeedProduct = (uint8_t)-1;
     CHECK(!Colonize_TypeAvailable(&t));
     memset(&t, 0, sizeof t);
-    ((uint8_t *)&t)[0x13 + 6] = 1;
+    t.Surfaces[6 - 1] = 1;
     CHECK(Colonize_SuitsSurface(&t, 6) && !Colonize_SuitsSurface(&t, 5));
 
     // Selecting buildings in the screen: slot 3 is the Builder Plant (its
@@ -390,9 +389,9 @@ static void test_colonize(void)
     ds.Colonize_ColonyCost = 100000;
     ds.Game_Credits = 100000 + 50000;
     const TStarterBuilding *sb = &ds.Colony_StarterBuildings[2];
-    const TBuildingType *bt = &ds.Surface_BuildingTypes[sb->Building - 1];
+    TBuildingType *bt = &ds.Surface_BuildingTypes[sb->Building - 1];
     ds.Game_StaffExp[1] = 100;
-    ((uint8_t *)bt)[0x13 + 1] = 1;  // suitable for surface type 1
+    bt->Surfaces[0] = 1;  // suitable for surface type 1
     ds.Game_HotspotHit = 0x17 + 3;
     int32_t before = ds.Colonize_ColonyCost;
     ds.Game_ColonySetups[0].Timers[2] = 0;
@@ -463,13 +462,13 @@ static void test_droids(void)
     ds.Game_BuildingCount = 0;
     PlanetInfo_SelectCurBody();
     TBody *b = ds.Game_CurBody;
-    b->_0A = 2;
+    b->Droids = 2;
     ds.Research_Products[1].Stock = 7;
     ds.Game_ScreenEntered = 0;
     ds.Game_MenuCommand = 0x19;
     ds.Game_HotspotHit = 0;
     Droids_DroidsScreen();
-    CHECK(b->_0A == 2 && ds.Research_Products[1].Stock == 7);
+    CHECK(b->Droids == 2 && ds.Research_Products[1].Stock == 7);
     ds.Game_HotspotHit = 0x15;
     ds.Game_MenuCommand = 0;
     Droids_DroidsScreen();
@@ -497,7 +496,7 @@ static void test_system_view(void)
     // One orbit record per planet, from the name table.
     const TBodyName *nm = ds.Galaxy_Names[7];
     const TOrbit *rec = &ds.PlanetInfo_Orbits[3];
-    CHECK(rec->RX == nm[2].X && rec->RY == nm[2].Y && rec->Speed == nm[2].Size);
+    CHECK(rec->RX == nm[2].X && rec->RY == nm[2].Y && rec->Speed == nm[2].OrbitSpeed);
     CHECK(rec->Angle >= 0 && rec->Angle < 3600);
 
     // Hand-placed planet 1 at 90 degrees: x = 160 + rx, y = 75, size 24.
@@ -527,7 +526,7 @@ static void test_system_view(void)
     PlanetInfo_SetupSystemViewHotspots();
     CHECK(ds.Mouse_HotspotCount >= 0x12);
     CHECK(pstr_is((const PString *)&Mouse_Hotspot(0x14)->Caption, "Mercury"));
-    CHECK(Mouse_Hotspot(0x14)->W == 0x20 && Mouse_Hotspot(0x14)->_1A == 5);
+    CHECK(Mouse_Hotspot(0x14)->W == 0x20 && Mouse_Hotspot(0x14)->Cursor == 5);
 
     // Planet view with moons: the moon records follow the moon list.
     ds.Game_CurPlanet[7] = 4;  // Mars

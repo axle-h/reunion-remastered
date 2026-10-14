@@ -8,9 +8,11 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/improvements.h"
 #include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
+#include "game/planetinfo.h"
 #include "game/satellite.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -43,8 +45,8 @@ static uint8_t kind_table(int table, uint8_t kind)
 }
 
 // Units[row][t] of g, addressed as the original does: g + 40 * row + 10 * t
-// - 21, five words (ShipType, then Weapons[1..4]) at odd offsets in the
-// packed record. Word w of it (0 = ShipType):
+// - 21, five words (Count, then Weapons[1..4]) at odd offsets in the
+// packed record. Word w of it (0 = Count):
 static uint8_t *unit_at(const TGroup *g, int row, int t)
 {
     return (uint8_t *)g + (row * 40 + t * 10 - 21);
@@ -403,7 +405,7 @@ void Groups_DrawGroupPanel(bool full)
 
     // Unit counts. FC (editable colour) when the slot's stock can be used and the colony allows it.
     for (int s = 1; s <= ships; s++) {
-        // Units[row][s]: ShipType, then the weapon counts
+        // Units[row][s]: Count, then the weapon counts
         const uint8_t *unit = unit_at(g, row, s);
         const uint8_t *ship = ship_item(layout, s);
         if (PRODUCT(ship[0])->State <= 0)
@@ -555,15 +557,13 @@ void Groups_ClearGroup(void)
     g->Leg2 = 0;
     for (int r = 0; r < 2; r++) {
         for (int s = 0; s < 4; s++) {
-            g->Units[r][s].ShipType = 0;
+            g->Units[r][s].Count = 0;
             for (int w = 0; w < 4; w++)
                 g->Units[r][s].Weapons[w] = 0;
         }
     }
-    for (int i = 0; i < 6; i++) {
-        g->Cargo[i].A = 0;
-        g->Cargo[i].B = 0;
-    }
+    for (int i = 0; i < 6; i++)
+        g->Cargo[i] = 0;
     for (int i = 0; i < 13; i++)
         g->Items[i] = 0;
 }
@@ -649,8 +649,13 @@ int16_t Groups_FindPlanetForce(int16_t system, int16_t planet, int16_t moon)
 int16_t Groups_PlanetStorage(int16_t system, int16_t planet, int16_t moon)
 {
     int16_t force = Groups_FindPlanetForce(system, planet, moon);
+    // Each Miner station's 10,000 t, as building kind 19h gives, also while
+    // a colony bought there waits to be set up (its planet force has none).
+    const TBody *b = PlanetInfo_BodyAt(system, planet, moon);
+    if (improvements.more_stations && b->Colony == 0 && (force == 0 || b->ColonyTimer > 0))
+        return (int16_t)(10 * SDL_max(b->Droids, 1));
     if (force == 0 && fixes.station_storage)
-        return 10;  // a Miner station's, as building kind 19h gives
+        return 10;
     return Groups_At(1, force)->Storage;
 }
 

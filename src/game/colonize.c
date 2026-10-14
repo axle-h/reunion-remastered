@@ -31,7 +31,7 @@ static int16_t cur_moon(void)
 bool Colonize_TypeAvailable(const TBuildingType *bt)
 {
     if (bt->NeedProduct == 0) {
-        int16_t need = (int8_t)bt->_10;
+        int16_t need = (int8_t)bt->NeedBuilder;
         if (need < 0 || ds.Game_StaffExp[1] >= (uint16_t)need)
             return true;
     }
@@ -40,7 +40,7 @@ bool Colonize_TypeAvailable(const TBuildingType *bt)
 
 bool Colonize_SuitsSurface(const TBuildingType *bt, int8_t surfaceType)
 {
-    return ((const uint8_t *)bt)[0x13 + surfaceType] != 0;
+    return bt->Surfaces[surfaceType - 1] != 0;
 }
 
 // 2841:0060
@@ -164,7 +164,7 @@ void Colonize_SetupColonizeHotspots(void)
         char name[256];
         pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &bt->Name));
         h->Repeat_ = 1;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }
 

@@ -188,7 +188,7 @@ static void losses(void)
     SDL_memset(ds.Game_Groups, 0, 2 * 32 * sizeof(TGroup));
     TGroup *g = &ds.Game_Groups[0][0];
     g->Kind = 1; g->System = 3; g->Planet = 2; g->Moon = 0; g->Status = 1;
-    g->Units[1][0].ShipType = 10;
+    g->Units[1][0].Count = 10;
     g->Units[1][0].Weapons[0] = 30;
     g->Units[1][0].Weapons[3] = 40; // weapon 4 is not scaled
     ds.Game_CurBody = game_alloc(sizeof(TBody));
@@ -201,13 +201,13 @@ static void losses(void)
     CHECK(s1 == 6);   // 4 in the slot + 2 unassigned
     CHECK(l1 == 4);   // 10 - 6
     CHECK(l2 == 15);  // 20 - 5
-    CHECK(g->Units[1][0].ShipType == 10 * 6 / 10);
+    CHECK(g->Units[1][0].Count == 10 * 6 / 10);
     CHECK(g->Units[1][0].Weapons[0] == 30 * 6 / 10);
     CHECK(g->Units[1][0].Weapons[3] == 40);
     // Types that were absent on the field are zeroed.
-    g->Units[1][1].ShipType = 7;
+    g->Units[1][1].Count = 7;
     GrWar_ApplyGroundLosses();
-    CHECK(g->Units[1][1].ShipType == 0);
+    CHECK(g->Units[1][1].Count == 0);
 }
 
 static void pick_anim(void)

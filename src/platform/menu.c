@@ -12,12 +12,12 @@
 // Layout, in the panel's 320x240 space (platform/panel.h).
 enum : int {
     CHAR = PANEL_CHAR,
-    TAB_X = 16,
-    TAB_W = 76,
+    TAB_X = 12,
+    TAB_W = 100,
     TAB_H = 14,
     TOP_Y = PANEL_TOP,
-    SPLIT_X = 98,
-    ROW_X = 106,
+    SPLIT_X = 112,
+    ROW_X = 116,
     ROW_W = 192,
     ROW_H = 13,
     VISIBLE_ROWS = 12,
@@ -32,13 +32,14 @@ typedef enum : int {
     SEC_SOUND,
     SEC_VIDEO,
     SEC_GAME,
+    SEC_IMPROVEMENTS,
     SEC_FIXES,
     SEC_SYSTEM,
     SECTIONS,
 } Section;
 
 static const char *const SECTION_NAMES[SECTIONS] = {"Cheats", "Sound", "Video", "Game",
-                                                    "Fixes", "System"};
+                                                    "Improvements", "Fixes", "System"};
 
 typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION } RowKind;
 
@@ -57,12 +58,15 @@ typedef enum : int {
     R_COLONY_STATS,
     R_DETOXIN_RATE,
     R_LANGUAGE,
+    R_IMPROVEMENTS_ON,
+    R_IMPROVEMENTS_OFF,
     R_FIXES_ON,
     R_FIXES_OFF,
     R_IMPORT,
     R_RESTART,
     R_QUIT,
-    R_FIX,  // + the fix's index
+    R_IMPROVEMENT,  // + the improvement's index
+    R_FIX = R_IMPROVEMENT + CONFIG_MAX_SWITCHES,  // + the fix's index
 } RowId;
 
 typedef struct Row {
@@ -226,11 +230,21 @@ static void build_rows(void)
         SDL_strlcpy(r->value, gamedata_language_label(shown_language()), sizeof r->value);
         r->enabled = (languages() & (languages() - 1)) != 0;  // more than one
         break;
+    case SEC_IMPROVEMENTS:
+        add(ROW_ACTION, R_IMPROVEMENTS_ON, "All on", "Changes to the original game's design.");
+        add(ROW_ACTION, R_IMPROVEMENTS_OFF, "All off", "The original's design. The fixes stay as they are.");
+        for (int i = 0; i < hooks.improvement_count && row_count < MAX_ROWS; i++) {
+            const MenuSwitch *f = &hooks.improvements[i];
+            r = add(ROW_TOGGLE, R_IMPROVEMENT + i, f->label, f->help);
+            r->on = config_improvement(f->key);
+        }
+        break;
     case SEC_FIXES:
         add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
-        add(ROW_ACTION, R_FIXES_OFF, "All off (original)", "The original game, bugs and all.");
+        add(ROW_ACTION, R_FIXES_OFF, "All off (original)",
+            "The original game, bugs and all: every fix and improvement off.");
         for (int i = 0; i < hooks.fix_count && row_count < MAX_ROWS; i++) {
-            const MenuFix *f = &hooks.fixes[i];
+            const MenuSwitch *f = &hooks.fixes[i];
             r = add(ROW_TOGGLE, R_FIX + i, f->label, f->help);
             r->on = config_fix(f->key);
         }
@@ -351,11 +365,20 @@ static void act(const Row *r, int dir)
     case R_SKIP_INTRO:
         config.skip_intro = !config.skip_intro;
         break;
+    case R_IMPROVEMENTS_ON:
+    case R_IMPROVEMENTS_OFF:
+        for (int i = 0; i < hooks.improvement_count; i++)
+            config_set_improvement(hooks.improvements[i].key, r->id == R_IMPROVEMENTS_ON);
+        changed(MENU_CHANGED_SWITCHES);
+        break;
     case R_FIXES_ON:
     case R_FIXES_OFF:
         for (int i = 0; i < hooks.fix_count; i++)
             config_set_fix(hooks.fixes[i].key, r->id == R_FIXES_ON);
-        changed(MENU_CHANGED_FIXES);
+        // The original game has no improvements either.
+        for (int i = 0; r->id == R_FIXES_OFF && i < hooks.improvement_count; i++)
+            config_set_improvement(hooks.improvements[i].key, false);
+        changed(MENU_CHANGED_SWITCHES);
         break;
     case R_COLONY_STATS:
         config.colony_stats = !config.colony_stats;
@@ -389,7 +412,11 @@ static void act(const Row *r, int dir)
         if (r->id >= R_FIX && r->id - R_FIX < hooks.fix_count) {
             const char *key = hooks.fixes[r->id - R_FIX].key;
             config_set_fix(key, !config_fix(key));
-            changed(MENU_CHANGED_FIXES);
+            changed(MENU_CHANGED_SWITCHES);
+        } else if (r->id >= R_IMPROVEMENT && r->id - R_IMPROVEMENT < hooks.improvement_count) {
+            const char *key = hooks.improvements[r->id - R_IMPROVEMENT].key;
+            config_set_improvement(key, !config_improvement(key));
+            changed(MENU_CHANGED_SWITCHES);
         }
         break;
     }

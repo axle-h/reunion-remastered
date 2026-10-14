@@ -1,0 +1,35 @@
+// Changes to the game's design rather than its bugs (game/fixes.h). Each is
+// a switch, on unless the port menu's config (platform/config.h) turns it
+// off; the Fixes section's "All off (original)" turns them off too.
+// Scripted runs (the autopilot, --replay, the tests) play with every
+// improvement off, so they play the original's game; a test of one switches
+// it on. An improvement keeps its state in fields the original already has,
+// so saves stay in the DOS format.
+#pragma once
+
+#include "game/fixes.h"
+
+typedef struct Improvements {
+    // A body with Miner stations and no colony takes up to MAX_STATIONS:
+    // the body menu's Miner station action adds one more while a trade
+    // group there carries one. Each mines as a droid does, every hour
+    // instead of 30% of hours, and stores 10,000 t of each ore, also while
+    // a colony bought there waits to be set up. The colony keeps them as
+    // its first droids, as the original does with one.
+    bool more_stations;
+} Improvements;
+
+extern Improvements improvements;
+
+// Every improvement. A new field of Improvements needs an entry here
+// (test_options checks).
+extern const SwitchInfo Improvements_List[];
+extern const int Improvements_Count;
+
+enum : int {
+    MAX_STATIONS = 4,  // on one body (more_stations)
+};
+
+// Each improvement as the config says (on by default), or, for a scripted
+// run, every one off.
+void Improvements_Init(bool scripted);

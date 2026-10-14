@@ -291,5 +291,5 @@ void Advisor_SetupAdvisorHotspots(void)
     h->H = 0x2D;
     pstr_set(&h->Caption, 0x12, Lang_TextAt(0x19910aaa, "Talking"));
     h->Repeat_ = 0;
-    h->_1A = 0;
+    h->Cursor = 0;
 }

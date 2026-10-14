@@ -85,16 +85,17 @@ typedef struct Fixes {
 
 extern Fixes fixes;
 
-// Every fix, for the port menu and the config file ([fixes] key = on|off).
-// A new field of Fixes needs an entry here (test_options checks).
-typedef struct FixInfo {
+// A fix's or an improvement's switch (game/improvements.h), for the port
+// menu and the config file ([fixes] / [improvements] key = on|off).
+typedef struct SwitchInfo {
     const char *key;    // the field's name
     const char *label;  // at most 20 characters
     const char *help;   // at most 72 characters
     bool *value;
-} FixInfo;
+} SwitchInfo;
 
-extern const FixInfo Fixes_List[];
+// Every fix. A new field of Fixes needs an entry here (test_options checks).
+extern const SwitchInfo Fixes_List[];
 extern const int Fixes_Count;
 
 enum : int {

@@ -16,6 +16,7 @@
 #include "cutscene/cutscene.h"
 #include "game/dseg.h"
 #include "game/fixes.h"
+#include "game/improvements.h"
 #include "game/gfx.h"
 #include "game/lang.h"
 #include "game/main_program.h"
@@ -223,7 +224,7 @@ static void menu_changed(MenuChange change)
         [MENU_CHANGED_CHEATS] = OPTIONS_CHEATS,
         [MENU_ADD_MONEY] = OPTIONS_ADD_MONEY_ONCE,
         [MENU_ADD_ORE] = OPTIONS_ADD_ORE_ONCE,
-        [MENU_CHANGED_FIXES] = OPTIONS_FIXES,
+        [MENU_CHANGED_SWITCHES] = OPTIONS_SWITCHES,
     };
     if (change == MENU_CHANGED_MUSIC) {
         if (!cutscene_music_changed())
@@ -237,7 +238,8 @@ static void menu_changed(MenuChange change)
 // anywhere) and what it sets before the game starts.
 static void setup_config(void)
 {
-    if (!replay && !autopilot_init()) {
+    bool scripted = replay || autopilot_init();
+    if (!scripted) {
         char *path = config_default_path();
         config_load(path);
         SDL_free(path);
@@ -249,18 +251,25 @@ static void setup_config(void)
         else
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unknown language %s", language_arg);
     }
-    // Every fix gets a line in the file.
+    // Every fix and improvement gets a line in the file.
     for (int i = 0; i < Fixes_Count; i++)
         config_set_fix(Fixes_List[i].key, config_fix(Fixes_List[i].key));
+    for (int i = 0; i < Improvements_Count; i++)
+        config_set_improvement(Improvements_List[i].key, config_improvement(Improvements_List[i].key));
     Fixes_Init();
+    Improvements_Init(scripted);
     audio_set_user_volumes(config.music_volume / 100.0f,
                            config.effects ? config.effects_volume / 100.0f : 0.0f);
     skip_intro |= config.skip_intro;
 
-    static MenuFix fixes[CONFIG_MAX_FIXES];
-    int n = SDL_min(Fixes_Count, CONFIG_MAX_FIXES);
+    static MenuSwitch fixes[CONFIG_MAX_SWITCHES], improvements[CONFIG_MAX_SWITCHES];
+    int n = SDL_min(Fixes_Count, CONFIG_MAX_SWITCHES);
     for (int i = 0; i < n; i++)
-        fixes[i] = (MenuFix){Fixes_List[i].key, Fixes_List[i].label, Fixes_List[i].help};
+        fixes[i] = (MenuSwitch){Fixes_List[i].key, Fixes_List[i].label, Fixes_List[i].help};
+    int m = SDL_min(Improvements_Count, CONFIG_MAX_SWITCHES);
+    for (int i = 0; i < m; i++)
+        improvements[i] = (MenuSwitch){Improvements_List[i].key, Improvements_List[i].label,
+                                       Improvements_List[i].help};
     menu_set_hooks(&(MenuHooks){
         .game_running = Options_GameRunning,
         .changed = menu_changed,
@@ -268,6 +277,8 @@ static void setup_config(void)
         .add_ore = OPTIONS_ADD_ORE,
         .fixes = fixes,
         .fix_count = n,
+        .improvements = improvements,
+        .improvement_count = m,
         .languages = data_languages,
     });
 }

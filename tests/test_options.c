@@ -1,7 +1,7 @@
 // options: the game side of the port menu. Freezing holds a stock from the
 // frame it is switched on, the add cheats raise it, a load re-takes the
-// frozen value, saves have no cheats trailer any more, and the fixes table
-// covers every fix and follows the config.
+// frozen value, saves have no cheats trailer any more, and the fixes' and
+// improvements' tables cover every switch and follow the config.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,6 +9,7 @@
 #include "game/dseg.h"
 #include "game/main_program.h"
 #include "game/fixes.h"
+#include "game/improvements.h"
 #include "game/options.h"
 #include "game/saveload.h"
 #include "game/system.h"
@@ -37,7 +38,7 @@ static void check_fixes(void)
     // Every field of Fixes is listed once, with a short label for the menu.
     CHECK(Fixes_Count * sizeof(bool) == sizeof(Fixes));
     for (int i = 0; i < Fixes_Count; i++) {
-        const FixInfo *f = &Fixes_List[i];
+        const SwitchInfo *f = &Fixes_List[i];
         CHECK((uint8_t *)f->value >= (uint8_t *)&fixes
               && (uint8_t *)f->value < (uint8_t *)&fixes + sizeof fixes);
         CHECK(SDL_strlen(f->label) <= 20 && SDL_strlen(f->help) <= 72);
@@ -56,12 +57,47 @@ static void check_fixes(void)
     // As the menu does it: applied at the main loop's next frame.
     config_set_fix("mine_all_systems", true);
     config_set_fix("find_jade", false);
-    Options_Request(OPTIONS_FIXES);
+    Options_Request(OPTIONS_SWITCHES);
     CHECK(!fixes.mine_all_systems);
     Options_Frame();
     CHECK(fixes.mine_all_systems && !fixes.find_jade);
     config_reset();
     Fixes_Init();
+}
+
+static void check_improvements(void)
+{
+    // Every field of Improvements is listed once, with a short label.
+    CHECK(Improvements_Count * sizeof(bool) == sizeof(Improvements));
+    for (int i = 0; i < Improvements_Count; i++) {
+        const SwitchInfo *f = &Improvements_List[i];
+        CHECK((uint8_t *)f->value >= (uint8_t *)&improvements
+              && (uint8_t *)f->value < (uint8_t *)&improvements + sizeof improvements);
+        CHECK(SDL_strlen(f->label) <= 20 && SDL_strlen(f->help) <= 72);
+        CHECK(SDL_strlen(f->key) < CONFIG_KEY_SIZE);
+        for (int j = 0; j < i; j++)
+            CHECK(f->value != Improvements_List[j].value
+                  && SDL_strcmp(f->key, Improvements_List[j].key) != 0);
+        for (int j = 0; j < Fixes_Count; j++)
+            CHECK(SDL_strcmp(f->key, Fixes_List[j].key) != 0);
+    }
+
+    // On without a config, off for a scripted run; the config turns one
+    // off, applied at the main loop's next frame.
+    Improvements_Init(false);
+    for (int i = 0; i < Improvements_Count; i++)
+        CHECK(*Improvements_List[i].value);
+    Improvements_Init(true);
+    for (int i = 0; i < Improvements_Count; i++)
+        CHECK(!*Improvements_List[i].value);
+    Improvements_Init(false);
+    config_set_improvement("more_stations", false);
+    Options_Request(OPTIONS_SWITCHES);
+    CHECK(improvements.more_stations);
+    Options_Frame();
+    CHECK(!improvements.more_stations);
+    config_reset();
+    Improvements_Init(true);
 }
 
 int main(int argc, char *argv[])
@@ -81,8 +117,7 @@ int main(int argc, char *argv[])
     CHECK(!Options_GameRunning());
 
     // The disk screen keeps the original's five buttons.
-    const uint8_t *rec = (const uint8_t *)&ds.Ui_Screens[0x0C - 1];
-    CHECK(rec[0x0C] == 5);
+    CHECK(ds.Ui_Screens[0x0C - 1].IconCount == 5);
 
     // Frozen money: spending is undone, income kept and then held; unfreezing
     // keeps it.
@@ -172,6 +207,7 @@ int main(int argc, char *argv[])
     Options_Frame();
 
     check_fixes();
+    check_improvements();
 
     SDL_RemovePath(path);
     SDL_RemovePath(dir);

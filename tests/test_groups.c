@@ -60,18 +60,18 @@ int main(int argc, char *argv[])
     static const uint8_t kinds[] = {1, 2, 4, 4, 1};
     for (int i = 1; i <= 5; i++) {
         ds.Game_SelGroup = (int16_t)i;
-        Groups_Selected()->Units[0][0].ShipType = 9;  // cleared again by InitGroupOfKind
+        Groups_Selected()->Units[0][0].Count = 9;  // cleared again by InitGroupOfKind
         Groups_InitGroupOfKind();
         CHECK(Groups_Selected()->Kind == kinds[i - 1]);
-        CHECK(Groups_Selected()->Units[0][0].ShipType == 0 && Groups_Selected()->Status == 1);
+        CHECK(Groups_Selected()->Units[0][0].Count == 0 && Groups_Selected()->Status == 1);
     }
 
     // ClearGroup
     TGroup *g = Groups_Selected();
-    g->Kind = 3; g->Cargo[2].B = 4; g->Items[12] = 7; g->Leg1 = 5; g->Storage = 3;
+    g->Kind = 3; g->Cargo[2] = 4; g->Items[12] = 7; g->Leg1 = 5; g->Storage = 3;
     Groups_ClearGroup();
     CHECK(g->Kind == 1 && g->Name.len == 9 && memcmp(g->Name.s, "New Group", 9) == 0);
-    CHECK(g->Cargo[2].B == 0 && g->Items[12] == 0 && g->Leg1 == 0 && g->Storage == 3);
+    CHECK(g->Cargo[2] == 0 && g->Items[12] == 0 && g->Leg1 == 0 && g->Storage == 3);
 
     // Slot categories cycle through the ones the kind uses.
     g->Kind = 1;
@@ -92,9 +92,9 @@ int main(int argc, char *argv[])
     // Emptiness: only the two ship categories of the kind count.
     g->Kind = 1;
     CHECK(Groups_IsGroupEmpty(0, ds.Game_SelGroup));
-    g->Units[0][2].ShipType = 1;
+    g->Units[0][2].Count = 1;
     CHECK(!Groups_IsGroupEmpty(0, ds.Game_SelGroup));
-    g->Units[0][2].ShipType = 0;
+    g->Units[0][2].Count = 0;
     CHECK(Groups_IsGroupEmptyOfCargo(0, ds.Game_SelGroup));
 
     Groups_Init();

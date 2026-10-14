@@ -143,14 +143,14 @@ static void test_losses(void)
     g->System = 1;
     g->Planet = 1;
     g->Status = 1;
-    g->Units[0][0].ShipType = 10;
+    g->Units[0][0].Count = 10;
     g->Units[0][0].Weapons[0] = 5;
     g->Units[0][0].Weapons[1] = 7;
     ds.SpWar_AttackerShipCount = 4;
     for (int i = 1; i <= 4; i++)
         set_ship(ship(ds.SpWar_AttackerList, i), 1, 1, 1, 10);
     SpWar_ApplySpaceLosses();
-    CHECK(g->Units[0][0].ShipType == 5);
+    CHECK(g->Units[0][0].Count == 5);
     CHECK(g->Units[0][0].Weapons[0] == 2);  // 5 * 5 / 10
     CHECK(g->Units[0][0].Weapons[1] == 3);  // 7 * 5 / 10
     CHECK(ds.SpWar_AttackerLosses[0] == 5);

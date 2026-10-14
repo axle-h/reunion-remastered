@@ -99,7 +99,7 @@ void ui_group_location(const char *name, char *out, size_t n)
     SDL_snprintf(out, n, "%s%s", g->Status <= 6 ? prefix[g->Status] : "", loc);
 }
 
-// Word w of the unit slot (0 = ShipType; groups.c unit_at).
+// Word w of the unit slot (0 = Count; groups.c unit_at).
 static int16_t grid_unit(const TGroup *g, int cat, int s, int w)
 {
     uint8_t row = ds.Groups_SlotA[g->Kind - 1][cat - 1];
@@ -204,7 +204,7 @@ int ui_map_bodies(char names[][19], int max)
     int n = 0;
     for (int j = BODY_FIRST; j <= ds.Mouse_HotspotCount && n < max; j++) {
         const THotspot *h = Mouse_Hotspot((int16_t)j);
-        if (h->_1A == BODY_FLAG && h->Caption.len > 0)
+        if (h->Cursor == BODY_FLAG && h->Caption.len > 0)
             SDL_snprintf(names[n++], 19, "%.*s", h->Caption.len, h->Caption.s);
     }
     return n;
@@ -447,7 +447,7 @@ static int body_hotspot(const char *name)
 {
     for (int j = BODY_FIRST; j <= ds.Mouse_HotspotCount; j++) {
         const THotspot *h = Mouse_Hotspot((int16_t)j);
-        if (h->_1A == BODY_FLAG && ui_hotspot_captioned(j, name))
+        if (h->Cursor == BODY_FLAG && ui_hotspot_captioned(j, name))
             return j;
     }
     return 0;
@@ -516,7 +516,7 @@ static PickResult pick_destination(const char *system, const char *planet, const
     if (!planet) {  // the sun: explore the system
         zoom_out();
         const THotspot *sun = Mouse_Hotspot(BODY_FIRST);
-        if (ds.Mouse_HotspotCount < BODY_FIRST || sun->_1A != BODY_FLAG || sun->Caption.len == 0) {
+        if (ds.Mouse_HotspotCount < BODY_FIRST || sun->Cursor != BODY_FLAG || sun->Caption.len == 0) {
             play_log("ui_launch: the sun is not offered (system explored)");
             ui_toolbar("ABORT MOVE");
             ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);

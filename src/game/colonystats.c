@@ -63,9 +63,9 @@ void ColonyStats_Compute(int16_t system, int16_t planet, int16_t moon, ColonySta
     // Surface_CountBuildingsByKind, without writing its table.
     for (int16_t i = 1; i <= ds.Game_BuildingCount; i++) {
         const TBuilding *bl = &ds.Game_Buildings[i - 1];
-        if (bl->System == system && bl->Planet == planet && bl->Moon == moon && bl->Health == 0
+        if (bl->System == system && bl->Planet == planet && bl->Moon == moon && bl->BuildLeft == 0
             && bl->Kind >= 1 && bl->Kind <= 25)
-            (bl->Flag ? s->powered : s->unpowered)[bl->Kind - 1]++;
+            (bl->Powered ? s->powered : s->unpowered)[bl->Kind - 1]++;
     }
     const int16_t *n = s->powered - 1;  // n[kind]
 
@@ -76,14 +76,14 @@ void ColonyStats_Compute(int16_t system, int16_t planet, int16_t moon, ColonySta
     s->housing = lmul(n[K_BUILDING], 7000) + 10000;
     s->food = lmul(n[K_FOOD], 20000) + lmul(n[K_FARM], 8000) + 20000;
     s->health = lmul(n[K_HOSPITAL], 20000) + 20000;
-    s->meteor_world = b->_14 == 100;
+    s->meteor_world = b->Hazard == 100;
     s->radiation = planet < 3 && n[K_SHIELD] == 0;
 
     // The disease timer counts down at the start of the update.
-    int8_t timer = b->_14;
+    int8_t timer = b->Hazard;
     if (timer > 0 && timer < 100)
         timer--;
-    s->disease_days = b->_14 == 0 ? 0 : b->_14 > 0 && b->_14 < 100 ? b->_14 : -1;
+    s->disease_days = b->Hazard == 0 ? 0 : b->Hazard > 0 && b->Hazard < 100 ? b->Hazard : -1;
     s->sick = timer == 0 ? 2 : 1;
 
     int16_t target = (int16_t)((7 - (int8_t)b->TechLevel) * 10);

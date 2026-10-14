@@ -212,6 +212,6 @@ void Hire_SetupHireHotspots(void)
         pstr_get(name, sizeof name, &ds.Staff_Names[ds.Hire_StaffKind - 1][i]);
         pstr_set(&h->Caption, 0x12, name);
         h->Repeat_ = 0;
-        h->_1A = 0;
+        h->Cursor = 0;
     }
 }

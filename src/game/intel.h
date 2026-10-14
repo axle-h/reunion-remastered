@@ -7,11 +7,10 @@
 // forces are Forces[1..7], ForceCount of them in use. TRaceForce fields:
 //   Mission        0 none, 1 stationed (garrison), >1 on a mission
 //   Active         0 idle, 1 present at System/Body/Moon, 2 travelling there
-//   _03            travel time, counted down by Sim; Timer: delay before NextMission
+//   TravelTime     counted down by Sim; Timer: delay before NextMission
 //   Units[1..4]    ship classes, Units[5..8] ground units
-// Race Status: 0 unknown, 2 / 4 active (IsRaceActive), 6 hostile, -1 eliminated.
-// TRace._0F, Speed ... KnownSystems hold flags the intel reports use (KnownSystems[1..4]
-// = ship classes, [5..8] = ground units known to the player).
+// Race Status: -1 eliminated, 0 not met, 2 hostile, 4 neutral, 6 allied; 2 / 4
+// are active (IsRaceActive).
 #pragma once
 
 #include <stdint.h>
@@ -32,7 +31,7 @@ static inline TRaceForce *Intel_Force(int16_t race, int16_t force)
 
 // 29b9:0000: first contact with `race`: shows msg once, sets Status and starts its story timers.
 void Intel_FirstContact(int16_t race, const char *msg);
-// 29b9:0217: resets Owner, Colony, Miner, stores (+ population, resistance, tech, attitude when full).
+// 29b9:0217: resets Owner, Colony, ColonyTimer, stores (+ population, resistance, tech, attitude when full).
 void Intel_ClearBody(int16_t system, int16_t planet, int16_t moon, bool full);
 // 29b9:0316: SetForceTarget + arrival timer Random(100 - Speed) + 5 + NextMission.
 void Intel_DispatchForce(int16_t race, int16_t force, int16_t system, int16_t planet, int16_t moon,

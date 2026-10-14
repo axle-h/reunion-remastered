@@ -200,7 +200,7 @@ void AlienTalk_SetupTalkHotspots(void)
     h->H = 0x3F;
     pstr_set(&h->Caption, 0x12, Lang_TextAt(0x2e4b0641, "Talking"));
     h->Repeat_ = 0;
-    h->_1A = 0;
+    h->Cursor = 0;
     ds.AlienTalk_HoverCol = 0xFFFF;
     ds.AlienTalk_HoverRow = -1;
 }

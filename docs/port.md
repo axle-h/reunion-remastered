@@ -132,7 +132,8 @@ rebuilds, so nothing left on the abandoned C stack matters.
 
 ## Deliberate deviations
 
-Besides the fixes (`src/game/fixes.h`) and the port menu, the port departs from
+Besides the fixes (`src/game/fixes.h`), the improvements
+(`src/game/improvements.h`) and the port menu, the port departs from
 the original in a few places, each commented in the code:
 
 - **The hero voice.** The original starts `ANIM\CHOISE.SPD` at the start
@@ -166,7 +167,8 @@ the original in a few places, each commented in the code:
 
 - **Port menu** (F1, `src/platform/menu.h`): cheats, music card, effects
   and volumes, display, skip intro, colony stats, Detoxin rate, language,
-  the fix switches, and System: import game data, restart and quit. The game
+  the improvement and fix switches, and System: import game data, restart
+  and quit. The game
   waits inside `timing_wait_retrace` while it is open. The platform layer
   knows nothing of the game: display and volumes apply at once, the music
   switch is made at once by `src/main.c`, and everything that touches
@@ -176,10 +178,14 @@ the original in a few places, each commented in the code:
 - **The player's folder** (`src/platform/playerdir.h`), the SDL pref
   directory (`~/.local/share/Reunion/Reunion/` on Linux): `reunion.ini`,
   `save/`, `screenshots/` and the imported game in `data/`.
-- **Settings** (`src/platform/config.h`): `reunion.ini`. Tests and
-  scripted runs never read or write it, and without it the game behaves
-  like the original with every fix on. Saves carry no port state: they
-  are byte for byte the original's format.
+- **Settings** (`src/platform/config.h`): `reunion.ini`. A fix or an
+  improvement it doesn't list is on. Tests and scripted runs never read or
+  write it: they play the original's game with every fix on and every
+  improvement off. Saves carry no port state: they are byte for byte the
+  original's format.
+- **Improvements** (`src/game/improvements.h`): changes to the game's
+  design, each a switch in the port menu like the fixes, kept in fields
+  the DOS saves already have.
 - **Importing the game data** (`src/platform/import.h`): the player's copy
   (a folder, a ZIP or an ISO image, `src/platform/source.h`) is checked
   against the list of files the port loads (`src/platform/gamedata.h`)

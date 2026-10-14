@@ -44,17 +44,17 @@ int32_t Shop_OrderHours(const TProduct *p, int32_t qty)
 {
     int32_t rate = ds.Game_ProductionRate;
     int32_t work;
-    if (p->_21 == 0)
-        work = long_mul((int16_t)p->_1F, qty);
+    if (p->WorkLeft == 0)
+        work = long_mul((int16_t)p->WorkPerPiece, qty);
     else
-        work = long_mul((int32_t)(qty - 1), (int16_t)p->_1F) + (int16_t)p->_21;
+        work = long_mul((int32_t)(qty - 1), (int16_t)p->WorkPerPiece) + (int16_t)p->WorkLeft;
     return long_div(work + rate - 1, rate);
 }
 
 int32_t Shop_QueueHours(const TProduct *p)
 {
     int32_t rate = ds.Game_ProductionRate;
-    int32_t work = long_mul((int16_t)(p->_1D - 1), (int16_t)p->_1F) + (int16_t)p->_21;
+    int32_t work = long_mul((int16_t)(p->Queued - 1), (int16_t)p->WorkPerPiece) + (int16_t)p->WorkLeft;
     return long_div(work + rate - 1, rate);
 }
 
@@ -78,7 +78,7 @@ void Shop_ShopScreen(void)
         ds.Shop_PrevSel = ds.Shop_Sel;
         ds.Shop_PrevSel2 = ds.Shop_Sel;
         Shop_InitProductPicture();
-        if (SEL_PRODUCT->_1D == 0)
+        if (SEL_PRODUCT->Queued == 0)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
@@ -132,7 +132,7 @@ void Shop_ShopScreen(void)
             GfxPath_SetToolbarAndShow(0xF);
             ds.Mouse_HotspotCount = 0;
             ds.Shop_QtyEdit = 1;
-            ds.Shop_Qty = (int16_t)p->_1D;
+            ds.Shop_Qty = (int16_t)p->Queued;
             for (int k = 1; k <= 6; k++)
                 ds.Shop_OreStock[k - 1] =
                     long_mul(p->Ores[k - 1], ds.Shop_Qty) + ds.Game_HomeStock[k - 1];
@@ -190,7 +190,7 @@ void Shop_ShopScreen(void)
             Shop_DrawProductInfo(true);
         else
             Shop_ShowProductPicture(true);
-        if (SEL_PRODUCT->_1D == 0)
+        if (SEL_PRODUCT->Queued == 0)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
@@ -206,7 +206,7 @@ void Shop_ShopScreen(void)
             Shop_SetupShopHotspots();
         else
             Shop_SetupShopListHotspots();
-        if (SEL_PRODUCT->_1D == 0)
+        if (SEL_PRODUCT->Queued == 0)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();
@@ -224,16 +224,16 @@ void Shop_ShopScreen(void)
         default: break;
         }
         if (ds.Game_MenuCommand == 0x1E && ds.Shop_Qty > 0) {
-            if (p->_21 == 0)
-                p->_21 = p->_1F;
-            p->_1D = (uint16_t)ds.Shop_Qty;
+            if (p->WorkLeft == 0)
+                p->WorkLeft = p->WorkPerPiece;
+            p->Queued = (uint16_t)ds.Shop_Qty;
             if (!ds.Shop_ListMode)
                 Shop_SetupShopHotspots();
             else
                 Shop_SetupShopListHotspots();
         }
         if (ds.Game_MenuCommand == 0x20)
-            ds.Shop_Qty = (int16_t)p->_1D;
+            ds.Shop_Qty = (int16_t)p->Queued;
         if (ds.Game_MenuCommand == 0x1E || ds.Game_MenuCommand == 0x20) {
             // Leave the editor: pay for the order and book the ore it uses.
             ds.Game_ClockRunning = true;
@@ -259,7 +259,7 @@ void Shop_ShopScreen(void)
         }
         if (ds.Shop_Qty < 0)
             ds.Shop_Qty = 0;
-        if ((int16_t)p->_21 > 0 && ds.Shop_Qty == 0)
+        if ((int16_t)p->WorkLeft > 0 && ds.Shop_Qty == 0)
             ds.Shop_Qty = 1;
         if (ds.Game_Credits < long_mul(p->Price, ds.Shop_Qty))
             Gfx_FlashCredits();
@@ -544,10 +544,10 @@ void Shop_DrawOrderSummary(void)
 void Shop_DrawQueueSummary(void)
 {
     const TProduct *p = SEL_PRODUCT;
-    field(Lang_Text("Bought items:"), 0xE, 0xB4, 0xF, (int16_t)p->_1D, 100, 5, true);
+    field(Lang_Text("Bought items:"), 0xE, 0xB4, 0xF, (int16_t)p->Queued, 100, 5, true);
     field(Lang_Text("Time to go:"), 0xA0, 0xB4, 0x11, Shop_QueueHours(p), 0x108, 6, true);
     field(Lang_Text("Stores:"), 0xE, 0xBD, 0x13, p->Stock, 100, 10, true);
-    field(Lang_Text("Total price:"), 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, (int16_t)p->_1D), 0x108, 8, true);
+    field(Lang_Text("Total price:"), 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, (int16_t)p->Queued), 0x108, 8, true);
 }
 
 // 32b4:18a1
@@ -581,10 +581,10 @@ void Shop_DrawNotProducible(void)
 void Shop_DrawQueueNumbers(void)
 {
     const TProduct *p = SEL_PRODUCT;
-    field("", 0, 0xB4, 0, (int16_t)p->_1D, 100, 5, false);
+    field("", 0, 0xB4, 0, (int16_t)p->Queued, 100, 5, false);
     field("", 0, 0xB4, 0, Shop_QueueHours(p), 0x108, 6, false);
     field("", 0, 0xBD, 0, p->Stock, 100, 10, false);
-    field("", 0, 0xBD, 0, Shop_OrderPrice(p, (int16_t)p->_1D), 0x108, 8, false);
+    field("", 0, 0xBD, 0, Shop_OrderPrice(p, (int16_t)p->Queued), 0x108, 8, false);
 }
 
 // 32b4:1b4a
@@ -604,7 +604,7 @@ static void set_hot(int16_t j, int16_t x, uint8_t y, int16_t w, uint8_t h, const
     s->H = h;
     pstr_set(&s->Caption, 0x12, caption ? caption : "");
     s->Repeat_ = repeat;
-    s->_1A = 0;
+    s->Cursor = 0;
 }
 
 // 32b4:1bf2
@@ -702,7 +702,7 @@ void Shop_HandleListClick(void)
         } while (ds.Mouse_Buttons != 0);
     }
     if (ds.Shop_Sel != old_sel) {
-        if (SEL_PRODUCT->_1D == 0)
+        if (SEL_PRODUCT->Queued == 0)
             Shop_DrawNotProducible();
         else
             Shop_DrawQueueSummary();

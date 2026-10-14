@@ -88,7 +88,7 @@ void Pub_SetupPubHotspots(void)
             char name[256];
             pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &p->Name));
             h->Repeat_ = 1;
-            h->_1A = 0;
+            h->Cursor = 0;
         } else {
             Mouse_ClearHotspots(k, k);
         }
@@ -133,7 +133,7 @@ void Pub_SetupTalkHotspot(void)
     h->H = 0x3F;
     pstr_set(&h->Caption, 0x12, Lang_TextAt(0x1fd2050f, "Talking"));
     h->Repeat_ = 0;
-    h->_1A = 0;
+    h->Cursor = 0;
     ds.Pub_HoverCol = 0xFFFF;
     ds.Pub_HoverRow = (int16_t)0xFFFF;
 }
@@ -314,16 +314,15 @@ void Pub_StartPubDealWindows(void)
 {
     for (int k = 0; k < 10; k++) {
         TPubDeal *d = &ds.Pub_Deals[k];
-        // Start: the stored offsets plus now. End: the same, kept in
-        // Active (year) and _15[0..2] (month, day, hour).
+        // Start and end: the stored offsets plus now.
         int16_t year = (int16_t)d->Year;
         Pub_AddToDate((int8_t)ds.Game_Hour, (int8_t)ds.Game_Day, (int8_t)ds.Game_Month,
                       (int16_t)ds.Game_Year, &d->Hour, &d->Day, &d->Month, &year);
         d->Year = (uint16_t)year;
-        year = (int16_t)d->Active;
+        year = (int16_t)d->EndYear;
         Pub_AddToDate((int8_t)ds.Game_Hour, (int8_t)ds.Game_Day, (int8_t)ds.Game_Month,
-                      (int16_t)ds.Game_Year, &d->_15[2], &d->_15[1], &d->_15[0], &year);
-        d->Active = (uint16_t)year;
+                      (int16_t)ds.Game_Year, &d->EndHour, &d->EndDay, &d->EndMonth, &year);
+        d->EndYear = (uint16_t)year;
     }
 }
 
@@ -344,7 +343,7 @@ int16_t Pub_FindActiveDeal(void)
         const TPubDeal *d = &ds.Pub_Deals[k - 1];
         int32_t now = Pub_DateToHours(ds.Game_Year, ds.Game_Month, ds.Game_Day, ds.Game_Hour);
         if (Pub_DateToHours((int16_t)d->Year, d->Month, d->Day, d->Hour) < now) {
-            int32_t end = Pub_DateToHours((int16_t)d->Active, d->_15[0], d->_15[1], d->_15[2]);
+            int32_t end = Pub_DateToHours((int16_t)d->EndYear, d->EndMonth, d->EndDay, d->EndHour);
             if (now < end)
                 found = k;
         }

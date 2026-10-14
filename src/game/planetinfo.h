@@ -15,6 +15,8 @@
 
 #include "game/dseg.h"
 
+// Port addition: the body record of the planet (moon 0) or its moon.
+TBody *PlanetInfo_BodyAt(int16_t sys, int16_t planet, int16_t moon);
 // 357b:0031: 3 hotspots (4 with the colony stats), or 1 when
 // ds.PlanetInfo_AlienMode is set.
 void PlanetInfo_SetupPlanetInfoHotspots(void);
@@ -64,7 +66,7 @@ void PlanetInfo_GetBodyLocationName(char *dst, size_t cap, int16_t sys, int16_t 
 
 // 357b:3cc0: balances the power of a body's buildings. Switches buildings
 // off (lowest priority first) while twice the output is below the energy
-// demand, stores each building's W9/WB/BD scaled by the supply ratio, and
-// leaves the planet force's energy supply in its Storage field and the
-// total of kind 16h's output in the body's bytes 4..5.
+// demand, stores each building's Workers/Energy/Working scaled by the supply
+// ratio, and leaves the planet force's ore storage in its Storage field and
+// the total of the Builder Plants' (kind 16h) output in the body's BuildPower.
 void PlanetInfo_BalanceBuildingPower(int16_t sys, int16_t planet, int16_t moon);
