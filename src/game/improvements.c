@@ -28,6 +28,9 @@ const SwitchInfo Improvements_List[] = {
     {"storage_full_message", "Storage full message",
      "A log entry when production stops on a full store.",
      &improvements.storage_full_message},
+    {"university_courses", "Universities count",
+     "Courses need a University; one staff member away per University.",
+     &improvements.university_courses},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);

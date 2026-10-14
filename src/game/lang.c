@@ -96,6 +96,11 @@ static const LangText port_texts[] = {
     {"Can't save now", {"Nicht speicherbar", "Pas de sauvegarde", "Non salvabile ora"}},
     // Storage full message (game/storefull.h).
     {"Storage is full on ", {"Lager ist voll auf ", "Entrep\223t plein sur ", "Magazzino pieno su "}},
+    // Universities that count (game/courses.h): the advisor's answer.
+    {"We have no University I could go to.",
+     {"Wir haben keine Universit\204t,|an die ich gehen k\224nnte.",
+      "Nous n'avons aucune universit\202 o\227 aller.",
+      "Non abbiamo un'universit\205 dove andare."}},
 };
 
 // printf formats where a translation changes the order of the pieces.

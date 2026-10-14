@@ -4,6 +4,7 @@
 
 #include "game/anim.h"
 #include "game/blit.h"
+#include "game/courses.h"
 #include "game/crt.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
@@ -256,8 +257,7 @@ void Command_SetupCommandHotspots(void)
     ds.Command_StaffHotspotCount = 0;
     for (int16_t s = 1; s <= 4; s++) {
         uint16_t hired = ds.Game_StaffHired[s - 1];
-        if ((int16_t)hired > 0 && ds.Advisor_TrainingKind != s
-            && (s != 4 || ds.Intel_DevAwayTimer == 0)) {
+        if ((int16_t)hired > 0 && !Courses_Away(s) && (s != 4 || ds.Intel_DevAwayTimer == 0)) {
             THotspot *h = Mouse_Hotspot((int16_t)(ds.Command_StaffHotspotCount + 1));
             h->X = (int16_t)(ds.Command_StaffX[s - 1] + 1);
             h->Y = (uint8_t)(ds.Command_StaffY[s - 1] + 0x32);
@@ -364,7 +364,7 @@ void Command_TickRoomAnim(void)
     uint16_t fighter = ds.Game_StaffHired[2];
     // The original draws them even at the university. Port fix
     // (game/fixes.h): not then.
-    bool away = fixes.away_staff_hidden && ds.Advisor_TrainingKind == 3;
+    bool away = fixes.away_staff_hidden && Courses_Away(3);
     Mouse_HideCursor();
     if ((int16_t)fighter > 0 && !away && ds.Command_AnimId < 7) {
         Blit_BlitTransparentStrided(
@@ -552,7 +552,7 @@ void Command_TickPanelDoorAnim(void)
         uint16_t hired = ds.Game_StaffHired[1];
         // The original draws them even at the university. Port fix
         // (game/fixes.h): not then.
-        bool away = fixes.away_staff_hidden && ds.Advisor_TrainingKind == 2;
+        bool away = fixes.away_staff_hidden && Courses_Away(2);
         if ((int16_t)hired > 0 && !away) {
             Blit_BlitTransparent(
                 ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[1][hired - 1] * 0x140
@@ -633,8 +633,7 @@ void Command_DrawStaffIcon(int16_t slot)
 {
     int16_t s = (int16_t)ds.Command_StaffOfSlot[slot - 1];
     uint16_t hired = ds.Game_StaffHired[s - 1];
-    if ((s != 4 || ds.Intel_DevAwayTimer == 0) && ds.Advisor_TrainingKind != s
-        && (int16_t)hired > 0) {
+    if ((s != 4 || ds.Intel_DevAwayTimer == 0) && !Courses_Away(s) && (int16_t)hired > 0) {
         Blit_BlitTransparent(
             ds.Command_MainFace + (uint16_t)(ds.Command_StaffSrcY[s - 1][hired - 1] * 0x140
                                              + ds.Command_StaffSrcX[s - 1][hired - 1] + 0x141),

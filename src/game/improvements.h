@@ -4,9 +4,9 @@
 // Scripted runs (the autopilot, --replay, the tests) play with every
 // improvement off, so they play the original's game; a test of one switches
 // it on. An improvement keeps its state in fields the original already has
-// where it can, so saves stay in the DOS format; trade routes and buildings
-// past 1,000 have no room there, and a save holding them is in the port's
-// format (game/saveload.h).
+// where it can, so saves stay in the DOS format; trade routes, buildings
+// past 1,000 and more than one university course have no room there, and a
+// save holding them is in the port's format (game/saveload.h).
 #pragma once
 
 #include "game/fixes.h"
@@ -41,6 +41,9 @@ typedef struct Improvements {
     // One log entry when a body's production stops on a full store
     // (game/storefull.h).
     bool storage_full_message;
+    // A university course needs a finished, powered University, and with N
+    // of them up to N staff can be away at once (game/courses.h).
+    bool university_courses;
 } Improvements;
 
 extern Improvements improvements;

@@ -15,6 +15,7 @@
 #include "game/cargo.h"
 #include "game/colonize.h"
 #include "game/command.h"
+#include "game/courses.h"
 #include "game/credits.h"
 #include "game/droids.h"
 #include "game/dseg.h"
@@ -302,6 +303,7 @@ static void startup(void)
     Routes_Reset();  // port improvement (game/routes.h)
     Autosave_Reset();  // port improvement (game/autosave.h)
     StoreFull_Reset();  // port improvement (game/storefull.h)
+    Courses_Reset();  // port improvement (game/courses.h)
     if (ds.Game_StartChoice == 2) {
         ds.Game_PrevScreen = 1;
         ds.Game_CurrentScreen = 12;

@@ -80,7 +80,9 @@ The port is complete and the game can be won in it.
   12 slots, written as a battle or alien talk starts (the hour's start),
   weekly and by F11 (`src/game/autosave.h`); Storage full message, one
   log entry when a body's production stops on a full store
-  (`src/game/storefull.h`).
+  (`src/game/storefull.h`); Universities count, a course needs a
+  powered University and each one lets one more staff member be away
+  (`src/game/courses.h`).
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -90,7 +92,7 @@ The port is complete and the game can be won in it.
   the 34 bugs found in the port while playing it, 33 are fixed and one
   turned out to be the original's behaviour; their write-ups are in git
   history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 96 ctest tests pass on the release build, the full
+- **Tests:** all 98 ctest tests pass on the release build, the full
   playthrough (`test_play_game`, and `_german`, `_french`, `_italian` from
   the CD's ISO), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -112,46 +114,6 @@ Changes to the game's design rather than its bugs: quality of life first,
 then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
-
-#### 1.1 Next: Universities that count
-
-Specified 2026-10-14; its own switch and commit: a field in
-`Improvements` and an entry in `Improvements_List` (test_options
-checks), its own test with the switch on, the port's new texts in
-German, French and Italian too (`lang.c`, as the routes' are), and with
-the switch off the original's behaviour, which the golden hashes prove
-(scripted runs play with it off). When done: the walkthrough's matching
-section and "Where we stand".
-
-**Universities that count** (`university_courses`). Today a University
-only matters for population (the 80k cap, the mood above 70k); courses
-need none and a second one does nothing (docs/walkthrough.md).
-
-- *A course needs a University:* at least one finished, powered
-  University at any colony, counted when the advisor is asked (or beside
-  `Sim_UniversityCount`, which keeps its own meaning for the population
-  rules). Without one the advisor refuses with a new answer, translated.
-- *One staff member away per University:* with N such Universities, up
-  to N staff can be on a course at once (at most 4, one per kind) in
-  place of the original's one. Course length, price and results are the
-  original's.
-- *State:* one course per staff kind (timer, course, price) in place of
-  the single `Advisor_Training*` set. The DOS fields hold one course; the
-  others are port records, and a save holding more than one running
-  course is in the port's format (as routes are, `game/saveload.h`).
-- *Reads:* every place that asks "who is away" goes through one accessor:
-  the advisor's "someone is already away" answer (now: as many away as
-  there are Universities), `Sim_GrowStaffExperience` (steps each course),
-  the Command centre's staff drawing (`fixes.away_staff_hidden`), the
-  research stop for an absent developer, the developer checks in
-  `Sim_ProcessStoryTimers`, and `Hire_HireScreen` (a replaced commander's
-  course ends).
-- Courses already running carry on if Universities are lost or lose
-  power; only a new course checks.
-- *Test:* no course without a powered University; two Universities let
-  two staff go together and refuse a third; each returns with the
-  original's results; a save with two courses round-trips in the port's
-  format and one with one course stays in the DOS format.
 
 ### 2. Checks against the DOS game
 

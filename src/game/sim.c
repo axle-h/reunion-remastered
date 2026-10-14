@@ -13,6 +13,7 @@
 #include "game/cargo.h"
 #include "game/colonize.h"
 #include "game/colonystats.h"
+#include "game/courses.h"
 #include "game/droids.h"
 #include "game/dseg.h"
 #include "game/fixes.h"
@@ -299,8 +300,7 @@ void Sim_ProgressResearch(void)
     for (int16_t k = 1; k <= 35; k++) {
         TProduct *p = product(k);
         // Research stops while the developer is with race 2 or at the university.
-        if (ds.Intel_DevAwayTimer != 0 || ds.Advisor_TrainingKind == 4
-            || !(p->State == 2 || p->State == 4))
+        if (ds.Intel_DevAwayTimer != 0 || Courses_Away(4) || !(p->State == 2 || p->State == 4))
             continue;
 
         int16_t shortfall = 0;
@@ -1352,6 +1352,41 @@ static uint8_t ability_cap(int16_t type)
     return (&ds.Staff_Ability[0][0])[(type - 1) * 3 + ds.Game_StaffHired[type - 1] - 1];
 }
 
+// A staff member of kind t back from the university: experience, and for
+// the developer course `course`'s skills.
+static void course_results(int16_t t, int16_t course)
+{
+    uint16_t *exp = &ds.Game_StaffExp[t - 1];
+    *exp += (uint16_t)(System_Random(4) + 0x69);
+    uint8_t cap = ability_cap(t);
+    if (cap < *exp)
+        *exp = cap;
+    if (t == 4) {
+        for (int16_t j = 1; j <= 4; j++) {
+            ds.Game_DevSkill[j - 1] += ds.Advisor_CourseSkills[course - 1][j - 1];
+            // Staff::DevSkills[StoryStage, StaffHired[4], j], indexed flat
+            const uint8_t *caps = &ds.Staff_DevSkills[0][0][0];
+            uint8_t skillCap =
+                caps[ds.Game_StoryStage * 12 + (ds.Game_StaffHired[3] - 1) * 4 + j - 1];
+            if (skillCap < ds.Game_DevSkill[j - 1])
+                ds.Game_DevSkill[j - 1] = skillCap;
+        }
+    }
+}
+
+static void course_returned(void)
+{
+    if (ds.Game_CurrentScreen == 1) {
+        ds.Game_CurrentScreen = -1;
+        ds.Game_ScreenSwitch = 1;
+    }
+    Message_ShowMessage(Lang_Text("| Your advisor has returned from the university |"));
+    if (ds.Game_CurrentScreen == 3) {
+        Research_DrawInventionInfo();
+        Research_DrawDeveloperSkills();
+    }
+}
+
 // 1b8a:3b83
 void Sim_GrowStaffExperience(void)
 {
@@ -1363,39 +1398,24 @@ void Sim_GrowStaffExperience(void)
     // A staff member at the university: back when the hours are up, with
     // experience (and for the developer, the course's skills).
     int16_t t = ds.Advisor_TrainingKind;
-    if (t <= 0)
-        return;
-    if (ds.Advisor_TrainingTimer > 0)
-        ds.Advisor_TrainingTimer--;
-    if (ds.Advisor_TrainingTimer != 0)
-        return;
-    uint16_t *exp = &ds.Game_StaffExp[t - 1];
-    *exp += (uint16_t)(System_Random(4) + 0x69);
-    uint8_t cap = ability_cap(t);
-    if (cap < *exp)
-        *exp = cap;
-    if (t == 4) {
-        for (int16_t j = 1; j <= 4; j++) {
-            int16_t course = ds.Advisor_TrainingCourse;
-            ds.Game_DevSkill[j - 1] += ds.Advisor_CourseSkills[course - 1][j - 1];
-            // Staff::DevSkills[StoryStage, StaffHired[4], j], indexed flat
-            const uint8_t *caps = &ds.Staff_DevSkills[0][0][0];
-            uint8_t skillCap =
-                caps[ds.Game_StoryStage * 12 + (ds.Game_StaffHired[3] - 1) * 4 + j - 1];
-            if (skillCap < ds.Game_DevSkill[j - 1])
-                ds.Game_DevSkill[j - 1] = skillCap;
+    if (t > 0) {
+        if (ds.Advisor_TrainingTimer > 0)
+            ds.Advisor_TrainingTimer--;
+        if (ds.Advisor_TrainingTimer == 0) {
+            course_results(t, ds.Advisor_TrainingCourse);
+            ds.Advisor_TrainingKind = 0;
+            course_returned();
         }
     }
-    ds.Advisor_TrainingKind = 0;
-    if (ds.Game_CurrentScreen == 1) {
-        ds.Game_CurrentScreen = -1;
-        ds.Game_ScreenSwitch = 1;
+    // Port improvement (game/courses.h): the other courses, the same way.
+    for (int16_t k = 1; k <= COURSE_KINDS; k++) {
+        Course *c = &Courses_Extra[k - 1];
+        if (c->Hours == 0 || --c->Hours != 0)
+            continue;
+        course_results(k, c->Course);
+        course_returned();
     }
-    Message_ShowMessage(Lang_Text("| Your advisor has returned from the university |"));
-    if (ds.Game_CurrentScreen == 3) {
-        Research_DrawInventionInfo();
-        Research_DrawDeveloperSkills();
-    }
+    Courses_Settle();
 }
 
 // A story timer counts down while its `done` byte is clear; true when it
@@ -1410,8 +1430,11 @@ static bool tick(int16_t *timer)
 // 1b8a:3d07: the idea timers and the story timers (each with its "done" flag).
 void Sim_ProcessStoryTimers(void)
 {
+    // The original asks (TrainingTimer == 0 || TrainingKind != 4) where
+    // Courses_Away(4) is asked here: the same, as a course's kind is
+    // cleared in the hour its timer reaches 0.
     if (ds.Game_StaffExp[3] != 0 && ds.Intel_DevAwayTimer == 0
-        && (ds.Advisor_TrainingTimer == 0 || ds.Advisor_TrainingKind != 4)) {
+        && !Courses_Away(4)) {
         for (int16_t k = 1; k <= 35; k++) {
             int16_t *timer = &ds.Game_IdeaTimer[k - 1];
             if (*timer <= 0)
@@ -1440,7 +1463,7 @@ void Sim_ProcessStoryTimers(void)
         AlienTalk_StartAlienScene(9);
     }
     if (ds.Game_StaffHired[3] != 0 && ds.Intel_Race2Done1 == 0 && ds.Intel_Race2Timer1 > 0
-        && (ds.Advisor_TrainingTimer == 0 || ds.Advisor_TrainingKind != 4)
+        && !Courses_Away(4)
         && ds.Races_Races[0].Status > 2 && --ds.Intel_Race2Timer1 == 0) {
         if (product(8)->State == 5)
             AlienTalk_StartAlienTalk(2);
@@ -1505,7 +1528,7 @@ void Sim_ProcessStoryTimers(void)
         ds.Intel_MorgrulAttack1Done = 1;
     }
     if (ds.Intel_Invention14Revealed == 0 && ds.Intel_Invention14Timer > 0 && product(14)->State > 0
-        && ds.Game_StaffExp[3] != 0 && ds.Intel_DevAwayTimer == 0 && ds.Advisor_TrainingKind != 4
+        && ds.Game_StaffExp[3] != 0 && ds.Intel_DevAwayTimer == 0 && !Courses_Away(4)
         && --ds.Intel_Invention14Timer == 0) {
         Message_ShowMessageLine(0x1E);
         ds.Intel_Invention14Revealed = 1;

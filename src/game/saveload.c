@@ -6,6 +6,7 @@
 #include "game/anim.h"
 #include "game/autosave.h"
 #include "game/blit.h"
+#include "game/courses.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/improvements.h"
@@ -103,9 +104,9 @@ typedef enum : uint8_t {
 static SlotFormat slot_format[AUTOSAVE_SLOT + 1];
 
 // The port's format: a header, then the DOS blocks with the building table
-// cut to its count, then the routes.
+// cut to its count, then the routes and, from version 2, the courses.
 static const uint8_t PORT_MAGIC[8] = {'R', 'E', 'U', 'N', 'I', 'O', 'N', 0x1A};
-enum : uint16_t { PORT_VERSION = 1 };
+enum : uint16_t { PORT_VERSION = 2 };
 
 // --- The block list -----------------------------------------------------------
 
@@ -178,17 +179,29 @@ static bool word(SDL_IOStream *f, uint16_t *w, bool save)
     return ok;
 }
 
-// The port's format has its records after the blocks: the routes'
-// (game/routes.h) as their count and size, then the records.
-static bool port_records(SDL_IOStream *f, bool save)
+// One table of the port's records: its count and record size, then the
+// records. A count of more than `count` or another size fails.
+static bool records(SDL_IOStream *f, void *table, uint16_t count, uint16_t size, bool save)
 {
-    uint16_t count = ROUTE_SLOTS, size = sizeof(Route);
-    if (!word(f, &count, save) || !word(f, &size, save) || count > ROUTE_SLOTS
-        || size != sizeof(Route))
+    uint16_t n = count, sz = size;
+    if (!word(f, &n, save) || !word(f, &sz, save) || n > count || sz != size)
         return false;
     if (!save)
-        Routes_Reset();
-    return block(f, Routes_Table, (size_t)count * size, save);
+        memset(table, 0, (size_t)count * size);
+    return block(f, table, (size_t)n * size, save);
+}
+
+// The port's format has its records after the blocks: the routes'
+// (game/routes.h), then from version 2 the courses' (game/courses.h).
+static bool port_records(SDL_IOStream *f, uint16_t version, bool save)
+{
+    if (!records(f, Routes_Table, ROUTE_SLOTS, sizeof(Route), save))
+        return false;
+    if (version < 2) {
+        Courses_Reset();
+        return true;
+    }
+    return records(f, Courses_Extra, COURSE_KINDS, sizeof(Course), save);
 }
 
 // The slot name as string[19] (the first 20 bytes of the string[20] at
@@ -198,9 +211,9 @@ static bool port_records(SDL_IOStream *f, bool save)
 static bool transfer(SDL_IOStream *f, uint8_t *name, bool save, bool port)
 {
     bool ok = true;
+    uint16_t version = PORT_VERSION;
     if (port) {
         uint8_t magic[sizeof PORT_MAGIC];
-        uint16_t version = PORT_VERSION;
         memcpy(magic, PORT_MAGIC, sizeof magic);
         ok = block(f, magic, sizeof magic, save) && word(f, &version, save)
              && memcmp(magic, PORT_MAGIC, sizeof magic) == 0 && version <= PORT_VERSION;
@@ -228,9 +241,11 @@ static bool transfer(SDL_IOStream *f, uint8_t *name, bool save, bool port)
         ok = block(f, p, size, save);
     }
     if (port)
-        ok = ok && port_records(f, save);
-    else if (ok && !save)
+        ok = ok && port_records(f, version, save);
+    else if (ok && !save) {
         Routes_Reset();
+        Courses_Reset();
+    }
     // Port addition: frozen cheats (game/options.h) hold the loaded stocks.
     // Saves of earlier port versions may end in a cheats trailer; it is
     // never read.
@@ -243,7 +258,8 @@ static bool transfer(SDL_IOStream *f, uint8_t *name, bool save, bool port)
 
 bool SaveLoad_PortFormat(void)
 {
-    return Improvements_PortSaves() || Routes_Any() || ds.Game_BuildingCount > BUILDINGS_DOS;
+    return Improvements_PortSaves() || Routes_Any() || Courses_Any()
+           || ds.Game_BuildingCount > BUILDINGS_DOS;
 }
 
 bool SaveLoad_Transfer(bool save)

@@ -3,10 +3,14 @@
 // valasz1.sp, its first two characters naming the next menu.
 //
 // State: the Advisor_* fields of DS (game/dseg.h); Advisor_Training* is
-// story state set by the answers.
+// story state set by the answers (with the port's courses, game/courses.h).
 #pragma once
 #include <stdint.h>
 #include "game/dseg.h"
+
+// Port improvement (game/courses.h): the answer past valasz1.sp's 15, "no
+// University to go to", which leads back to the main menu.
+enum : int16_t { ADVISOR_NO_UNIVERSITY = 16 };
 
 // 1991:0000
 void Advisor_AdvisorScreen(void);

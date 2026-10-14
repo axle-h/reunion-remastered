@@ -403,7 +403,10 @@ All **[src]** unless marked.
 - **University** (advisor screen, `Advisor_AdvisorScreen`,
   `Sim_GrowStaffExperience`).
   - Cost: (Random(10) + current experience) × 1,000.
-  - Away for 50–69 hours. Only one commander can be away at a time.
+  - Away for 50–69 hours. Only one commander can be away at a time. In the
+    port, the Universities count improvement makes a course need a
+    finished, powered University at any colony (New Earth starts with
+    one), and lets one commander per University be away at a time.
   - Returns with +105–108 experience, i.e. at the cap after one course.
   - Refused once experience is at the cap ("I don't think I could become more
     skilled"). The guide's "veterans of many battles can't go" is wrong
@@ -414,7 +417,8 @@ All **[src]** unless marked.
     (not by courses taken). Thomas Dempsey's cap is 5/6/5/2 at stage 1,
     6/7/7/5 at stage 2 and 7/7/7/7 from stage 3 (after the third Morgrul
     force is beaten). Klaatoo's cap is 9 everywhere.
-  - Destroying the University does not stop courses.
+  - Destroying the University does not stop courses (with the improvement
+    neither: only a new course needs one).
 - **Research.** A product takes DevTime / developer experience hours
   (`Sim_ProgressResearch`). If the developer is short of the required skills,
   research stops at about 100 / (shortfall + 1) % complete, where *shortfall*
@@ -681,7 +685,8 @@ University thresholds, target mood and growth (port menu, Game).
   surface. A hit that destroys a building schedules the Meteor disintegrator
   research.
 - **University.** It has no effect on courses; the game never reads the
-  count.
+  count. In the port, the Universities count improvement makes a
+  course need one, and a second one lets a second commander go.
 
 ### Exploits and bugs to know
 

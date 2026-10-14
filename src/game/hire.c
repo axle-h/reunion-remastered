@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "game/blit.h"
+#include "game/courses.h"
 #include "game/gfx.h"
 #include "game/lang.h"
 #include "game/mouse.h"
@@ -108,8 +109,7 @@ void Hire_HireScreen(void)
                 ds.Game_DevSkill[k - 1] = dev_skills(c)[k - 1];
         }
         Gfx_DrawCredits();
-        if (ds.Advisor_TrainingKind == ds.Hire_StaffKind)
-            ds.Advisor_TrainingKind = 0;
+        Courses_End(ds.Hire_StaffKind);
         Sound_PlayButtonSfx("welcome");
         break;
     }

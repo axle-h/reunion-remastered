@@ -400,7 +400,7 @@ static void test_saves(void)
     SDL_snprintf(path, sizeof path, "%s/reunion.1", dir);
     size_t size = 0;
     uint8_t *file = SDL_LoadFile(path, &size);
-    CHECK(file && size > 10 && SDL_memcmp(file, "REUNION\x1A", 8) == 0 && file[8] == 1 && file[9] == 0);
+    CHECK(file && size > 10 && SDL_memcmp(file, "REUNION\x1A", 8) == 0 && file[8] == 2 && file[9] == 0);
     if (file) {
         file[8] = 99;
         SDL_SaveFile(path, file, size);

@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "game/blit.h"
+#include "game/courses.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/lang.h"
@@ -24,7 +25,7 @@ static uint16_t icon_offset(uint16_t k)
 // university.
 static bool developer_away(void)
 {
-    return ds.Intel_DevAwayTimer != 0 || ds.Advisor_TrainingKind == 4;
+    return ds.Intel_DevAwayTimer != 0 || Courses_Away(4);
 }
 
 // Selection frame position: top-left pixel of the two-pixel mark.

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "game/blit.h"
+#include "game/courses.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/lang.h"
@@ -64,10 +65,9 @@ void Advisor_AdvisorScreen(void)
     case 3: ds.Advisor_Answer = 7; break;
     case 4: ds.Advisor_Answer = 8; break;
     case 5:
-        if (ds.Advisor_TrainingKind < 1)
-            ds.Advisor_Answer = ds.Command_StaffPicked == 4 ? 0xE : 10;
-        else
-            ds.Advisor_Answer = 9;
+        // The original: 9 while anyone is away. Port improvement
+        // (game/courses.h): one away per University.
+        ds.Advisor_Answer = Courses_Answer(ds.Command_StaffPicked == 4 ? 0xE : 10);
         if (ds.Command_StaffPicked != 4) {
             int16_t kind = ds.Command_StaffPicked;
             uint8_t ability = ds.Staff_Ability[kind - 1][ds.Game_StaffHired[kind - 1] - 1];
@@ -82,8 +82,7 @@ void Advisor_AdvisorScreen(void)
             ds.Game_Credits -= ds.Advisor_TrainingPrice;
             Gfx_DrawCredits();
             ds.Advisor_Answer = 0xD;
-            ds.Advisor_TrainingKind = ds.Command_StaffPicked;
-            ds.Advisor_TrainingTimer = (int16_t)(System_Random(0x14) + 0x32);
+            Courses_Start(ds.Command_StaffPicked, (int16_t)(System_Random(0x14) + 0x32));
         }
         break;
     case 7: ds.Advisor_Answer = 0xB; break;
@@ -180,7 +179,10 @@ static char *hint_name(char *name, size_t cap, int16_t v)
 void Advisor_ShowAdvisorAnswer(void)
 {
     char s1[256] = "", s2[256], s3[256], name[256];
-    TextFile_ReadTextLine("valasz1.sp", ds.Advisor_Answer, s1, sizeof s1);
+    if (ds.Advisor_Answer == ADVISOR_NO_UNIVERSITY)
+        SDL_snprintf(s1, sizeof s1, "01 %s", Lang_Text("We have no University I could go to."));
+    else
+        TextFile_ReadTextLine("valasz1.sp", ds.Advisor_Answer, s1, sizeof s1);
     // The first two characters are the number of the next menu. After the
     // third, text up to the first '|' is the first line, the rest the second.
     ds.Advisor_MenuNumber = TextFile_LineCode(s1);

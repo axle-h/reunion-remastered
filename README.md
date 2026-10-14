@@ -97,12 +97,17 @@ Improvements change the game's design where it falls short
   production stops, the message log says "Storage is full on" the body.
   It says so once: not again while that or another ore there stays full,
   but again for the next ore to fill after one has gone below its cap.
+- Universities count: a university course needs a finished, powered
+  University at one of your colonies (New Earth starts with one), and
+  each University lets one more staff member be away at once, up to all
+  four. Without one, the staff member says there is none to go to.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play
 without them. Saves stay in the DOS game's format except while Trade
-routes or No building limit is on, a route is set up or the game holds
-more than 1,000 buildings: those are written as `save/reunion.<n>`, which
+routes or No building limit is on, a route is set up, the game holds
+more than 1,000 buildings or more than one staff member is at the
+university: those are written as `save/reunion.<n>`, which
 the DOS game can't load (the port menu says so). The autosave is always
 in that format.
 
