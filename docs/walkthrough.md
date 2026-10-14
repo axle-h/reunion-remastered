@@ -640,7 +640,8 @@ University thresholds, target mood and growth (port menu, Game).
 - **Storage** (per ore). Mine 10,000, Miner station 10,000 (a body with
   only stations: 10,000 in all, or per station with More Miner stations),
   Derrick 5,000, Storage bay 20,000. The Command centre gives none. Production stops when
-  storage is full. Mines beyond the ninth still add storage, which makes them
+  storage is full, without a word (in the port, the Storage full message
+  improvement logs it). Mines beyond the ninth still add storage, which makes them
   cheaper storage than bays.
 - **Mining.**
   - Each mine needs a droid; droids per body are capped at 9 and at mines +

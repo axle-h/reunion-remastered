@@ -38,6 +38,9 @@ typedef struct Improvements {
     // One rolling autosave outside the 12 slots, written as a battle or an
     // alien talk starts, weekly and by the quick-save key (game/autosave.h).
     bool autosave;
+    // One log entry when a body's production stops on a full store
+    // (game/storefull.h).
+    bool storage_full_message;
 } Improvements;
 
 extern Improvements improvements;

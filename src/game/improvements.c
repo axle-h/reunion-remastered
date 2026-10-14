@@ -25,6 +25,9 @@ const SwitchInfo Improvements_List[] = {
     {"autosave", "Autosave",
      "Saved before battles and talks, weekly and by F11 (Keys).",
      &improvements.autosave},
+    {"storage_full_message", "Storage full message",
+     "A log entry when production stops on a full store.",
+     &improvements.storage_full_message},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);

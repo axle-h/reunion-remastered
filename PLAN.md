@@ -78,7 +78,9 @@ The port is complete and the game can be won in it.
   building table leaves the game data block past 1,000 and grows up to
   32,766 (`Game_ReserveBuildings`); Autosave, one rolling save beside the
   12 slots, written as a battle or alien talk starts (the hour's start),
-  weekly and by F11 (`src/game/autosave.h`).
+  weekly and by F11 (`src/game/autosave.h`); Storage full message, one
+  log entry when a body's production stops on a full store
+  (`src/game/storefull.h`).
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -111,50 +113,17 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-#### 1.1 Next: two smaller improvements
+#### 1.1 Next: Universities that count
 
-Specified 2026-10-14; to be done in this order, each its own switch and
-commit. Each one: a field in `Improvements` and an entry in
-`Improvements_List` (test_options checks), its own test with the switch
-on, the port's new texts in German, French and Italian too (`lang.c`,
-as the routes' are), and with the switch off the original's behaviour,
-which the golden hashes prove (scripted runs play with it off). When
-done: the walkthrough's matching section and "Where we stand".
+Specified 2026-10-14; its own switch and commit: a field in
+`Improvements` and an entry in `Improvements_List` (test_options
+checks), its own test with the switch on, the port's new texts in
+German, French and Italian too (`lang.c`, as the routes' are), and with
+the switch off the original's behaviour, which the golden hashes prove
+(scripted runs play with it off). When done: the walkthrough's matching
+section and "Where we stand".
 
-**1. A storage-full message** (`storage_full_message`). Production stops
-without a word when a store is full (Storage, docs/walkthrough.md);
-players find out by noticing the numbers stand still. One log entry,
-"Storage is full on <body>" (`Message_AddMessageLogEntry`, as the
-routes' entries), no box.
-
-- *State,* in memory only (not saved): per body (system, planet, moon) a
-  full bit per ore and an armed flag.
-- *Checked* where production is skipped for a full store: ores 2–6 in
-  `Sim_MineBody` (every hour, whether or not the 30% roll of a body
-  without a colony comes up), ore 1 (Detoxin) in the Derrick step of
-  `Sim_UpdateBuildings`; New Earth's `Game_HomeStock` as each other
-  body's `Stores`. Only ores the body produces: ores 2–6 with droids and
-  a deposit, ore 1 with a finished, powered Derrick there. The check must
-  not change when `System_Random` is called (the original skips the roll
-  when the store is full).
-- *Rule,* for each ore checked: at or over the cap, if its bit is clear,
-  set it, and if the body is armed, log the entry and disarm it. Under
-  the cap, if its bit is set, clear it and arm the body. So the first
-  full ore warns; while it or others stay full nothing more is said;
-  bringing any full ore below its cap (moving ore away, or more storage)
-  re-arms, and the next ore to fill warns again for the body.
-- *Seeded* after a new game and after every load from the loaded state:
-  a bit for every produced ore already at its cap, and armed only if
-  none is, so a load doesn't flood the log with warnings the player
-  already had.
-- Trade routes need nothing of their own: ore left aboard because New
-  Earth is full shows up as New Earth's own warning when its production
-  of that ore stops.
-- *Test:* a body filling up warns once; a second ore filling says
-  nothing; one ore drained and refilled warns again; a load with full
-  stores is quiet; the random stream is unchanged.
-
-**2. Universities that count** (`university_courses`). Today a University
+**Universities that count** (`university_courses`). Today a University
 only matters for population (the 80k cap, the mood above 70k); courses
 need none and a second one does nothing (docs/walkthrough.md).
 

@@ -94,6 +94,8 @@ static const LangText port_texts[] = {
       " Questo salvataggio si pu\225 solo caricare! "}},
     {"Game saved", {"Spiel gesichert", "Partie sauvegard\202e", "Partita salvata"}},
     {"Can't save now", {"Nicht speicherbar", "Pas de sauvegarde", "Non salvabile ora"}},
+    // Storage full message (game/storefull.h).
+    {"Storage is full on ", {"Lager ist voll auf ", "Entrep\223t plein sur ", "Magazzino pieno su "}},
 };
 
 // printf formats where a translation changes the order of the pieces.

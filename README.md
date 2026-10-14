@@ -93,6 +93,10 @@ Improvements change the game's design where it falls short
   battle or talk again; also once a week of game time, and when you press
   F11 (not in battles, talks and other screens where the clock stops). The
   disk screen lists it under the slots, to load only.
+- Storage full message: when a body's store of an ore is full and its
+  production stops, the message log says "Storage is full on" the body.
+  It says so once: not again while that or another ore there stays full,
+  but again for the next ore to fill after one has gone below its cap.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play

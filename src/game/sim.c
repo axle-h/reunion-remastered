@@ -33,6 +33,7 @@
 #include "game/shipmove.h"
 #include "game/shop.h"
 #include "game/sound.h"
+#include "game/storefull.h"
 #include "game/system.h"
 #include "game/textfile.h"
 
@@ -889,7 +890,11 @@ void Sim_UpdateBuildings(void)
                             ? body_at(bl->System, bl->Planet, bl->Moon)
                             : body(bl->System, bl->Planet);
             int32_t cap = lmul((uint16_t)Groups_PlanetStorage(bl->System, bl->Planet, bl->Moon), 1000);
-            if (bl->System == 1 && bl->Planet == 5 && bl->Moon == 0) {
+            bool home = bl->System == 1 && bl->Planet == 5 && bl->Moon == 0;
+            // Port improvement (game/storefull.h).
+            StoreFull_Check(bl->System, bl->Planet, bl->Moon, 1,
+                            home ? ds.Game_HomeStock[0] : bd->Stores[0], cap);
+            if (home) {
                 if (ds.Game_HomeStock[0] < cap && System_Random(100) < 0x23)
                     ds.Game_HomeStock[0] += bd->Deposits[0] / 10;
             } else if (bd->Stores[0] < cap && System_Random(100) < 0x23) {
@@ -943,7 +948,14 @@ static void Sim_MineBody(int16_t system, int16_t planet, int16_t moon, int16_t b
     // Ores 2..6; without a colony only the Droids mine, 30% of the
     // time, or every hour with improvements.more_stations.
     bool every_hour = b->Colony != 0 || improvements.more_stations;
-    if (system == 1 && planet == 5 && moon == 0) {
+    bool home = system == 1 && planet == 5 && moon == 0;
+    // Port improvement (game/storefull.h): each ore the body produces.
+    for (int16_t j = 2; j <= 6; j++) {
+        if (b->Droids != 0 && b->Deposits[j - 1] != 0)
+            StoreFull_Check(system, planet, moon, j,
+                            home ? ds.Game_HomeStock[j - 1] : b->Stores[j - 1], cap);
+    }
+    if (home) {
         for (int16_t j = 2; j <= 6; j++) {
             if (ds.Game_HomeStock[j - 1] < cap && (every_hour || System_Random(100) < 0x1E))
                 ds.Game_HomeStock[j - 1] += (int16_t)(uint16_t)(b->Deposits[j - 1] * b->Droids) / 10;

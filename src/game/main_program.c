@@ -50,6 +50,7 @@
 #include "game/sim.h"
 #include "game/sound.h"
 #include "game/spwar.h"
+#include "game/storefull.h"
 #include "game/surface.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -300,6 +301,7 @@ static void startup(void)
     SaveLoad_LoadInit();
     Routes_Reset();  // port improvement (game/routes.h)
     Autosave_Reset();  // port improvement (game/autosave.h)
+    StoreFull_Reset();  // port improvement (game/storefull.h)
     if (ds.Game_StartChoice == 2) {
         ds.Game_PrevScreen = 1;
         ds.Game_CurrentScreen = 12;

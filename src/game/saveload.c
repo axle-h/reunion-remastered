@@ -17,6 +17,7 @@
 #include "game/options.h"
 #include "game/routes.h"
 #include "game/sound.h"
+#include "game/storefull.h"
 #include "game/system.h"
 #include "game/textfile.h"
 #include "platform/fs.h"
@@ -233,8 +234,10 @@ static bool transfer(SDL_IOStream *f, uint8_t *name, bool save, bool port)
     // Port addition: frozen cheats (game/options.h) hold the loaded stocks.
     // Saves of earlier port versions may end in a cheats trailer; it is
     // never read.
-    if (ok && !save)
+    if (ok && !save) {
         Options_Rebase();
+        StoreFull_Reset();  // port improvement (game/storefull.h)
+    }
     return ok;
 }
 
