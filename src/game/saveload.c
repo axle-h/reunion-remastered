@@ -8,10 +8,13 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/improvements.h"
 #include "game/lang.h"
+#include "game/message.h"
 #include "game/mouse.h"
 #include "game/music.h"
 #include "game/options.h"
+#include "game/routes.h"
 #include "game/sound.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -54,16 +57,36 @@ static const char *player_dir(void)
     return save_dir;
 }
 
-// Opens save\spidysav.<slot> in the player's directory.
-static FILE *open_slot(int16_t slot, bool write)
+// A slot's file: save\spidysav.<slot> in the DOS format, save/reunion.<slot>
+// in the port's, in the player's directory. False without a directory.
+static bool slot_path(char *path, size_t size, int16_t slot, bool port)
 {
     const char *dir = player_dir();
     if (!dir)
-        return nullptr;
-    char path[1024];
-    SDL_snprintf(path, sizeof path, "%sspidysav.%d", dir, slot);
-    return fopen(path, write ? "wb" : "rb");
+        return false;
+    SDL_snprintf(path, size, "%s%s.%d", dir, port ? "reunion" : "spidysav", slot);
+    return true;
 }
+
+static FILE *open_slot(int16_t slot, bool port, bool write)
+{
+    char path[1024];
+    return slot_path(path, sizeof path, slot, port) ? fopen(path, write ? "wb" : "rb") : nullptr;
+}
+
+// What each slot's file is (SaveLoad_ReadSlotNames).
+typedef enum : uint8_t {
+    SLOT_DOS,
+    SLOT_PORT,
+    SLOT_NEWER,  // the port's format, of a version this port doesn't know
+} SlotFormat;
+
+static SlotFormat slot_format[SLOT_COUNT + 1];
+
+// The port's format: a header, then the DOS blocks with the building table
+// cut to its count, then the routes.
+static const uint8_t PORT_MAGIC[8] = {'R', 'E', 'U', 'N', 'I', 'O', 'N', 0x1A};
+enum : uint16_t { PORT_VERSION = 1 };
 
 // --- The block list -----------------------------------------------------------
 
@@ -123,22 +146,65 @@ static const SaveBlock blocks[] = {
 #undef P
 
 // 1a3e:0240 Block (nested in SaveLoadGame): one BlockWrite/BlockRead + CheckIO.
-static bool block(FILE *f, void *buf, uint16_t size, bool save)
+static bool block(FILE *f, void *buf, size_t size, bool save)
 {
     return (save ? fwrite(buf, 1, size, f) : fread(buf, 1, size, f)) == size;
 }
 
-// The header, the slot name as string[19] (the first 20 bytes of the
-// string[20] at `name`), then the blocks.
-static bool transfer(FILE *f, uint8_t *name, bool save)
+static bool word(FILE *f, uint16_t *w, bool save)
 {
-    bool ok = block(f, name, 0x14, save);
+    uint8_t b[2] = {(uint8_t)*w, (uint8_t)(*w >> 8)};
+    bool ok = block(f, b, 2, save);
+    *w = (uint16_t)(b[0] | b[1] << 8);
+    return ok;
+}
+
+// The port's format has its records after the blocks: the routes'
+// (game/routes.h) as their count and size, then the records.
+static bool port_records(FILE *f, bool save)
+{
+    uint16_t count = ROUTE_SLOTS, size = sizeof(Route);
+    if (!word(f, &count, save) || !word(f, &size, save) || count > ROUTE_SLOTS
+        || size != sizeof(Route))
+        return false;
+    if (!save)
+        Routes_Reset();
+    return block(f, Routes_Table, (size_t)count * size, save);
+}
+
+// The slot name as string[19] (the first 20 bytes of the string[20] at
+// `name`), then the blocks. The port's format (port) starts with its magic
+// and version, has only the buildings in use of the building table, and
+// ends with its records.
+static bool transfer(FILE *f, uint8_t *name, bool save, bool port)
+{
+    bool ok = true;
+    if (port) {
+        uint8_t magic[sizeof PORT_MAGIC];
+        uint16_t version = PORT_VERSION;
+        memcpy(magic, PORT_MAGIC, sizeof magic);
+        ok = block(f, magic, sizeof magic, save) && word(f, &version, save)
+             && memcmp(magic, PORT_MAGIC, sizeof magic) == 0 && version <= PORT_VERSION;
+    }
+    ok = ok && block(f, name, 0x14, save);
     for (size_t i = 0; ok && i < sizeof blocks / sizeof blocks[0]; i++) {
         void *p = (uint8_t *)&ds + blocks[i].off;
         if (blocks[i].ptr)
             memcpy(&p, p, sizeof p);  // the block the pointer field points to
-        ok = block(f, p, blocks[i].size, save);
+        size_t size = blocks[i].size;
+        if (port && blocks[i].off == offsetof(DSeg, Game_Buildings)) {
+            if (ds.Game_BuildingCount < 0 || ds.Game_BuildingCount > 1000)
+                return false;
+            size = (size_t)ds.Game_BuildingCount * sizeof(TBuilding);
+            if (!save)
+                memset((uint8_t *)p + size, 0, blocks[i].size - size);
+        }
+        ok = block(f, p, size, save);
     }
+    if (port)
+        ok = ok && port_records(f, save);
+    else if (ok && !save)
+        Routes_Reset();
     // Port addition: frozen cheats (game/options.h) hold the loaded stocks.
     // Saves of earlier port versions may end in a cheats trailer; it is
     // never read.
@@ -147,15 +213,29 @@ static bool transfer(FILE *f, uint8_t *name, bool save)
     return ok;
 }
 
+bool SaveLoad_PortFormat(void)
+{
+    return Improvements_PortSaves() || Routes_Any();
+}
+
 bool SaveLoad_Transfer(bool save)
 {
-    if (!save && !*slot_entry(ds.SaveLoad_SelectedSlot))
+    int16_t slot = ds.SaveLoad_SelectedSlot;
+    if (!save && (!*slot_entry(slot) || slot_format[slot] == SLOT_NEWER))
         return false;
-    FILE *f = open_slot(ds.SaveLoad_SelectedSlot, save);
+    bool port = save ? SaveLoad_PortFormat() : slot_format[slot] == SLOT_PORT;
+    FILE *f = open_slot(slot, port, save);
     if (!f)
         return false;
-    bool ok = transfer(f, slot_entry(ds.SaveLoad_SelectedSlot) + 1, save);
+    bool ok = transfer(f, slot_entry(slot) + 1, save, port);
     fclose(f);
+    if (ok && save) {
+        // A slot has one file: the other format's goes.
+        char other[1024];
+        if (slot_path(other, sizeof other, slot, !port))
+            SDL_RemovePath(other);
+        slot_format[slot] = port ? SLOT_PORT : SLOT_DOS;
+    }
     return ok;
 }
 
@@ -164,7 +244,7 @@ bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save)
     FILE *f = fopen(path, save ? "wb" : "rb");
     if (!f)
         return false;
-    bool ok = transfer(f, name, save);
+    bool ok = transfer(f, name, save, false);
     fclose(f);
     return ok;
 }
@@ -213,7 +293,22 @@ void SaveLoad_ReadSlotNames(void)
     ds.SaveLoad_SlotTable = game_alloc(0x108);
     for (int16_t n = 1; n <= SLOT_COUNT; n++) {
         uint8_t *e = slot_entry(n);
-        FILE *f = open_slot(n, false);
+        // Port addition: a save in the port's format, else the DOS one.
+        slot_format[n] = SLOT_DOS;
+        FILE *f = open_slot(n, true, false);
+        if (f) {
+            uint8_t magic[sizeof PORT_MAGIC];
+            uint16_t version = 0;
+            if (block(f, magic, sizeof magic, false) && memcmp(magic, PORT_MAGIC, sizeof magic) == 0
+                && word(f, &version, false)) {
+                slot_format[n] = version > PORT_VERSION ? SLOT_NEWER : SLOT_PORT;
+            } else {
+                fclose(f);
+                f = nullptr;
+            }
+        }
+        if (!f)
+            f = open_slot(n, false, false);
         e[0] = f != nullptr;
         if (!f) {
             const char *empty = Lang_Text("Empty---------------");
@@ -401,7 +496,11 @@ void SaveLoad_DiskScreen(void)
         DiskScreenInit();
         SetupDiskHotspots();
     }
-    if (ds.Game_MenuCommand == 0x2F && *slot_entry(ds.SaveLoad_SelectedSlot) != 0) {
+    if (ds.Game_MenuCommand == 0x2F && slot_format[ds.SaveLoad_SelectedSlot] == SLOT_NEWER
+        && *slot_entry(ds.SaveLoad_SelectedSlot) != 0) {
+        // Port addition: listed, but not loaded.
+        Message_ShowMessageNoLog(Lang_Text(" This save is from a newer version of the game! "));
+    } else if (ds.Game_MenuCommand == 0x2F && *slot_entry(ds.SaveLoad_SelectedSlot) != 0) {
         SaveLoad_LoadGame();
         ds.Game_ScreenSwitch = true;
         ds.Game_CurrentScreen = 1;

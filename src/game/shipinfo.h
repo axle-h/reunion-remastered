@@ -27,3 +27,6 @@ void ShipInfo_DrawSelectionMarkerBuffered(void);
 void ShipInfo_EraseSelectionMarkerBuffered(void);
 // 26fe:1278
 void ShipInfo_SetupShipInfoHotspots(void);
+// Port addition (game/routes.h): fleet group `group`'s icon and square, and
+// the panel if it is selected, after a route moved it.
+void ShipInfo_RedrawGroup(int16_t group);

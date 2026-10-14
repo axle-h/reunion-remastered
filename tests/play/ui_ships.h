@@ -87,6 +87,13 @@ bool ui_dock(const char *group);
 // the sun to explore the system. Returns false (box closed) on a refusal,
 // true when it flies or (a fast pilot, a short trip) is there already.
 bool ui_launch(const char *group, const char *system, const char *planet, const char *moon);
+// On the destination map (18): picks `planet`, or its moon `moon`, of
+// `system` (nullptr = the system shown) as ui_launch does; the map then
+// goes back to the screen it was opened from. UI_PICK_REFUSED: a box
+// refused it, or the body is not offered (ABORT MOVE taken);
+// UI_PICK_HIDDEN: the planet is behind the sun for now (ABORT MOVE taken).
+typedef enum { UI_PICK_REFUSED, UI_PICK_DONE, UI_PICK_HIDDEN } UiPick;
+UiPick ui_pick_destination(const char *system, const char *planet, const char *moon);
 // Screen 13 via screen 17: moves `item` between the group (docked at a
 // colony) and the planet: amount > 0 to the ship, < 0 to the planet. Ores
 // move up to 100 t per left press until |amount| has moved; SHIP_CARGO_ALL

@@ -70,10 +70,17 @@ Improvements change the game's design where it falls short
   hour and kept when a colony is founded there.
 - Repeat build: on a planet's surface, Shift+click places a building and
   stays in build mode for another of the same kind; a plain click ends it.
+- Trade routes: ROUTE on a trade group's control panel opens its route,
+  up to six of your colonies or Miner-station bodies to load ore at, and
+  New Earth to unload it. Started, the group flies the loop on its own,
+  docking 5 game hours at each stop and at home, until you end it or give
+  the group another order.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play
-without them. Saves stay in the DOS game's format.
+without them. Saves stay in the DOS game's format except while Trade
+routes is on or a route is set up: those are written as `save/reunion.<n>`,
+which the DOS game can't load (the port menu says so).
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

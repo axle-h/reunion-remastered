@@ -62,11 +62,12 @@ static bool row_is(int row, const char *text)
 int main(void)
 {
     static const MenuSwitch fixes[] = {
-        {"find_jade", "Jade found in time", "help"},
-        {"mine_all_systems", "All systems mine", "help"},
+        {"find_jade", "Jade found in time", "help", false},
+        {"mine_all_systems", "All systems mine", "help", false},
     };
     static const MenuSwitch improvements[] = {
-        {"more_stations", "More Miner stations", "help"},
+        {"more_stations", "More Miner stations", "help", false},
+        {"trade_routes", "Trade routes", "help", true},
     };
     MenuHooks hooks = {
         .game_running = game_running,
@@ -76,7 +77,7 @@ int main(void)
         .fixes = fixes,
         .fix_count = 2,
         .improvements = improvements,
-        .improvement_count = 1,
+        .improvement_count = 2,
         .languages = languages,
     };
     menu_set_hooks(&hooks);
@@ -172,8 +173,10 @@ int main(void)
     config.language = LANGUAGE_ENGLISH;
 
     // Improvements: a row each, on; off and on again, all off and all on.
+    // While Trade routes is on, two rows say that saves won't load in DOS.
     go_to(SEC_IMPROVEMENTS);
-    CHECK(menu_row_count() == 3 && row_is(2, "[x] More Miner stations"));
+    CHECK(menu_row_count() == 6 && row_is(2, "[x] More Miner stations") && row_is(3, "[x] Trade routes"));
+    CHECK(row_is(4, "Saves made now can't be") && row_is(5, "loaded by the DOS game."));
     press(SDLK_DOWN);
     press(SDLK_DOWN);
     press(SDLK_RETURN);
@@ -183,9 +186,10 @@ int main(void)
     press(SDLK_UP);
     press(SDLK_RETURN);  // All off
     CHECK(!config_improvement("more_stations") && config_fix("find_jade"));
+    CHECK(menu_row_count() == 4);
     press(SDLK_UP);
     press(SDLK_RETURN);  // All on
-    CHECK(config_improvement("more_stations"));
+    CHECK(config_improvement("more_stations") && menu_row_count() == 6);
     changes[MENU_CHANGED_SWITCHES] = 0;
 
     // Fixes: a row per fix, all on; one off, then all on again. All off

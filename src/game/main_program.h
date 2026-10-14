@@ -20,6 +20,8 @@
 //   17 group control panel (16), T   34 alien talk, F
 //   18 destination map, F            35 death ending, 36 victory: Halt
 //                                    37 colony list (74), -
+//                                    39 route editor, T: the port's
+//                                       (game/routes.h), from 17
 // Ids 6, 9, 14, 15, 26, 27, 30, 31 and 38 are unused (command 7 opens the
 // empty screen 9, a dead end).
 //

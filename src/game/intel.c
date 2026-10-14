@@ -12,6 +12,7 @@
 #include "game/message.h"
 #include "game/planetinfo.h"
 #include "game/research.h"
+#include "game/routes.h"
 #include "game/surface.h"
 #include "game/system.h"
 
@@ -174,6 +175,7 @@ void Intel_SpaceBattleLost(int16_t system, int16_t planet)
     while (i <= ds.Game_GroupCount) {
         TGroup *g = Groups_At(0, i);
         if (g->Status < 3 && g->System == system && g->Planet == planet) {
+            Routes_BattleLost(i);  // port improvement (game/routes.h)
             if (system == 1 && planet == 5) {
                 Intel_DisbandGroup(0, i);
             } else {
@@ -329,6 +331,8 @@ static uint8_t *group_slot(TGroup *g, int t, int u)
 // 29b9:0b93
 void Intel_DisbandGroup(int16_t list, int16_t group)
 {
+    if (list == 0)
+        Routes_GroupDisbanded(group);  // port improvement (game/routes.h)
     if (list == 0) {
         TGroup *g = Groups_At(0, group);
         int16_t pf_index = Groups_FindPlanetForce(g->System, g->Planet, g->Moon);

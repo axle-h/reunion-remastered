@@ -8,6 +8,7 @@
 #include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
+#include "game/planetinfo.h"
 #include "game/system.h"
 
 // Routines missing from their units' headers.
@@ -15,7 +16,6 @@ void Message_ShowMessageNoLog(const char *text);                                
 int16_t Surface_CountBuildings(int16_t kind, int16_t system, int16_t planet,
                                int16_t moon, bool activeOnly);                        // 2ef2:2b1a
 void Surface_CountBuildingsByKind(int16_t system, int16_t planet, int16_t moon);      // 2ef2:2b9e
-void PlanetInfo_SelectCurBody(void);                                                  // 357b:3253
 
 #define group_at Groups_At
 #define sel_group Groups_Selected
@@ -70,6 +70,37 @@ int32_t Cargo_ItemsSpace(const TGroup *g)
     return (int32_t)sum;
 }
 
+// What a click on an ore row moves from the ship to a planet store holding
+// `store` of `cap`: all the ship has, 100 t while the left button is held,
+// no more than fills the store (less than nothing when it is over full, as
+// in the original).
+static int32_t ore_to_planet(int32_t have, int32_t store, int32_t cap, bool held)
+{
+    int32_t amount = have;
+    if (amount > 100 && held)
+        amount = 100;
+    uint32_t after = (uint32_t)store + (uint32_t)amount;
+    if ((int32_t)after > cap)
+        amount = (int32_t)((uint32_t)cap - (uint32_t)store);
+    return amount;
+}
+
+// The other way: what the planet has, 100 t while held, at most the ship's
+// room. The original then caps this ore's cargo slot (`slot` t aboard) at
+// the planet's storage `cap`. Port fix (game/fixes.h): the ship's room
+// alone.
+static int32_t ore_to_ship(int32_t have, int32_t room, int32_t slot, int32_t cap, bool held)
+{
+    int32_t amount = have;
+    if (amount > 100 && held)
+        amount = 100;
+    if (room < amount)
+        amount = room;
+    if (!fixes.cargo_planet_cap && (int32_t)((uint32_t)slot + (uint32_t)amount) > cap)
+        amount = (int32_t)((uint32_t)cap - (uint32_t)slot);
+    return amount;
+}
+
 // True when the ship is at a colony of ours whose store can be shown/used.
 static bool at_own_colony(const TGroup *g)
 {
@@ -101,13 +132,8 @@ void Cargo_CargoScreen(void)
             int slot = ds.Game_HotspotHit - 0x14;
             int32_t have = cargo_of(g, slot);
             if (have > 0) {
-                int32_t amount = have;
-                if (amount > 100 && ds.Mouse_HeldLeft)
-                    amount = 100;
-                uint32_t after = (uint32_t)store_of(ds.Cargo_Row) + (uint32_t)amount;
-                if ((int32_t)after > ds.Cargo_PlanetCap)
-                    amount = (int32_t)((uint32_t)ds.Cargo_PlanetCap
-                                       - (uint32_t)store_of(ds.Cargo_Row));
+                int32_t amount = ore_to_planet(have, store_of(ds.Cargo_Row), ds.Cargo_PlanetCap,
+                                               ds.Mouse_HeldLeft);
                 add_cargo(g, slot, (int32_t)(0u - (uint32_t)amount));
                 add_store(ds.Cargo_Row, amount);
                 ds.Cargo_ShipUsed -= (uint32_t)amount;
@@ -141,19 +167,9 @@ void Cargo_CargoScreen(void)
         if (ds.Cargo_Row < 7) {
             int32_t have = store_of(ds.Cargo_Row);
             if (have > 0) {
-                int32_t amount = have;
-                if (amount > 100 && ds.Mouse_HeldLeft)
-                    amount = 100;
                 int32_t room = (int32_t)((uint32_t)ds.Cargo_ShipCap - (uint32_t)ds.Cargo_ShipUsed);
-                if (room < amount)
-                    amount = room;
-                // The original then caps this ore's cargo slot at the planet's
-                // storage (Cargo::PlanetCap). Port fix (game/fixes.h): the ship's
-                // room alone.
-                int32_t slot = cargo_of(g, ds.Cargo_Row);
-                if (!fixes.cargo_planet_cap
-                    && (int32_t)((uint32_t)slot + (uint32_t)amount) > ds.Cargo_PlanetCap)
-                    amount = (int32_t)((uint32_t)ds.Cargo_PlanetCap - (uint32_t)slot);
+                int32_t amount = ore_to_ship(have, room, cargo_of(g, ds.Cargo_Row), ds.Cargo_PlanetCap,
+                                             ds.Mouse_HeldLeft);
                 add_cargo(g, ds.Cargo_Row, amount);
                 add_store(ds.Cargo_Row, (int32_t)(0u - (uint32_t)amount));
                 ds.Cargo_ShipUsed += (uint32_t)amount;
@@ -314,4 +330,39 @@ void Cargo_DrawCargoAmounts(void)
     Gfx_DrawTextF9(s, 5, 0xC1, 0x19);
     SDL_snprintf(s, sizeof s, "%s%d", Lang_Text("Storage space on planet: "), (int)ds.Cargo_PlanetCap);
     Gfx_DrawTextF9(s, 0x80, 0xC1, 0x1F);
+}
+
+int32_t Cargo_ShipRoom(const TGroup *g)
+{
+    uint32_t used = (uint32_t)Cargo_ItemsSpace(g);
+    for (int i = 1; i <= 6; i++)
+        used += (uint32_t)cargo_of(g, i);
+    return (int32_t)((uint32_t)Cargo_ShipCapacity(g) - used);
+}
+
+int32_t Cargo_MoveAllOre(TGroup *g, bool to_ship)
+{
+    bool home = g->System == 1 && g->Planet == 5 && g->Moon == 0;
+    // Longints of a packed record, as Cargo_Stores points at them.
+    uint8_t *stores = home ? (uint8_t *)ds.Game_HomeStock
+                           : (uint8_t *)PlanetInfo_BodyAt(g->System, g->Planet, g->Moon)->Stores;
+    int32_t cap = (int32_t)(uint16_t)Groups_PlanetStorage(g->System, g->Planet, g->Moon) * 1000;
+    int32_t room = Cargo_ShipRoom(g), moved = 0;
+    for (int i = 1; i <= 6; i++) {
+        int32_t store = rd32le(stores + (i - 1) * 4);
+        int32_t have = to_ship ? store : cargo_of(g, i);
+        if (have <= 0)
+            continue;
+        int32_t amount = to_ship ? ore_to_ship(have, room, cargo_of(g, i), cap, false)
+                                 : ore_to_planet(have, store, cap, false);
+        if (amount <= 0)
+            continue;  // a store over full gives nothing back
+        if (!to_ship)
+            amount = -amount;
+        add_cargo(g, i, amount);
+        wr32le(stores + (i - 1) * 4, (int32_t)((uint32_t)store - (uint32_t)amount));
+        room -= amount;
+        moved += amount < 0 ? -amount : amount;
+    }
+    return moved;
 }

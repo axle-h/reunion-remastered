@@ -340,12 +340,10 @@ static const uint8_t *icon_at(uint16_t offset)
     return ds.Groups_IconBuffer + offset;
 }
 
-// 2b8d:092b group name, location and (when full) the slot grid
-void Groups_DrawGroupPanel(bool full)
+void Groups_DrawGroupHeader(void)
 {
-    TGroup *g = Groups_Selected();
-    char t[256], loc[256], num[16];
-
+    const TGroup *g = Groups_Selected();
+    char t[256], loc[256];
     Gfx_DrawTextF9(pstr_get(t, sizeof t, Lang_Slot(&ds.Groups_TypeNames[g->Kind - 1])), 0xDF, 0x38,
                    0xD);
     Gfx_DrawTextFC(pstr_get(t, sizeof t, &g->Name), 0x18, 0x38, 0x11);
@@ -356,6 +354,15 @@ void Groups_DrawGroupPanel(bool full)
                                                                          : "";
     SDL_snprintf(loc, sizeof loc, "%s%s", prefix, t);
     Gfx_DrawTextF9(loc, 0xC, 0x43, 0x31);
+}
+
+// 2b8d:092b group name, location and (when full) the slot grid
+void Groups_DrawGroupPanel(bool full)
+{
+    TGroup *g = Groups_Selected();
+    char t[256], num[16];
+
+    Groups_DrawGroupHeader();
 
     if (full) {
         Mouse_HideCursor();

@@ -26,6 +26,9 @@ typedef struct MenuSwitch {
     const char *key;    // config key
     const char *label;  // at most 20 characters
     const char *help;   // at most 2 lines of 36 characters
+    // On, saves are in the port's format, which the DOS game can't load: the
+    // Improvements section says so under the switches.
+    bool port_saves;
 } MenuSwitch;
 
 typedef struct MenuHooks {

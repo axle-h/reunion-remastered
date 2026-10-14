@@ -10,6 +10,8 @@
 #include "game/groups.h"
 #include "game/lang.h"
 #include "game/mouse.h"
+#include "game/portcmd.h"
+#include "game/routes.h"
 #include "game/satellite.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -61,10 +63,12 @@ void ShipMove_GroupScreen(void)
     int16_t surf;
 
     if (ds.Game_ScreenEntered) {
-        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0)
+        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0) {
+            Routes_Order(ds.Game_SelGroup);  // port improvement (game/routes.h)
             Intel_SetGroupTarget(ds.Game_SelGroup, ds.Game_CurSystem,
                                  ds.Game_CurPlanet[ds.Game_CurSystem - 1],
                                  ds.Game_CurMoon[ds.Game_CurSystem - 1]);
+        }
         if (g->Status == 1 || g->Status == 2) {
             ds.Game_CurSystem = g->System;
             ds.Game_CurPlanet[ds.Game_CurSystem - 1] = g->Planet;
@@ -121,6 +125,7 @@ void ShipMove_GroupScreen(void)
             body = ds.Game_CurBody;
             if (body->InfoLevel < 6)
                 body->InfoLevel = 6;
+            Routes_Order(ds.Game_SelGroup);  // port improvement (game/routes.h)
             g->Status = (uint8_t)(3 - g->Status);
             ds.Game_HotspotHit = 0;
             Gfx_DrawStatusText("");
@@ -205,6 +210,11 @@ void ShipMove_GroupScreen(void)
         ds.Game_CurMoon[ds.Game_CurSystem - 1] = g->Moon;
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 7;
+    }
+    // Port improvement (game/routes.h): the route editor.
+    if (ds.Game_MenuCommand == CMD_ROUTE) {
+        ds.Game_ScreenSwitch = 1;
+        ds.Game_CurrentScreen = SCREEN_ROUTE;
     }
 }
 
@@ -319,6 +329,23 @@ void ShipMove_RedrawBackdrop(void)
     load_view_pic("planets\\nagy0", dest);
     Mouse_HideCursor();
     ShipMove_BlitViewport(dest);
+    Mouse_ShowCursor();
+    game_free(dest);
+}
+
+void ShipMove_RedrawView(void)
+{
+    const TGroup *g = Groups_Selected();
+    if (g->Status != 1) {
+        ShipMove_RedrawBackdrop();
+        return;
+    }
+    char name[32];
+    int16_t surf = ds.ShipMove_InRestrictedArea ? 12 : ds.Game_CurBody->SurfaceType;
+    uint8_t *dest = game_alloc(0xBCC0);
+    load_view_pic(nagy_name(name, surf), dest);
+    Mouse_HideCursor();
+    ShipMove_BlitViewport(dest + 0x35C0);
     Mouse_ShowCursor();
     game_free(dest);
 }

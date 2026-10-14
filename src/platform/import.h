@@ -19,7 +19,8 @@
 // folder's (REUNION.DEU), else its TEXT\MESSAGE.TXT's.
 //
 // The DOS game's saves (SAVE\SPIDYSAV.n, data/'s game first) are copied to
-// save/spidysav.n for the slots that are empty there. SAVE\SETUP.SPD is
+// save/spidysav.n for the slots that are empty there (no spidysav.n, nor a
+// save in the port's format, reunion.n). SAVE\SETUP.SPD is
 // not imported: the CD's says "no sound", and without one the game behaves
 // as the floppy's.
 #pragma once

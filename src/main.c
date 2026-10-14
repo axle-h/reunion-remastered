@@ -265,11 +265,11 @@ static void setup_config(void)
     static MenuSwitch fixes[CONFIG_MAX_SWITCHES], improvements[CONFIG_MAX_SWITCHES];
     int n = SDL_min(Fixes_Count, CONFIG_MAX_SWITCHES);
     for (int i = 0; i < n; i++)
-        fixes[i] = (MenuSwitch){Fixes_List[i].key, Fixes_List[i].label, Fixes_List[i].help};
+        fixes[i] = (MenuSwitch){Fixes_List[i].key, Fixes_List[i].label, Fixes_List[i].help, false};
     int m = SDL_min(Improvements_Count, CONFIG_MAX_SWITCHES);
     for (int i = 0; i < m; i++)
         improvements[i] = (MenuSwitch){Improvements_List[i].key, Improvements_List[i].label,
-                                       Improvements_List[i].help};
+                                       Improvements_List[i].help, Improvements_NeedsPortSaves(i)};
     menu_set_hooks(&(MenuHooks){
         .game_running = Options_GameRunning,
         .changed = menu_changed,

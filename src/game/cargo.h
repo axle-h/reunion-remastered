@@ -25,3 +25,12 @@ void Cargo_DrawCargoAmounts(void);
 // a ship (sum of unit count * Cargo_UnitSpace) and the space its items use.
 int32_t Cargo_ShipCapacity(const TGroup *g);
 int32_t Cargo_ItemsSpace(const TGroup *g);
+
+// Port addition (game/routes.h): the room left aboard g (capacity less its
+// items and ore).
+int32_t Cargo_ShipRoom(const TGroup *g);
+// Port addition (game/routes.h): what a right click on each ore row of the
+// screen moves, for group g docked at its body, without the screen: every
+// ore that fits from the planet's store to the ship (to_ship) or from the
+// ship to the store. Returns the tonnes moved.
+int32_t Cargo_MoveAllOre(TGroup *g, bool to_ship);

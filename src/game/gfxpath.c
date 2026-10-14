@@ -7,6 +7,7 @@
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/mouse.h"
+#include "game/portcmd.h"
 #include "game/sound.h"
 #include "game/system.h"
 
@@ -38,12 +39,23 @@ static inline void set_slot_id(int n, int16_t id)
     menu_slot(n)->Command = id;
 }
 
-// Slot n's caption := button label `id` (DS strings both; the caption is a
-// string[18]).
+// Slot n's caption := button label `id` (DS strings both, or the port's;
+// the caption is a string[18]).
 static void set_slot_label(int n, int16_t id)
 {
     char label[256];
-    pstr_set(&menu_slot(n)->Caption, 18, pstr_get(label, sizeof label, &ds.Ui_ButtonLabels[id]));
+    PortCmd_Label(id, label, sizeof label);
+    pstr_set(&menu_slot(n)->Caption, 18, label);
+}
+
+// Command id's icon into a cell; the port's commands have their own
+// (game/portcmd.h).
+static void draw_command_icon(int16_t id, uint8_t *cell)
+{
+    if (id >= CMD_ORIGINAL_COUNT)
+        PortCmd_DrawIcon(id, cell);
+    else
+        GfxPath_DrawIcon(ds.GfxPath_CommandIcon[id], cell);
 }
 
 static uint8_t *block_base(void)
@@ -87,9 +99,8 @@ static void draw_slot(uint16_t k, bool check_icon)
     uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
     int16_t id = slot_id(slot);
-    int8_t icon = ds.GfxPath_CommandIcon[id];
-    if (!check_icon || icon != 0)
-        GfxPath_DrawIcon(icon, cell);
+    if (!check_icon || id >= CMD_ORIGINAL_COUNT || ds.GfxPath_CommandIcon[id] != 0)
+        draw_command_icon(id, cell);
     set_slot_label(slot, id);
 }
 
@@ -107,14 +118,15 @@ void GfxPath_SetToolbarAndShow(int16_t screen)
     ds.Game_HotspotHit = 0;
 }
 
-// 3a1b:0030: the screen record's (Ui::Screens) IconCount and Icons.
+// 3a1b:0030: the screen record's (Ui::Screens, or the port's) IconCount
+// and Icons.
 void GfxPath_SetToolbar(int16_t screen)
 {
     if (screen == 1)
         ds.GfxPath_PageFlagB = ds.GfxPath_SavedPage;
     else
         ds.GfxPath_PageFlagB = 1;
-    const TScreenInfo *rec = &ds.Ui_Screens[screen - 1];
+    const TScreenInfo *rec = PortCmd_Screen(screen);
     int16_t count = (int8_t)rec->IconCount;
     for (int16_t i = 1; i <= count; i++)
         set_slot_id(i, rec->Icons[i - 1]);
@@ -163,7 +175,7 @@ void GfxPath_AddToolbarIcon(int16_t id)
     uint16_t k = (uint16_t)(slot - 1);
     uint8_t *cell = bar(cell_ofs(k));
     clear_cell(cell);
-    GfxPath_DrawIcon(ds.GfxPath_CommandIcon[id], cell);
+    draw_command_icon(id, cell);
     set_slot_label(slot, id);
     if (slot == 7) {
         draw_arrow(0x30, ARROW_NEXT);
@@ -293,7 +305,7 @@ void GfxPath_ShowScreenBackdrop(void)
 {
     uint8_t *buf = game_alloc(0xBCC0);
     char name[256], path[256];
-    pstr_get(name, sizeof name, &ds.Ui_Screens[ds.Game_CurrentScreen - 1].Name);
+    pstr_get(name, sizeof name, &PortCmd_Screen(ds.Game_CurrentScreen)->Name);
     SDL_snprintf(path, sizeof path, "grafika\\%s", name);
     Gfx_LoadPicScreen(path, buf, 0x97, Gfx_PalettePtr());
     Blit_CopyRect(buf, gfx_screen() + 0x3D40, 0x140, 0x97);

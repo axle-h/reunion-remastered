@@ -462,6 +462,20 @@ static void zoom_out(void)
     ui_settle();
 }
 
+static bool off_destination(void *unused)
+{
+    (void)unused;
+    return ui_screen() != SCR_DESTINATION;
+}
+
+// ABORT MOVE: back to the screen the map was opened from.
+static void abort_move(void)
+{
+    ui_toolbar("ABORT MOVE");
+    ui_wait_until(off_destination, nullptr, SCREEN_TIMEOUT);
+    ui_settle();
+}
+
 // A destination click refused with a box (closed by the wait after the
 // click at frame `since`): leave the screen.
 static bool destination_refused(uint64_t since)
@@ -469,15 +483,8 @@ static bool destination_refused(uint64_t since)
     ui_settle();
     if (ui_screen() != SCR_DESTINATION || !ui_box_seen("", since))
         return false;
-    ui_toolbar("ABORT MOVE");
-    ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
+    abort_move();
     return true;
-}
-
-static bool off_destination(void *unused)
-{
-    (void)unused;
-    return ui_screen() != SCR_DESTINATION;
 }
 
 // Clicks body hotspot `name` to pick it as the destination; the map then
@@ -497,9 +504,7 @@ static void click_destination(const char *name, UiClick how)
     }
 }
 
-typedef enum { PICK_REFUSED, PICK_DONE, PICK_HIDDEN } PickResult;
-
-static PickResult pick_destination(const char *system, const char *planet, const char *moon)
+UiPick ui_pick_destination(const char *system, const char *planet, const char *moon)
 {
     if (system && !pstr_is(&ds.Names_Systems[ds.Game_CurSystem - 1], system)) {
         zoom_out();
@@ -511,31 +516,30 @@ static PickResult pick_destination(const char *system, const char *planet, const
             play_fail("ui_launch: system %s not listed", system);
         ui_click_hotspot(j, UI_CLICK);
         if (destination_refused(play_frame()))
-            return PICK_REFUSED;
+            return UI_PICK_REFUSED;
     }
     if (!planet) {  // the sun: explore the system
         zoom_out();
         const THotspot *sun = Mouse_Hotspot(BODY_FIRST);
         if (ds.Mouse_HotspotCount < BODY_FIRST || sun->Cursor != BODY_FLAG || sun->Caption.len == 0) {
             play_log("ui_launch: the sun is not offered (system explored)");
-            ui_toolbar("ABORT MOVE");
-            ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
-            return PICK_REFUSED;
+            abort_move();
+            return UI_PICK_REFUSED;
         }
         ui_click_hotspot(BODY_FIRST, UI_CLICK);
-        return PICK_DONE;
+        return UI_PICK_DONE;
     }
     bool on_planet = zoomed() && body_hotspot(planet) == BODY_FIRST;
     if (!moon) {
         if (on_planet) {
             ui_click_hotspot(BODY_FIRST, UI_CLICK);
-            return PICK_DONE;
+            return UI_PICK_DONE;
         }
         zoom_out();
         if (body_hotspot(planet) == 0)
             play_fail("ui_launch: planet %s not on the map", planet);
         click_destination(planet, UI_CLICK_RIGHT);
-        return PICK_DONE;
+        return UI_PICK_DONE;
     }
     // The planets move every game hour: a click aimed just before one can
     // zoom in on another, so the zoom is checked and tried again.
@@ -554,12 +558,11 @@ static PickResult pick_destination(const char *system, const char *planet, const
         // (where it was last drawn) does nothing.
         play_log("ui_launch: moon %s of %s not on the map%s", moon, planet,
                  on_planet ? "" : " (no zoom on the planet)");
-        ui_toolbar("ABORT MOVE");
-        ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT);
-        return on_planet ? PICK_REFUSED : PICK_HIDDEN;
+        abort_move();
+        return on_planet ? UI_PICK_REFUSED : UI_PICK_HIDDEN;
     }
     click_destination(moon, UI_CLICK);
-    return PICK_DONE;
+    return UI_PICK_DONE;
 }
 
 // The destination screen opened, or a box (closed by the wait) refused it.
@@ -632,9 +635,9 @@ static LaunchResult launch_once(const char *group, const char *system, const cha
         SDL_snprintf(line + SDL_strlen(line), sizeof line - SDL_strlen(line), "%s'%s'", i ? " " : "",
                      bodies[i]);
     play_log("destination map: %s", line);
-    PickResult pick = pick_destination(system, planet, moon);
-    if (pick != PICK_DONE)
-        return pick == PICK_HIDDEN ? LAUNCH_HIDDEN : LAUNCH_REFUSED;
+    UiPick pick = ui_pick_destination(system, planet, moon);
+    if (pick != UI_PICK_DONE)
+        return pick == UI_PICK_HIDDEN ? LAUNCH_HIDDEN : LAUNCH_REFUSED;
     if (!ui_wait_screen(SCR_GROUP, SCREEN_TIMEOUT))
         play_fail("ui_launch: no way back to the control panel");
     char loc[128];

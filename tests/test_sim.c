@@ -507,6 +507,7 @@ static void test_more_stations(void)
         ds.Game_CurMoon[0] = 0;
         ds.Game_CurrentScreen = 0x11;
         ds.Game_GroupCount = 1;
+        ds.Game_SelGroup = 1;
         ds.Game_SelGroup0 = 1;
         TGroup *g = Groups_At(0, 1);
         SDL_memset(g, 0, sizeof *g);

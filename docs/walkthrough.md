@@ -75,7 +75,8 @@ Standing orders for the whole game:
    - Build 9 Mines plus a Spaceport in every colony (Apollo counts its Miner
      station), and fill them with droids.
    - Build many trade ships. The guide uses ~50, which carry 100k t per trip.
-   - Haul ore home regularly, mainly Energon, Raenium and Texon.
+   - Haul ore home regularly, mainly Energon, Raenium and Texon. (In the
+     port a trade route does it on its own: `improvements.trade_routes`.)
 3. Meeting 1: **send the scientist** (gives Trade ship).
 4. Meeting 2: **buy the device** (16,000; gives Hyperspace drive).
 5. Meeting 3: **agree to help**. You get Hunter and Laser cannon. Buy ~20

@@ -13,9 +13,22 @@ const SwitchInfo Improvements_List[] = {
     {"repeat_build", "Repeat build (Shift)",
      "Shift+click places a building and stays in build mode for another.",
      &improvements.repeat_build},
+    {"trade_routes", "Trade routes",
+     "Trade groups haul ore home on routes. Saves then won't load in DOS.",
+     &improvements.trade_routes},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);
+
+bool Improvements_NeedsPortSaves(int i)
+{
+    return Improvements_List[i].value == &improvements.trade_routes;
+}
+
+bool Improvements_PortSaves(void)
+{
+    return improvements.trade_routes;
+}
 
 void Improvements_Init(bool scripted)
 {

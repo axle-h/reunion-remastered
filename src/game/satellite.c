@@ -3,6 +3,7 @@
 #include "game/groups.h"
 #include "game/improvements.h"
 #include "game/lang.h"
+#include "game/portcmd.h"
 #include "game/system.h"
 
 // Routines missing from their units' headers.
@@ -168,19 +169,25 @@ void Satellite_AcquireBody(void)
     }
 }
 
-// 28cd:0367: toolbar for screen 0x11
+// 28cd:0367: toolbar for screen 0x11. Port improvement (game/routes.h):
+// a trade group's ROUTE before PLANET MAIN, or after TRANSFER in flight.
 void Satellite_SetupGroupScreenMenu(void)
 {
     int16_t hit = ds.Game_HotspotHit;
     const TGroup *g = Groups_Selected();
+    bool route = improvements.trade_routes && g->Kind == 2 && ds.Game_GroupList == 0;
     bool any;
     GfxPath_SetToolbar(0x11);
     if (g->Kind == 2 || g->Kind == 3)
         GfxPath_AddToolbarIcon(3);
     if (g->Status == 1 || g->Status == 2) {
         GfxPath_AddToolbarIcon(0x2E);
+        if (route)
+            GfxPath_AddToolbarIcon(CMD_ROUTE);
         GfxPath_AddToolbarIcon(0x29);
         Satellite_AddBodyActionItems(g->System, g->Planet, g->Moon, &any);
+    } else if (route) {
+        GfxPath_AddToolbarIcon(CMD_ROUTE);
     }
     GfxPath_ShowToolbar();
     ds.Game_HotspotHit = hit;

@@ -7,6 +7,18 @@
 // Where the port keeps files: saves are save/spidysav.<n> in the player's
 // folder (platform/playerdir.h), where the import puts the DOS game's saves
 // too. save\init comes from the game data.
+//
+// The port's format. While an improvement keeps state the DOS save has no
+// room for (Improvements_PortSaves), or the game holds some (a trade route,
+// game/routes.h), a save is written as save/reunion.<n> instead: the DOS
+// game never opens it (its slot shows "Empty" there and can be saved over),
+// where a different layout under its own name would load as garbage. The
+// file: "REUNION" 1Ah, a version word, the slot name, the DOS blocks in
+// their order with the building table cut to BuildingCount records, then
+// the routes (their count and record size, then the records). Writing a
+// slot in one format deletes its file in the other. The disk screen lists
+// both and loads either, whatever the switches say; a version newer than
+// the port knows is listed but refused.
 #pragma once
 
 #include <stdint.h>
@@ -23,9 +35,11 @@ void SaveLoad_SetSaveDir(const char *dir);
 // false if the file could not be opened or a block failed (the original stops
 // with I/O error 100 and leaves the state half-loaded).
 bool SaveLoad_Transfer(bool save);
-// Port addition (test hook): the same with the file at `path`; `name` holds
-// the header (the slot name as string[19]).
+// Port addition (test hook): the same with the file at `path` in the DOS
+// format; `name` holds the header (the slot name as string[19]).
 bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save);
+// Port addition: a save now is written in the port's format.
+bool SaveLoad_PortFormat(void);
 
 // 1a3e:0008
 void SaveLoad_DiskScreen(void);

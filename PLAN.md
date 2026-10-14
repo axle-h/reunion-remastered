@@ -30,6 +30,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
 | Bugs of the original | A bug that changes play gets a switch in `src/game/fixes.h` (all on by default); a harmless one is kept and described where the code reproduces it | With every fix off the port plays like the original, which the golden hashes check |
 | Improvements | Changes to the game's design are switches in `src/game/improvements.h` (port menu, Improvements; `[improvements]` in `reunion.ini`), on by default. The Fixes section's "All off (original)" turns them off too | Scripted runs (autopilot, `--replay`, the tests) play with every improvement off, so the golden hashes, the playthrough and the DOS-save tests still prove the original's behaviour; a test of one switches it on |
+| Saves | The DOS format unless an improvement needs more: then `save/reunion.<n>`, the DOS blocks plus the port's records behind a magic and a version (`src/game/saveload.h`) | The DOS game never opens that name, where another layout under `spidysav.<n>` would load as garbage; a slot has one file, and the disk screen lists both |
 
 ## Source
 
@@ -70,7 +71,8 @@ The port is complete and the game can be won in it.
 - **Improvements** (`src/game/improvements.h`): More Miner stations, up
   to four on a body, mining every hour and kept by a colony founded there;
   Repeat build, Shift+click on the surface places a building and stays in
-  build mode.
+  build mode; Trade routes, a trade group hauls ore home on its own along
+  up to six stops (`src/game/routes.h`), edited on a screen of the port's.
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -80,7 +82,7 @@ The port is complete and the game can be won in it.
   the 34 bugs found in the port while playing it, 33 are fixed and one
   turned out to be the original's behaviour; their write-ups are in git
   history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 90 ctest tests pass on the release build, the full
+- **Tests:** all 92 ctest tests pass on the release build, the full
   playthrough (`test_play_game`, and `_german`, `_french`, `_italian` from
   the CD's ISO), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -103,128 +105,7 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-**Saves.** An improvement keeps its state in fields the original already
-has where it can, so the save stays in the DOS format and still loads in
-the original, which then plays it by its own rules. Trade routes (1.1) and
-the building table past 1,000 (1.3) have no room there, so they break
-with the DOS format:
-
-- **When.** A save is written in the port's own format while
-  `trade_routes` or `no_building_limit` is on, or while the game holds
-  something the DOS format can't (a route, more than 1,000 buildings,
-  e.g. after loading such a save with both switches off). Otherwise it is
-  the DOS format, as now.
-- **A clean break.** The original takes a slot as used if
-  `save\spidysav.<n>` exists and reads it as raw blocks with no checks, so
-  a different layout under that name would load garbage or stop on an I/O
-  error. The port's format therefore goes in `save/reunion.<n>`, which the
-  original never opens: there the slot shows "Empty" and can be saved
-  over. Writing a slot in one format deletes the slot's file in the
-  other, so a slot has one file. The disk screen lists and loads both.
-- **The format.** A magic and a version number, the slot name, the DOS
-  blocks in their order with the building table as its true count and
-  records, then the routes. The version lets later improvements add to
-  it; a newer version than the port knows is listed but refused on load.
-- **Loading** a `reunion.<n>` save works whatever the switches say. With
-  `no_building_limit` off, the buildings past 1,000 stay but no new one
-  is allowed; with `trade_routes` off, routes are kept but not flown.
-- **Warning.** The F1 menu's Improvements section shows, while either switch is on:
-  "Saves made now can't be loaded by the DOS game." The two switches'
-  own descriptions say it too.
-- **Test.** Each switch on writes `reunion.<n>` and deletes
-  `spidysav.<n>`, and both off does the reverse; a save that still holds
-  routes or more than 1,000 buildings is written as `reunion.<n>` with
-  both off; save and load in the port format restores everything; an
-  unknown version is refused; the DOS-save tests are unchanged.
-
-#### 1.1 Trade routes
-
-Ore is hauled home by hand, group by group, for the whole game. Switch
-`trade_routes`: a trade group can be given a route and then flies it on
-its own.
-
-- **A route** is a list of up to 6 pickup stops (bodies the player owns)
-  and a drop-off, New Earth. A loop: fly to each stop in order, dock and
-  load every ore there that fits; then fly to New Earth, dock and unload
-  all of it; start again. If the group is full at any stop, it goes
-  straight to New Earth, unloads and starts again from the first stop. A
-  stop with nothing to load is passed by without docking.
-- **Docking takes time.** Loading at a stop and unloading at New Earth
-  each take 5 game hours, during which the group stays docked. They are
-  counted on the game clock (an hour is 101 frames, about 1.4 s), so they
-  pause when the clock stops, follow the clock button, and save and replay
-  exactly.
-- **Rules stay the game's:** the group needs a hired pilot whose tier
-  reaches every stop, a Galleon to leave a system, and travel takes the
-  usual time. Loading and unloading use the cargo screen's own booking
-  (`Cargo_CargoScreen`, `Cargo_ShipCapacity`) rather than clicks, and
-  unloading stops at New Earth's storage: what doesn't fit stays aboard
-  and the route goes on.
-- **ROUTE button.** A trade group's cockpit toolbar
-  (`Satellite_SetupGroupScreenMenu`) gets ROUTE just before PLANET MAIN.
-  In orbit that pushes PLANET MAIN and the body's actions to the
-  toolbar's second page; in flight ROUTE follows TRANSFER.
-- **The editor** is a port screen in the equipment screen's frame
-  (`BEOSZTAS`): its header (group name, type, the arrows to the previous
-  and next group) and location line as there. Code paints a list over the
-  unit grid (Nr and Stop, six rows 10 pixels apart like the grid's),
-  copies the texture beside the footer's "Stock:" label over it, and
-  writes two footer lines: "Unload at" New Earth, and the route's state
-  (not running, flying to stop n, loading at stop n with the hours left,
-  or ended and why).
-  - Clicking a row selects it, drawn in the cargo screen's highlight
-    (`Gfx_DrawTextFC`). The equipment screen's red arrows (`BENYIL`) move
-    the selected stop up or down, each shown only when that move is
-    possible. While the route runs, the stop it is heading for has its
-    number drawn in colour F6, the font having no marker character.
-  - Toolbar: BACK TO M.SCREEN, CONTROL PANEL, then ADD STOP, REMOVE STOP
-    and START ROUTE (the OK icon) while the route is stopped, and only
-    END ROUTE (the ABORT icon) while it runs: a route is ended before it
-    is edited. As in the original, a button that can't act isn't shown
-    (no REMOVE STOP or START ROUTE without stops).
-  - ADD STOP opens the destination screen (`Launch_DestinationScreen`)
-    unchanged. A click on a body adds it after the selected stop, or at
-    the end, and returns; ABORT returns without one. Refused with a
-    message box, as the original refuses a move: not the player's colony,
-    out of the pilot's reach (the original's text), already on the route,
-    route full.
-- **New toolbar commands** take ids past the original's 78
-  (`Ui_ButtonLabels` and `GfxPath_CommandIcon` are DS arrays of that
-  size), with their labels and icons in a port table that `GfxPath`
-  draws from.
-- **Icons** are built at run time from the player's `ICON.ALL`, so no
-  pixels of the original are compiled in (Decisions, Distribution). ADD
-  STOP and REMOVE STOP are PLANET INFO with its "?" erased and a + in the
-  "?"'s greens or a − in END TALK's reds drawn by code. ROUTE is PLANET
-  INFO's planet and ADD MINER STATION's small planet on a loop drawn in
-  those greens. START and END ROUTE use OK and ABORT, as OK, BUILD IT and
-  ABORT MOVE do.
-- **The groups list** gives a group on a route a green slot square (red
-  stays the selected group's), and the info panel adds "Route: to stop
-  n/m".
-- **Notifications.** A route's traffic is silent: arriving, docking,
-  loading and unloading add no log entry, sample or flash, where a
-  group's arrival otherwise does all three
-  (`Message_AddMessageLogEntry`), and the log holds only 15 entries.
-- **It stops** when the player gives the group any other order, the
-  group is disbanded or loses a battle, a stop is lost to an enemy, or
-  the pilot can no longer reach a stop. The editor's footer says which
-  and why, and one log entry is added (sample and flash, no box).
-- **Where it lives.** Routes are stepped where groups arrive
-  (`Sim_ProcessTravellingGroups`) and their docking hours each game hour
-  after it. The DOS records have no room for them, so they are saved in
-  the port's format (Saves, above), the hours left included; a route
-  names its group by index and must follow it when the list shifts after
-  a disband. New texts (captions, footer lines, refusals, log entries)
-  go in `lang_texts.c` with German, French and Italian.
-- **Test.** A route of two stops runs several loops, each stop and New
-  Earth docked for 5 hours; a full group goes home early; New Earth full;
-  each stop condition, with its one log entry and none for routine
-  traffic; save and load mid-loading keep the route and its hours. The
-  editor is built through clicks on the playthrough fixture: add, move,
-  remove, start, end, and the refusals.
-
-#### 1.2 Playing with the keyboard only
+#### 1.1 Playing with the keyboard only
 
 The original is played with the mouse; the keyboard is used only for
 typing names. Switch `keyboard_play`: every screen can be played with
@@ -243,7 +124,7 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 1.3 No building limit
+#### 1.2 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -260,25 +141,32 @@ Switch `no_building_limit`:
   (the surface's building layer holds `uint16_t`), so the real cap is
   32,767; refuse at that as the fix refuses at 1,000. Every `< 1000` /
   `> 999` test goes through one limit function.
-- **Saves** are in the port's format while the switch is on (Saves,
-  above), with the whole table. The DOS format can't hold more than
-  1,000: its block is 14,000 bytes, and a larger `Game_BuildingCount`
-  would make the original read past the table into the charset.
+- **Saves** are in the port's format (`src/game/saveload.h`) while the
+  switch is on (`Improvements_NeedsPortSaves`) or the game holds more than
+  1,000 buildings (as `SaveLoad_PortFormat` does for routes), with the
+  whole table: the format already writes the table to its count. The DOS
+  format can't hold more than 1,000: its block is 14,000 bytes, and a
+  larger `Game_BuildingCount` would make the original read past the table
+  into the charset. A port save loaded with the switch off keeps the
+  buildings past 1,000 but allows no new one. The port menu's warning
+  (`MenuSwitch.port_saves`) and the switch's description say saves won't
+  load in DOS.
 - **Check** every loop over the table for a fixed bound, and the code
   that holds a building index in a byte. Deleting a building
   (`Surface_DeleteBuilding`) shifts the later records down; the side file
   needs nothing for that, as it is written from the table.
 - **Test.** Build past 1,000, save, load, and check every building and the
-  count came back; with the switch off, the 1,001st is refused.
+  count came back; with the switch off, the 1,001st is refused; a save
+  holding more than 1,000 is written as `reunion.<n>` with the switch off.
 
-#### 1.4 Smaller candidates
+#### 1.3 Smaller candidates
 
 Each needs a short spec before work starts.
 
 | Idea | Why |
 |---|---|
 | Autosave before every battle and alien conversation, into a slot of its own | The walkthrough's standing order is to save before each, as results are random. The original has 12 slots; the autosave must not take one of the player's |
-| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still. Trade routes (1.1) leave ore aboard silently when New Earth is full, so it covers them too |
+| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still. Trade routes (`src/game/routes.h`) leave ore aboard silently when New Earth is full, so it covers them too |
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
 

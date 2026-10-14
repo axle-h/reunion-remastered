@@ -5,10 +5,12 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/improvements.h"
 #include "game/lang.h"
 #include "game/le.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
+#include "game/routes.h"
 #include "game/satellite.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -150,6 +152,7 @@ void ShipInfo_ShipInfoScreen(void)
         ds.Game_SelGroup = ds.Game_ShownGroupCount;
         ds.Game_SelGroup0 = ds.Game_ShownGroupCount;
         Groups_ClearGroup();
+        *Routes_Of(ds.Game_SelGroup) = (Route){};  // port improvement (game/routes.h)
         ds.Game_ScreenSwitch = 1;
         ds.Game_CurrentScreen = 0x15;
     }
@@ -363,6 +366,14 @@ void ShipInfo_DrawGroupInfo(void)
     Mouse_HideCursor();
     Blit_FillRect(199, 0x73, 0x72, 0x4D, 0x40);
     Mouse_ShowCursor();
+    // Port improvement (game/routes.h): the route's progress, under the
+    // location.
+    if (improvements.trade_routes) {
+        char route[S30] = "";
+        if (ds.Game_GroupList == 0)
+            Routes_PanelText(ds.Game_SelGroup, route, sizeof route);
+        Gfx_DrawTextF9(route, 0xCA, 0x6C, 0x13);
+    }
     int16_t y = 0x74;
     // The original uses the global SlotCategory as its loop counter; it ends at 4.
     for (ds.Groups_SlotCategory = 1;; ds.Groups_SlotCategory++) {
@@ -460,6 +471,31 @@ static void marker(uint16_t sprite_ofs, uint8_t *seg, uint16_t base)
     Mouse_ShowCursor();
 }
 
+// Port improvement (game/routes.h): a group on a route has a green square
+// where the others have the unlit one: the selection's red one in the
+// toolbar's greens.
+static void route_marker(uint8_t *seg, uint16_t base)
+{
+    uint8_t green[6 * 7];
+    for (int y = 0; y < 6; y++)
+        for (int x = 0; x < 7; x++) {
+            uint8_t c = ds.ShipInfo_Sprites[MARKER_ON + y * 320 + x];
+            green[y * 7 + x] = c == 0x61 || c == 0x63 ? 0x1E : c == 0x65 || c == 0x66 ? 0x1F
+                               : c == 0x68                ? 0x20
+                                                          : c;
+        }
+    uint16_t row = slot_row(ds.Game_SelGroup), col = slot_col(ds.Game_SelGroup);
+    Mouse_HideCursor();
+    Blit_CopyRectStrided(green, seg + (uint16_t)(base + (row * 0x10) * 320 + 5 + col * 0x30), 7, 6,
+                         7, 320);
+    Mouse_ShowCursor();
+}
+
+static bool on_route(void)
+{
+    return ds.Game_GroupList == 0 && ds.Game_SelGroup != 0 && Routes_Running(ds.Game_SelGroup);
+}
+
 // 26fe:10e8 / 1147 (screen) and 11a6 / 1209 (off-screen copy)
 void ShipInfo_DrawSelectionMarker(void)
 {
@@ -468,7 +504,10 @@ void ShipInfo_DrawSelectionMarker(void)
 
 void ShipInfo_EraseSelectionMarker(void)
 {
-    marker(MARKER_OFF, gfx_screen(), 0x41 * 320);
+    if (on_route())
+        route_marker(gfx_screen(), 0x41 * 320);
+    else
+        marker(MARKER_OFF, gfx_screen(), 0x41 * 320);
 }
 
 void ShipInfo_DrawSelectionMarkerBuffered(void)
@@ -478,7 +517,21 @@ void ShipInfo_DrawSelectionMarkerBuffered(void)
 
 void ShipInfo_EraseSelectionMarkerBuffered(void)
 {
-    marker(MARKER_OFF, ds.ShipInfo_Buffer, ROW49 + 0x10 * 320);
+    if (on_route())
+        route_marker(ds.ShipInfo_Buffer, ROW49 + 0x10 * 320);
+    else
+        marker(MARKER_OFF, ds.ShipInfo_Buffer, ROW49 + 0x10 * 320);
+}
+
+void ShipInfo_RedrawGroup(int16_t group)
+{
+    if (ds.Game_GroupList != 0 || group > ds.Game_ShownGroupCount)
+        return;
+    ShipInfo_DrawGroupIcon(icon_of(Groups_At(0, group)), group);
+    if (ds.Game_SelGroup == group) {
+        Satellite_UpdateShipInfoMenu();
+        ShipInfo_DrawGroupInfo();
+    }
 }
 
 // 26fe:1278: hotspot 1 = Change mode, 2 = unused, 3..34 = icons, 35.. = names

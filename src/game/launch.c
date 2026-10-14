@@ -3,6 +3,7 @@
 #include "game/groups.h"
 #include "game/intel.h"
 #include "game/lang.h"
+#include "game/routes.h"
 #include "game/sound.h"
 #include "game/system.h"
 
@@ -36,8 +37,10 @@ void Launch_MapScreen(void)
     uint16_t hit;
 
     if (ds.Game_ScreenEntered) {
-        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0)
+        if (ds.Game_PrevScreen == 0x12 && ds.Launch_DestinationActive == 0) {
+            Routes_Order(ds.Game_SelGroup);  // port improvement (game/routes.h)
             Intel_SetGroupTarget(ds.Game_SelGroup, ds.Game_CurSystem, CUR_PLANET, CUR_MOON);
+        }
         int16_t p = ds.Game_PrevScreen;
         if ((p != 8 && p != 0x11 && p != 0x12 && p != 0x13 && p != 0x14 && p != 0x15 && p != 0x16
              && p != 0x1D && p != 0x1F && p != 0x20)

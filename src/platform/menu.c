@@ -41,7 +41,7 @@ typedef enum : int {
 static const char *const SECTION_NAMES[SECTIONS] = {"Cheats", "Sound", "Video", "Game",
                                                     "Improvements", "Fixes", "System"};
 
-typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION } RowKind;
+typedef enum : int { ROW_TOGGLE, ROW_CHOICE, ROW_ACTION, ROW_NOTE } RowKind;
 
 typedef enum : int {
     R_FREEZE_MONEY,
@@ -65,6 +65,7 @@ typedef enum : int {
     R_IMPORT,
     R_RESTART,
     R_QUIT,
+    R_NOTE,
     R_IMPROVEMENT,  // + the improvement's index
     R_FIX = R_IMPROVEMENT + CONFIG_MAX_SWITCHES,  // + the fix's index
 } RowId;
@@ -233,10 +234,17 @@ static void build_rows(void)
     case SEC_IMPROVEMENTS:
         add(ROW_ACTION, R_IMPROVEMENTS_ON, "All on", "Changes to the original game's design.");
         add(ROW_ACTION, R_IMPROVEMENTS_OFF, "All off", "The original's design. The fixes stay as they are.");
+        bool port_saves = false;
         for (int i = 0; i < hooks.improvement_count && row_count < MAX_ROWS; i++) {
             const MenuSwitch *f = &hooks.improvements[i];
             r = add(ROW_TOGGLE, R_IMPROVEMENT + i, f->label, f->help);
             r->on = config_improvement(f->key);
+            port_saves |= r->on && f->port_saves;
+        }
+        if (port_saves && row_count + 2 <= MAX_ROWS) {
+            static const char warning[] = "Saves made now can't be loaded by the DOS game.";
+            add(ROW_NOTE, R_NOTE, "Saves made now can't be", warning)->enabled = false;
+            add(ROW_NOTE, R_NOTE, "loaded by the DOS game.", warning)->enabled = false;
         }
         break;
     case SEC_FIXES:
@@ -632,6 +640,9 @@ static void draw_row(SDL_Renderer *r, const Row *row, float y, bool focused)
         SDL_snprintf(buf, sizeof buf, "> %s", row->label);
         panel_text(r, ROW_X, y, buf);
         break;
+    case ROW_NOTE:
+        panel_text(r, ROW_X, y, row->label);
+        break;
     case ROW_CHOICE:
         panel_text(r, ROW_X, y, row->label);
         SDL_snprintf(buf, sizeof buf, "<%s>", row->value);
@@ -716,6 +727,8 @@ const char *menu_row_text(int row)
         SDL_snprintf(row_text, sizeof row_text, "[%c] %s", r->on ? 'x' : ' ', r->label);
     else if (r->kind == ROW_CHOICE)
         SDL_snprintf(row_text, sizeof row_text, "%s <%s>", r->label, r->value);
+    else if (r->kind == ROW_NOTE)
+        SDL_strlcpy(row_text, r->label, sizeof row_text);
     else
         SDL_snprintf(row_text, sizeof row_text, "> %s", r->label);
     return row_text;

@@ -27,6 +27,7 @@
 #include "game/planetinfo.h"
 #include "game/protect.h"
 #include "game/research.h"
+#include "game/routes.h"
 #include "game/satellite.h"
 #include "game/shipinfo.h"
 #include "game/shipmove.h"
@@ -1058,7 +1059,9 @@ void Sim_ProcessTravellingGroups(void)
             PlanetInfo_GetBodyFullName(body, sizeof body, g->System, g->Planet, g->Moon);
             SDL_snprintf(t, sizeof t, "%s%s%s %s", name, Lang_Text(" arrived to "),
                          system_name(sys, g->System), body);
-            Message_AddMessageLogEntry(2, t, "message");
+            // Port improvement (game/routes.h): a route's arrivals are silent.
+            if (!Routes_Running(i))
+                Message_AddMessageLogEntry(2, t, "message");
             g->Status = 2;
             arrived = true;
         }

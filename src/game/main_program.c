@@ -35,10 +35,12 @@
 #include "game/options.h"
 #include "game/planetinfo.h"
 #include "game/planetlist.h"
+#include "game/portcmd.h"
 #include "game/protect.h"
 #include "game/pub.h"
 #include "game/rawtext.h"
 #include "game/research.h"
+#include "game/routes.h"
 #include "game/satellite.h"
 #include "game/saveload.h"
 #include "game/shipinfo.h"
@@ -61,10 +63,10 @@
 #define CUR_MOON(s) ds.Game_CurMoon[(s) - 1]
 #define CUR_SYS ds.Game_CurSystem
 
-// Ui::Screens[screen].
-static inline TScreenInfo *screen_info(int16_t screen)
+// Ui::Screens[screen], or the port's record (game/portcmd.h).
+static inline const TScreenInfo *screen_info(int16_t screen)
 {
-    return &ds.Ui_Screens[screen - 1];
+    return PortCmd_Screen(screen);
 }
 
 static inline TBody *cur_body(void)
@@ -250,6 +252,7 @@ static void startup(void)
     ds.Sound_SampleBuf = 0;
     ds.TextFile_InputActive = 0;
     SaveLoad_LoadInit();
+    Routes_Reset();  // port improvement (game/routes.h)
     if (ds.Game_StartChoice == 2) {
         ds.Game_PrevScreen = 1;
         ds.Game_CurrentScreen = 12;
@@ -282,6 +285,7 @@ static void advance_hour(bool held)
     Sim_UpdateColonySetups();
     Sim_MineAllBodies();
     Sim_ProcessTravellingGroups();
+    Routes_Hour();  // port improvement (game/routes.h)
     Sim_CheckEnemyAttacks();
     Sim_ProcessPubTimers();
     ds.Game_Ticks = 0;
@@ -562,6 +566,8 @@ static void free_left_screen_buffers(void)
     }
     if (leaving(37))
         game_free(ds.PlanetList_Entries);
+    if (leaving(SCREEN_ROUTE))
+        Routes_LeaveScreen();
 }
 
 // --- Screen 20: planet surface ---------------------------------------------------
@@ -1813,6 +1819,10 @@ static void dispatch(void)
     }
     if (on(37))
         screen_planet_list();
+    if (on(SCREEN_ROUTE)) {
+        ds.Game_ClockRunning = 1;
+        Routes_RouteScreen();
+    }
 }
 
 // --- The loop ----------------------------------------------------------------------
@@ -1893,7 +1903,7 @@ void Game_Main(void)
                 if (ds.Game_MenuCommand != 0) {
                     char sfx[256];
                     if (ds.Game_SoundFx == 2) {
-                        pstr_get(sfx, sizeof sfx, &ds.Ui_ButtonSounds[ds.Game_MenuCommand - 1]);
+                        PortCmd_Sound(ds.Game_MenuCommand, sfx, sizeof sfx);
                         Sound_PlayButtonSfx(sfx);
                     } else
                         Sound_PlayButtonSfx("x");

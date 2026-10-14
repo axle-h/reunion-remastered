@@ -181,11 +181,15 @@ the original in a few places, each commented in the code:
 - **Settings** (`src/platform/config.h`): `reunion.ini`. A fix or an
   improvement it doesn't list is on. Tests and scripted runs never read or
   write it: they play the original's game with every fix on and every
-  improvement off. Saves carry no port state: they are byte for byte the
-  original's format.
+  improvement off. Saves carry no settings.
 - **Improvements** (`src/game/improvements.h`): changes to the game's
   design, each a switch in the port menu like the fixes, kept in fields
-  the DOS saves already have.
+  the DOS saves already have where they can. Trade routes
+  (`src/game/routes.h`) can't: a save holding them is in the port's own
+  format, `save/reunion.<n>` (`src/game/saveload.h`); otherwise saves are
+  byte for byte the original's. The route editor is the port's own screen
+  39, with toolbar commands past the original's 77
+  (`src/game/portcmd.h`).
 - **Importing the game data** (`src/platform/import.h`): the player's copy
   (a folder, a ZIP or an ISO image, `src/platform/source.h`) is checked
   against the list of files the port loads (`src/platform/gamedata.h`)

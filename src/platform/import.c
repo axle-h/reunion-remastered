@@ -298,7 +298,11 @@ static void copy_saves(Source *src, const Game *games, int game_count, const cha
         if (!sf)
             continue;
         SDL_asprintf(&to, "%s/spidysav.%d", dir, n);
-        if (to && SDL_GetPathInfo(to, nullptr)) {
+        char *port = nullptr;  // a save in the port's format has the slot too (game/saveload.h)
+        SDL_asprintf(&port, "%s/reunion.%d", dir, n);
+        bool taken = port && SDL_GetPathInfo(port, nullptr);
+        SDL_free(port);
+        if (to && (taken || SDL_GetPathInfo(to, nullptr))) {
             r->save_skipped[n] = true;
         } else if (to) {
             size_t size = 0;

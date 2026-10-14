@@ -14,6 +14,9 @@ void ShipMove_SetupGroupScreenHotspots(void);
 void ShipMove_InitOrbitView(void);
 void ShipMove_InitDockView(int16_t surfaceType);
 void ShipMove_RedrawBackdrop(void);
+// Port addition (game/routes.h): the selected group's dock or orbit view at
+// once, as the screen's set-up draws it, when a route docked or launched it.
+void ShipMove_RedrawView(void);
 // 22ca:0bbc / 0fd3
 void ShipMove_LaunchAnimation(int16_t surfaceType);
 void ShipMove_DockingAnimation(int16_t surfaceType);

@@ -42,6 +42,9 @@ void Groups_NewGroupScreen(void);
 void Groups_LoadGroupsGfx(void);
 // 2b8d:092b
 void Groups_DrawGroupPanel(bool full);
+// Its first part: the selected group's type, name and location line (the
+// route editor's header too, game/routes.h).
+void Groups_DrawGroupHeader(void);
 // 2b8d:11bf
 void Groups_SetupGroupsHotspots(void);
 // 2b8d:15ec / 1659
