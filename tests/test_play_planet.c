@@ -7,6 +7,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/improvements.h"
 #include "platform/config.h"
 #include "platform/fs.h"
 #include "play/play.h"
@@ -264,6 +265,89 @@ static void check_fixes(bool on)
     config_set_fix("building_limit", true);
 }
 
+// Improvement (game/improvements.h, repeat_build): Derricks on New Earth
+// with Shift+clicks, with the switch on and then off. Test setup switches it
+// on (scripted runs play without improvements) and sets the credits, so
+// this run is no proof.
+static struct {
+    bool started, first, kept_first, taken_kept, second, kept_second, plain, kept_plain;
+    int32_t credits_before_taken, credits_after_taken;
+    bool short_started, short_first, short_kept, short_second, short_kept_second;
+} rb;
+
+static void repeat_on(void *arg)
+{
+    improvements.repeat_build = *(bool *)arg;
+    ds.Game_Credits = 100000;
+}
+
+// Enough for two Derricks and a little more.
+static void two_derricks(void *unused)
+{
+    (void)unused;
+    ds.Game_Credits = 2 * DERRICK_COST + 500;
+}
+
+static void repeat_drivers(void *arg)
+{
+    ui_new_game();
+    ui_hire("BUILDERS", "William Forbs");
+    ui_planet_main();
+    play_test_setup(repeat_on, arg);
+    rb.started = ui_build_start("Derrick");
+    rb.first = ui_build_place("Derrick", true);
+    rb.kept_first = ui_build_blinks();
+    // A taken spot: the original keeps the build mode and charges nothing.
+    rb.credits_before_taken = ds.Game_Credits;
+    ui_build_on_taken();
+    rb.credits_after_taken = ds.Game_Credits;
+    rb.taken_kept = ui_build_blinks();
+    rb.second = ui_build_blinks() && ui_build_place("Derrick", true);
+    rb.kept_second = ui_build_blinks();
+    rb.plain = ui_build_blinks() && ui_build_place("Derrick", false);
+    rb.kept_plain = ui_build_blinks();
+    play_dump("repeat-build");
+
+    // Money for two: the mode ends after the second.
+    play_test_setup(two_derricks, nullptr);
+    rb.short_started = ui_build_start("Derrick");
+    rb.short_first = ui_build_place("Derrick", true);
+    rb.short_kept = ui_build_blinks();
+    rb.short_second = rb.short_kept && ui_build_place("Derrick", true);
+    rb.short_kept_second = ui_build_blinks();
+    play_quit();
+}
+
+static void check_repeat_build(bool on)
+{
+    rb = (typeof(rb)){};
+    PlayResult r = play_run(12345, repeat_drivers, &on, nullptr);
+    printf("repeat_build %s: exit %d after %llu frames%s%s\n", on ? "on" : "off", r.exit_code,
+           (unsigned long long)r.frames, r.failed ? ", FAILED: " : "", r.failure);
+    printf("  started %d, first %d kept %d, taken kept %d (credits %d -> %d), second %d kept %d, "
+           "plain %d kept %d; short: started %d, first %d kept %d, second %d kept %d\n",
+           rb.started, rb.first, rb.kept_first, rb.taken_kept, rb.credits_before_taken,
+           rb.credits_after_taken, rb.second, rb.kept_second, rb.plain, rb.kept_plain,
+           rb.short_started, rb.short_first, rb.short_kept, rb.short_second, rb.short_kept_second);
+    CHECK(!r.failed);
+    CHECK(rb.started && rb.first);
+    if (on) {
+        // Shift keeps the mode; a taken spot costs nothing and keeps it too;
+        // a plain click places and ends it.
+        CHECK(rb.kept_first);
+        CHECK(rb.taken_kept && rb.credits_after_taken == rb.credits_before_taken);
+        CHECK(rb.second && rb.kept_second);
+        CHECK(rb.plain && !rb.kept_plain);
+        // No money for a third: the second Shift+click ends the mode.
+        CHECK(rb.short_started && rb.short_first && rb.short_kept);
+        CHECK(rb.short_second && !rb.short_kept_second);
+    } else {
+        // Off, Shift changes nothing: each placement ends the mode.
+        CHECK(!rb.kept_first);
+        CHECK(rb.short_started && rb.short_first && !rb.short_kept);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2 || !fs_init(argv[1])) {
@@ -325,6 +409,8 @@ int main(int argc, char *argv[])
 
     check_fixes(true);
     check_fixes(false);
+    check_repeat_build(true);
+    check_repeat_build(false);
 
     SDL_Quit();
     return ok ? 0 : 1;

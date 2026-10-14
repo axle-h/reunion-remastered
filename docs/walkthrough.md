@@ -62,7 +62,8 @@ Standing orders for the whole game:
    - Set tax to Very difficult, and lower it as the colony passes ~60–100k.
 8. On New Earth, add Mines up to 9 with droids, and build Derricks: the guide
    uses 20 at this point and 60 later. Detoxin is only needed at New Earth,
-   so don't build Derricks elsewhere.
+   so don't build Derricks elsewhere. In the port, Shift+click places one
+   and stays in build mode for the next (`improvements.repeat_build`).
 9. Watch for New Earth's observatory to reveal **Jade**. Do not demolish the
    observatory.
 

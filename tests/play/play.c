@@ -435,6 +435,7 @@ bool play_wait_until(bool (*pred)(void *arg), void *arg, int timeout)
 void play_mouse(int x, int y, int buttons)
 {
     input_set_mouse(x, y, buttons & 1, (buttons >> 1) & 1);
+    input_set_shift(buttons & 4);
     record_line("%llu:mouse:%d,%d,%d\n", (unsigned long long)ctl.frame, x, y, buttons);
 }
 

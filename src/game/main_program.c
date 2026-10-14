@@ -24,6 +24,7 @@
 #include "game/grwar.h"
 #include "game/grwarunits.h"
 #include "game/hire.h"
+#include "game/improvements.h"
 #include "game/intel.h"
 #include "game/lang.h"
 #include "game/launch.h"
@@ -51,6 +52,7 @@
 #include "game/textfile.h"
 #include "game/title.h"
 #include "game/vecload.h"
+#include "platform/input.h"
 #include "platform/timing.h"
 
 
@@ -646,6 +648,16 @@ static void return_spare_droid(void)
         Groups_At(1, force)->Items[12]++;
 }
 
+// Improvement (game/improvements.h, repeat_build): after a Shift+click
+// placed a building, does the build mode stay on for another of its kind?
+// Not when the next one can't be paid for or the table is full.
+static bool build_again(void)
+{
+    return improvements.repeat_build && input_shift()
+           && building_type(ds.Surface_SelKind)->Cost <= ds.Game_Credits
+           && ds.Game_BuildingCount < 1000;
+}
+
 // Clicks on the map (hotspot 0x15) with the left button: place, select or
 // destroy a building.
 static void surface_map_click(void)
@@ -662,11 +674,15 @@ static void surface_map_click(void)
             Surface_BuildOnCurrentPlanet(ds.Surface_SelKind, click_cell_x(1, 0), click_cell_y(1, 0));
             add_credits(-building_type(ds.Surface_SelKind)->Cost);
             Gfx_DrawCredits();
-            ds.Surface_Mode = 4;
-            Surface_ShowBuildingInfoView();
-            if (ds.Surface_PrevKind != ds.Surface_SelKind)
-                Surface_DrawBuildingPreview(ds.Surface_SelKind);
-            Surface_SetupSimpleInfoHotspots();
+            if (build_again()) {
+                ds.Mouse_HeldPhase = 1;
+            } else {
+                ds.Surface_Mode = 4;
+                Surface_ShowBuildingInfoView();
+                if (ds.Surface_PrevKind != ds.Surface_SelKind)
+                    Surface_DrawBuildingPreview(ds.Surface_SelKind);
+                Surface_SetupSimpleInfoHotspots();
+            }
             if (ds.Surface_SelKind == 7) {
                 uint16_t r = System_Random(500);
                 cur_body()->Population = (int32_t)((uint32_t)cur_body()->Population + (uint16_t)(r + 800));

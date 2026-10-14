@@ -29,6 +29,7 @@ typedef enum {
     UI_CLICK_RIGHT,  // the same with the right button
     UI_PRESS,        // press 1 retrace, slide off to an inert point, hold 4,
     UI_PRESS_RIGHT,  // release there, 2 more
+    UI_CLICK_SHIFT,  // UI_CLICK with Shift held until the release
 } UiClick;
 // Either holds the press until the game's input poll has taken it (ui.c
 // hold_until_polled): longer than 1 or 4 retraces only if the game turned

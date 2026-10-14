@@ -329,6 +329,7 @@ void autopilot_frame(uint64_t frame)
             mouse_x = ev->x;
             mouse_y = ev->y;
             input_set_mouse(ev->x, ev->y, ev->buttons & 1, (ev->buttons >> 1) & 1);
+            input_set_shift(ev->buttons & 4);
             pressed = false;
             break;
         case EV_KEY:

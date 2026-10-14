@@ -157,7 +157,8 @@ static int hold_until_polled(void)
 
 void ui_click_as(int x, int y, UiClick how)
 {
-    int screen = ui_screen(), button = how == UI_CLICK_RIGHT || how == UI_PRESS_RIGHT ? 2 : 1;
+    int screen = ui_screen();
+    int button = how == UI_CLICK_RIGHT || how == UI_PRESS_RIGHT ? 2 : how == UI_CLICK_SHIFT ? 1 | 4 : 1;
     int scenes = ui_scenes_played();
     for (int tries = 1;; tries++) {
         if (!ui_wait_idle(BUSY_TIMEOUT))

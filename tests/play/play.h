@@ -71,7 +71,8 @@ void play_wait(int frames);
 // Waits until pred(arg) holds, checking once per retrace, for at most
 // `timeout` retraces. Returns whether it holds.
 bool play_wait_until(bool (*pred)(void *arg), void *arg, int timeout);
-// Sets the mouse: position in game pixels, buttons bit 0 left, bit 1 right.
+// Sets the mouse: position in game pixels, buttons bit 0 left, bit 1 right,
+// bit 2 Shift held.
 void play_mouse(int x, int y, int buttons);
 // Left click: press for 4 retraces, release, then 2 retraces.
 void play_click(int x, int y);

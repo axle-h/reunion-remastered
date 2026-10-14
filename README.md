@@ -64,9 +64,13 @@ unwinnable to ones that unbalance colonies and battles
 all of them at once.
 
 Improvements change the game's design where it falls short
-(`src/game/improvements.h`). So far there is one: More Miner stations,
-up to four Miner stations on a body, mining every hour and kept when a
-colony is founded there.
+(`src/game/improvements.h`):
+
+- More Miner stations: up to four Miner stations on a body, mining every
+  hour and kept when a colony is founded there.
+- Repeat build: on a planet's surface, Shift+click places a building and
+  stays in build mode for another of the same kind; a plain click ends it.
+
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play
 without them. Saves stay in the DOS game's format.

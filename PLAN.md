@@ -67,9 +67,10 @@ The port is complete and the game can be won in it.
   first start imports the player's copy (a folder, a ZIP or the CD's ISO;
   the floppy release, and the CD with its four languages) into the
   player's folder, checked against the list of files the port loads.
-- **Improvements:** one so far, More Miner stations: up to four on a body,
-  mining every hour and kept by a colony founded there
-  (`src/game/improvements.h`).
+- **Improvements** (`src/game/improvements.h`): More Miner stations, up
+  to four on a body, mining every hour and kept by a colony founded there;
+  Repeat build, Shift+click on the surface places a building and stays in
+  build mode.
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -89,23 +90,13 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(mostly done, see 3 below).
+(mostly done, see 2 below).
 
 ## Remaining work
 
 In rough priority order.
 
-### 1. Licence and publication
-
-The game is still under copyright. Decided (2026-10-12): release builds
-ship without the art and carry the data taken from the executables
-(`src/game/dsinit.c`, the game's typed constants and texts; the cut-scene
-tables; the AdLib player's image in `src/game/adlib.c`). The player
-supplies the rest (the import, README). Still open: whether to publish the repository itself.
-Until then keep it private, or publish only the code (no assets, no raw
-decompiler dumps).
-
-### 2. Improvements
+### 1. Improvements
 
 Changes to the game's design rather than its bugs: quality of life first,
 then mechanics that don't do what the game seems to mean. Each one is a
@@ -114,8 +105,8 @@ it on.
 
 **Saves.** An improvement keeps its state in fields the original already
 has where it can, so the save stays in the DOS format and still loads in
-the original, which then plays it by its own rules. Trade routes (2.2) and
-the building table past 1,000 (2.4) have no room there, so they break
+the original, which then plays it by its own rules. Trade routes (1.1) and
+the building table past 1,000 (1.3) have no room there, so they break
 with the DOS format:
 
 - **When.** A save is written in the port's own format while
@@ -146,18 +137,7 @@ with the DOS format:
   both off; save and load in the port format restores everything; an
   unknown version is refused; the DOS-save tests are unchanged.
 
-#### 2.1 Build the same building again
-
-Placing many copies of one building (the guide builds 20, then 60
-Derricks on New Earth) means going back to the build menu for each one.
-Switch `repeat_build`: placing a building with the **right** button
-places it as the left button does, then keeps the build mode (2) with the
-same kind selected, so the next right click places another. A left click
-places as today and ends the mode. The repeat stops by itself when money
-runs out or the spot is taken (`Surface_UpdateModeForCell` drops to mode
-1 as now). Check first what a right click does on the surface today.
-
-#### 2.2 Trade routes
+#### 1.1 Trade routes
 
 Ore is hauled home by hand, group by group, for the whole game. Switch
 `trade_routes`: a trade group can be given a route and then flies it on
@@ -174,7 +154,7 @@ its own.
   screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
   Start and Stop. The groups list marks a group on a route. Decide
   whether the editor is a game screen in the original's style or a port
-  panel like the F1 menu (simpler, and the keyboard work in 2.3 gets it
+  panel like the F1 menu (simpler, and the keyboard work in 1.2 gets it
   for free).
 - **Rules stay the game's:** the group needs a hired pilot whose tier
   reaches every stop, a Galleon to leave a system, and travel takes the
@@ -195,7 +175,7 @@ its own.
   home early; New Earth full; each stop condition; save and load keep the
   route.
 
-#### 2.3 Playing with the keyboard only
+#### 1.2 Playing with the keyboard only
 
 The original is played with the mouse; the keyboard is used only for
 typing names. Switch `keyboard_play`: every screen can be played with
@@ -214,7 +194,7 @@ keys alone, and the keys can be remapped (`[keys]` in `reunion.ini`).
 - **Test.** Drive a screen of each kind (a menu, the surface, the star
   map, a battle) with key events alone.
 
-#### 2.4 No building limit
+#### 1.3 No building limit
 
 All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
 bytes each, in the game data block from 2840h up to the charset at 5EF0h).
@@ -242,7 +222,7 @@ Switch `no_building_limit`:
 - **Test.** Build past 1,000, save, load, and check every building and the
   count came back; with the switch off, the 1,001st is refused.
 
-#### 2.5 Smaller candidates
+#### 1.4 Smaller candidates
 
 Each needs a short spec before work starts.
 
@@ -253,7 +233,7 @@ Each needs a short spec before work starts.
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
 
-### 3. Checks against the DOS game
+### 2. Checks against the DOS game
 
 Both need DOSBox-X driven by a script, too much work for now.
 
@@ -266,3 +246,20 @@ Both need DOSBox-X driven by a script, too much work for now.
   routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
   Nothing has compared a longer run (timing per game hour, a battle) with
   the original from the same save.
+
+### 3. Publication
+
+Last, once the work above is done. The repository is to go public.
+Decided (2026-10-12): release builds ship without the art and carry the
+data taken from the executables (`src/game/dsinit.c`, the game's typed
+constants and texts; the cut-scene tables; the AdLib player's image in
+`src/game/adlib.c`). The player supplies the rest (the import, README).
+Until it is published the repository stays private.
+
+- **A last scan for copyrighted content.** Nothing of the game beyond what
+  the Decisions allow: no pictures, animations, modules, samples or other
+  files of the player's copy, no raw decompiler dumps, nothing of them in
+  `tests/`, `tools/` or the git history.
+- **The README for players only:** what the port is, getting and running
+  it, importing their copy, the port menu and `reunion.ini`. Developer
+  material (building from source, tests, the docs) moves out of it.

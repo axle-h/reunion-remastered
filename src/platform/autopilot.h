@@ -7,7 +7,8 @@
 //   FRAME:rclick:X,Y   the same with the right button
 //   FRAME:move:X,Y     moves the mouse
 //   FRAME:mouse:X,Y,B  sets the mouse exactly: position and buttons (bit 0
-//                      left, bit 1 right), held until the next mouse event
+//                      left, bit 1 right, bit 2 Shift held), held until the
+//                      next mouse event
 //   FRAME:key:N        queues ReadKey code N (decimal, e.g. 13 = Enter)
 //   FRAME:dump:PATH    saves the frame shown at that retrace (.png or .bmp)
 //   FRAME:quit         requests quit (as closing the window)

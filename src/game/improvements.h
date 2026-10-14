@@ -17,6 +17,11 @@ typedef struct Improvements {
     // a colony bought there waits to be set up. The colony keeps them as
     // its first droids, as the original does with one.
     bool more_stations;
+    // Shift+left click on the surface places a building and keeps the build
+    // mode with the same kind, for the next one; a plain left click places
+    // and ends it, as in the original. It ends too when the next one can't
+    // be paid for or the building table is full.
+    bool repeat_build;
 } Improvements;
 
 extern Improvements improvements;

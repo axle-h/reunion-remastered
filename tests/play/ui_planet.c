@@ -636,6 +636,57 @@ UiBuildResult ui_build(const char *kind)
     return UI_BUILD_NO_ROOM;
 }
 
+bool ui_build_start(const char *kind)
+{
+    if (ui_screen() != 20)
+        play_fail("ui_build_start: not on a planet surface");
+    see_surface();
+    if (!ui_select_kind(kind))
+        return false;
+    ui_settle();
+    uint64_t since = play_frame();
+    ui_hotspot("Build");
+    return ui_wait_until(build_answered, &since, 50) && build_blinks(nullptr);
+}
+
+bool ui_build_place(const char *kind, bool shift)
+{
+    int k = kind_index(kind), x, y, step = 0;
+    for (; step < (int)SDL_arraysize(radar_moves) && !find_spot(k, &x, &y); step++)
+        radar_move(step);
+    if (step == (int)SDL_arraysize(radar_moves))
+        play_fail("ui_build_place: no room for a %s", kind);
+    Spot s = {k, x, y};
+    play_mouse(cell_px(x), cell_py(y), 0);
+    if (!play_wait_until(green, &s, 60))
+        play_fail("ui_build_place: (%d,%d) not green", x, y);
+    int before = ui_buildings(kind).total;
+    ui_click_as(cell_px(x), cell_py(y), shift ? UI_CLICK_SHIFT : UI_CLICK);
+    play_wait(10);
+    ui_settle();
+    return ui_buildings(kind).total == before + 1;
+}
+
+void ui_build_on_taken(void)
+{
+    for (int j = 1; j <= MAP_ROWS; j++) {
+        for (int i = 1; i <= MAP_COLS; i++) {
+            if (building_under(i, j) != 0) {
+                ui_click_as(cell_px(i), cell_py(j), UI_CLICK_SHIFT);
+                play_wait(10);
+                ui_settle();
+                return;
+            }
+        }
+    }
+    play_fail("ui_build_on_taken: no building in the window");
+}
+
+bool ui_build_blinks(void)
+{
+    return build_blinks(nullptr);
+}
+
 static bool destroy_blinks(void *unused)
 {
     (void)unused;

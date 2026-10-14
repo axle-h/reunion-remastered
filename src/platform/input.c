@@ -17,6 +17,7 @@ static InputMouse mouse;
 static bool quit;
 static bool restart;
 static bool menu_request;
+static bool shift;
 static int queue[QUEUE_SIZE];
 static int queue_head, queue_count;
 
@@ -140,7 +141,11 @@ void input_pump(void)
             break;
         }
         case SDL_EVENT_KEY_DOWN:
+            shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
             key_down(&e.key);
+            break;
+        case SDL_EVENT_KEY_UP:
+            shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
             break;
         case SDL_EVENT_TEXT_INPUT:
             for (const char *p = e.text.text; *p; p++)
@@ -178,6 +183,7 @@ void input_reset(void)
     menu_request = false;
     queue_head = queue_count = 0;
     mouse.left = mouse.right = mouse.middle = 0;
+    shift = false;
 }
 
 void input_release(void)
@@ -187,6 +193,7 @@ void input_release(void)
     float x, y;
     SDL_GetMouseState(&x, &y);
     set_position(x, y);
+    shift = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
 }
 
 void input_set_mouse(int x, int y, uint8_t left, uint8_t right)
@@ -198,6 +205,10 @@ void input_set_mouse(int x, int y, uint8_t left, uint8_t right)
 }
 
 InputMouse input_mouse(void) { return mouse; }
+
+bool input_shift(void) { return shift; }
+
+void input_set_shift(bool held) { shift = held; }
 
 bool input_key_pressed(void) { return queue_count > 0; }
 

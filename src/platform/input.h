@@ -42,6 +42,12 @@ void input_push_key(int code);
 
 InputMouse input_mouse(void);
 
+// Is a Shift key held? (Shift+click, game/improvements.h repeat_build.)
+bool input_shift(void);
+// Sets the Shift state as if the user pressed or released it (test
+// autopilot). It holds until the next real key event or the next call.
+void input_set_shift(bool held);
+
 // Crt.KeyPressed.
 bool input_key_pressed(void);
 

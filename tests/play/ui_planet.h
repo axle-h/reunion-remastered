@@ -74,6 +74,18 @@ typedef enum {
 // show green on every cell) and clicks it, then returns to the map view.
 UiBuildResult ui_build(const char *kind);
 
+// Building again with Shift (improvements.repeat_build), on the body whose
+// surface is shown. ui_build_start picks `kind` and clicks Build: true if
+// Build blinks. ui_build_place clicks free ground for it (moving the window
+// with the radar, which keeps the build mode, to find some; Shift held if
+// `shift`), true if the map then shows one more of the kind.
+// ui_build_on_taken Shift+clicks a building in the window.
+// ui_build_blinks: Build still blinks, waiting for a cell.
+bool ui_build_start(const char *kind);
+bool ui_build_place(const char *kind, bool shift);
+void ui_build_on_taken(void);
+bool ui_build_blinks(void);
+
 // Buildings of `kind` on the body whose surface or info is shown, as its
 // surface map draws them: `total` footprints, `building` still drawn as a
 // construction site, `finished` drawn as the building, `active` those of
