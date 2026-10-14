@@ -99,6 +99,49 @@ enum : uint16_t {
     CHARSET_OFS = 0x5EF0,
 };
 
+// The building table once it has outgrown the data block (Game_ReserveBuildings).
+static TBuilding *moved_buildings;
+static int32_t moved_capacity;
+
+static void free_moved_buildings(void)
+{
+    SDL_free(moved_buildings);
+    moved_buildings = nullptr;
+    moved_capacity = 0;
+}
+
+int16_t Game_BuildingLimit(void)
+{
+    return improvements.no_building_limit ? BUILDINGS_MAX : BUILDINGS_DOS;
+}
+
+bool Game_ReserveBuildings(int32_t n)
+{
+    if (n <= BUILDINGS_DOS || (Game_BuildingsMoved() && n <= moved_capacity))
+        return true;
+    if (n > BUILDINGS_MAX)
+        return false;
+    int32_t capacity = SDL_max(moved_capacity, 2 * BUILDINGS_DOS);
+    while (capacity < n)
+        capacity *= 2;
+    capacity = SDL_min(capacity, BUILDINGS_MAX);
+    TBuilding *table = SDL_calloc((size_t)capacity, sizeof *table);
+    if (!table)
+        return false;
+    int32_t used = Game_BuildingsMoved() ? moved_capacity : BUILDINGS_DOS;
+    SDL_memcpy(table, ds.Game_Buildings, (size_t)used * sizeof *table);
+    SDL_free(moved_buildings);
+    moved_buildings = table;
+    moved_capacity = capacity;
+    ds.Game_Buildings = table;
+    return true;
+}
+
+bool Game_BuildingsMoved(void)
+{
+    return moved_buildings && ds.Game_Buildings == moved_buildings;
+}
+
 // 4719:0317 (Ems::RestoreProc, run by Gfx_ExitHandler): 4719:0253 EmsRelease
 // on the game data block.
 static void free_game_data(void)
@@ -107,11 +150,13 @@ static void free_game_data(void)
         game_free(ds.Ems_GameData.Data);
     ds.Ems_GameData.State = 0;
     ds.Ems_GameData.Size = 0;
+    free_moved_buildings();
 }
 
 // 4719:0325
 void Game_InitGameData(void)
 {
+    free_moved_buildings();
     // 4719:0188 EmsMoveToEms, without an EMM: the block stays the heap copy.
     ds.Ems_Buffer = game_alloc(GAME_DATA_SIZE);
     ds.Ems_GameData.State = 1;
@@ -661,7 +706,7 @@ static bool build_again(void)
 {
     return improvements.repeat_build && input_shift()
            && building_type(ds.Surface_SelKind)->Cost <= ds.Game_Credits
-           && ds.Game_BuildingCount < 1000;
+           && ds.Game_BuildingCount < Game_BuildingLimit();
 }
 
 // Clicks on the map (hotspot 0x15) with the left button: place, select or
@@ -671,7 +716,8 @@ static void surface_map_click(void)
     ds.Surface_PrevKind = ds.Surface_SelKind;
     if (ds.Surface_Mode == 2) {
         Surface_UpdateModeForCell(click_cell_x(0, 1), click_cell_y(0, 1));
-        if (ds.Surface_Mode == 2 && fixes.building_limit && ds.Game_BuildingCount > 999) {
+        if (ds.Surface_Mode == 2 && fixes.building_limit
+            && ds.Game_BuildingCount >= Game_BuildingLimit()) {
             // The original refuses the building (Surface_BuildOnCurrentPlanet)
             // and charges it all the same. Port fix: refused, nothing paid.
             Sound_PlayButtonSfx("x");

@@ -10,11 +10,14 @@
 //
 // The port's format. While an improvement keeps state the DOS save has no
 // room for (Improvements_PortSaves), or the game holds some (a trade route,
-// game/routes.h), a save is written as save/reunion.<n> instead: the DOS
-// game never opens it (its slot shows "Empty" there and can be saved over),
-// where a different layout under its own name would load as garbage. The
+// game/routes.h, or more than 1,000 buildings), a save is written as
+// save/reunion.<n> instead: the DOS game never opens it (its slot shows
+// "Empty" there and can be saved over), where a different layout under its
+// own name would load as garbage. The
 // file: "REUNION" 1Ah, a version word, the slot name, the DOS blocks in
-// their order with the building table cut to BuildingCount records, then
+// their order with the building table cut to BuildingCount records (up to
+// BUILDINGS_MAX, game/main_program.h; the DOS format can't hold more than
+// 1,000: the original would read past its table into the charset), then
 // the routes (their count and record size, then the records). Writing a
 // slot in one format deletes its file in the other. The disk screen lists
 // both and loads either, whatever the switches say; a version newer than

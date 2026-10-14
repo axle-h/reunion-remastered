@@ -10,6 +10,7 @@
 #include "game/gfxpath.h"
 #include "game/improvements.h"
 #include "game/lang.h"
+#include "game/main_program.h"
 #include "game/message.h"
 #include "game/mouse.h"
 #include "game/music.h"
@@ -192,12 +193,19 @@ static bool transfer(FILE *f, uint8_t *name, bool save, bool port)
         if (blocks[i].ptr)
             memcpy(&p, p, sizeof p);  // the block the pointer field points to
         size_t size = blocks[i].size;
-        if (port && blocks[i].off == offsetof(DSeg, Game_Buildings)) {
-            if (ds.Game_BuildingCount < 0 || ds.Game_BuildingCount > 1000)
+        if (blocks[i].off == offsetof(DSeg, Game_Buildings)) {
+            // The count, just read or written, fails past what the format
+            // holds: the DOS table's 1,000 records, or the port's limit.
+            int16_t count = ds.Game_BuildingCount;
+            if (count < 0 || count > (port ? BUILDINGS_MAX : BUILDINGS_DOS)
+                || !Game_ReserveBuildings(count))
                 return false;
-            size = (size_t)ds.Game_BuildingCount * sizeof(TBuilding);
-            if (!save)
-                memset((uint8_t *)p + size, 0, blocks[i].size - size);
+            p = ds.Game_Buildings;
+            if (port) {
+                size = (size_t)count * sizeof(TBuilding);
+                if (!save && size < blocks[i].size)
+                    memset((uint8_t *)p + size, 0, blocks[i].size - size);
+            }
         }
         ok = block(f, p, size, save);
     }
@@ -215,7 +223,7 @@ static bool transfer(FILE *f, uint8_t *name, bool save, bool port)
 
 bool SaveLoad_PortFormat(void)
 {
-    return Improvements_PortSaves() || Routes_Any();
+    return Improvements_PortSaves() || Routes_Any() || ds.Game_BuildingCount > BUILDINGS_DOS;
 }
 
 bool SaveLoad_Transfer(bool save)

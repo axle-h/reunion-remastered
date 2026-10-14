@@ -265,6 +265,42 @@ static void check_fixes(bool on)
     config_set_fix("building_limit", true);
 }
 
+// Improvement (game/improvements.h, no_building_limit): with 1,000
+// buildings in the game and the switch on, a Mine is built and paid for
+// (off, check_fixes). Test setup fills the table and switches it on.
+static void no_limit_on(void *unused)
+{
+    fill_buildings(unused);
+    improvements.no_building_limit = true;
+}
+
+static void no_limit_drivers(void *unused)
+{
+    (void)unused;
+    ui_new_game();
+    ui_hire("BUILDERS", "William Forbs");
+    ui_planet_main();
+    play_test_setup(no_limit_on, nullptr);
+    fx.credits_before = ds.Game_Credits;
+    fx.build = ui_build("Mine");
+    fx.credits_after = ds.Game_Credits;
+    fx.buildings = ds.Game_BuildingCount;
+    play_dump("no-building-limit");
+    play_quit();
+}
+
+static void check_no_building_limit(void)
+{
+    fx = (typeof(fx)){};
+    PlayResult r = play_run(12345, no_limit_drivers, nullptr, nullptr);
+    printf("no_building_limit: exit %d after %llu frames%s%s; build %d, credits %d -> %d, %d buildings\n",
+           r.exit_code, (unsigned long long)r.frames, r.failed ? ", FAILED: " : "", r.failure, fx.build,
+           fx.credits_before, fx.credits_after, fx.buildings);
+    CHECK(!r.failed);
+    CHECK(fx.build == UI_BUILD_OK && fx.credits_after == fx.credits_before - MINE_COST);
+    CHECK(fx.buildings == 1001);
+}
+
 // Improvement (game/improvements.h, repeat_build): Derricks on New Earth
 // with Shift+clicks, with the switch on and then off. Test setup switches it
 // on (scripted runs play without improvements) and sets the credits, so
@@ -411,6 +447,7 @@ int main(int argc, char *argv[])
     check_fixes(false);
     check_repeat_build(true);
     check_repeat_build(false);
+    check_no_building_limit();
 
     SDL_Quit();
     return ok ? 0 : 1;

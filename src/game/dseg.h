@@ -1541,8 +1541,8 @@ typedef struct DSeg {
     uint8_t _pad_A212[0x8];
     int16_t Game_ColonySetupCount; // Number of used ColonySetups (< 10, checked in 28cd:062b)
     TColonySetup Game_ColonySetups[10]; // [1..10] Colonies under construction (2841:0060 adds; 1b8a:25b5 counts down and removes). Ends at A2BB
-    TBuilding *Game_Buildings; // ^array[1..1000] of TBuilding = Ems block + 2840h. 14,000 bytes saved
-    int16_t Game_BuildingCount; // < 1000
+    TBuilding *Game_Buildings; // ^array[1..1000] of TBuilding = Ems block + 2840h, or the port's heap array past 1000 (Game_ReserveBuildings). 14,000 bytes saved
+    int16_t Game_BuildingCount; // <= Game_BuildingLimit()
     int16_t Game_ShownGroupCount; // Copy of GroupCount or PlanetForceCount for the list on screen (ship info, 26fe)
     int16_t Game_GroupCount; // Groups in list 0 (fleets), max 32
     int16_t Game_PlanetForceCount; // Groups in list 1 (planet forces, one per colony). Colonise (2841) adds one

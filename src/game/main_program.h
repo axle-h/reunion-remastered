@@ -51,6 +51,24 @@ void Game_InitUnits(void);
 // as on a DOS machine without an EMM.
 void Game_InitGameData(void);
 
+enum : int16_t {
+    BUILDINGS_DOS = 1000,  // the data block's table, all the DOS game has
+    // The improvement's cap (no_building_limit): building indices are
+    // int16_t, and the loops `for (i = 1; i <= count; i++)` must end.
+    BUILDINGS_MAX = INT16_MAX - 1,
+};
+// The buildings the game may hold now: BUILDINGS_DOS, or BUILDINGS_MAX with
+// no_building_limit on. A game loaded with more keeps them, but takes no new
+// one.
+int16_t Game_BuildingLimit(void);
+// Port addition (no_building_limit): room in Game_Buildings for n records.
+// Past BUILDINGS_DOS the table moves out of the game data block to a heap
+// array that grows; records 1-1,000 of the block are then stale. False past
+// BUILDINGS_MAX.
+bool Game_ReserveBuildings(int32_t n);
+// The table is on that heap array.
+bool Game_BuildingsMoved(void);
+
 // The pub dialogue's opening menu (Pub_MenuIdx) for Pub_Person, from the
 // story flags (part of screen 25's set-up).
 void Game_PickPubMenu(void);

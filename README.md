@@ -85,12 +85,15 @@ Improvements change the game's design where it falls short
   screen, H held runs the clock, F2 opens the command centre and F3-F10
   its rooms. The port menu (Keys) lists them; `[keys]` in `reunion.ini`
   changes them. The mouse works alongside.
+- No building limit: the game holds more than the original's 1,000
+  buildings across all colonies.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play
 without them. Saves stay in the DOS game's format except while Trade
-routes is on or a route is set up: those are written as `save/reunion.<n>`,
-which the DOS game can't load (the port menu says so).
+routes or No building limit is on, a route is set up or the game holds
+more than 1,000 buildings: those are written as `save/reunion.<n>`, which
+the DOS game can't load (the port menu says so).
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

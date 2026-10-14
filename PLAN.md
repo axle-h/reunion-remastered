@@ -74,7 +74,9 @@ The port is complete and the game can be won in it.
   build mode; Trade routes, a trade group hauls ore home on its own along
   up to six stops (`src/game/routes.h`), edited on a screen of the port's;
   Keyboard play, every screen played with keys that drive the mouse
-  (`src/game/keyplay.h`), remappable in `[keys]`.
+  (`src/game/keyplay.h`), remappable in `[keys]`; No building limit, the
+  building table leaves the game data block past 1,000 and grows up to
+  32,766 (`Game_ReserveBuildings`).
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -84,7 +86,7 @@ The port is complete and the game can be won in it.
   the 34 bugs found in the port while playing it, 33 are fixed and one
   turned out to be the original's behaviour; their write-ups are in git
   history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 93 ctest tests pass on the release build, the full
+- **Tests:** all 94 ctest tests pass on the release build, the full
   playthrough (`test_play_game`, and `_german`, `_french`, `_italian` from
   the CD's ISO), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -107,42 +109,7 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-#### 1.1 No building limit
-
-All colonies share one table of 1,000 buildings (`Game_Buildings`, 14
-bytes each, in the game data block from 2840h up to the charset at 5EF0h).
-When it is full a new building is refused (`Surface_AddBuilding`,
-`Surface_BuildOnCurrentPlanet`; `fixes.building_limit` keeps it from
-being paid for), and so is every building a new colony would get. A large
-late game runs into it.
-
-Switch `no_building_limit`:
-
-- **The table.** Move it out of the game data block into a heap array
-  that grows as buildings are added; records 1-1,000 stay where they are
-  so the data block keeps its layout. Indices are `int16_t` everywhere
-  (the surface's building layer holds `uint16_t`), so the real cap is
-  32,767; refuse at that as the fix refuses at 1,000. Every `< 1000` /
-  `> 999` test goes through one limit function.
-- **Saves** are in the port's format (`src/game/saveload.h`) while the
-  switch is on (`Improvements_NeedsPortSaves`) or the game holds more than
-  1,000 buildings (as `SaveLoad_PortFormat` does for routes), with the
-  whole table: the format already writes the table to its count. The DOS
-  format can't hold more than 1,000: its block is 14,000 bytes, and a
-  larger `Game_BuildingCount` would make the original read past the table
-  into the charset. A port save loaded with the switch off keeps the
-  buildings past 1,000 but allows no new one. The port menu's warning
-  (`MenuSwitch.port_saves`) and the switch's description say saves won't
-  load in DOS.
-- **Check** every loop over the table for a fixed bound, and the code
-  that holds a building index in a byte. Deleting a building
-  (`Surface_DeleteBuilding`) shifts the later records down; the side file
-  needs nothing for that, as it is written from the table.
-- **Test.** Build past 1,000, save, load, and check every building and the
-  count came back; with the switch off, the 1,001st is refused; a save
-  holding more than 1,000 is written as `reunion.<n>` with the switch off.
-
-#### 1.2 Smaller candidates
+#### 1.1 Smaller candidates
 
 Each needs a short spec before work starts.
 

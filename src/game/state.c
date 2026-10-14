@@ -4,6 +4,7 @@
 
 #include "game/dseg.h"
 #include "game/dsfields.h"
+#include "game/main_program.h"
 #include "platform/autopilot.h"
 #include "platform/video.h"
 
@@ -203,6 +204,11 @@ void state_serialize(StateBuf *b)
     put_ds(b);
     put_ems_block(b, "Ems_GameData^", &ds.Ems_GameData);
     put_ems_block(b, "GfxPath_ToolbarBlock^", &ds.GfxPath_ToolbarBlock);
+    // Port addition: the building table once it has left the data block
+    // (no_building_limit), whose copy is then stale.
+    if (Game_BuildingsMoved())
+        put(b, "Game_Buildings^", ds.Game_Buildings,
+            (uint32_t)SDL_max(ds.Game_BuildingCount, 0) * sizeof(TBuilding), sizeof(TBuilding), -1);
     put_log(b);
     put_u8(b, "vid_mode", (uint8_t)vid_mode());
     if (vid_mode() == VID_MODE_13H) {

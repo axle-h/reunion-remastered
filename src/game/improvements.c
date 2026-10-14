@@ -19,18 +19,22 @@ const SwitchInfo Improvements_List[] = {
     {"keyboard_play", "Keyboard play",
      "Tab, arrows and Enter play every screen; shortcuts in Keys.",
      &improvements.keyboard_play},
+    {"no_building_limit", "No building limit",
+     "More than 1,000 buildings in the game. Saves then won't load in DOS.",
+     &improvements.no_building_limit},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);
 
 bool Improvements_NeedsPortSaves(int i)
 {
-    return Improvements_List[i].value == &improvements.trade_routes;
+    return Improvements_List[i].value == &improvements.trade_routes
+           || Improvements_List[i].value == &improvements.no_building_limit;
 }
 
 bool Improvements_PortSaves(void)
 {
-    return improvements.trade_routes;
+    return improvements.trade_routes || improvements.no_building_limit;
 }
 
 void Improvements_Init(bool scripted)

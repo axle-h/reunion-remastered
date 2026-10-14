@@ -4,8 +4,9 @@
 // Scripted runs (the autopilot, --replay, the tests) play with every
 // improvement off, so they play the original's game; a test of one switches
 // it on. An improvement keeps its state in fields the original already has
-// where it can, so saves stay in the DOS format; trade routes have no room
-// there, and a save holding one is in the port's format (game/saveload.h).
+// where it can, so saves stay in the DOS format; trade routes and buildings
+// past 1,000 have no room there, and a save holding them is in the port's
+// format (game/saveload.h).
 #pragma once
 
 #include "game/fixes.h"
@@ -30,6 +31,10 @@ typedef struct Improvements {
     // Every screen played with keys alone (game/keyplay.h): the keys move
     // and click the mouse.
     bool keyboard_play;
+    // The game holds up to BUILDINGS_MAX buildings instead of 1,000
+    // (Game_BuildingLimit, game/main_program.h): the table leaves the game
+    // data block for a heap array as it grows.
+    bool no_building_limit;
 } Improvements;
 
 extern Improvements improvements;

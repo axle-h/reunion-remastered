@@ -185,7 +185,8 @@ the original in a few places, each commented in the code:
 - **Improvements** (`src/game/improvements.h`): changes to the game's
   design, each a switch in the port menu like the fixes, kept in fields
   the DOS saves already have where they can. Trade routes
-  (`src/game/routes.h`) can't: a save holding them is in the port's own
+  (`src/game/routes.h`) and buildings past 1,000 (No building limit,
+  `Game_ReserveBuildings`) can't: a save holding them is in the port's own
   format, `save/reunion.<n>` (`src/game/saveload.h`); otherwise saves are
   byte for byte the original's. The route editor is the port's own screen
   39, with toolbar commands past the original's 77

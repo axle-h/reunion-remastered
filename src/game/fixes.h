@@ -68,9 +68,9 @@ typedef struct Fixes {
     // fix takes a droid that has lost its place off the body, back into the
     // colony's stock, as a meteorite's hit takes one.
     bool demolish_droids;
-    // With 1,000 buildings in the game a new one is refused with a sound,
-    // but still paid for (and a Building still adds its people). The fix
-    // refuses it before anything is paid.
+    // With 1,000 buildings in the game (Game_BuildingLimit) a new one is
+    // refused with a sound, but still paid for (and a Building still adds
+    // its people). The fix refuses it before anything is paid.
     bool building_limit;
     // Spy reports on a race's armies, garrisons and weapons build the line
     // "Information on: <race>" and then overwrite it, so they never say

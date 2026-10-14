@@ -10,6 +10,7 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/lang.h"
+#include "game/main_program.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
@@ -735,7 +736,8 @@ void Surface_AddBuilding(uint8_t kind, uint8_t system, uint8_t planet, uint8_t m
     int8_t surface = (int8_t)body_of(system, planet, moon)->SurfaceType;
     // Nonzero = allowed there, and the value scales the Output.
     int8_t factor = (int8_t)btype(kind)->Surfaces[surface - 1];
-    if (factor != 0 && ds.Game_BuildingCount < 1000) {
+    if (factor != 0 && ds.Game_BuildingCount < Game_BuildingLimit()
+        && Game_ReserveBuildings(idx + 1)) {
         TBuilding *b = ds.Game_Buildings + idx;
         ds.Game_BuildingCount++;
         b->Kind = kind;
@@ -759,9 +761,9 @@ void Surface_BuildOnCurrentPlanet(int16_t kind, int16_t x, int16_t y)
 {
     // A full building table plays the 'x' sound and places nothing; the
     // caller charges for it all the same (fixes.building_limit).
-    if (ds.Game_BuildingCount > 999)
+    if (ds.Game_BuildingCount >= Game_BuildingLimit())
         Sound_PlayButtonSfx("x");
-    if (ds.Game_BuildingCount < 1000) {
+    if (ds.Game_BuildingCount < Game_BuildingLimit()) {
         Sound_PlayButtonSfx("buildin");
         Surface_AddBuilding((uint8_t)kind, (uint8_t)ds.Game_CurSystem, (uint8_t)cur_planet(),
                             (uint8_t)cur_moon(), (uint8_t)x, (uint8_t)y);
