@@ -144,36 +144,85 @@ Ore is hauled home by hand, group by group, for the whole game. Switch
 its own.
 
 - **A route** is a list of up to 6 pickup stops (bodies the player owns)
-  and a drop-off, New Earth. A loop: fly to each stop in order and load
-  every ore there that fits; then fly to New Earth and unload all of it;
-  start again. If the group is full at any stop, it goes straight to New
-  Earth, unloads and starts again from the first stop. A stop with
-  nothing to load is passed by.
-- **The UI.** A "Route" button on a trade group's screen opens a route
-  editor: the stop list with Add (picks a body as the destination
-  screen, `Launch_DestinationScreen`, does), Remove and Up/Down, then
-  Start and Stop. The groups list marks a group on a route. Decide
-  whether the editor is a game screen in the original's style or a port
-  panel like the F1 menu (simpler, and the keyboard work in 1.2 gets it
-  for free).
+  and a drop-off, New Earth. A loop: fly to each stop in order, dock and
+  load every ore there that fits; then fly to New Earth, dock and unload
+  all of it; start again. If the group is full at any stop, it goes
+  straight to New Earth, unloads and starts again from the first stop. A
+  stop with nothing to load is passed by without docking.
+- **Docking takes time.** Loading at a stop and unloading at New Earth
+  each take 5 game hours, during which the group stays docked. They are
+  counted on the game clock (an hour is 101 frames, about 1.4 s), so they
+  pause when the clock stops, follow the clock button, and save and replay
+  exactly.
 - **Rules stay the game's:** the group needs a hired pilot whose tier
   reaches every stop, a Galleon to leave a system, and travel takes the
   usual time. Loading and unloading use the cargo screen's own booking
   (`Cargo_CargoScreen`, `Cargo_ShipCapacity`) rather than clicks, and
   unloading stops at New Earth's storage: what doesn't fit stays aboard
   and the route goes on.
+- **ROUTE button.** A trade group's cockpit toolbar
+  (`Satellite_SetupGroupScreenMenu`) gets ROUTE just before PLANET MAIN.
+  In orbit that pushes PLANET MAIN and the body's actions to the
+  toolbar's second page; in flight ROUTE follows TRANSFER.
+- **The editor** is a port screen in the equipment screen's frame
+  (`BEOSZTAS`): its header (group name, type, the arrows to the previous
+  and next group) and location line as there. Code paints a list over the
+  unit grid (Nr and Stop, six rows 10 pixels apart like the grid's),
+  copies the texture beside the footer's "Stock:" label over it, and
+  writes two footer lines: "Unload at" New Earth, and the route's state
+  (not running, flying to stop n, loading at stop n with the hours left,
+  or ended and why).
+  - Clicking a row selects it, drawn in the cargo screen's highlight
+    (`Gfx_DrawTextFC`). The equipment screen's red arrows (`BENYIL`) move
+    the selected stop up or down, each shown only when that move is
+    possible. While the route runs, the stop it is heading for has its
+    number drawn in colour F6, the font having no marker character.
+  - Toolbar: BACK TO M.SCREEN, CONTROL PANEL, then ADD STOP, REMOVE STOP
+    and START ROUTE (the OK icon) while the route is stopped, and only
+    END ROUTE (the ABORT icon) while it runs: a route is ended before it
+    is edited. As in the original, a button that can't act isn't shown
+    (no REMOVE STOP or START ROUTE without stops).
+  - ADD STOP opens the destination screen (`Launch_DestinationScreen`)
+    unchanged. A click on a body adds it after the selected stop, or at
+    the end, and returns; ABORT returns without one. Refused with a
+    message box, as the original refuses a move: not the player's colony,
+    out of the pilot's reach (the original's text), already on the route,
+    route full.
+- **New toolbar commands** take ids past the original's 78
+  (`Ui_ButtonLabels` and `GfxPath_CommandIcon` are DS arrays of that
+  size), with their labels and icons in a port table that `GfxPath`
+  draws from.
+- **Icons** are built at run time from the player's `ICON.ALL`, so no
+  pixels of the original are compiled in (Decisions, Distribution). ADD
+  STOP and REMOVE STOP are PLANET INFO with its "?" erased and a + in the
+  "?"'s greens or a − in END TALK's reds drawn by code. ROUTE is PLANET
+  INFO's planet and ADD MINER STATION's small planet on a loop drawn in
+  those greens. START and END ROUTE use OK and ABORT, as OK, BUILD IT and
+  ABORT MOVE do.
+- **The groups list** gives a group on a route a green slot square (red
+  stays the selected group's), and the info panel adds "Route: to stop
+  n/m".
+- **Notifications.** A route's traffic is silent: arriving, docking,
+  loading and unloading add no log entry, sample or flash, where a
+  group's arrival otherwise does all three
+  (`Message_AddMessageLogEntry`), and the log holds only 15 entries.
 - **It stops** when the player gives the group any other order, the
   group is disbanded or loses a battle, a stop is lost to an enemy, or
-  the pilot can no longer reach a stop; a message line says which and
-  why.
+  the pilot can no longer reach a stop. The editor's footer says which
+  and why, and one log entry is added (sample and flash, no box).
 - **Where it lives.** Routes are stepped where groups arrive
-  (`Sim_ProcessTravellingGroups`). The DOS records have no room for them,
-  so they are saved in the port's format (Saves, above); a route names
-  its group by index and must follow it when the list shifts after a
-  disband.
-- **Test.** A route of two stops runs several loops; a full group goes
-  home early; New Earth full; each stop condition; save and load keep the
-  route.
+  (`Sim_ProcessTravellingGroups`) and their docking hours each game hour
+  after it. The DOS records have no room for them, so they are saved in
+  the port's format (Saves, above), the hours left included; a route
+  names its group by index and must follow it when the list shifts after
+  a disband. New texts (captions, footer lines, refusals, log entries)
+  go in `lang_texts.c` with German, French and Italian.
+- **Test.** A route of two stops runs several loops, each stop and New
+  Earth docked for 5 hours; a full group goes home early; New Earth full;
+  each stop condition, with its one log entry and none for routine
+  traffic; save and load mid-loading keep the route and its hours. The
+  editor is built through clicks on the playthrough fixture: add, move,
+  remove, start, end, and the refusals.
 
 #### 1.2 Playing with the keyboard only
 
@@ -229,7 +278,7 @@ Each needs a short spec before work starts.
 | Idea | Why |
 |---|---|
 | Autosave before every battle and alien conversation, into a slot of its own | The walkthrough's standing order is to save before each, as results are random. The original has 12 slots; the autosave must not take one of the player's |
-| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still |
+| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still. Trade routes (1.1) leave ore aboard silently when New Earth is full, so it covers them too |
 | Saving anywhere | |
 | Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
 
