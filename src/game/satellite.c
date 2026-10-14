@@ -1,6 +1,7 @@
 #include "game/satellite.h"
 
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/system.h"
 
 // Routines missing from their units' headers.
@@ -85,7 +86,7 @@ void Satellite_DeploySatellite(void)
         CheckStoryLocations();
     } else {
         Satellite_DeductSatellites(ds.Game_CurSystem, CUR_PLANET, CUR_MOON, 1, 1);
-        Message_ShowMessageNoLog("| You lost the contact with your satellite ! |");
+        Message_ShowMessageNoLog(Lang_Text("| You lost the contact with your satellite ! |"));
     }
 }
 

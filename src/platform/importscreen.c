@@ -76,8 +76,21 @@ char *importscreen_describe(const ImportReport *r, int max_problems)
         bool root = r->root && r->root[0];
         char saves[256];
         saves_note(r, saves, sizeof saves);
-        SDL_asprintf(&out, "Imported the %s edition%s%s.%s%s", gamedata_edition_name(r->edition),
-                     root ? " from " : "", root ? r->root : "", saves[0] ? " " : "", saves);
+        // "in English, German, French and Italian"
+        char langs[96] = "";
+        int n = 0, k = 0;
+        for (unsigned bits = r->languages; bits; bits &= bits - 1)
+            n++;
+        for (Language l = 0; l < LANGUAGE_COUNT && n > 1; l++) {
+            if (!(r->languages & 1u << l))
+                continue;
+            size_t len = SDL_strlen(langs);
+            SDL_snprintf(langs + len, sizeof langs - len, "%s%s",
+                         k == 0 ? ", in " : k == n - 1 ? " and " : ", ", gamedata_language_label(l));
+            k++;
+        }
+        SDL_asprintf(&out, "Imported the %s edition%s%s%s.%s%s", gamedata_edition_name(r->edition),
+                     root ? " from " : "", root ? r->root : "", langs, saves[0] ? " " : "", saves);
         return out;
     }
     if (r->error) {

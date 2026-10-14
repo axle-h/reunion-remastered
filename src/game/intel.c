@@ -7,6 +7,7 @@
 #include "game/alientalk.h"
 #include "game/fixes.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/message.h"
 #include "game/planetinfo.h"
@@ -297,7 +298,7 @@ void Intel_ClaimBodyForPlayer(int16_t system, int16_t planet, int16_t moon)
     char name[256], tmp[256];
     PlanetInfo_GetBodyName(name, sizeof name, system, planet, moon);
     TGroup *g = Groups_At(1, ds.Game_SelGroup);
-    SDL_snprintf(tmp, sizeof tmp, "%s forces", name);
+    SDL_snprintf(tmp, sizeof tmp, Lang_Format(0x29b90a1f, "%s forces"), name);
     pstr_set(&g->Name, 17, tmp);
     g->Kind = 5;
     g->Status = 7;
@@ -578,19 +579,20 @@ bool Intel_IsRaceActive(int16_t race)
 // The intel reports are built a piece at a time in 255-character strings;
 // cutting each step is the same as cutting the whole message once.
 
-// msg += "<n:3>  <name><tail>", the lines of unit counts.
-static void append_count(char msg[256], int n, const void *pname, const char *tail)
+// msg += "<n:3><sep><name><tail>", the lines of unit counts (sep is "  ").
+static void append_count(char msg[256], int n, const char *sep, const void *pname, const char *tail)
 {
     char name[256], item[300];
-    SDL_snprintf(item, sizeof item, "%3d  %s%s", n, pstr_get(name, sizeof name, pname), tail);
+    SDL_snprintf(item, sizeof item, "%3d%s%s%s", n, sep, pstr_get(name, sizeof name, Lang_Slot(pname)),
+                 tail);
     SDL_strlcat(msg, item, 256);
 }
 
-// msg += "  <name><tail>".
-static void append_name(char msg[256], const void *pname, const char *tail)
+// msg += "<sep><name><tail>" (sep is "  ").
+static void append_name(char msg[256], const char *sep, const void *pname, const char *tail)
 {
     char name[256], item[300];
-    SDL_snprintf(item, sizeof item, "  %s%s", pstr_get(name, sizeof name, pname), tail);
+    SDL_snprintf(item, sizeof item, "%s%s%s", sep, pstr_get(name, sizeof name, Lang_Slot(pname)), tail);
     SDL_strlcat(msg, item, 256);
 }
 
@@ -605,8 +607,9 @@ static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int1
         return;
     pstr_get(name, sizeof name, &Intel_Race(race)->Name);
     if (kind == 1) {
-        SDL_snprintf(msg, sizeof msg, "    Information on: %s|%s%s", name,
-                     b->_01 != 0 ? "  Their main planet is | " : "    Their colony is on| ",
+        SDL_snprintf(msg, sizeof msg, "%s%s%s%s%s", Lang_TextAt(0x29b91573, "    Information on: "),
+                     name, Lang_TextAt(0x29b91591, "|"),
+                     Lang_Text(b->_01 != 0 ? "  Their main planet is | " : "    Their colony is on| "),
                      title);
         Message_ShowMessage(msg);
     }
@@ -615,18 +618,22 @@ static void show_race_body_info(int16_t race, int16_t kind, int16_t system, int1
         // replaces it with this. Port fix (game/fixes.h): keeps it.
         msg[0] = '\0';
         if (fixes.spy_reports)
-            SDL_snprintf(msg, sizeof msg, "    Information on: %s|", name);
+            SDL_snprintf(msg, sizeof msg, "%s%s|", Lang_TextAt(0x29b91650, "    Information on: "),
+                         name);
         size_t n = SDL_strlen(msg);
-        SDL_snprintf(msg + n, sizeof msg - n, "  Their garrison troops are on| %s: ", title);
+        SDL_snprintf(msg + n, sizeof msg - n, "%s%s%s", Lang_Text("  Their garrison troops are on| "),
+                     title, Lang_Text(": "));
         for (int i = 1; i <= 4; i++) {
             if (i & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
-            append_count(msg, (int)b->Stores[i - 1], &ds.Names_ShipClasses[i - 1], " ");
+            append_count(msg, (int)b->Stores[i - 1], Lang_TextAt(0x29b91729, "  "),
+                         &ds.Names_ShipClasses[i - 1], Lang_TextAt(0x29b91742, " "));
         }
         for (int i = 1; i <= 4; i++) {
             if (i & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
-            append_count(msg, (int)b->Stores[i + 3], &ds.Names_GroundUnits[i - 1], "  ");
+            append_count(msg, (int)b->Stores[i + 3], Lang_TextAt(0x29b917e0, "  "),
+                         &ds.Names_GroundUnits[i - 1], Lang_TextAt(0x29b917f9, "  "));
         }
         Message_ShowMessage(msg);
     }
@@ -647,18 +654,22 @@ static void show_race_army_info(int16_t race)
         // replaces it with this. Port fix (game/fixes.h): keeps it.
         msg[0] = '\0';
         if (fixes.spy_reports)
-            SDL_snprintf(msg, sizeof msg, " Information on: %s |", name);
+            SDL_snprintf(msg, sizeof msg, "%s%s%s", Lang_TextAt(0x29b918db, " Information on: "), name,
+                         Lang_TextAt(0x29b918f0, " |"));
         size_t n = SDL_strlen(msg);
-        SDL_snprintf(msg + n, sizeof msg - n, "  The %d. army power is  ", f);
+        SDL_snprintf(msg + n, sizeof msg - n, "%s%d%s", Lang_TextAt(0x29b9190e, "  The "), f,
+                     Lang_Text(". army power is  "));
         for (int k = 1; k <= 4; k++) {
             if (k & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
-            append_count(msg, (uint16_t)rf->Units[k - 1], &ds.Names_ShipClasses[k - 1], " ");
+            append_count(msg, (uint16_t)rf->Units[k - 1], Lang_TextAt(0x29b919b4, "  "),
+                         &ds.Names_ShipClasses[k - 1], Lang_TextAt(0x29b919cd, " "));
         }
         for (int k = 1; k <= 4; k++) {
             if (k & 1)
                 SDL_strlcat(msg, "|", sizeof msg);
-            append_count(msg, (uint16_t)rf->Units[k + 3], &ds.Names_GroundUnits[k - 1], "  ");
+            append_count(msg, (uint16_t)rf->Units[k + 3], Lang_TextAt(0x29b91a67, "  "),
+                         &ds.Names_GroundUnits[k - 1], Lang_TextAt(0x29b91a80, "  "));
         }
         Message_ShowMessage(msg);
     }
@@ -673,16 +684,19 @@ static void show_race_weapon_info(int16_t race)
     // with this. Port fix (game/fixes.h): keeps it, on the same line.
     char msg[256] = "", name[256];
     if (fixes.spy_reports)
-        SDL_snprintf(msg, sizeof msg, " Information on: %s", pstr_get(name, sizeof name, &r->Name));
-    SDL_strlcat(msg, "    Their weapons are |", sizeof msg);
+        SDL_snprintf(msg, sizeof msg, "%s%s", Lang_TextAt(0x29b91b0e, " Information on: "),
+                     pstr_get(name, sizeof name, &r->Name));
+    SDL_strlcat(msg, Lang_Text("    Their weapons are |"), sizeof msg);
     for (int k = 1; k <= 4; k++) {
         if (flags[k - 1] != 0)
-            append_name(msg, &ds.Names_ShipClasses[k - 1], " ");
+            append_name(msg, Lang_TextAt(0x29b91b78, "  "), &ds.Names_ShipClasses[k - 1],
+                        Lang_TextAt(0x29b91b91, " "));
     }
     SDL_strlcat(msg, "|", sizeof msg);
     for (int k = 1; k <= 4; k++) {
         if (flags[k + 3] != 0)
-            append_name(msg, &ds.Names_GroundUnits[k - 1], "  ");
+            append_name(msg, Lang_TextAt(0x29b91c03, "  "), &ds.Names_GroundUnits[k - 1],
+                        Lang_TextAt(0x29b91c1c, "  "));
     }
     Message_ShowMessage(msg);
 }

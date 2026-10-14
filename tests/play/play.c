@@ -9,6 +9,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/main_program.h"
 #include "game/options.h"
 #include "game/state.h"
@@ -215,7 +216,8 @@ static PlayResult boot_and_run(const char *script)
         trace = fopen(path, "w");
     }
     if (setjmp(game_out) == 0) {
-        gfx_set_cd_charset(gamedata_edition() == EDITION_CD);  // as main.c's boot
+        Lang_Set(gamedata_language());  // as main.c's boot
+        gfx_set_cd_charset(gamedata_edition() == EDITION_CD);
         vid_clear();
         dseg_init();
         system_init();

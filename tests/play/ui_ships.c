@@ -4,9 +4,11 @@
 
 #include "game/dseg.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui.h"
 #include "play/ui_message.h"
@@ -31,11 +33,12 @@ enum : int {
 // are ignored, as on screen.
 static bool pstr_is(const void *p, const char *s)
 {
-    const uint8_t *q = p;
+    const uint8_t *q = (const uint8_t *)Lang_Slot(p);  // the whole text the game shows
     size_t n = SDL_strlen(s), len = q[0];
     while (len > n && q[len] == ' ')
         len--;
-    return len == n && SDL_strncasecmp((const char *)q + 1, s, n) == 0;
+    return (len == n && SDL_strncasecmp((const char *)q + 1, s, n) == 0)
+           || lang_matches((const char *)q + 1, q[0], s);
 }
 
 // Clicks hotspot `caption`; fails the run if there is none.

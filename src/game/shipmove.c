@@ -8,6 +8,7 @@
 #include "game/dseg.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/satellite.h"
 #include "game/sound.h"
@@ -108,11 +109,11 @@ void ShipMove_GroupScreen(void)
         TBody *body = ds.Game_CurBody;
         const char *msg =
             body->SurfaceType == 2
-                ? " You cannot land on this type of planet, |          since it is gaseous!"
+                ? Lang_Text(" You cannot land on this type of planet, |          since it is gaseous!")
             : g->Kind == 4 && (g->System != 1 || g->Planet != 5 || g->Moon != 0)
-                ? " The satellite carriers can only land |          on your main planet"
+                ? Lang_Text(" The satellite carriers can only land |          on your main planet")
             : Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)
-                ? " No ships in this unit ! "
+                ? Lang_Text(" No ships in this unit ! ")
                 : nullptr;
         if (msg) {
             Message_ShowMessageNoLog(msg);
@@ -162,7 +163,7 @@ void ShipMove_GroupScreen(void)
         // Move / Change destination
         if (ds.Game_StaffExp[0] > 0 || g->Kind == 4) {
             if (Groups_IsGroupEmpty(ds.Game_GroupList, ds.Game_SelGroup)) {
-                Message_ShowMessageNoLog(" No ships in this unit! ");
+                Message_ShowMessageNoLog(Lang_Text(" No ships in this unit! "));
             } else {
                 Sound_PlayButtonSfx("controll");
                 for (int16_t i = 1; i <= 4; i++) {
@@ -180,7 +181,7 @@ void ShipMove_GroupScreen(void)
                 ShipMove_DrawButtonAnimFrame(i);
                 Gfx_WaitFrames(3);
             }
-            Message_ShowMessageNoLog(" You haven't got a pilot! ");
+            Message_ShowMessageNoLog(Lang_Text(" You haven't got a pilot! "));
             for (int16_t i = 4; i >= 1; i--) {
                 ShipMove_DrawButtonAnimFrame(i);
                 Gfx_WaitFrames(3);
@@ -214,41 +215,41 @@ void ShipMove_SetupGroupScreenHotspots(void)
     ds.Mouse_HotspotCount = 6;
 
     set_rect(1, 0, 0x31, 0x140, 0x57);
-    set_caption(1, "Planet main");
+    set_caption(1, Lang_Text("Planet main"));
     Mouse_Hotspot(1)->Repeat_ = 1;
     if (g->Status > 2)
         Mouse_ClearHotspots(1, 1);
 
     set_rect(2, 0, 0x95, 0x47, 0x33);
     switch (g->Status) {
-    case 6: case 5: case 4: set_caption(2, "No effect"); break;
-    case 2: set_caption(2, "Docking"); break;
-    case 1: set_caption(2, "Launch"); break;
+    case 6: case 5: case 4: set_caption(2, Lang_Text("No effect")); break;
+    case 2: set_caption(2, Lang_Text("Docking")); break;
+    case 1: set_caption(2, Lang_Text("Launch")); break;
     default: break; // caption keeps its old value
     }
     Mouse_Hotspot(2)->Repeat_ = 1;
 
     set_rect(3, 0x4D, 0x8D, 0x2A, 0x28);
-    set_caption(3, "Transfer");
+    set_caption(3, Lang_Text("Transfer"));
     Mouse_Hotspot(3)->Repeat_ = 1;
     if (g->Kind != 2 && g->Kind != 3)
         Mouse_ClearHotspots(3, 3);
 
     set_rect(4, 0x83, 0x89, 0x3B, 0x3F);
     switch (g->Status) {
-    case 6: case 5: case 4: set_caption(4, "Change destination"); break;
-    case 2: set_caption(4, "Move"); break;
-    case 1: set_caption(4, "No effect"); break;
+    case 6: case 5: case 4: set_caption(4, Lang_Text("Change destination")); break;
+    case 2: set_caption(4, Lang_TextAt(0x22ca0816, "Move")); break;
+    case 1: set_caption(4, Lang_Text("No effect")); break;
     default: break;
     }
     Mouse_Hotspot(4)->Repeat_ = 1;
 
     set_rect(5, 0xCA, 0x91, 0x29, 0x27);
-    set_caption(5, "Ships");
+    set_caption(5, Lang_Text("Ships"));
     Mouse_Hotspot(5)->Repeat_ = 1;
 
     set_rect(6, 0xFF, 0x99, 0x41, 0x2F);
-    set_caption(6, "Group");
+    set_caption(6, Lang_Text("Group"));
     Mouse_Hotspot(6)->Repeat_ = 1;
 }
 

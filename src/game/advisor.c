@@ -6,6 +6,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/system.h"
 #include "game/textfile.h"
@@ -192,13 +193,15 @@ void Advisor_ShowAdvisorAnswer(void)
         s3[0] = '\0';
         int16_t v = Advisor_FindAdvisorItem(false);
         if (v == 0) {
-            SDL_strlcpy(s2, "I don't need anything right now", sizeof s2);
+            SDL_strlcpy(s2, Lang_Text("I don't need anything right now"), sizeof s2);
         } else {
             hint_name(name, sizeof name, v);
             if (System_Random(0x32) < 0x19)
-                SDL_snprintf(s2, sizeof s2, "We could develop a %s", name);
+                SDL_snprintf(s2, sizeof s2, "%s%s%s", Lang_Text("We could develop a "), name,
+                             Lang_TextAt(0x199106ed, ""));
             else
-                SDL_snprintf(s2, sizeof s2, "The most important thing would be a %s", name);
+                SDL_snprintf(s2, sizeof s2, "%s%s", Lang_Text("The most important thing would be a "),
+                             name);
             TextFile_ReadTextLine("ajanlas.sp", v, s3, sizeof s3);
         }
     }
@@ -206,13 +209,15 @@ void Advisor_ShowAdvisorAnswer(void)
         s3[0] = '\0';
         int16_t v = Advisor_FindAdvisorItem(true);
         if (v == 0) {
-            SDL_strlcpy(s2, "I don't need anything right now.", sizeof s2);
+            SDL_strlcpy(s2, Lang_Text("I don't need anything right now."), sizeof s2);
         } else {
             hint_name(name, sizeof name, v);
             if (System_Random(0x32) < 0x19)
-                SDL_snprintf(s2, sizeof s2, "We might need %s.", name);
+                SDL_snprintf(s2, sizeof s2, "%s%s%s", Lang_Text("We might need "), name,
+                             Lang_TextAt(0x199107c1, "."));
             else
-                SDL_snprintf(s2, sizeof s2, "We really need more %ss", name);
+                SDL_snprintf(s2, sizeof s2, "%s%s%s", Lang_Text("We really need more "), name,
+                             Lang_TextAt(0x199107f6, "s"));
             TextFile_ReadTextLine("ajanlas.sp", v, s3, sizeof s3);
         }
     }
@@ -220,7 +225,8 @@ void Advisor_ShowAdvisorAnswer(void)
         // Price of the help: (Random(10) + the staff member's experience) * 1000.
         uint16_t exp = ds.Game_StaffExp[ds.Command_StaffPicked - 1];
         ds.Advisor_TrainingPrice = (int32_t)((uint32_t)((uint16_t)System_Random(10) + exp) * 1000u);
-        SDL_snprintf(s2, sizeof s2, "It will be %d credits", (int)ds.Advisor_TrainingPrice);
+        SDL_snprintf(s2, sizeof s2, "%s%d%s", Lang_Text("It will be "), (int)ds.Advisor_TrainingPrice,
+                     Lang_TextAt(0x19910891, " credits"));
         s3[0] = '\0';
     }
     Gfx_TypeTextF9(s2, 0xC, 0x3E, 0x33);
@@ -283,7 +289,7 @@ void Advisor_SetupAdvisorHotspots(void)
     h->Y = 0x5C;
     h->W = 0x60;
     h->H = 0x2D;
-    pstr_set(&h->Caption, 0x12, "Talking");
+    pstr_set(&h->Caption, 0x12, Lang_TextAt(0x19910aaa, "Talking"));
     h->Repeat_ = 0;
     h->_1A = 0;
 }

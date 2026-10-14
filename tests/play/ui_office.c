@@ -5,6 +5,7 @@
 #include "game/dseg.h"
 #include "game/mouse.h"
 #include "platform/video.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui.h"
 #include "play/ui_message.h"
@@ -57,8 +58,7 @@ static int icon_index(const char *name)
         return 0;
     for (int j = 1; j <= ds.Mouse_HotspotCount; j++) {
         const THotspot *h = Mouse_Hotspot((int16_t)j);
-        if ((size_t)h->Caption.len == SDL_strlen(name)
-            && SDL_strncasecmp(h->Caption.s, name, h->Caption.len) == 0)
+        if (lang_matches(h->Caption.s, h->Caption.len, name))
             return j;
     }
     return 0;
@@ -142,7 +142,7 @@ bool ui_developer_skills(int skills[4])
 static bool panel_running(const char *name)
 {
     UiResearchPanel p;
-    return ui_research_panel(&p) && SDL_strcasecmp(p.name, name) == 0
+    return ui_research_panel(&p) && lang_reads_as(p.name, name)
            && SDL_strncmp(p.status, "Under ", 6) == 0;
 }
 
@@ -219,7 +219,7 @@ static int find_row(const char *name)
     for (int i = 1; i <= LIST_ROWS; i++) {
         char row[20];
         list_row(i, row, sizeof row);
-        if (SDL_strcasecmp(row, name) == 0)
+        if (lang_reads_as(row, name))
             return i;
     }
     return 0;
@@ -251,20 +251,34 @@ bool ui_shop_select(const char *name)
     return true;
 }
 
+// The label `english` (or a translation) is drawn at (x, y), as far as the
+// number after it at x 100 leaves it: "Oggetti compr.:" loses its colon.
+static bool queue_label_at(int x, int y, const char *english)
+{
+    int cells = (QUEUE_LEFT_X - x) / 6;
+    char t[32];
+    SDL_snprintf(t, sizeof t, "%.*s", cells, english);
+    if (ui_text_at(x, y, t))
+        return true;
+    for (int k = 0; lang_translation(english, k); k++) {
+        SDL_snprintf(t, sizeof t, "%.*s", cells, lang_translation(english, k));
+        if (ui_text_at(x, y, t))
+            return true;
+    }
+    return false;
+}
+
 bool ui_shop_queue(UiShopQueue *q)
 {
     *q = (UiShopQueue){0};
     if (ui_screen() != 5)
         return false;
-    char label[32];
-    ui_read_text(QUEUE_LABEL_X, QUEUE_Y1, 13, label, sizeof label);
-    if (SDL_strcmp(label, "Bought items:") == 0) {
+    if (queue_label_at(QUEUE_LABEL_X, QUEUE_Y1, "Bought items:")) {
         q->shown = ui_read_number(QUEUE_LEFT_X, QUEUE_Y1, 5, &q->queued)
                    && ui_read_number(QUEUE_RIGHT_X, QUEUE_Y1, 6, &q->hours)
                    && ui_read_number(QUEUE_RIGHT_X, QUEUE_Y2, 8, &q->price);
     }
-    ui_read_text(QUEUE_LABEL_X, QUEUE_Y2, 7, label, sizeof label);
-    if (SDL_strcmp(label, "Stores:") == 0)
+    if (queue_label_at(QUEUE_LABEL_X, QUEUE_Y2, "Stores:"))
         ui_read_number(QUEUE_LEFT_X, QUEUE_Y2, 10, &q->stores);
     else
         ui_read_text(QUEUE_LABEL_X, QUEUE_Y2, 40, q->note, sizeof q->note);

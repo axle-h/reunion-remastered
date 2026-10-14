@@ -566,14 +566,57 @@ void gfx_set_cd_charset(bool cd)
     cd_charset = cd;
 }
 
-// Past the 78 glyphs the CD's sheet keeps the floppy's addresses: they fall
-// on its blank fourth row, as the floppy's glyph 78 (a character not in the
-// charset) is blank.
 uint16_t gfx_glyph_offset(uint8_t g)
 {
-    if (cd_charset && g < 78)
+    if (cd_charset)
         return (uint16_t)((g / 40) * 0xA00 + (g % 40) * 8 + 0x80);
     return (uint16_t)((g / 20) * 0xA00 + (g % 20) * 16 + 0x80);
+}
+
+// The CD's Gfx_CharsetChars: the floppy's 78, two more spaces and ÄÖÜäöüß
+// (code page 437), glyphs 80-86. The two zero bytes after it in the CD's
+// DS are part of DrawText6x8's scan.
+static const char CD_CHARS[89] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz?!()'\"+-:;.,"
+                                 "1234567890%& /  \x8E\x99\x9A\x84\x94\x81\xE1\0";
+enum : uint8_t { CD_SCAN = 89, CD_CHAR_COUNT = 87 };
+
+// The CD's sheet has glyphs for the French and Italian accents that its
+// table doesn't name, so the original draws them all as é (DrawText6x8) or
+// from past the sheet (TypeText). The port draws each with its own glyph
+// (code page 437), the three without one with the nearest.
+static int cd_accent_glyph(uint8_t c)
+{
+    switch (c) {
+    case 0x80: return 93;  // Ç
+    case 0x82: return 88;  // é
+    case 0x83: return 90;  // â, as à
+    case 0x85: return 90;  // à
+    case 0x87: return 94;  // ç
+    case 0x88: return 87;  // ê
+    case 0x8A: return 89;  // è
+    case 0x8B: return 34;  // ï, as i
+    case 0x8C: return 99;  // î, as ì
+    case 0x8D: return 99;  // ì
+    case 0x90: return 91;  // É
+    case 0x93: return 95;  // ô
+    case 0x95: return 98;  // ò
+    case 0x96: return 96;  // û
+    case 0x97: return 97;  // ù
+    default: return -1;
+    }
+}
+
+// The CD's glyph for c, or -1 if its table doesn't have it. Character 1
+// stands for ß in the CD's text files; the CD's DrawText6x8 turns it into
+// E1h before drawing.
+static int cd_glyph(uint8_t c)
+{
+    if (c == 1)
+        c = 0xE1;
+    for (int k = 0; k < CD_CHAR_COUNT; k++)
+        if ((uint8_t)CD_CHARS[k] == c)
+            return k;
+    return cd_accent_glyph(c);
 }
 
 // Draws glyph g (cell in the charset sheet) at screen offset ofs.
@@ -590,8 +633,22 @@ static void draw_glyph(uint16_t ofs, uint8_t g, uint8_t colour)
     }
 }
 
-// 405f:1056. Characters not in Gfx_CharsetChars get glyph 78 (the scan
-// gives up after 79 characters).
+uint8_t gfx_text_glyph(uint8_t c)
+{
+    if (cd_charset) {
+        // The CD scans 89 bytes: a NUL finds the zero after the table
+        // (glyph 87), any other character missing gets glyph 88.
+        int g = c == (uint8_t)PSTR_NUL ? 87 : cd_glyph(c);
+        return (uint8_t)(g >= 0 ? g : CD_SCAN - 1);
+    }
+    const PString *chars = &ds.Gfx_CharsetChars;
+    uint8_t k = 0;
+    while (k < 78 && (uint8_t)chars->s[k] != c)
+        k++;
+    return k;
+}
+
+// 405f:1056
 void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t colour)
 {
     // The original pads in a 256-byte stack copy of the string (length byte
@@ -604,19 +661,13 @@ void Gfx_DrawText6x8(const char *s, int16_t x, int16_t y, int16_t width, uint8_t
     if (hide)
         Mouse_HideCursor();
     uint8_t blank = (uint8_t)(charset_pos(' ') - 1);
-    char chars[256] = {};
-    pstr_get(chars, sizeof chars, &ds.Gfx_CharsetChars);
     if (str[0] == 0) {
         str[0] = 1;
         str[1] = ' ';
     }
     uint16_t len = str[0];
-    for (uint16_t i = 1; i <= len; i++) {
-        uint16_t k = 0;
-        while (k < 78 && (uint8_t)chars[k] != str[i])
-            k++;
-        str[i] = (uint8_t)k;
-    }
+    for (uint16_t i = 1; i <= len; i++)
+        str[i] = gfx_text_glyph(str[i]);
     if ((uint16_t)width >= len) {
         for (uint16_t i = len + 1; i <= (uint16_t)width && i < sizeof str; i++)
             str[i] = blank;
@@ -750,6 +801,8 @@ void Gfx_TypeText(const char *s, int16_t x, int16_t y, int16_t width, uint8_t co
         for (uint16_t i = 1;; i++) {
             uint8_t ch = str[(uint8_t)i];  // the original reads past its 256-byte buffer for width > 255; none is
             uint8_t g = (uint8_t)(charset_pos((char)ch) - 1);
+            if (cd_charset)  // Pos in the CD's table; the port adds the accents
+                g = (uint8_t)(ch == (uint8_t)PSTR_NUL ? 255 : cd_glyph(ch));
             Mouse_HideCursor();
             type_glyph(x, y, i, g, colour);
             Mouse_ShowCursor();

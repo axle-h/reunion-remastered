@@ -4,6 +4,7 @@
 
 #include "game/blit.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/rawtext.h"
 #include "game/sound.h"
@@ -98,7 +99,7 @@ void Hire_HireScreen(void)
                     ds.Staff_DevSkills[0][ds.Game_StaffHired[3] - 1][k - 1] = (uint8_t)ds.Game_DevSkill[k - 1];
             }
         }
-        say("OK, I will work for you.");
+        say(Lang_Text("OK, I will work for you."));
         ds.Game_Credits -= ds.Staff_Price[t - 1][c - 1];
         ds.Game_StaffHired[t - 1] = (uint16_t)c;
         ds.Game_StaffExp[t - 1] = (uint16_t)ds.Staff_Level[t - 1][c - 1];
@@ -113,16 +114,16 @@ void Hire_HireScreen(void)
         break;
     }
     case HIRE_NO_CREDITS:
-        say("You don't have enough credits to hire me.");
+        say(Lang_Text("You don't have enough credits to hire me."));
         Gfx_FlashCredits();
         Sound_PlayButtonSfx("hiba");
         break;
     case HIRE_ALREADY_HIRED:
-        say("I am still working for you.");
+        say(Lang_Text("I am still working for you."));
         Sound_PlayButtonSfx("hiba");
         break;
     case HIRE_NOT_SKILLED:
-        say("I'm not skilled enough for the job.");
+        say(Lang_TextAt(0x3fab08e5, "I'm not skilled enough for the job."));
         Sound_PlayButtonSfx("hiba");
         break;
     }
@@ -172,15 +173,15 @@ void Hire_DrawCandidateInfo(void)
     bool is_hired = c >= 0 && hired(t) == (uint16_t)c;
     char s[256], text[256];
     int level = !is_hired ? ds.Staff_Level[t - 1][c - 1] : ds.Game_StaffExp[t - 1];
-    SDL_snprintf(s, sizeof s, "My scholarly level:  %d", level);
+    SDL_snprintf(s, sizeof s, "%s%d", Lang_Text("My scholarly level:  "), level);
     if (t == 4) {
         // The developer shows his four skills instead of the level.
-        SDL_strlcpy(s, "Level:  ", sizeof s);
+        SDL_strlcpy(s, Lang_Text("Level:  "), sizeof s);
         for (int k = 1; k <= 4; k++) {
             int32_t v = !is_hired ? dev_skills(c)[k - 1] : ds.Game_DevSkill[k - 1];
             char discipline[256];
             size_t n = SDL_strlen(s);
-            pstr_get(discipline, sizeof discipline, &ds.Names_Disciplines[k - 1]);
+            pstr_get(discipline, sizeof discipline, Lang_Slot(&ds.Names_Disciplines[k - 1]));
             SDL_snprintf(s + n, sizeof s - n, "%s: %d  ", discipline, (int)v);
         }
     }
@@ -191,9 +192,9 @@ void Hire_DrawCandidateInfo(void)
     if (c >= 0 && h < (uint16_t)c)
         Gfx_TypeTextF9(face_text(text, t, c, 2), 10, 0xBC, 0x32);
     else if (c >= 0 && h == (uint16_t)c)
-        Gfx_TypeTextF9("I work for you", 10, 0xBC, 0x32);
+        Gfx_TypeTextF9(Lang_Text("I work for you"), 10, 0xBC, 0x32);
     else
-        Gfx_TypeTextF9("I'm no better than your advisor", 10, 0xBC, 0x32);
+        Gfx_TypeTextF9(Lang_Text("I'm no better than your advisor"), 10, 0xBC, 0x32);
 }
 
 // 3fab:092b

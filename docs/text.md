@@ -8,7 +8,9 @@ What the 50 files in `TEXT\` hold and how the game uses them. Decoding is in
 | Line files | 20 `.AT`, 18 `.LOC`, 4 `.SP`, 5 `.TXT` | CR LF text lines, each line obfuscated on its own |
 | String tables | 3 `.RAW` | Fixed-size Pascal string slots, not obfuscated |
 
-All decoded text is 7-bit ASCII. A line is asked for by its 1-based number;
+English text is 7-bit ASCII; the CD's German, French and Italian files
+use code page 437, with 1 for ß in the line files (docs/versions.md, "The
+CD's font"). A line is asked for by its 1-based number;
 `|` is a line break, and leading spaces centre lines by hand.
 
 To edit a line file, encode each character at position `i` (1-based) with

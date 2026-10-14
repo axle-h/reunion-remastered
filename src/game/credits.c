@@ -3,6 +3,7 @@
 
 #include "game/blit.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/system.h"
 
@@ -28,9 +29,9 @@ void Credits_ShowCredits(void)
     Gfx_TypeTextF9("         DESIGN BY:   CSABA GYARMATI", x, y + 0x3F, 0x28);
     Gfx_TypeTextF9("        ARTWORK BY:   TAMAS FODOR", x, y + 0x48, 0x28);
     Gfx_TypeTextF9("          MUSIC BY:   TAMAS KREINER", x, y + 0x51, 0x28);
-    Gfx_TypeTextF9("   PROGRAM MANAGER:   STEVE SARGENT", x, y + 0x63, 0x28);
-    Gfx_TypeTextF9("                      GABOR FEHER", x, y + 0x6C, 0x28);
-    Gfx_TypeTextF9("COPYRIGHT (C) 1994 GRANDSLAM VIDEO LIMITED", x, y + 0x7E, 0x2A);
-    Gfx_TypeTextF9("            ALL RIGHTS RESERVED", x, y + 0x87 + 3, 0x28);
+    Gfx_TypeTextF9(Lang_Text("   PROGRAM MANAGER:   STEVE SARGENT"), x, y + 0x63, 0x28);
+    Gfx_TypeTextF9(Lang_Text("                      GABOR FEHER"), x, y + 0x6C, 0x28);
+    Gfx_TypeTextF9(Lang_Text("COPYRIGHT (C) 1994 GRANDSLAM VIDEO LIMITED"), x, y + 0x7E, 0x2A);
+    Gfx_TypeTextF9(Lang_Text("            ALL RIGHTS RESERVED"), x, y + 0x87 + 3, 0x28);
 }
 

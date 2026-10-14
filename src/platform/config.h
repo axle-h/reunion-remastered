@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include "platform/gamedata.h"
+
 typedef enum : int {
     CONFIG_MUSIC_SETUP,  // as SAVE\SETUP.SPD says (the default without a file)
     CONFIG_MUSIC_NONE,
@@ -42,6 +44,7 @@ typedef struct Config {
     bool skip_intro;
     bool colony_stats;  // planet info: the POP row opens the colony's stats
     bool detoxin_rate;  // droids screen and Derrick info: the Derricks' Detoxin rate
+    Language language;  // of the CD's games imported, from the next restart (platform/import.h)
     // [fixes]: switched off ones; a fix not listed is on.
     int fix_count;
     char fix_keys[CONFIG_MAX_FIXES][CONFIG_KEY_SIZE];

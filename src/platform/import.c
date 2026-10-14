@@ -8,14 +8,16 @@
 // for it.
 static const char MARKER[] = "import.ini";
 
-static void problem(ImportReport *r, const char *what, const char *path)
+// `game` is the folder of a language other than data/'s ("REUNION.DEU\\"),
+// or "".
+static void problem(ImportReport *r, const char *what, const char *game, const char *path)
 {
     char **p = SDL_realloc(r->problems, (size_t)(r->problem_count + 1) * sizeof *p);
     if (!p)
         return;
     r->problems = p;
     p[r->problem_count] = nullptr;
-    SDL_asprintf(&p[r->problem_count], "%s: %s", what, path);
+    SDL_asprintf(&p[r->problem_count], "%s: %s%s", what, game, path);
     if (p[r->problem_count])
         r->problem_count++;
 }
@@ -107,34 +109,70 @@ static int group_end(const GameFile *files, int count, int first)
     return end;
 }
 
-// The listed version a file of this size and CRC is, or nullptr.
-static const GameFile *match(const GameFile *files, int first, int end, uint64_t size, uint32_t crc)
+// The listed version of this size and CRC that `language` may have, or
+// nullptr.
+static const GameFile *match(const GameFile *files, int first, int end, Language language,
+                             uint64_t size, uint32_t crc)
 {
     for (int k = first; k < end; k++)
-        if (files[k].size == size && files[k].crc == crc)
+        if (gamedata_in_language(&files[k], language) && files[k].size == size
+            && files[k].crc == crc)
             return &files[k];
     return nullptr;
 }
 
-static bool size_listed(const GameFile *files, int first, int end, uint64_t size)
+static bool size_listed(const GameFile *files, int first, int end, Language language,
+                        uint64_t size)
 {
     for (int k = first; k < end; k++)
-        if (files[k].size == size)
+        if (gamedata_in_language(&files[k], language) && files[k].size == size)
             return true;
     return false;
 }
 
+// Does `language` have its own version of the path, not the one of `base`?
+// Every path differs from LANGUAGE_COUNT, so a check against it takes all.
+static bool differs(const GameFile *files, int first, int end, Language language, Language base)
+{
+    if (base == LANGUAGE_COUNT)
+        return true;
+    for (int k = first; k < end; k++)
+        if (files[k].languages && gamedata_in_language(&files[k], language))
+            return !gamedata_in_language(&files[k], base);
+    return false;
+}
+
+// One game of the copy to check and copy: the main one has every file,
+// another language only the files where it differs from the main one.
+typedef struct Game {
+    int index;          // in the source
+    Language language;
+    Language base;      // LANGUAGE_COUNT for the main game, else its language
+    const char *label;  // before paths in problems: "" or "REUNION.DEU\\"
+    char *dir;          // where it goes, under data.partial/
+} Game;
+
+static int game_groups(const Game *g, const GameFile *files, int count)
+{
+    int n = 0;
+    for (int i = 0; i < count; i = group_end(files, count, i))
+        n += differs(files, i, group_end(files, count, i), g->language, g->base);
+    return n;
+}
+
 // Every listed file present and the same: else the report names them.
-static bool check(Source *src, const GameFile *files, int count, ImportReport *r,
+static bool check(Source *src, const Game *g, const GameFile *files, int count, ImportReport *r,
                   ImportProgress *progress)
 {
     for (int i = 0; i < count; i = group_end(files, count, i)) {
         int end = group_end(files, count, i);
-        const SourceFile *sf = source_find(src, files[i].path);
+        if (!differs(files, i, end, g->language, g->base))
+            continue;
+        const SourceFile *sf = source_find_in(src, g->index, files[i].path);
         if (!sf) {
-            problem(r, "Missing", files[i].path);
-        } else if (!size_listed(files, i, end, sf->size)) {
-            problem(r, "Different", files[i].path);
+            problem(r, "Missing", g->label, files[i].path);
+        } else if (!size_listed(files, i, end, g->language, sf->size)) {
+            problem(r, "Different", g->label, files[i].path);
         } else {
             uint32_t crc = sf->crc;
             if (!sf->crc_known) {
@@ -145,10 +183,10 @@ static bool check(Source *src, const GameFile *files, int count, ImportReport *r
                 crc = gamedata_crc32(0, data, size);
                 SDL_free(data);
             }
-            const GameFile *m = match(files, i, end, sf->size, crc);
+            const GameFile *m = match(files, i, end, g->language, sf->size, crc);
             if (!m)
-                problem(r, "Different", files[i].path);
-            else if (m->edition)
+                problem(r, "Different", g->label, files[i].path);
+            else if (m->edition && g->base == LANGUAGE_COUNT)
                 r->edition = m->edition;
         }
         step(progress);
@@ -156,21 +194,23 @@ static bool check(Source *src, const GameFile *files, int count, ImportReport *r
     return r->problem_count == 0;
 }
 
-static bool copy(Source *src, const GameFile *files, int count, const char *partial,
-                 ImportReport *r, ImportProgress *progress)
+static bool copy(Source *src, const Game *g, const GameFile *files, int count, ImportReport *r,
+                 ImportProgress *progress)
 {
     for (int i = 0; i < count; i = group_end(files, count, i)) {
         int end = group_end(files, count, i);
-        const SourceFile *sf = source_find(src, files[i].path);
+        if (!differs(files, i, end, g->language, g->base))
+            continue;
+        const SourceFile *sf = source_find_in(src, g->index, files[i].path);
         size_t size = 0;
         uint8_t *data = sf ? source_read(src, sf, &size) : nullptr;
         if (!data)
             return fail(r, "Reading %s: %s", files[i].path);
-        bool same = match(files, i, end, size, gamedata_crc32(0, data, size)) != nullptr;
-        bool written = same && write_file(partial, files[i].path, data, size);
+        bool same = match(files, i, end, g->language, size, gamedata_crc32(0, data, size)) != nullptr;
+        bool written = same && write_file(g->dir, files[i].path, data, size);
         SDL_free(data);
         if (!same) {
-            problem(r, "Changed while it was copied", files[i].path);
+            problem(r, "Changed while it was copied", g->label, files[i].path);
             return false;
         }
         if (!written)
@@ -178,6 +218,40 @@ static bool copy(Source *src, const GameFile *files, int count, const char *part
         step(progress);
     }
     return true;
+}
+
+// A game's language: by the CD's folder name (REUNION.DEU), else by its
+// TEXT\MESSAGE.TXT; LANGUAGE_COUNT if neither tells.
+static Language game_language(Source *src, int game, const GameFile *files, int count)
+{
+    const char *name = source_game(src, game);
+    const char *base = name;
+    for (const char *c = name; *c; c++)
+        if (*c == '\\')
+            base = c + 1;
+    if (SDL_strlen(base) == 11 && SDL_strncasecmp(base, "REUNION.", 8) == 0) {
+        Language l = gamedata_language_from_name(base + 8);
+        if (l < LANGUAGE_COUNT)
+            return l;
+    }
+    static const char PROBE[] = "TEXT\\MESSAGE.TXT";
+    const SourceFile *sf = source_find_in(src, game, PROBE);
+    if (!sf)
+        return LANGUAGE_COUNT;
+    uint32_t crc = sf->crc;
+    if (!sf->crc_known) {
+        size_t size = 0;
+        uint8_t *data = source_read(src, sf, &size);
+        if (!data)
+            return LANGUAGE_COUNT;
+        crc = gamedata_crc32(0, data, size);
+        SDL_free(data);
+    }
+    for (int i = 0; i < count; i++)
+        if (files[i].languages && SDL_strcmp(files[i].path, PROBE) == 0
+            && files[i].size == sf->size && files[i].crc == crc)
+            return (Language)SDL_MostSignificantBitIndex32(files[i].languages);
+    return LANGUAGE_COUNT;
 }
 
 // data.partial/ becomes data/; an earlier data/ goes only once the new one
@@ -206,7 +280,9 @@ static bool swap_in(const char *player_dir, const char *partial, ImportReport *r
     return ok;
 }
 
-static void copy_saves(Source *src, const char *player_dir, ImportReport *r)
+// Each slot's save from the first game that has one, data/'s first.
+static void copy_saves(Source *src, const Game *games, int game_count, const char *player_dir,
+                       ImportReport *r)
 {
     char *dir = nullptr;
     SDL_asprintf(&dir, "%ssave", player_dir);
@@ -216,7 +292,9 @@ static void copy_saves(Source *src, const char *player_dir, ImportReport *r)
     for (int n = 1; n <= IMPORT_SAVE_SLOTS; n++) {
         char dos[32], *to = nullptr;
         SDL_snprintf(dos, sizeof dos, "SAVE\\SPIDYSAV.%d", n);
-        const SourceFile *sf = source_find(src, dos);
+        const SourceFile *sf = nullptr;
+        for (int g = 0; g < game_count && !sf; g++)
+            sf = source_find_in(src, games[g].index, dos);
         if (!sf)
             continue;
         SDL_asprintf(&to, "%s/spidysav.%d", dir, n);
@@ -236,6 +314,51 @@ static void copy_saves(Source *src, const char *player_dir, ImportReport *r)
     SDL_free(dir);
 }
 
+// The games to import: the English one if there is one, else the first,
+// fills data/; each other language goes to data/<FOLDER> (one game per
+// language; games of no known language are left out). Returns how many.
+static int pick_games(Source *src, const GameFile *files, int count, const char *partial,
+                      Game games[LANGUAGE_COUNT])
+{
+    int n = source_game_count(src);
+    Language langs[64];
+    n = SDL_min(n, (int)SDL_arraysize(langs));
+    int main = 0;
+    for (int g = n - 1; g >= 0; g--) {
+        langs[g] = game_language(src, g, files, count);
+        if (langs[g] == LANGUAGE_ENGLISH)
+            main = g;
+    }
+    // Checked as English if nothing tells: the problems are then named.
+    Language main_lang = langs[main] < LANGUAGE_COUNT ? langs[main] : LANGUAGE_ENGLISH;
+    games[0] = (Game){.index = main, .language = main_lang, .base = LANGUAGE_COUNT, .label = ""};
+    int picked = 1;
+    for (int g = 0; g < n; g++) {
+        bool taken = g == main || langs[g] == LANGUAGE_COUNT;
+        for (int k = 0; k < picked && !taken; k++)
+            taken = games[k].language == langs[g];
+        if (taken)
+            continue;
+        Game *x = &games[picked++];
+        *x = (Game){.index = g, .language = langs[g], .base = main_lang};
+        SDL_asprintf(&x->dir, "%s/%s", partial, gamedata_language_folder(langs[g]));
+        char *label = nullptr;
+        SDL_asprintf(&label, "%s\\", source_game(src, g));
+        x->label = label ? label : "";
+    }
+    games[0].dir = SDL_strdup(partial);
+    return picked;
+}
+
+static void free_games(Game *games, int n)
+{
+    for (int g = 0; g < n; g++) {
+        SDL_free(games[g].dir);
+        if (g > 0 && games[g].label[0])
+            SDL_free((char *)games[g].label);
+    }
+}
+
 bool import_game(const char *path, const char *player_dir, const GameFile *files, int count,
                  ImportReport *r, ImportProgress *progress)
 {
@@ -252,20 +375,40 @@ bool import_game(const char *path, const char *player_dir, const GameFile *files
         r->error = SDL_strdup(SDL_GetError());
         return false;
     }
-    r->root = SDL_strdup(source_root(src));
     char *partial = nullptr;
     SDL_asprintf(&partial, "%sdata.partial", player_dir);
-    bool ok = partial && check(src, files, count, r, progress);
+    Game games[LANGUAGE_COUNT] = {};
+    int game_count = partial ? pick_games(src, files, count, partial, games) : 0;
+    bool ok = game_count > 0 && games[0].dir;
+    if (ok) {
+        r->root = SDL_strdup(source_game(src, games[0].index));
+        r->language = games[0].language;
+        int total = 0;
+        for (int g = 0; g < game_count; g++)
+            total += game_groups(&games[g], files, count);
+        if (progress)
+            SDL_SetAtomicInt(&progress->total, 2 * total);
+    }
+    for (int g = 0; ok && g < game_count; g++)
+        ok = check(src, &games[g], files, count, r, progress) || r->error == nullptr;
+    ok = ok && r->problem_count == 0;
     if (ok) {
         remove_tree(partial);  // left by an import that never finished
         ok = SDL_CreateDirectory(partial) || fail(r, "Creating %s: %s", partial);
-        ok = ok && copy(src, files, count, partial, r, progress);
+        for (int g = 0; ok && g < game_count; g++) {
+            ok = copy(src, &games[g], files, count, r, progress);
+            r->languages |= (uint8_t)(1u << games[g].language);
+        }
         if (ok) {
-            char marker[128];
-            SDL_snprintf(marker, sizeof marker,
-                         "; The Reunion port imported the game here.\n"
-                         "list = %d\nedition = %s\n",
-                         GAMEDATA_LIST_VERSION, gamedata_edition_name(r->edition));
+            char marker[256];
+            int len = SDL_snprintf(marker, sizeof marker,
+                                   "; The Reunion port imported the game here.\n"
+                                   "list = %d\nedition = %s\nlanguages =",
+                                   GAMEDATA_LIST_VERSION, gamedata_edition_name(r->edition));
+            for (int g = 0; g < game_count; g++)
+                len += SDL_snprintf(marker + len, sizeof marker - (size_t)len, " %s",
+                                    gamedata_language_name(games[g].language));
+            SDL_strlcat(marker, "\n", sizeof marker);
             ok = write_file(partial, MARKER, marker, SDL_strlen(marker))
                  || fail(r, "Writing %s: %s", MARKER);
         }
@@ -274,7 +417,10 @@ bool import_game(const char *path, const char *player_dir, const GameFile *files
             remove_tree(partial);
     }
     if (ok)
-        copy_saves(src, player_dir, r);
+        copy_saves(src, games, game_count, player_dir, r);
+    if (!ok)
+        r->languages = 0;
+    free_games(games, game_count);
     SDL_free(partial);
     source_close(src);
     r->ok = ok;
@@ -291,7 +437,7 @@ void import_report_free(ImportReport *r)
     *r = (ImportReport){0};
 }
 
-char *import_data_dir(const char *player_dir, Edition *edition)
+char *import_data_dir(const char *player_dir, ImportedData *info)
 {
     char *dir = nullptr, *marker = nullptr;
     SDL_asprintf(&dir, "%sdata", player_dir);
@@ -299,7 +445,7 @@ char *import_data_dir(const char *player_dir, Edition *edition)
     char *text = marker ? SDL_LoadFile(marker, nullptr) : nullptr;
     SDL_free(marker);
     int list = 0;
-    Edition ed = EDITION_UNKNOWN;
+    ImportedData in = {.language = LANGUAGE_ENGLISH};
     char *save = nullptr;
     for (char *line = text ? SDL_strtok_r(text, "\r\n", &save) : nullptr; line;
          line = SDL_strtok_r(nullptr, "\r\n", &save)) {
@@ -307,14 +453,25 @@ char *import_data_dir(const char *player_dir, Edition *edition)
         if (SDL_sscanf(line, "list = %d", &list) == 1)
             continue;
         if (SDL_sscanf(line, "edition = %15s", name) == 1)
-            ed = gamedata_edition_from_name(name);
+            in.edition = gamedata_edition_from_name(name);
+        if (SDL_strncmp(line, "languages =", 11) == 0) {
+            char *words = line + 11, *at = nullptr;
+            for (char *w = SDL_strtok_r(words, " ", &at); w; w = SDL_strtok_r(nullptr, " ", &at)) {
+                Language l = gamedata_language_from_name(w);
+                if (l == LANGUAGE_COUNT)
+                    continue;
+                if (!in.languages)
+                    in.language = l;
+                in.languages |= (uint8_t)(1u << l);
+            }
+        }
     }
     SDL_free(text);
-    if (list != GAMEDATA_LIST_VERSION) {
+    if (list != GAMEDATA_LIST_VERSION || !in.languages) {
         SDL_free(dir);
         return nullptr;
     }
-    if (edition)
-        *edition = ed;
+    if (info)
+        *info = in;
     return dir;
 }

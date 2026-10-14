@@ -99,8 +99,9 @@ has them and their harness (`tests/diff/`).
 
 `src/main.c` finds the game data (README, "Running"), showing the import
 screen when there is none, and plays the cut-scenes. Each boot then picks
-the font sheet's layout for the data's edition (`gfx_set_cd_charset`), and
-runs `vid_clear`, `dseg_init`, `system_init`, the unit initialisers in
+the language's folder (`fs_set_language_dir`), the language of the
+program's own texts (`Lang_Set`, `src/game/lang.h`) and the CD's or the
+floppy's font for the data's edition (`gfx_set_cd_charset`), and runs `vid_clear`, `dseg_init`, `system_init`, the unit initialisers in
 Main's order (`Game_InitUnits`) and `Game_Main`, the main program body
 (`src/game/main_program.c`). The original never returns from
 Main: it ends in `Halt`, often deep inside a screen. The port unwinds with
@@ -150,6 +151,13 @@ the original in a few places, each commented in the code:
   0000:0000), and a footprint at uninitialised coordinates in
   `Surface_RegisterBuildingAnims`.
 - **No copy protection** (`src/game/protect.h`).
+- **The CD's French and Italian accents** draw with the font sheet's own
+  glyphs, as the install archives' programs do; the CD's executable draws
+  them all as é (`cd_glyph`, `src/game/gfx.c`).
+- **The texts compiled into the program** are the language's in the CD's
+  German, French and Italian games: the CD runs them with the English
+  program, the port takes the texts of each language's own build of it
+  from the install archives (docs/versions.md, `src/game/lang.h`).
 - **Without `SAVE\SETUP.SPD`** `Sound_Init` takes the floppy's Sound
   Blaster, where the original takes a GUS. The import leaves the file out,
   since the CD's switches the sound off.
@@ -157,8 +165,8 @@ the original in a few places, each commented in the code:
 ## Port additions
 
 - **Port menu** (F1, `src/platform/menu.h`): cheats, music card, effects
-  and volumes, display, skip intro, colony stats, Detoxin rate, the fix
-  switches, and System: import game data, restart and quit. The game
+  and volumes, display, skip intro, colony stats, Detoxin rate, language,
+  the fix switches, and System: import game data, restart and quit. The game
   waits inside `timing_wait_retrace` while it is open. The platform layer
   knows nothing of the game: display and volumes apply at once, the music
   switch is made at once by `src/main.c`, and everything that touches
@@ -179,9 +187,13 @@ the original in a few places, each commented in the code:
   (`src/platform/importscreen.h`) asks for it when no game data is found,
   and the port menu's System section imports another copy. Debug builds
   warn when the game loads a file that isn't on the list.
-- **Editions.** The English floppy release, and REUNION.ENG of the European
-  CD, whose font sheet is laid out differently (docs/versions.md):
-  `gfx_set_cd_charset` (`src/game/gfx.h`) picks the layout.
+- **Editions and languages.** The English floppy release, and the European
+  CD's four games, whose font differs (docs/versions.md):
+  `gfx_set_cd_charset` (`src/game/gfx.h`) picks it. An import of the CD
+  has all four: data/ the English game, data/DEU, FRA and ITA each
+  language's own files, read first in that language
+  (`src/platform/import.h`, `fs_set_language_dir`). The language is a
+  setting (port menu, Game; `--language`) used from the next restart.
 - **Music cards.** None, Sound Blaster (the AdLib FM tunes, through the
   original's player on Nuked OPL3) or UltraSound (the `ANIM\*.SPD`
   ProTracker modules, through libxmp), switchable at any time

@@ -8,6 +8,7 @@
 #include "game/command.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -197,7 +198,7 @@ void AlienTalk_SetupTalkHotspots(void)
     h->Y = 0x86;
     h->W = 0xD2;
     h->H = 0x3F;
-    pstr_set(&h->Caption, 0x12, "Talking");
+    pstr_set(&h->Caption, 0x12, Lang_TextAt(0x2e4b0641, "Talking"));
     h->Repeat_ = 0;
     h->_1A = 0;
     ds.AlienTalk_HoverCol = 0xFFFF;

@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "game/dsfields.h"
+#include "game/lang.h"
 
 DSeg ds;
 
@@ -63,4 +64,5 @@ uint8_t *dseg_orig(uint16_t orig)
 void dseg_init(void)
 {
     ds = ds_initial;
+    Lang_PatchDS();
 }

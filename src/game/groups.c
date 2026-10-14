@@ -8,6 +8,7 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/satellite.h"
@@ -343,12 +344,13 @@ void Groups_DrawGroupPanel(bool full)
     TGroup *g = Groups_Selected();
     char t[256], loc[256], num[16];
 
-    Gfx_DrawTextF9(pstr_get(t, sizeof t, &ds.Groups_TypeNames[g->Kind - 1]), 0xDF, 0x38, 0xD);
+    Gfx_DrawTextF9(pstr_get(t, sizeof t, Lang_Slot(&ds.Groups_TypeNames[g->Kind - 1])), 0xDF, 0x38,
+                   0xD);
     Gfx_DrawTextFC(pstr_get(t, sizeof t, &g->Name), 0x18, 0x38, 0x11);
     PlanetInfo_GetBodyLocationName(t, sizeof t, g->System, g->Planet, g->Moon);
-    const char *prefix = g->Status == 4 || g->Status == 5 || g->Status == 6 ? "Fly to "
-                         : g->Status == 2                                ? "In orbit "
-                         : g->Status == 1                                ? "In the dock of "
+    const char *prefix = g->Status == 4 || g->Status == 5 || g->Status == 6 ? Lang_Text("Fly to ")
+                         : g->Status == 2                                ? Lang_Text("In orbit ")
+                         : g->Status == 1                                ? Lang_Text("In the dock of ")
                                                                          : "";
     SDL_snprintf(loc, sizeof loc, "%s%s", prefix, t);
     Gfx_DrawTextF9(loc, 0xC, 0x43, 0x31);
@@ -476,16 +478,16 @@ void Groups_SetupGroupsHotspots(void)
     ds.Groups_CanChangeSlots = (uint8_t)ds.Game_CurBodyIsColony != 0 && (g->Status == 1 || g->Status == 7);
 
     ds.Mouse_HotspotCount = 0x20;
-    Mouse_SetHotspot(1, 0x15, 0x35, 0x6C, 0xC, "Change name", 1, 0);
+    Mouse_SetHotspot(1, 0x15, 0x35, 0x6C, 0xC, Lang_Text("Change name"), 1, 0);
     Mouse_SetHotspot(2, 7, 0x35, 0xE, 0xC,
-                     ds.Groups_PlanetForceMode ? "" : "Previous group",
+                     ds.Groups_PlanetForceMode ? "" : Lang_Text("Previous group"),
                      1, 0);
     Mouse_SetHotspot(3, 0x81, 0x35, 0xD, 0xC,
-                     ds.Groups_PlanetForceMode ? "" : "Next group",
+                     ds.Groups_PlanetForceMode ? "" : Lang_Text("Next group"),
                      1, 0);
     Mouse_SetHotspot(4, 0, 0, 0, 0, "", 1, 0);
-    Mouse_SetHotspot(5, 0x123, 0x54, 0x1C, 0x23, "Page up", 1, 0);
-    Mouse_SetHotspot(6, 0x123, 0x79, 0x1C, 0x23, "Page down", 1, 0);
+    Mouse_SetHotspot(5, 0x123, 0x54, 0x1C, 0x23, Lang_Text("Page up"), 1, 0);
+    Mouse_SetHotspot(6, 0x123, 0x79, 0x1C, 0x23, Lang_Text("Page down"), 1, 0);
     Mouse_ClearHotspots(7, 7);
 
     const uint8_t kind = g->Kind;
@@ -526,15 +528,16 @@ void Groups_DrawNewGroupNameAndType(void)
     const TGroup *g = Groups_Selected();
     char t[256];
     Gfx_DrawTextFC(pstr_get(t, sizeof t, &g->Name), 0x87, 0x5E, 0xE);
-    Gfx_DrawTextFC(pstr_get(t, sizeof t, &ds.Groups_TypeNames[g->Kind - 1]), 0x87, 0x77, 0xD);
+    Gfx_DrawTextFC(pstr_get(t, sizeof t, Lang_Slot(&ds.Groups_TypeNames[g->Kind - 1])), 0x87, 0x77,
+                   0xD);
 }
 
 // 2b8d:1659
 void Groups_SetupNewGroupHotspots(void)
 {
     ds.Mouse_HotspotCount = 2;
-    Mouse_SetHotspot(1, 0x84, 0x5B, 0x5D, 0xD, "Change name", 1, 0);
-    Mouse_SetHotspot(2, 0x84, 0x75, 0x5D, 0xB, "Change type", 1, 0);
+    Mouse_SetHotspot(1, 0x84, 0x5B, 0x5D, 0xD, Lang_Text("Change name"), 1, 0);
+    Mouse_SetHotspot(2, 0x84, 0x75, 0x5D, 0xB, Lang_Text("Change type"), 1, 0);
 }
 
 // 2b8d:16d0 resets the selected group
@@ -542,7 +545,7 @@ void Groups_ClearGroup(void)
 {
     TGroup *g = Groups_Selected();
     g->Kind = 1;
-    pstr_set(&g->Name, 17, "New Group");
+    pstr_set(&g->Name, 17, Lang_Text("New Group"));
     g->System = 1;
     g->Planet = 5;
     g->Moon = 0;
@@ -577,7 +580,7 @@ void Groups_InitGroupOfKind(void)
     if (g->Kind == 3)
         g->Kind = 4;
     char name[256];
-    pstr_set(&g->Name, 17, pstr_get(name, sizeof name, &ds.Groups_DefaultNames[g->Kind - 1]));
+    pstr_set(&g->Name, 17, pstr_get(name, sizeof name, Lang_Slot(&ds.Groups_DefaultNames[g->Kind - 1])));
     if (g->Kind == 5)
         g->Status = 7;
     for (int cat = 1; cat <= 4; cat++) {

@@ -4,6 +4,7 @@
 
 #include "game/blit.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/system.h"
@@ -20,7 +21,7 @@ static PlanetListEntry *entry_at(int16_t i)
 void PlanetList_SetupScrollBarHotspot(void)
 {
     ds.Mouse_HotspotCount = 1;
-    Mouse_SetHotspot(1, 0x134, 0x37, 0xC, 0x8C, "Scroll bar", 0, 0);
+    Mouse_SetHotspot(1, 0x134, 0x37, 0xC, 0x8C, Lang_Text("Scroll bar"), 0, 0);
 }
 
 // 1390:0047
@@ -133,7 +134,7 @@ void PlanetList_ListKindCaption(char *dst, size_t cap, int16_t mode, int16_t kin
         if (kind == 3)
             text = "Friendly colony on ";
     }
-    SDL_strlcpy(dst, text, cap);
+    SDL_strlcpy(dst, Lang_Text(text), cap);
 }
 
 // 1390:04cc
@@ -159,7 +160,7 @@ void PlanetList_DrawList(void)
                     char system[256];
                     pstr_get(system, sizeof system, &ds.Names_Systems[e->System - 1]);
                     PlanetInfo_GetBodyName(name, sizeof name, e->System, e->Planet, 0);
-                    SDL_snprintf(line, sizeof line, "%s system planet %s", system, name);
+                    SDL_snprintf(line, sizeof line, "%s%s%s", system, Lang_Text(" system planet "), name);
                 }
                 Gfx_DrawTextF9(line, x, y, (int16_t)((0x133 - x) / 6));
             }
@@ -171,7 +172,7 @@ void PlanetList_DrawList(void)
             int16_t x = (int16_t)(len * 6 + 10);
             Blit_FillRect(10, y, (int16_t)(len * 6 - 1), 8, 0x40);
             PlanetInfo_GetBodyName(name, sizeof name, e->System, e->Planet, e->Moon);
-            SDL_snprintf(line, sizeof line, "moon %s", name);
+            SDL_snprintf(line, sizeof line, "%s%s", Lang_Text("moon "), name);
             Gfx_DrawTextF9(line, x, y, (int16_t)((0x133 - x) / 6));
         }
         if (row == shown)

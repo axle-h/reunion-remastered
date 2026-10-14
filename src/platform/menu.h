@@ -1,7 +1,7 @@
 // The port menu (F1): settings drawn over the game, which waits inside
 // timing_wait_retrace while it is open. Sections: Cheats, Sound, Video,
-// Game, Fixes and System (import game data, restart, quit). Every change
-// goes to the config file at once.
+// Game (with the language of the CD's games), Fixes and System (import
+// game data, restart, quit). Every change goes to the config file at once.
 //
 // The menu knows nothing of the game. Settings of the platform layer
 // (volumes, display) apply at once; for the rest it calls hooks.changed and
@@ -34,6 +34,8 @@ typedef struct MenuHooks {
     int add_money, add_ore;  // the add cheats' amounts, for their labels
     const MenuFix *fixes;
     int fix_count;
+    // IN_* of the languages the game data has (platform/gamedata.h).
+    unsigned (*languages)(void);
 } MenuHooks;
 
 void menu_set_hooks(const MenuHooks *hooks);

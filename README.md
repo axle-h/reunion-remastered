@@ -38,15 +38,23 @@ CMake setting (default `vendor/Reunion_DOS_EN`; not in release builds).
 If none of them has the game, the game asks for the player's copy of the
 DOS game: its folder, a ZIP of it, or the CD's ISO image, chosen in a file
 dialog or dropped onto the window. The English floppy release and the
-English game on the European CD are accepted (docs/versions.md). The copy is
-checked file by file and copied to `data/`; the DOS game's saves go to
-`save/` where their slot is free. `reunion --import=PATH` does the same
-without a window. The port menu (System) imports another copy.
+European CD are accepted (docs/versions.md). The copy is checked file by
+file and copied to `data/`; the DOS game's saves go to `save/` where their
+slot is free. `reunion --import=PATH` does the same without a window. The
+port menu (System) imports another copy.
+
+The CD's import has its English, German, French and Italian games; the port
+menu (Game, Language) picks one, used from the next restart. Their menus,
+captions and the program's messages are translated too (the CD left those
+in English).
+`--language=english|german|french|italian` does the same from the command
+line (scripted runs read no `reunion.ini`). A `DATA_DIR` laid out like an
+import (`DEU`, `FRA`, `ITA` next to `GRAFIKA`) has its languages too.
 
 F1 opens the port menu over the game: cheats, music (None, Sound Blaster,
 UltraSound), effects and volumes, display mode and size, skipping the
-intro, the colony stats, the Detoxin rate, the fixes, importing game data,
-restart and quit. Its settings are kept in `reunion.ini`.
+intro, the colony stats, the Detoxin rate, the language, the fixes,
+importing game data, restart and quit. Its settings are kept in `reunion.ini`.
 Alt+Enter toggles full screen; F12 saves a BMP screenshot to
 `screenshots/`.
 

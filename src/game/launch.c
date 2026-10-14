@@ -2,6 +2,7 @@
 
 #include "game/groups.h"
 #include "game/intel.h"
+#include "game/lang.h"
 #include "game/sound.h"
 #include "game/system.h"
 
@@ -27,7 +28,7 @@ void Message_ShowMessageNoLog(const char *text); // 34b0:0197
 #define CUR_PLANET (ds.Game_CurPlanet[ds.Game_CurSystem - 1])
 #define CUR_MOON (ds.Game_CurMoon[ds.Game_CurSystem - 1])
 
-#define MSG(lit) Message_ShowMessageNoLog(lit)
+#define MSG(lit) Message_ShowMessageNoLog(Lang_Text(lit))
 
 // 18e0:00e8
 void Launch_MapScreen(void)

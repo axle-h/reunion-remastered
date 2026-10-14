@@ -5,6 +5,7 @@
 
 #include "game/blit.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -130,7 +131,7 @@ void Pub_SetupTalkHotspot(void)
     h->Y = 0x86;
     h->W = 0xD2;
     h->H = 0x3F;
-    pstr_set(&h->Caption, 0x12, "Talking");
+    pstr_set(&h->Caption, 0x12, Lang_TextAt(0x1fd2050f, "Talking"));
     h->Repeat_ = 0;
     h->_1A = 0;
     ds.Pub_HoverCol = 0xFFFF;
@@ -161,8 +162,12 @@ void Pub_ShowReply(void)
         ds.Pub_OfferPrice = price;
         ds.Pub_People[1].Deal = (uint8_t)((ds.Pub_ReplyLine - 9) * 0x14 + ds.Pub_OfferItem);
         ds.Pub_CurMenu.Count = 1;
-        SDL_snprintf(line, sizeof line, "09 %s%d credits",
-                     System_Random(2) == 0 ? "It will be " : "My work will cost ", (int)price);
+        if (System_Random(2) == 0)
+            SDL_snprintf(line, sizeof line, "%s%d%s", Lang_TextAt(0x1fd206bd, "09 It will be "),
+                         (int)price, Lang_TextAt(0x1fd206d2, " credits"));
+        else
+            SDL_snprintf(line, sizeof line, "%s%d%s", Lang_Text("09 My work will cost "), (int)price,
+                         Lang_TextAt(0x1fd20707, " credits"));
         SDL_strlcpy(line_at(1), line, 256);
     }
     Mouse_HideCursor();

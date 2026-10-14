@@ -7,6 +7,7 @@
 #include "game/crt.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -281,14 +282,14 @@ void Command_SetupCommandHotspots(void)
         h->Repeat_ = 1;
         h->_1A = 0;
     }
-    Mouse_SetHotspot(5, 0x2A, 0x47, 0x26, 0x3C, "RESEARCH-DESIGN", 1, 0);
-    Mouse_SetHotspot(6, 0, 0x47, 0x2A, 0x4F, "MESSAGE", 1, 0);
-    Mouse_SetHotspot(7, 0xA3, 0x31, 0x1E, 0x36, "COMMANDERS", 1, 0);
-    Mouse_SetHotspot(8, 0xFF, 0x31, 0x41, 0x58, "INFO-BUY", 1, 0);
-    Mouse_SetHotspot(9, 0, 0x31, 0x50, 0x16, "STARMAP", 1, 0);
-    Mouse_SetHotspot(10, 0x51, 0x31, 0x30, 0x31, "SPACE LOCAL", 1, 0);
-    Mouse_SetHotspot(11, 0xC2, 0x31, 0x35, 0x52, "SHIP INFO", 1, 0);
-    Mouse_SetHotspot(12, 0x49, 0x9D, 0xBE, 0x2B, "PLANET MAIN", 1, 0);
+    Mouse_SetHotspot(5, 0x2A, 0x47, 0x26, 0x3C, Lang_Text("RESEARCH-DESIGN"), 1, 0);
+    Mouse_SetHotspot(6, 0, 0x47, 0x2A, 0x4F, Lang_Text("MESSAGE"), 1, 0);
+    Mouse_SetHotspot(7, 0xA3, 0x31, 0x1E, 0x36, Lang_Text("COMMANDERS"), 1, 0);
+    Mouse_SetHotspot(8, 0xFF, 0x31, 0x41, 0x58, Lang_Text("INFO-BUY"), 1, 0);
+    Mouse_SetHotspot(9, 0, 0x31, 0x50, 0x16, Lang_Text("STARMAP"), 1, 0);
+    Mouse_SetHotspot(10, 0x51, 0x31, 0x30, 0x31, Lang_Text("SPACE LOCAL"), 1, 0);
+    Mouse_SetHotspot(11, 0xC2, 0x31, 0x35, 0x52, Lang_Text("SHIP INFO"), 1, 0);
+    Mouse_SetHotspot(12, 0x49, 0x9D, 0xBE, 0x2B, Lang_Text("PLANET MAIN"), 1, 0);
 }
 
 // 3abd:0ba1

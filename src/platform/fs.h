@@ -8,12 +8,18 @@
 #include <stdint.h>
 
 // Sets the directory holding the game data (the one with GRAFIKA, PICS, ...).
+// Clears the language folder.
 bool fs_init(const char *data_dir);
 void fs_shutdown(void);
 // The directory fs_init set, or nullptr.
 const char *fs_root(void);
+// A folder of one language's own versions of some files (an import's
+// data/DEU, platform/import.h), searched before the root; nullptr for none.
+bool fs_set_language_dir(const char *dir);
+const char *fs_language_dir(void);
 
-// Returns the host path of an existing file or directory, or nullptr.
+// Returns the host path of an existing file or directory, in the language
+// folder if it has one, else in the root; or nullptr.
 // The caller frees the result with SDL_free().
 char *fs_resolve(const char *dos_path);
 

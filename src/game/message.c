@@ -7,6 +7,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/sound.h"
@@ -83,7 +84,7 @@ static void blink(uint16_t *counter)
     if (*counter == 25)
         Gfx_DrawStatusText("");
     if (*counter == 50)
-        Gfx_DrawStatusText("Press mouse button");
+        Gfx_DrawStatusText(Lang_Text("Press mouse button"));
 }
 
 static bool button_down(void)
@@ -153,7 +154,7 @@ void Message_MessageBox(const char *text, const char *voice, bool logIt, uint8_t
         TextFile_InputLine(buf, (int16_t)((editCol - 1) * 6 + x0),
                            (int16_t)(y0 + 1 + (editLine - 1) * 9), maxLen, false);
     } else {
-        Gfx_DrawStatusText("Press mouse button");
+        Gfx_DrawStatusText(Lang_Text("Press mouse button"));
         uint16_t counter = 0;
         // Wait for the button to be released (if held), pressed, released.
         while (button_down() && !TextFile_KeyPressed() && !input_quit_requested()) {
@@ -282,7 +283,8 @@ void Message_PromptPlanetName(int16_t sys, int16_t planet)
 {
     char system[256], s[256];
     pstr_get(system, sizeof system, &ds.Names_Systems[sys - 1]);
-    SDL_snprintf(s, sizeof s, "| The new planet's name in %s system? &xxxxxxxx |", system);
+    SDL_snprintf(s, sizeof s, "%s%s%s", Lang_Text("| The new planet's name in "), system,
+                 Lang_Text(" system? &xxxxxxxx |"));
     // The names of system sys are 13-byte records (string[12]) behind Galaxy::Names[sys].
     uint8_t *name = (uint8_t *)&ds.Galaxy_Names[sys - 1][planet - 1];
     Message_MessageBox(s, "", false, name, true, 9);

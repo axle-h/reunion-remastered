@@ -12,12 +12,17 @@
 // Environment:
 //   PLAY_SEED=N         game seed (default: the plan's, else 12345)
 //   PLAY_RECORD=FILE    the recording (default: NAME.txt in the working
-//                       directory, i.e. the build directory under ctest)
+//                       directory, i.e. the build directory under ctest;
+//                       NAME_LANGUAGE.txt with PLAY_LANGUAGE)
 //   PLAY_RESUME=STEP    replays the recording up to step STEP's checkpoint
 //                       and plays from there (PLAY_RESUME_FROM=FILE reads
 //                       another recording); the new recording replaces it
 //   PLAY_STOP=STEP      ends the run (as a quit) when step STEP would start
 //   PLAY_VERIFY=0       skips replaying the recording at the end
+//   PLAY_LANGUAGE=NAME  plays the CD's German, French or Italian game: the
+//                       data is then an import's data/ (English, with the
+//                       language's folder; lang.h), or the CD's ISO, which
+//                       is imported into NAME_LANGUAGE.import/ first
 //   REUNION_BIN=PATH    also replays it with `PATH --replay` (set by CMake)
 //   PLAY_DUMP_DIR, PLAY_TRACE, PLAY_STATE_DUMP: see play.c
 #pragma once

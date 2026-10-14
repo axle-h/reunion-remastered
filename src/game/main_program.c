@@ -25,12 +25,13 @@
 #include "game/grwarunits.h"
 #include "game/hire.h"
 #include "game/intel.h"
+#include "game/lang.h"
 #include "game/launch.h"
 #include "game/message.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
-#include "game/options.h"
 #include "game/music.h"
+#include "game/options.h"
 #include "game/planetinfo.h"
 #include "game/planetlist.h"
 #include "game/protect.h"
@@ -364,7 +365,7 @@ static void draw_hint(int16_t hit)
     else if (h == 0 || h == 0xD)
         Gfx_DrawStatusText("");
     else if (h == 0xE)
-        Gfx_DrawStatusText("Time");
+        Gfx_DrawStatusText(Lang_Text("Time"));
     else
         Gfx_DrawStatusText(pstr_get(caption, sizeof caption,
                                     &Mouse_Hotspot((int16_t)(h - 0x14))->Caption));
@@ -761,15 +762,15 @@ static void surface_build_button(void)
         Sound_PlayButtonSfx("hiba");
         Gfx_FlashCredits();
     } else if (ds.Game_StaffExp[1] == 0) {
-        Message_ShowMessageNoLog(" You have no builder! ");
+        Message_ShowMessageNoLog(Lang_Text(" You have no builder! "));
     } else if (ds.Surface_SelKind == 1) {
-        Message_ShowMessageNoLog(" You cannot have two command centres built! ");
+        Message_ShowMessageNoLog(Lang_Text(" You cannot have two command centres built! "));
     } else if (ds.Surface_SelKind == 0x19) {
-        Message_ShowMessageNoLog(" You already have a colony! ");
+        Message_ShowMessageNoLog(Lang_Text(" You already have a colony! "));
     } else if (bt->_12[0] != 0 && ds.Main_HasBuilderPlant == 0) {
-        Message_ShowMessageNoLog(" This building needs a builder plant! ");
+        Message_ShowMessageNoLog(Lang_Text(" This building needs a builder plant! "));
     } else if (bt->_12[1] != 0 && ds.Main_HasVehiclePlant == 0) {
-        Message_ShowMessageNoLog(" This building needs a vehicle plant! ");
+        Message_ShowMessageNoLog(Lang_Text(" This building needs a vehicle plant! "));
     } else if ((int32_t)ds.Game_StaffHired[1] >= (int32_t)(int8_t)bt->_10) {
         Sound_PlayButtonSfx("build");
         ds.Surface_Mode = 2;
@@ -779,7 +780,7 @@ static void surface_build_button(void)
         // Staff::Names[2, StaffHired[2]]; none hired reads Names[1, 3].
         char name[256], msg[256];
         pstr_get(name, sizeof name, &ds.Staff_Names[0][0] + 2 + ds.Game_StaffHired[1]);
-        SDL_snprintf(msg, sizeof msg, "%s is not able to construct this building", name);
+        SDL_snprintf(msg, sizeof msg, "%s%s", name, Lang_Text(" is not able to construct this building"));
         Message_ShowMessageNoLog(msg);
     }
 }
@@ -1033,7 +1034,7 @@ static void pub_answer(void)
     if (who == 1) {
         if (a == 1) {
             ds.Pub_StoryFlags[0] = 1;
-            pstr_set(&p[0].Name, 13, "Spy-Hunter   ");
+            pstr_set(&p[0].Name, 13, Lang_Text("Spy-Hunter   "));
         } else if (a == 2) {
             ds.Pub_ReplyLine = ds.Pub_StoryFlags[1] == 0 ? 4 : 6;
         } else if (a == 4) {
@@ -1091,7 +1092,7 @@ static void pub_answer(void)
                 ds.Galaxy_PlanetStatus[1][4] = 0;
         } else if (a == 5) {
             ds.Pub_StoryFlags[3] = 1;
-            pstr_set(&p[8].Name, 13, "Pirate Leader");
+            pstr_set(&p[8].Name, 13, Lang_Text("Pirate Leader"));
             add_credits(-500);
         }
     }
@@ -1111,7 +1112,7 @@ static void pub_answer(void)
             ds.Pub_StoryFlags[2] = 1;
         } else if (a == 10) {
             ds.Pub_StoryFlags[2] = 1;
-            pstr_set(&p[1].Name, 13, "Spy          ");
+            pstr_set(&p[1].Name, 13, Lang_Text("Spy          "));
         } else if (a == 11) {
             ds.Pub_StoryFlags[9] = 1;
         } else if (a == 13) {
@@ -1138,7 +1139,7 @@ static void pub_answer(void)
     }
     if (who == 7) {
         ds.Pub_StoryFlags[10] = 1;
-        pstr_set(&p[6].Name, 13, "Bounty-Hunter");
+        pstr_set(&p[6].Name, 13, Lang_Text("Bounty-Hunter"));
     }
     if (who == 9) {
         if (a == 2) {
@@ -1307,7 +1308,8 @@ static void ground_battle_won_story(void)
         return;
     char race[256], msg[256];
     pstr_get(race, sizeof race, &Intel_Race((int8_t)body->Owner)->Name);
-    SDL_snprintf(msg, sizeof msg, " Your forces have eliminated '%s' ", race);
+    SDL_snprintf(msg, sizeof msg, "%s%s%s", Lang_Text(" Your forces have eliminated '"), race,
+                 Lang_Text("' "));
     Message_ShowMessage(msg);
     if (body->Owner == 3) {
         Message_ShowMessageLine(0x23);

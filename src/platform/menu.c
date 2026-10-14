@@ -56,6 +56,7 @@ typedef enum : int {
     R_SKIP_INTRO,
     R_COLONY_STATS,
     R_DETOXIN_RATE,
+    R_LANGUAGE,
     R_FIXES_ON,
     R_FIXES_OFF,
     R_IMPORT,
@@ -96,6 +97,22 @@ static void changed(MenuChange c)
 }
 
 // --- Rows ---------------------------------------------------------------------
+
+// The languages to choose from (IN_*), at least one.
+static unsigned languages(void)
+{
+    unsigned in = hooks.languages ? hooks.languages() : 0;
+    return in ? in : IN_ENGLISH;
+}
+
+// config.language if it can be had, else the one the game falls back on.
+static Language shown_language(void)
+{
+    unsigned in = languages();
+    if (in & 1u << config.language)
+        return config.language;
+    return (Language)SDL_MostSignificantBitIndex32(in & -in);
+}
 
 static Row *add(RowKind kind, int id, const char *label, const char *help)
 {
@@ -205,6 +222,9 @@ static void build_rows(void)
         r = add(ROW_TOGGLE, R_DETOXIN_RATE, "Detoxin rate",
                 "Droids screen and Derrick info: all the Derricks' Detoxin T/PTP.");
         r->on = config.detoxin_rate;
+        r = add(ROW_CHOICE, R_LANGUAGE, "Language", "The CD's games. From the next restart (System).");
+        SDL_strlcpy(r->value, gamedata_language_label(shown_language()), sizeof r->value);
+        r->enabled = (languages() & (languages() - 1)) != 0;  // more than one
         break;
     case SEC_FIXES:
         add(ROW_ACTION, R_FIXES_ON, "All on", "Fixes to bugs of the original game.");
@@ -343,6 +363,14 @@ static void act(const Row *r, int dir)
     case R_DETOXIN_RATE:
         config.detoxin_rate = !config.detoxin_rate;
         break;
+    case R_LANGUAGE: {
+        Language l = shown_language();
+        do
+            l = (Language)step(l, dir ? dir : 1, 0, LANGUAGE_COUNT - 1, true);
+        while (!(languages() & 1u << l));
+        config.language = l;
+        break;
+    }
     case R_IMPORT:
         importscreen_run(true);
         vid_set_overlay(menu_draw);

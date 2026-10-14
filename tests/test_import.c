@@ -1,8 +1,10 @@
 // import: copies of the game in a folder, a ZIP and an ISO image, each built
 // here from a small fake list of game files. The edition, the root at any
-// depth (REUNION.ENG of several), the DOS saves with a slot already in use,
-// a missing file, a different one (in a folder and in a ZIP), a copy with
-// no game, an import left half done, an old list version and a re-import.
+// depth, the CD's languages (REUNION.ENG to data/, REUNION.DEU's own files
+// to data/DEU; a lone German game), the DOS saves with a slot already in
+// use, a missing file, a different one (in a folder and in a ZIP, in data/'s
+// game and in another language's), a copy with no game, an import left
+// half done, an old list version and a re-import.
 #include <SDL3/SDL.h>
 #include <miniz.h>
 #include <stdio.h>
@@ -19,11 +21,13 @@ static const char PLAYER[] = "test_import.tmp/player/";
 
 // The fake list; sizes and CRCs are filled in from the contents.
 static GameFile files[] = {
-    {"GRAFIKA\\CHARSET1.PIC", 0, 0, EDITION_FLOPPY},
-    {"GRAFIKA\\CHARSET1.PIC", 0, 0, EDITION_CD},
-    {"GRAFIKA\\MAIN.PIC", 0, 0, EDITION_UNKNOWN},
-    {"SAVE\\INIT", 0, 0, EDITION_UNKNOWN},
-    {"TEXT\\MESSAGE.TXT", 0, 0, EDITION_UNKNOWN},
+    {"GRAFIKA\\CHARSET1.PIC", 0, 0, EDITION_FLOPPY, 0},
+    {"GRAFIKA\\CHARSET1.PIC", 0, 0, EDITION_CD, 0},
+    {"GRAFIKA\\MAIN.PIC", 0, 0, EDITION_UNKNOWN, 0},
+    {"SAVE\\INIT", 0, 0, EDITION_UNKNOWN, 0},
+    {"TEXT\\MESSAGE.TXT", 0, 0, EDITION_UNKNOWN, IN_ENGLISH},
+    {"TEXT\\MESSAGE.TXT", 0, 0, EDITION_UNKNOWN, IN_GERMAN},
+    {"WAR\\GRLOST.PIC", 0, 0, EDITION_UNKNOWN, IN_ENGLISH | IN_GERMAN},
 };
 enum { FILE_COUNT = (int)SDL_arraysize(files) };
 
@@ -35,8 +39,9 @@ typedef struct Entry {
     size_t size;
 } Entry;
 
-// A copy of the game: the listed files (CHARSET1 of `edition`), two DOS
-// saves and two files that are not on the list, under `prefix`.
+// A copy of the game: the listed files (CHARSET1 of `edition`, the
+// versions of `language`), two DOS saves and two files that are not on the
+// list, under `prefix`.
 typedef struct Copy {
     Entry e[16];
     int count;
@@ -52,11 +57,12 @@ static void add(Copy *c, const char *prefix, const char *path, const uint8_t *da
     e->size = size;
 }
 
-static Copy make_copy(const char *prefix, Edition edition)
+static Copy make_copy(const char *prefix, Edition edition, Language language)
 {
     Copy c = {0};
     for (int i = 0; i < FILE_COUNT; i++) {
-        if (files[i].edition && files[i].edition != edition)
+        if ((files[i].edition && files[i].edition != edition)
+            || !gamedata_in_language(&files[i], language))
             continue;
         // One in lower case: names match in any case.
         const char *path = i == 2 ? "grafika\\main.pic" : files[i].path;
@@ -310,10 +316,21 @@ static bool file_is(const char *rel, const void *data, size_t size)
 // The edition of the import in use, or EDITION_UNKNOWN if none is.
 static Edition installed(void)
 {
-    Edition e = EDITION_UNKNOWN;
-    char *dir = import_data_dir(PLAYER, &e);
+    ImportedData in;
+    char *dir = import_data_dir(PLAYER, &in);
+    bool found = dir != nullptr;
     SDL_free(dir);
-    return dir ? e : EDITION_UNKNOWN;
+    return found ? in.edition : EDITION_UNKNOWN;
+}
+
+// The languages of the import in use (IN_*), data/'s in *main.
+static unsigned installed_languages(Language *main)
+{
+    ImportedData in = {};
+    char *dir = import_data_dir(PLAYER, &in);
+    SDL_free(dir);
+    *main = in.language;
+    return in.languages;
 }
 
 static bool run(const char *path, ImportReport *r)
@@ -321,8 +338,9 @@ static bool run(const char *path, ImportReport *r)
     ImportProgress progress;
     bool done = import_game(path, PLAYER, files, FILE_COUNT, r, &progress);
     CHECK(done == r->ok);
-    if (done)  // checked and copied: four paths, twice
-        CHECK(SDL_GetAtomicInt(&progress.done) == 8 && SDL_GetAtomicInt(&progress.total) == 8);
+    if (done)  // checked and copied, every path counted twice
+        CHECK(SDL_GetAtomicInt(&progress.done) == SDL_GetAtomicInt(&progress.total)
+              && SDL_GetAtomicInt(&progress.total) >= 10);
     if (!done && r->error)
         printf("  (%s)\n", r->error);
     return done;
@@ -352,7 +370,7 @@ int main(void)
 
     // A folder, the game one level down. Slot 2 already holds a save.
     write_at(PLAYER, "save\\spidysav.2", "mine", 4);
-    Copy floppy = make_copy("Reunion\\", EDITION_FLOPPY);
+    Copy floppy = make_copy("Reunion\\", EDITION_FLOPPY, LANGUAGE_ENGLISH);
     char *folder = write_folder("folder", &floppy);
     CHECK(run(folder, &r));
     CHECK(r.edition == EDITION_FLOPPY && SDL_strcmp(r.root, "Reunion") == 0);
@@ -362,9 +380,13 @@ int main(void)
     CHECK(file_is("data/GRAFIKA/MAIN.PIC", contents[2], files[2].size));
     CHECK(file_is("data/GRAFIKA/CHARSET1.PIC", contents[0], files[0].size));
     CHECK(file_is("data/SAVE/INIT", contents[3], files[3].size));
+    CHECK(file_is("data/TEXT/MESSAGE.TXT", contents[4], files[4].size));
     CHECK(!exists("data/SAVE/SPIDYSAV.1") && !exists("data/README.TXT") && !exists("data/GRWAR"));
     CHECK(!exists("data.partial") && !exists("data.old"));
     CHECK(installed() == EDITION_FLOPPY);
+    Language main_lang;
+    CHECK(r.languages == IN_ENGLISH && r.language == LANGUAGE_ENGLISH);
+    CHECK(installed_languages(&main_lang) == IN_ENGLISH && main_lang == LANGUAGE_ENGLISH);
     char *dir = import_data_dir(PLAYER, nullptr);
     CHECK(dir && SDL_strcmp(dir, "test_import.tmp/player/data") == 0);
     SDL_free(dir);
@@ -372,7 +394,7 @@ int main(void)
 
     // A ZIP of the CD's files, the game at the top, replaces it.
     write_at(PLAYER, "data\\OLD", "x", 1);
-    Copy cd = make_copy("", EDITION_CD);
+    Copy cd = make_copy("", EDITION_CD, LANGUAGE_ENGLISH);
     char *zip = write_zip("cd.zip", &cd);
     CHECK(run(zip, &r));
     CHECK(r.edition == EDITION_CD && SDL_strcmp(r.root, "") == 0);
@@ -382,33 +404,59 @@ int main(void)
     CHECK(installed() == EDITION_CD);
     import_report_free(&r);
 
-    // An ISO with two languages: REUNION.ENG is taken, not REUNION.DEU
-    // (whose MAIN.PIC differs).
-    Copy deu = make_copy("REUNION.DEU\\", EDITION_CD);
-    Copy eng = make_copy("REUNION.ENG\\", EDITION_FLOPPY);
+    // An ISO with two languages: REUNION.ENG goes to data/, of REUNION.DEU
+    // only what differs from it, to data/DEU. The German game's MAIN.PIC
+    // differs, but the two share it: only the English one is checked.
+    Copy deu = make_copy("REUNION.DEU\\", EDITION_CD, LANGUAGE_GERMAN);
+    Copy eng = make_copy("REUNION.ENG\\", EDITION_CD, LANGUAGE_ENGLISH);
     uint8_t other[sizeof contents[2]];
     SDL_memcpy(other, contents[2], files[2].size);
     other[5] ^= 1;
     find(&deu, "MAIN.PIC")->data = other;
     char *iso = write_iso("cd.iso", &deu, &eng);
     CHECK(run(iso, &r));
-    CHECK(r.edition == EDITION_FLOPPY && SDL_strcmp(r.root, "REUNION.ENG") == 0);
+    CHECK(r.edition == EDITION_CD && SDL_strcmp(r.root, "REUNION.ENG") == 0);
+    CHECK(r.languages == (IN_ENGLISH | IN_GERMAN) && r.language == LANGUAGE_ENGLISH);
     CHECK(file_is("data/SAVE/INIT", contents[3], files[3].size));  // "INIT.;1" on the image
-    CHECK(installed() == EDITION_FLOPPY);
+    CHECK(file_is("data/TEXT/MESSAGE.TXT", contents[4], files[4].size));
+    CHECK(file_is("data/DEU/TEXT/MESSAGE.TXT", contents[5], files[5].size));
+    CHECK(!exists("data/DEU/GRAFIKA") && !exists("data/DEU/WAR") && !exists("data/DEU/SAVE"));
+    CHECK(installed() == EDITION_CD);
+    CHECK(installed_languages(&main_lang) == (IN_ENGLISH | IN_GERMAN)
+          && main_lang == LANGUAGE_ENGLISH);
+    import_report_free(&r);
+
+    // A German file that differs: named with its folder, nothing copied.
+    find(&deu, "MESSAGE.TXT")->data = contents[4];
+    find(&deu, "MESSAGE.TXT")->size = files[5].size;
+    char *bad_iso = write_iso("bad.iso", &deu, &eng);
+    CHECK(!run(bad_iso, &r));
+    CHECK(only_problem(&r, "Different: REUNION.DEU\\TEXT\\MESSAGE.TXT"));
+    CHECK(installed_languages(&main_lang) == (IN_ENGLISH | IN_GERMAN));
+    import_report_free(&r);
+
+    // A German game alone, in a folder of another name: its MESSAGE.TXT
+    // tells the language, and it fills data/.
+    Copy lone = make_copy("Reunion\\", EDITION_CD, LANGUAGE_GERMAN);
+    char *lone_dir = write_folder("lone", &lone);
+    CHECK(run(lone_dir, &r));
+    CHECK(r.languages == IN_GERMAN && r.language == LANGUAGE_GERMAN);
+    CHECK(file_is("data/TEXT/MESSAGE.TXT", contents[5], files[5].size) && !exists("data/DEU"));
+    CHECK(installed_languages(&main_lang) == IN_GERMAN && main_lang == LANGUAGE_GERMAN);
     import_report_free(&r);
 
     // A missing file: named, and nothing is copied.
-    Copy missing = make_copy("", EDITION_CD);
+    Copy missing = make_copy("", EDITION_CD, LANGUAGE_ENGLISH);
     *find(&missing, "MESSAGE.TXT") = missing.e[--missing.count];
     char *missing_dir = write_folder("missing", &missing);
     CHECK(!run(missing_dir, &r));
     CHECK(only_problem(&r, "Missing: TEXT\\MESSAGE.TXT") && !r.error);
-    CHECK(installed() == EDITION_FLOPPY && !exists("data.partial"));
+    CHECK(installed() == EDITION_CD && !exists("data.partial"));
     import_report_free(&r);
 
     // A different file: by its CRC in a folder, by the archive's CRC in a
     // ZIP, and by its size.
-    Copy changed = make_copy("", EDITION_CD);
+    Copy changed = make_copy("", EDITION_CD, LANGUAGE_ENGLISH);
     find(&changed, "MAIN.PIC")->data = other;
     char *changed_dir = write_folder("changed", &changed);
     CHECK(!run(changed_dir, &r));
@@ -423,7 +471,7 @@ int main(void)
     char *short_dir = write_folder("short", &changed);
     CHECK(!run(short_dir, &r));
     CHECK(only_problem(&r, "Different: TEXT\\MESSAGE.TXT"));
-    CHECK(installed() == EDITION_FLOPPY);
+    CHECK(installed() == EDITION_CD);
     import_report_free(&r);
 
     // No game: a folder without GRAFIKA, a file that is no archive.
@@ -454,6 +502,8 @@ int main(void)
     SDL_free(folder);
     SDL_free(zip);
     SDL_free(iso);
+    SDL_free(bad_iso);
+    SDL_free(lone_dir);
     SDL_free(missing_dir);
     SDL_free(changed_dir);
     SDL_free(changed_zip);

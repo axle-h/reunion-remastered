@@ -107,6 +107,39 @@ driver read the surface (the game frees its map layers on leaving it;
 seed 113), wave 2 attacking during M8's last look at the Home Guard (seed
 79), and the Psy radar taking 65 days to find Rigel 2 (seed 207, X4).
 
+## The CD's languages
+
+The same policy plays the CD's German, French and Italian games
+(`PLAY_LANGUAGE`, `tests/play/run.h`): the data is an import of the CD,
+whose data/ is the English game, or the ISO itself, which the run imports
+first. The policy is written against the English texts, so the readers
+turn what the game shows into English (`tests/play/lang.h`): a dialogue
+or message is the same line of the same file in every language, and a box
+read off the screen is matched to its line with a tolerance for misread
+cells; the game's own texts (buttons, captions, panels, the messages it
+builds) go back through the port's tables of them (`src/game/lang.h`),
+whole or piece by piece. Where one translation stands for two English
+texts the reading can only be one of them: the drivers compare a reading
+with what each translation of the text they want reads as
+(`lang_reads_as`), toolbar labels go by the button labels alone, and a
+race's name in a message reads as the race. A few checks accept each
+game's wording ("Kall 2" for "Kall Fleet 2", a location line without
+"system"). The screen reader knows the CD's accented glyphs. Seed 12345,
+release build, 2026-10-13:
+
+| Game | Won | Frames | Hash |
+|---|---|---|---|
+| English (CD import) | 2930-03-06 09:00 | 3,504,170 | `b3fe94192bcf1188`, as on the floppy |
+| German | 2930-03-17 03:00 | 3,542,909 | `54595921dacbc0d4` |
+| French | 2930-03-03 02:00 | 3,541,306 | `dd17783ba3237a64` |
+| Italian | 2930-03-18 22:00 | 3,597,274 | `02c26e6c8446b948` |
+
+The other languages take other paths (their texts and speech take other
+times to show), and each recording replays to the same end in-process
+and with `reunion --replay --language=...`. ctest runs the three as
+`test_play_game_german`, `_french` and `_italian` where `test_play_game`
+runs and vendor/ holds the CD's ISO.
+
 ## The fixture
 
 Each module's header says how it works; in short:
@@ -117,6 +150,7 @@ Each module's header says how it works; in short:
 | `run.h`, `run.c` | Runner: a test is a list of steps with a checkpoint before each; the `PLAY_*` variables (`PLAY_RESUME=step`, `PLAY_STOP=step`, `PLAY_SEED`, ...); replays the recording in-process and with `reunion --replay` and checks all three ends match |
 | `ui.h`, `ui.c` | Acting: waits, clicks, toolbar, hotspots by caption, navigation, hiring, new game. Every wait services the interrupts (message boxes, rename prompts, story scenes, holograms) |
 | `ui_message.h` | Reading the screen (6x8 font text reader, status bar) and the interrupts |
+| `lang.h`, `lang.c` | The CD's other languages: what the game shows, in English |
 | `ui_office.h`, `ui_planet.h`, `ui_ships.h`, `ui_talk.h`, `ui_battle.h` | Drivers and observers per group of screens: research, shop, log; planet info, surface, droids, colonisation, colony list; ship info, groups, cargo, control panel, destination map; alien talks, pub, advisor; battles |
 | `policy.h`, `policy.c` | The policy's shared part: money and ore gates with claims by priority, background goals, standing orders, the dispatch of talks and battles (`pol_try`, `pol_service`) |
 | `act1.c` ... `act5.c` | The steps of each act; `tests/test_play_game.c` lists them (one checkpoint per step, e.g. `PLAY_RESUME=E15_station_on_apollo`) |

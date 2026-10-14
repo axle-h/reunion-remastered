@@ -5,6 +5,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/sound.h"
 #include "game/system.h"
@@ -131,7 +132,7 @@ void Research_SetupResearchHotspots(void)
         else
             pstr_set(&h->Caption, 0x12, pstr_get(name, sizeof name, &PRODUCT(j).Name));
         if (j == 14 && ds.Intel_Invention14Revealed == 0)
-            pstr_set(&h->Caption, 0x12, "Unknown");
+            pstr_set(&h->Caption, 0x12, Lang_Text("Unknown"));
         h->Repeat_ = 1;
         h->_1A = 0;
     }
@@ -144,15 +145,15 @@ void Research_DrawInventionInfo(void)
         return;
     const TProduct *p = &PRODUCT(ds.Game_SelInvention);
     if (ds.Game_SelInvention == 14 && ds.Intel_Invention14Revealed == 0) {
-        Gfx_DrawTextF9("Project name :", 0xBE, 0x4C, 0x12);
-        Gfx_DrawTextF9("Unknown", 0xC8, 0x58, 0x10);
+        Gfx_DrawTextF9(Lang_Text("Project name :"), 0xBE, 0x4C, 0x12);
+        Gfx_DrawTextF9(Lang_Text("Unknown"), 0xC8, 0x58, 0x10);
         Gfx_DrawTextF9("", 0xBE, 0x64, 0x12);
         Gfx_DrawTextF9("", 0xBE, 0x70, 0x12);
         Blit_FillRect(0xBD, 0x8B, 0x72, 0x14, 0x40);
         return;
     }
     char s[256], t[256];
-    Gfx_DrawTextF9("Project name :", 0xBE, 0x4C, 0x12);
+    Gfx_DrawTextF9(Lang_Text("Project name :"), 0xBE, 0x4C, 0x12);
     Gfx_DrawTextF9(pstr_get(t, sizeof t, &p->Name), 0xC8, 0x58, 0x10);
     const char *state = "";
     switch (p->State) {
@@ -163,12 +164,12 @@ void Research_DrawInventionInfo(void)
     case 5: state = "Done"; break;
     default: break;
     }
-    Gfx_DrawTextF9(state, 0xBE, 0x64, 0x12);
+    Gfx_DrawTextF9(Lang_Text(state), 0xBE, 0x64, 0x12);
     if (p->State == 2 || p->State == 4) {
         if (ds.Game_StaffExp[3] == 0) {
-            Gfx_DrawTextF9("No developer", 0xBE, 0x70, 0x12);
+            Gfx_DrawTextF9(Lang_Text("No developer"), 0xBE, 0x70, 0x12);
         } else {
-            SDL_snprintf(t, sizeof t, "Completed: %d%%", p->Progress / 100);
+            SDL_snprintf(t, sizeof t, "%s%d%%", Lang_Text("Completed: "), p->Progress / 100);
             Gfx_DrawTextF9(t, 0xBE, 0x70, 0x12);
         }
     } else {
@@ -179,14 +180,14 @@ void Research_DrawInventionInfo(void)
         return;
     }
     // The four required skills, two per line.
-    static const struct { int16_t nx, vx, y; int16_t w; const char *sep; } pos[4] = {
-        {0xBD, 0xE0, 0x8B, 6, " :"}, {0xEB, 0x11A, 0x8B, 8, ":"},
-        {0xBD, 0xE0, 0x95, 6, ":"},  {0xEB, 0x11A, 0x95, 8, "  :"},
+    static const struct { int16_t nx, vx, y; int16_t w; uint32_t at; const char *sep; } pos[4] = {
+        {0xBD, 0xE0, 0x8B, 6, 0x2d6605f6, " :"}, {0xEB, 0x11A, 0x8B, 8, 0x2d66064e, ":"},
+        {0xBD, 0xE0, 0x95, 6, 0x2d6606a6, ":"},  {0xEB, 0x11A, 0x95, 8, 0x2d6606fe, "  :"},
     };
     for (int k = 0; k < 4; k++) {
         char discipline[256];
-        pstr_get(discipline, sizeof discipline, &ds.Names_Disciplines[k]);
-        SDL_snprintf(t, sizeof t, "%s%s", discipline, pos[k].sep);
+        pstr_get(discipline, sizeof discipline, Lang_Slot(&ds.Names_Disciplines[k]));
+        SDL_snprintf(t, sizeof t, "%s%s", discipline, Lang_TextAt(pos[k].at, pos[k].sep));
         SDL_snprintf(s, sizeof s, "%d", p->Skills[k]);
         Gfx_DrawTextF9(t, pos[k].nx, pos[k].y, pos[k].w);
         Gfx_DrawTextFC(s, pos[k].vx, pos[k].y, 1);
@@ -200,7 +201,7 @@ void Research_DrawDeveloperSkills(void)
     if (ds.Game_StaffHired[3] == 0) {
         for (int k = 1; k <= 4; k++)
             Gfx_DrawTextF9("-", (int16_t)(ds.Research_SkillX[k - 1] + 100), 0xBC, 1);
-        Gfx_DrawTextF9("No developer", 8, 0xBC, 0xE);
+        Gfx_DrawTextF9(Lang_Text("No developer"), 8, 0xBC, 0xE);
     } else {
         for (int k = 1; k <= 4; k++) {
             SDL_snprintf(s, sizeof s, "%d", (int)ds.Game_DevSkill[k - 1]);

@@ -6,7 +6,8 @@ the Grandslam logo in the intro; some archives carry a readme naming Merit
 Studios as the publisher. No Amiga release is known.
 
 The port is the floppy's `REUNION.PRG` (`src/game/dsinit.c` holds its typed
-constants), and `vendor/Reunion_DOS_EN` is the floppy release. Everything below
+constants), with the CD's font and its four languages, and
+`vendor/Reunion_DOS_EN` is the floppy release. Everything below
 was checked on 2026-10-12 against that folder, a DOSBox install of it
 (`~/dos/c/REUNION`) and the CD image `Reunion (1995)(Grandslam)(M4).iso`
 (CRC32 `81098dff`, 140,656,640 bytes; plain ISO 9660, 8.3 names, no Joliet or
@@ -15,9 +16,9 @@ Rock Ridge).
 ## The CD
 
 The CD holds four complete games, `REUNION.ENG`, `.DEU`, `.FRA` and `.ITA`,
-each runnable from the disc (`START.BAT` changes into one), plus
-`UNION_1.RNC` (an `RNCA` archive the installer unpacks), `INSTALL.EXE` and
-`CDPATCH.EXE`.
+each runnable from the disc (`START.BAT` changes into one), with an
+installer: `UNION_1.RNC` (an `RNCA` archive of RNC ProPack files, below),
+`INSTALL.EXE` and `CDPATCH.EXE`.
 
 `REUNION.ENG` and the floppy release have 892 files in common, byte for byte.
 Only these differ:
@@ -57,27 +58,65 @@ Nothing else changed: the CD's claimed stability fixes are not there.
 
 **The CD's font** has the floppy's 78 glyphs, pixel for pixel, but packs them
 40 to a row, 8 pixels apart, where the floppy's sheet has 20 to a row, 16
-pixels apart. After them come 20 accented glyphs. The CD's executable finds
-glyph *g* at `(g / 40) * 0A00h + (g % 40) * 8 + 80h` and has 87 characters in
+pixels apart. Glyph 78 is a ß, 79 is blank, and 80-99 are accented:
+`ÄÖÜäöüß` then `êéèàÉÂÇçôûùòì`. The CD's executable finds glyph *g* at
+`(g / 40) * 0A00h + (g % 40) * 8 + 80h` and has 87 characters in
 `Gfx_CharsetChars`: the floppy's 78, two more spaces, and `ÄÖÜäöüß` (code
-page 437). The port picks the sheet's layout by edition and keeps the
-floppy's 78 characters (`gfx_set_cd_charset`); in the floppy's layout the
-CD's sheet draws wrong or blank characters, and the money and the date stay
-empty. On an import of the CD, the playthrough (seed 12345) wins in the same
-frame with the same state hash as on the floppy release (checked
-2026-10-12).
+page 437), glyphs 80-86. `Gfx_DrawText6x8` scans 89 bytes of it, so a
+character it lacks gets glyph 88 (é) where the floppy's gets the blank 78,
+and it first turns character 1 into ß (E1h): the text files have 1 for ß,
+the `.RAW` tables E1h. `Gfx_TypeText` (the hire screen) has neither: a
+character the table lacks reads glyph 255, past the sheet. So German draws
+right, but every French and Italian accent draws as é, or as garbage on the
+hire screen. The port takes the CD's table, layout and text routines, and
+draws each French and Italian accent with its own glyph (`â`, `ï` and `î`,
+which have none, as `à`, `i` and `ì`; `gfx_set_cd_charset`). With the
+floppy's layout the CD's sheet draws wrong or blank characters, and the
+money and the date stay empty.
 
-**The languages.** All four language folders share the same `REUNION.PRG` and
-`CHARSET1.PIC`. Only `VICTORY.PRG` differs between them, at the same size.
-Compared with `REUNION.ENG`, each other language changes about 160 files:
-`TEXT\` (about 50), `SOUND\` (about 63: the speech), stills with text in
-`INTRO\`, `INTROP\`, `GRAFIKA\`, `WAR\` and `VICTORY\`. Only English has
+**The languages.** All four language folders share the same `REUNION.PRG`,
+`INTRO.PRG`, `CREDITS.PRG` and `CHARSET1.PIC`, so the texts compiled into
+the executable (menus, captions, names, the advisor's price) are English in
+every language run from the disc (the port translates them: below). Compared with `REUNION.ENG`, each other language changes
+161 of the files the port loads (`src/platform/gamefiles.c`): `TEXT\` (49),
+`SOUND\` (63-64: the speech), the intro's modules (`INTRO\INTRO1-7.MOD`:
+their samples speak) and stills with text in `INTRO\`, `INTROP\`,
+`GRAFIKA\`, `WAR\` and `VICTORY\`. The text files are the same lines in
+the same order (the game reads them by line number); German, French and
+Italian text uses code page 437. `VICTORY.PRG` has no text of its own: the
+German one leaves out `TX5` (its `TX5.PIC` is the English one), and the
+French and Italian one (the same file, 16 bytes longer) plays the English
+script; both only lengthen an out-of-memory message. The port plays each
+language's script (`src/cutscene/victory.c`). Only English has
 `CREDITS\STEAL3.MOD` and `INTRO\PAL13.PIC`, `PAL14.PIC` and `PAL21.PIC`; only
 French has `INTROP\_BACKUP_.PIC` (`19X4.PIC` with a 640x1100 white rectangle
 below it). `REUNION.ITA\SAVE` ships a `SPIDYSAV.1` (2927-08-14).
 `GRAFIKA\DEATH.PIC` is 320x256 in English (a black field and a pink
 separator below the picture) and 320x200 in the other three; the port reads
 only its first 200 rows (`command.c`).
+
+**The install archives.** Each language folder's `UNION_1.RNC` holds that
+language's game for the hard disk, with an older program: its
+`GRWAR\REUNION.PRG` is the floppy release's program (the English one is
+the floppy's, uncracked) with the texts compiled into it translated in
+German, French and Italian: button labels, hotspot captions, panels and
+lists, names, and the messages the program puts together. Its character
+table names the French and Italian accents (`ê é è à É Ç ç ô û ù ò ì`,
+glyphs 87-99, `Â` by 8Fh). The port takes those texts, compiled in so
+that building needs no copy of the game: `tools/cd_texts.py` pairs each
+text of the English program with the other builds' by lining up their
+code, and writes `src/game/lang_texts.c` (`src/game/lang.h`). The builds
+mostly differ only in their texts. Where the code differs as well,
+`src/game/lang.c` does what each build does: most leave out a piece of a
+message that the translation words differently, the German trader quotes
+a price one way only, and the German race buttons have no captions. The
+Italian planet name line is put together in another order ("NOME DEL TUO
+PIANETA : New Earth", `planetinfo.c`). Some translations are longer than
+the program's room for them (the German "Planetenkräfte", the French
+"Jaanosiens"); the data segment holds what fits, and the screens that
+show them whole take them from the table. The French build captions the
+command centre's PLANET MAIN hotspot "INFO VAISSEAU", as it does SHIP
+INFO; the port keeps it.
 
 ## Saves
 

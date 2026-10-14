@@ -43,6 +43,8 @@ int ui_text_colour(int x, int y);
 // The screen shows `s` at (x, y) in any colour. Cells under the cursor
 // match anything, but at least one pixel must be seen.
 bool ui_text_at(int x, int y, const char *s);
+// What ui_read_text reads where `ch` is drawn ('?' if nothing).
+char ui_read_as(char ch);
 // Reads a number drawn at (x, y) in `width` cells; false if there is none.
 bool ui_read_number(int x, int y, int width, int32_t *value);
 // Pixel (x, y) shows `colour`, or the mouse cursor hides it.
@@ -78,7 +80,7 @@ typedef struct {
     int x, y;          // first text cell
     bool rename;       // the planet rename prompt (edit field, Enter closes it)
     char line[UI_BOX_LINES][UI_BOX_COLS + 1];
-    char text[UI_BOX_TEXT];  // non-blank lines joined with '|', leading blanks dropped
+    char text[UI_BOX_TEXT];  // non-blank lines joined with '|', leading blanks dropped; English (lang.h)
 } UiBox;
 
 // A message box (or rename prompt) is drawn and the game waits in it (box

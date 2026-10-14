@@ -5,6 +5,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/message.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
@@ -61,9 +62,9 @@ void Colonize_ColonizeScreen(void)
             cs->Moon = (uint8_t)cur_moon();
         } else {
             if (ds.Game_StaffHired[1] == 0)
-                Message_ShowMessageNoLog("|  You haven't got a builder!  |");
+                Message_ShowMessageNoLog(Lang_Text("|  You haven't got a builder!  |"));
             else
-                Message_ShowMessageNoLog("|  You builder not able to build this colony  |");
+                Message_ShowMessageNoLog(Lang_Text("|  You builder not able to build this colony  |"));
             int16_t cur = ds.Game_CurrentScreen;
             ds.Game_CurrentScreen = ds.Game_PrevScreen;
             ds.Game_PrevScreen = cur;
@@ -89,7 +90,7 @@ void Colonize_ColonizeScreen(void)
             char name[256], tmp[256];
             PlanetInfo_GetBodyName(name, sizeof name, ds.Game_CurSystem, cur_planet(), cur_moon());
             TGroup *g = Groups_At(1, ds.Game_SelGroup);
-            SDL_snprintf(tmp, sizeof tmp, "%s forces", name);
+            SDL_snprintf(tmp, sizeof tmp, Lang_Format(0x28410228, "%s forces"), name);
             pstr_set(&g->Name, 0x11, tmp);
             g->Kind = 5;
             g->Status = 7;
@@ -149,9 +150,9 @@ void Colonize_ColonizeScreen(void)
 void Colonize_SetupColonizeHotspots(void)
 {
     ds.Mouse_HotspotCount = 9;
-    Mouse_SetHotspot(1, 0x10B, 0x36, 0x30, 0x30, "Change people", 1, 0);
-    Mouse_SetHotspot(2, 0x10B, 0x69, 0x17, 0x0B, "Previous people", 1, 0);
-    Mouse_SetHotspot(3, 0x123, 0x69, 0x17, 0x0B, "Next people", 1, 0);
+    Mouse_SetHotspot(1, 0x10B, 0x36, 0x30, 0x30, Lang_TextAt(0x284104e6, "Change people"), 1, 0);
+    Mouse_SetHotspot(2, 0x10B, 0x69, 0x17, 0x0B, Lang_TextAt(0x28410517, "Previous people"), 1, 0);
+    Mouse_SetHotspot(3, 0x123, 0x69, 0x17, 0x0B, Lang_TextAt(0x28410548, "Next people"), 1, 0);
     for (int16_t k = 1; k <= 6; k++) {
         const TStarterBuilding *sb = &ds.Colony_StarterBuildings[k - 1];
         const TBuildingType *bt = &ds.Surface_BuildingTypes[sb->Building - 1];
@@ -190,10 +191,10 @@ void Colonize_DrawColonizeScreen(void)
                            (int16_t)(bt->Height * 16 + sb->Y - 1), 0x40);
         SDL_snprintf(s, sizeof s, "%d", (int)bt->Cost);
         if (!Colonize_TypeAvailable(bt) || !Colonize_SuitsSurface(bt, (int8_t)body->SurfaceType))
-            SDL_strlcpy(s, "Sorry", sizeof s);
+            SDL_strlcpy(s, Lang_Text("Sorry"), sizeof s);
         Gfx_DrawTextF9(s, (int16_t)(sb->X + 2), (int16_t)(sb->Y - 0xB), 5);
     }
-    Gfx_DrawTextF9("Cost of colony:", 0xB4, 0xB9, 0xF);
+    Gfx_DrawTextF9(Lang_Text("Cost of colony:"), 0xB4, 0xB9, 0xF);
     Gfx_DrawTextF9("100000", 0x114, 0xB9, 6);
     Gfx_FadeIn(0x40, 0xFE, Gfx_PalettePtr());
 }

@@ -18,7 +18,8 @@ struct Source {
     SDL_IOStream *io;  // ZIP, ISO
     mz_zip_archive zip;
     uint32_t block;    // ISO: logical block size
-    char *root;
+    char **games;      // the games' folders, the preferred one first
+    int game_count;
     SourceFile *files;
     int count, cap;
 };
@@ -58,55 +59,89 @@ static SourceFile *add_file(Source *src, const char *path)
     return f;
 }
 
-// The game's root among the files' paths (archives): the shallowest folder
-// holding a GRAFIKA folder, REUNION.ENG first, else the first by name.
-// Returns its prefix ("" or "A\\B\\") or nullptr.
-static char *pick_root(const Source *src)
+// Is the last part of a game's path REUNION.ENG (either slash, with or
+// without one at the end)?
+static bool is_english(const char *path)
 {
-    char *best = nullptr;
-    int best_depth = MAX_DEPTH + 1;
-    bool best_eng = false;
-    for (int i = 0; i < src->count; i++) {
-        const char *p = src->files[i].path;
-        int depth = 0;
-        for (const char *part = p; *part; depth++) {
-            const char *end = SDL_strchr(part, '\\');
-            if (!end || depth > MAX_DEPTH)
-                break;
-            if (end - part == 7 && SDL_strncasecmp(part, "GRAFIKA", 7) == 0) {
-                size_t n = (size_t)(part - p);
-                // The folder holding GRAFIKA, as its own name.
-                const char *name = p;
-                for (const char *c = p; c + 1 < part; c++)
-                    if (*c == '\\')
-                        name = c + 1;
-                bool eng = n > 0 && SDL_strncasecmp(name, "REUNION.ENG\\", 12) == 0;
-                bool better = depth < best_depth || (depth == best_depth && eng && !best_eng)
-                              || (depth == best_depth && eng == best_eng && best
-                                  && SDL_strncasecmp(p, best, n) < 0);
-                if (better) {
-                    SDL_free(best);
-                    best = SDL_strndup(p, n);
-                    best_depth = depth;
-                    best_eng = eng;
-                }
-                break;
-            }
-            part = end + 1;
-        }
-    }
-    return best;
+    size_t n = SDL_strlen(path);
+    while (n > 0 && (path[n - 1] == '\\' || path[n - 1] == '/'))
+        n--;
+    return n >= 11 && SDL_strncasecmp(path + n - 11, "REUNION.ENG", 11) == 0
+           && (n == 11 || path[n - 12] == '\\' || path[n - 12] == '/');
 }
 
-// Keeps the files under `prefix`, with paths relative to it.
-static void keep_root(Source *src, const char *prefix)
+// Orders game folders: REUNION.ENG first, then by path.
+static int game_cmp(const void *a, const void *b)
 {
-    size_t n = SDL_strlen(prefix);
+    const char *x = *(char *const *)a, *y = *(char *const *)b;
+    if (is_english(x) != is_english(y))
+        return is_english(x) ? -1 : 1;
+    return SDL_strcasecmp(x, y);
+}
+
+static bool add_game(Source *src, char *prefix)
+{
+    for (int g = 0; g < src->game_count; g++) {
+        if (SDL_strcasecmp(src->games[g], prefix) == 0) {
+            SDL_free(prefix);
+            return true;
+        }
+    }
+    char **grown = SDL_realloc(src->games, (size_t)(src->game_count + 1) * sizeof *grown);
+    if (!grown) {
+        SDL_free(prefix);
+        return false;
+    }
+    src->games = grown;
+    src->games[src->game_count++] = prefix;
+    return true;
+}
+
+// The games among the files' paths (archives): every shallowest folder
+// holding a GRAFIKA folder, as prefixes ("" or "A\\B\\").
+static bool pick_roots(Source *src)
+{
+    int best_depth = MAX_DEPTH + 1;
+    for (int pass = 0; pass < 2; pass++) {
+        for (int i = 0; i < src->count; i++) {
+            const char *p = src->files[i].path;
+            int depth = 0;
+            for (const char *part = p; *part; depth++) {
+                const char *end = SDL_strchr(part, '\\');
+                if (!end || depth > MAX_DEPTH || (pass == 1 && depth > best_depth))
+                    break;
+                if (end - part == 7 && SDL_strncasecmp(part, "GRAFIKA", 7) == 0) {
+                    if (pass == 0)
+                        best_depth = SDL_min(best_depth, depth);
+                    else if (depth == best_depth && !add_game(src, SDL_strndup(p, (size_t)(part - p))))
+                        return false;
+                    break;
+                }
+                part = end + 1;
+            }
+        }
+    }
+    SDL_qsort(src->games, (size_t)src->game_count, sizeof *src->games, game_cmp);
+    return src->game_count > 0;
+}
+
+// Keeps the files under the games' prefixes, with paths relative to their
+// game; the prefixes become the folders' names.
+static void keep_games(Source *src)
+{
     int kept = 0;
     for (int i = 0; i < src->count; i++) {
         SourceFile f = src->files[i];
-        if (SDL_strncasecmp(f.path, prefix, n) == 0 && f.path[n]) {
+        int game = -1;
+        size_t n = 0;
+        for (int g = 0; g < src->game_count && game < 0; g++) {
+            n = SDL_strlen(src->games[g]);
+            if (SDL_strncasecmp(f.path, src->games[g], n) == 0 && f.path[n])
+                game = g;
+        }
+        if (game >= 0) {
             SDL_memmove(f.path, f.path + n, SDL_strlen(f.path + n) + 1);
+            f.game = game;
             src->files[kept++] = f;
         } else {
             SDL_free(f.path);
@@ -114,14 +149,19 @@ static void keep_root(Source *src, const char *prefix)
         }
     }
     src->count = kept;
-    src->root = SDL_strndup(prefix, n ? n - 1 : 0);
+    for (int g = 0; g < src->game_count; g++) {
+        size_t n = SDL_strlen(src->games[g]);
+        if (n)
+            src->games[g][n - 1] = '\0';
+    }
 }
 
 // --- Folders ----------------------------------------------------------------------
 
 typedef struct Walk {
     Source *src;
-    const char *rel;  // the folder's path relative to the root, "" or "A\\"
+    int game;
+    const char *rel;  // the folder's path relative to the game, "" or "A\\"
     char **subdirs;   // its subfolders' names
     int subdir_count;
     bool has_grafika;
@@ -158,6 +198,7 @@ static SDL_EnumerationResult walk_entry(void *userdata, const char *dirname, con
         }
         f->size = (uint64_t)info.size;
         f->host = host;
+        f->game = w->game;
         return SDL_ENUM_CONTINUE;
     }
     SDL_free(host);
@@ -181,17 +222,18 @@ static char *dir_path(const char *dir)
     return out;
 }
 
-// Every file under `dir` (with a trailing separator), as `rel` + its path.
-static bool list_folder(Source *src, const char *dir, const char *rel, int depth)
+// Every file under `dir` (with a trailing separator), as `rel` + its path,
+// in `game`.
+static bool list_folder(Source *src, int game, const char *dir, const char *rel, int depth)
 {
-    Walk w = {.src = src, .rel = rel};
+    Walk w = {.src = src, .game = game, .rel = rel};
     SDL_EnumerateDirectory(dir, walk_entry, &w);
     bool ok = !w.failed;
     for (int i = 0; ok && i < w.subdir_count && depth < MAX_DEPTH; i++) {
         char *sub = nullptr, *sub_rel = nullptr;
         SDL_asprintf(&sub, "%s%s/", dir, w.subdirs[i]);
         SDL_asprintf(&sub_rel, "%s%s\\", rel, w.subdirs[i]);
-        ok = sub && sub_rel && list_folder(src, sub, sub_rel, depth + 1);
+        ok = sub && sub_rel && list_folder(src, game, sub, sub_rel, depth + 1);
         SDL_free(sub);
         SDL_free(sub_rel);
     }
@@ -204,15 +246,25 @@ static int name_cmp(const void *a, const void *b)
     return SDL_strcasecmp(*(char *const *)a, *(char *const *)b);
 }
 
-// Breadth first: the shallowest folders holding GRAFIKA. Returns the
-// chosen one's host path (with a separator) and its name in *name.
-static char *find_folder_root(const char *top, char **name)
+typedef struct FolderGame {
+    char *name;  // the folder's own name, "" for `top` itself
+    char *host;  // with a separator
+} FolderGame;
+
+static int folder_game_cmp(const void *a, const void *b)
+{
+    return game_cmp(&((const FolderGame *)a)->name, &((const FolderGame *)b)->name);
+}
+
+// Breadth first: the shallowest folders holding GRAFIKA, the preferred one
+// first. Returns how many, 0 if none.
+static int find_folder_games(const char *top, FolderGame **games)
 {
     char **level = SDL_malloc(sizeof *level);
-    int count = 1, visited = 0;
-    char *found = nullptr;
+    int count = 1, visited = 0, found = 0;
+    *games = nullptr;
     if (!level)
-        return nullptr;
+        return 0;
     level[0] = dir_path(top);
     for (int depth = 0; !found && count > 0 && depth <= MAX_DEPTH; depth++) {
         char **next = nullptr;
@@ -228,16 +280,18 @@ static char *find_folder_root(const char *top, char **name)
                     base += k;
                     break;
                 }
-            bool eng = SDL_strncasecmp(base, "REUNION.ENG", 11) == 0;
-            if (w.has_grafika && (!found || eng)) {
-                SDL_free(found);
-                found = SDL_strdup(level[i]);
-                SDL_free(*name);
-                *name = depth ? SDL_strndup(base, SDL_strlen(base) - 1) : SDL_strdup("");
-            }
-            char **grown = SDL_realloc(next, (size_t)(next_count + w.subdir_count) * sizeof *next);
+            FolderGame *grown = w.has_grafika
+                                    ? SDL_realloc(*games, (size_t)(found + 1) * sizeof *grown)
+                                    : nullptr;
             if (grown) {
-                next = grown;
+                *games = grown;
+                grown[found].host = SDL_strdup(level[i]);
+                grown[found].name = depth ? SDL_strndup(base, SDL_strlen(base) - 1) : SDL_strdup("");
+                found++;
+            }
+            char **more = SDL_realloc(next, (size_t)(next_count + w.subdir_count) * sizeof *next);
+            if (more) {
+                next = more;
                 for (int s = 0; s < w.subdir_count; s++)
                     SDL_asprintf(&next[next_count++], "%s%s/", level[i], w.subdirs[s]);
             }
@@ -248,6 +302,8 @@ static char *find_folder_root(const char *top, char **name)
         count = next_count;
     }
     free_names(level, count);
+    if (found)
+        SDL_qsort(*games, (size_t)found, sizeof **games, folder_game_cmp);
     return found;
 }
 
@@ -416,20 +472,24 @@ Source *source_open(const char *path)
         return nullptr;
     }
     bool ok;
-    char *prefix = nullptr;
     if (info.type == SDL_PATHTYPE_DIRECTORY) {
         src->kind = SOURCE_FOLDER;
-        char *name = nullptr;
-        char *root = find_folder_root(path, &name);
-        ok = root && list_folder(src, root, "", 0);
-        if (ok) {
-            src->root = name;
-            name = nullptr;
-        } else if (!root) {
-            SDL_SetError("No game in %s: no folder there holds GRAFIKA", path);
+        FolderGame *games = nullptr;
+        int n = find_folder_games(path, &games);
+        ok = n > 0 || SDL_SetError("No game in %s: no folder there holds GRAFIKA", path);
+        for (int g = 0; g < n; g++) {
+            // Two folders of the same name at that depth: the first.
+            bool take = ok && games[g].name && games[g].host;
+            for (int k = 0; take && k < src->game_count; k++)
+                take = SDL_strcasecmp(src->games[k], games[g].name) != 0;
+            if (take)
+                ok = add_game(src, games[g].name)  // takes the name
+                     && list_folder(src, src->game_count - 1, games[g].host, "", 0);
+            else
+                SDL_free(games[g].name);
+            SDL_free(games[g].host);
         }
-        SDL_free(name);
-        SDL_free(root);
+        SDL_free(games);
     } else {
         src->io = SDL_IOFromFile(path, "rb");
         bool is_iso = false;
@@ -439,15 +499,11 @@ Source *source_open(const char *path)
             if (!ok && src->kind != SOURCE_ZIP)
                 SDL_SetError("%s is not a folder, a ZIP archive or an ISO 9660 image", path);
         }
-        if (ok) {
-            prefix = pick_root(src);
-            if (prefix)
-                keep_root(src, prefix);
-            else
-                ok = SDL_SetError("No game in %s: no folder in it holds GRAFIKA", path);
-        }
+        if (ok && pick_roots(src))
+            keep_games(src);
+        else if (ok)
+            ok = SDL_SetError("No game in %s: no folder in it holds GRAFIKA", path);
     }
-    SDL_free(prefix);
     if (!ok) {
         source_close(src);
         return nullptr;
@@ -468,13 +524,25 @@ void source_close(Source *src)
         SDL_free(src->files[i].host);
     }
     SDL_free(src->files);
-    SDL_free(src->root);
+    for (int g = 0; g < src->game_count; g++)
+        SDL_free(src->games[g]);
+    SDL_free(src->games);
     SDL_free(src);
 }
 
 const char *source_root(const Source *src)
 {
-    return src->root ? src->root : "";
+    return source_game(src, 0);
+}
+
+int source_game_count(const Source *src)
+{
+    return src->game_count;
+}
+
+const char *source_game(const Source *src, int game)
+{
+    return game >= 0 && game < src->game_count ? src->games[game] : "";
 }
 
 int source_file_count(const Source *src)
@@ -489,8 +557,13 @@ const SourceFile *source_file(const Source *src, int i)
 
 const SourceFile *source_find(const Source *src, const char *dos_path)
 {
+    return source_find_in(src, 0, dos_path);
+}
+
+const SourceFile *source_find_in(const Source *src, int game, const char *dos_path)
+{
     for (int i = 0; i < src->count; i++)
-        if (path_cmp(src->files[i].path, dos_path) == 0)
+        if (src->files[i].game == game && path_cmp(src->files[i].path, dos_path) == 0)
             return &src->files[i];
     return nullptr;
 }

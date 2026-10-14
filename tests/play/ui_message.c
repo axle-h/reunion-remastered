@@ -7,6 +7,7 @@
 #include "game/main_program.h"
 #include "game/mouse.h"
 #include "platform/video.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui.h"
 
@@ -15,7 +16,6 @@ enum : int {
     SCREEN_H = 200,
     GLYPH_W = 6,
     GLYPH_H = 8,
-    GLYPHS = 78,              // Gfx_DrawText6x8 looks characters up among 78 glyphs
     BOX_FILL = 2,             // message.c: Blit_FillRect(..., 2)
     BOX_BORDER = 4,           // Gfx_DrawRectOutline(..., 4)
     BOX_CX = 0xA0,            // centre of the box
@@ -91,14 +91,49 @@ static bool in_screen(int x, int y)
     return x >= 0 && y >= 0 && x + GLYPH_W <= SCREEN_W && y + GLYPH_H <= SCREEN_H;
 }
 
-// The glyph Gfx_DrawText6x8 draws for ch (GLYPHS if it has none).
+// The glyph Gfx_DrawText6x8 draws for ch.
 static int glyph_of(char ch)
 {
+    return gfx_text_glyph((uint8_t)ch);
+}
+
+// The characters the reader knows, in the order it tries them, and their
+// glyphs: the 78 of the floppy's table ('O' before '0', which share a
+// glyph), then with the CD's font (it has Ä) the CD's accents (code page
+// 437; its text files have 1 for ß, read as E1h; â, î and ï, drawn as à, ì
+// and i, read as those). Made once the font is set.
+static struct {
+    bool cd;
+    int count;
+    char ch[128];
+    uint8_t glyph[128];
+} readable = {.count = -1};
+
+static void know_readable(void)
+{
+    bool cd = gfx_text_glyph(0x8E) == 80;
+    if (readable.count >= 0 && readable.cd == cd)
+        return;
+    readable.cd = cd;
+    readable.count = 0;
     const PString *chars = &ds.Gfx_CharsetChars;
-    for (int g = 0; g < GLYPHS && g < chars->len; g++)
-        if (chars->s[g] == ch)
-            return g;
-    return GLYPHS;
+    for (int g = 0; g < 78 && g < chars->len; g++)
+        readable.ch[readable.count++] = chars->s[g];
+    static const char CD[] = "\x8E\x99\x9A\x84\x94\x81\xE1\x80\x82\x85\x87\x88\x8A\x8D\x90\x93\x95\x96\x97";
+    for (const char *c = CD; cd && *c; c++)
+        readable.ch[readable.count++] = *c;
+    for (int i = 0; i < readable.count; i++)
+        readable.glyph[i] = (uint8_t)glyph_of(readable.ch[i]);
+}
+
+char ui_read_as(char ch)
+{
+    know_readable();
+    int g = glyph_of(ch);
+    for (int i = 0; i < readable.count; i++)
+        if (readable.glyph[i] == g)
+            return readable.ch[i];
+    return '?';
 }
 
 // Reads one cell drawn in `want` (UI_ANY_COLOUR: any): its character ('?'
@@ -108,19 +143,30 @@ static char read_cell(int x, int y, int want, int *colour)
     *colour = -1;
     if (!in_screen(x, y))
         return '?';
-    const PString *chars = &ds.Gfx_CharsetChars;
+    know_readable();
     int blank = glyph_of(' '), seen;
     if ((*colour = match_glyph(x, y, blank, &seen)) >= 0 && (want < 0 || *colour == want))
         return ' ';
-    for (int g = 0; g < GLYPHS && g < chars->len; g++) {
+    for (int i = 0; i < readable.count; i++) {
+        int g = readable.glyph[i];
         if (g != blank && (*colour = match_glyph(x, y, g, &seen)) >= 0 && (want < 0 || *colour == want))
-            return chars->s[g];
+            return readable.ch[i];
     }
     *colour = -1;
     return '?';
 }
 
+static bool read_text_in(int x, int y, int width, int colour, char *out, size_t size);
+
 bool ui_read_text_in(int x, int y, int width, int colour, char *out, size_t size)
+{
+    char shown[LANG_LINE];
+    bool ok = read_text_in(x, y, width, colour, shown, sizeof shown);
+    lang_untranslate_line(shown, out, size);
+    return ok;
+}
+
+static bool read_text_in(int x, int y, int width, int colour, char *out, size_t size)
 {
     bool ok = true;
     size_t n = 0;
@@ -164,7 +210,25 @@ int ui_text_colour(int x, int y)
     return colour;
 }
 
+static bool text_at(int x, int y, const char *s);
+
 bool ui_text_at(int x, int y, const char *s)
+{
+    if (text_at(x, y, s))
+        return true;
+    const char *t;
+    for (int k = 0; (t = lang_translation(s, k)); k++)
+        if (text_at(x, y, t))
+            return true;
+    if (lang_english())
+        return false;
+    // Made of several of the game's texts.
+    char shown[LANG_LINE];
+    lang_translate_line(s, shown, sizeof shown);
+    return SDL_strcmp(shown, s) != 0 && text_at(x, y, shown);
+}
+
+static bool text_at(int x, int y, const char *s)
 {
     int seen_all = 0;
     for (int i = 0; s[i]; i++) {
@@ -338,7 +402,9 @@ static bool find_box(UiBox *box)
             *box = (UiBox){.lines = lines, .cols = cols, .x = l + 3, .y = t + 4};
             size_t n = 0;
             for (int i = 0; i < lines; i++) {
-                ui_read_text(box->x, box->y + i * 9, cols, box->line[i], sizeof box->line[i]);
+                // As shown: lang_box turns the whole box into English.
+                read_text_in(box->x, box->y + i * 9, cols, UI_ANY_COLOUR, box->line[i],
+                             sizeof box->line[i]);
                 const char *s = box->line[i];
                 while (*s == ' ')
                     s++;
@@ -349,6 +415,9 @@ static bool find_box(UiBox *box)
                 if (n >= sizeof box->text)
                     n = sizeof box->text - 1;
             }
+            char read[sizeof box->text];
+            SDL_strlcpy(read, box->text, sizeof read);
+            lang_box(read, box->text, sizeof box->text);
             box->rename = SDL_strstr(box->text, "new planet's name") != nullptr;
             return true;
         }

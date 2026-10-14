@@ -5,6 +5,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/message.h"
 #include "game/mouse.h"
 #include "game/rawtext.h"
@@ -267,7 +268,7 @@ void Shop_ShopScreen(void)
         if (p->SpaceBuilt != 0) {
             if ((int32_t)SPACE_STATION.Stock < ds.Shop_Qty)
                 Message_ShowMessageNoLog(
-                    " You can build only one Destroyer or Cruiser |             on a space station");
+                    Lang_Text(" You can build only one Destroyer or Cruiser |             on a space station"));
             while ((int32_t)SPACE_STATION.Stock < ds.Shop_Qty)
                 ds.Shop_Qty--;
         }
@@ -465,8 +466,9 @@ void Shop_UpdateOrderOres(void)
     // The original stores "Ore needed: (<n> piece" (at most 30 characters),
     // then appends " )" or "s )": the second store covers the first.
     char t[64];
-    SDL_snprintf(t, sizeof t, "Ore needed: (%d piece%s", ds.Shop_Qty,
-                 ds.Shop_Qty < 2 ? " )" : "s )");
+    SDL_snprintf(t, sizeof t, "%s%d%s%s", Lang_Text("Ore needed: ("), ds.Shop_Qty,
+                 Lang_TextAt(0x32b40e72, " piece"),
+                 ds.Shop_Qty < 2 ? Lang_Text(" )") : Lang_TextAt(0x32b40ea8, "s )"));
     set_ore_header(t);
     for (int i = 0; i < 6; i++)
         set_ore_line(i, ORE_ORDER[i], ds.Shop_OreNeeded[ORE_ORDER[i] - 1]);
@@ -475,7 +477,7 @@ void Shop_UpdateOrderOres(void)
 // 32b4:1003
 void Shop_SetupOnePieceOreText(void)
 {
-    set_ore_header("Ore needed: (One piece)");
+    set_ore_header(Lang_Text("Ore needed: (One piece)"));
     for (int i = 0; i < 6; i++)
         set_ore_line(i, ORE_ORDER[i], SEL_PRODUCT->Ores[ORE_ORDER[i] - 1]);
 }
@@ -509,7 +511,7 @@ void Shop_DrawOreTextsMarked(void)
 void Shop_ShowOreStock(void)
 {
     static const int16_t ys[6] = {0x52, 0x52, 0x5B, 0x5B, 0x64, 0x64};
-    set_ore_header("Ores in stock");
+    set_ore_header(Lang_Text("Ores in stock"));
     for (int i = 0; i < 6; i++)
         set_ore_line(i, ORE_ORDER[i], ds.Shop_OreStock[ORE_ORDER[i] - 1]);
     draw_ore_header(0x49);
@@ -532,20 +534,20 @@ static void field(const char *label, int16_t lx, int16_t ly, int16_t lw, int32_t
 void Shop_DrawOrderSummary(void)
 {
     const TProduct *p = SEL_PRODUCT;
-    field("Bought items:", 0xE, 0xB4, 0xF, ds.Shop_Qty, 100, 5, true);
-    field("Time to go:", 0xA0, 0xB4, 0x11, Shop_OrderHours(p, ds.Shop_Qty), 0x108, 6, true);
-    field("Stores:", 0xE, 0xBD, 0x13, p->Stock, 100, 10, true);
-    field("Total price:", 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, ds.Shop_Qty), 0x108, 8, true);
+    field(Lang_Text("Bought items:"), 0xE, 0xB4, 0xF, ds.Shop_Qty, 100, 5, true);
+    field(Lang_Text("Time to go:"), 0xA0, 0xB4, 0x11, Shop_OrderHours(p, ds.Shop_Qty), 0x108, 6, true);
+    field(Lang_Text("Stores:"), 0xE, 0xBD, 0x13, p->Stock, 100, 10, true);
+    field(Lang_Text("Total price:"), 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, ds.Shop_Qty), 0x108, 8, true);
 }
 
 // 32b4:1666
 void Shop_DrawQueueSummary(void)
 {
     const TProduct *p = SEL_PRODUCT;
-    field("Bought items:", 0xE, 0xB4, 0xF, (int16_t)p->_1D, 100, 5, true);
-    field("Time to go:", 0xA0, 0xB4, 0x11, Shop_QueueHours(p), 0x108, 6, true);
-    field("Stores:", 0xE, 0xBD, 0x13, p->Stock, 100, 10, true);
-    field("Total price:", 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, (int16_t)p->_1D), 0x108, 8, true);
+    field(Lang_Text("Bought items:"), 0xE, 0xB4, 0xF, (int16_t)p->_1D, 100, 5, true);
+    field(Lang_Text("Time to go:"), 0xA0, 0xB4, 0x11, Shop_QueueHours(p), 0x108, 6, true);
+    field(Lang_Text("Stores:"), 0xE, 0xBD, 0x13, p->Stock, 100, 10, true);
+    field(Lang_Text("Total price:"), 0xA0, 0xBD, 0x11, Shop_OrderPrice(p, (int16_t)p->_1D), 0x108, 8, true);
 }
 
 // 32b4:18a1
@@ -559,19 +561,19 @@ void Shop_DrawNotProducible(void)
     bool stores = p->Produced != 0 || (p->SpaceBuilt != 0 && SPACE_STATION.State == 5);
     if (!stores) {
         const char *msg =
-            id == 8 || id == 12 || id == 0x22 ? "You only need one of this item."
-            : id == 14 || id == 18            ? "This item will be fitted on the ships"
-            : id == 0x1C                      ? "This is fitted on the colony centres"
-            : id == 0x17                      ? "This cannot be produced on New Earth"
+            id == 8 || id == 12 || id == 0x22 ? Lang_Text("You only need one of this item.")
+            : id == 14 || id == 18            ? Lang_Text("This item will be fitted on the ships")
+            : id == 0x1C                      ? Lang_Text("This is fitted on the colony centres")
+            : id == 0x17                      ? Lang_Text("This cannot be produced on New Earth")
             : id == 1 || id == 7 || id == 0x1D || id == 0x1E || id == 0x23
-                ? "This can be built on your colonies"
-                : "This cannot be produced";
+                ? Lang_Text("This can be built on your colonies")
+                : Lang_Text("This cannot be produced");
         Gfx_DrawTextFC(msg, 0xE, 0xBD, 0x28);
         return;
     }
     char num[16];
     SDL_snprintf(num, sizeof num, "%d", p->Stock);
-    Gfx_DrawTextF9("Stores:", 0xE, 0xBD, 0x13);
+    Gfx_DrawTextF9(Lang_Text("Stores:"), 0xE, 0xBD, 0x13);
     Gfx_DrawTextFC(num, 100, 0xBD, 0xA);
 }
 
@@ -610,8 +612,8 @@ void Shop_SetupShopHotspots(void)
 {
     ds.Mouse_HotspotCount = 2;
     set_hot(1, 0x81, 0x31, 0xBE, 0x7F,
-            ds.Shop_ShowPicture == 0 ? "See picture" : "See info", 1);
-    set_hot(2, 0, 0x31, 0x80, 0x7F, "Select", 1);
+            Lang_Text(ds.Shop_ShowPicture == 0 ? "See picture" : "See info"), 1);
+    set_hot(2, 0, 0x31, 0x80, 0x7F, Lang_Text("Select"), 1);
 }
 
 // 32b4:1ca3
@@ -619,12 +621,12 @@ void Shop_SetupShopListHotspots(void)
 {
     ds.Mouse_HotspotCount = 6;
     set_hot(1, 0x81, 0x31, 0xBE, 0x7F,
-            ds.Shop_ShowPicture == 0 ? "See picture" : "See info", 1);
+            Lang_Text(ds.Shop_ShowPicture == 0 ? "See picture" : "See info"), 1);
     set_hot(2, 0xC, 0x31, 0x68, 0x80, nullptr, 0);
-    set_hot(3, 0, 0x31, 0xB, 0x12, "Scroll up", 0);
-    set_hot(4, 0x72, 0x31, 0xC, 0x12, "Scroll up", 0);
-    set_hot(5, 0, 0x9E, 0xB, 0x12, "Scroll down", 0);
-    set_hot(6, 0x72, 0x9E, 0xC, 0x12, "Scroll down", 0);
+    set_hot(3, 0, 0x31, 0xB, 0x12, Lang_Text("Scroll up"), 0);
+    set_hot(4, 0x72, 0x31, 0xC, 0x12, Lang_Text("Scroll up"), 0);
+    set_hot(5, 0, 0x9E, 0xB, 0x12, Lang_Text("Scroll down"), 0);
+    set_hot(6, 0x72, 0x9E, 0xC, 0x12, Lang_Text("Scroll down"), 0);
 }
 
 // 32b4:1de0

@@ -6,6 +6,7 @@
 #include "game/main_program.h"
 #include "game/mouse.h"
 #include "platform/input.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui_message.h"
 
@@ -226,20 +227,11 @@ static bool page1_shown(void)
 
 // Pascal string p equals s, ignoring case and p's blanks at both ends
 // (toolbar labels are padded).
-static bool pstr_equals(const uint8_t *p, const char *s)
-{
-    size_t start = 1, len = p[0], n = SDL_strlen(s);
-    while (len > 0 && p[len] == ' ')
-        len--;
-    while (start <= len && p[start] == ' ')
-        start++;
-    return len + 1 - start == n && SDL_strncasecmp((const char *)p + start, s, n) == 0;
-}
-
 static int slot_labelled(const char *label)
 {
     for (int slot = 1; slot <= 12; slot++)
-        if (slot_command(slot) != 0 && pstr_equals(slot_label(slot), label))
+        if (slot_command(slot) != 0
+            && lang_matches_constant((const char *)slot_label(slot) + 1, slot_label(slot)[0], label))
             return slot;
     return 0;
 }
@@ -309,7 +301,8 @@ static bool caption_is(const THotspot *h, const char *s)
         len--;
     while (start < len && h->Caption.s[start] == ' ')
         start++;
-    return len - start == n && SDL_strncasecmp(h->Caption.s + start, s, n) == 0;
+    return (len - start == n && SDL_strncasecmp(h->Caption.s + start, s, n) == 0)
+           || lang_matches(h->Caption.s, h->Caption.len, s);
 }
 
 bool ui_hotspot_captioned(int j, const char *caption)
@@ -336,6 +329,8 @@ const char *ui_hotspot_caption(int j)
         start++;
     SDL_memcpy(s, h->Caption.s + start, len - start);
     s[len - start] = 0;
+    char english[64];
+    SDL_strlcpy(s, lang_untranslate_line(s, english, sizeof english), sizeof s);
     return s;
 }
 

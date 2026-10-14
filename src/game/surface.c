@@ -9,6 +9,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
@@ -235,35 +236,35 @@ void Surface_SetupSurfaceHotspots(void)
 {
     bool cb = ds.Surface_CanBuild != 0;
     ds.Mouse_HotspotCount = 0xC;
-    Mouse_SetHotspot(1, 0x5D, 0x35, 0xE0, 0x90, "Terrain", 0, 0);
+    Mouse_SetHotspot(1, 0x5D, 0x35, 0xE0, 0x90, Lang_Text("Terrain"), 0, 0);
     Mouse_SetHotspot(2, 0, 0x8A, 0x59, 0x3E, "Radar", 0, 0);
-    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, cb ? "Invention up " : "No effect", 1, 0);
-    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, cb ? "Invention down" : "No effect", 1, 0);
-    Mouse_SetHotspot(5, 0xC, 0x42, 0x4D, 0x3B, cb ? "Invention Info" : "No effect", 1, 0);
-    Mouse_SetHotspot(6, 0x59, 0x35, 4, 0x90, "Left", 0, 1);
-    Mouse_SetHotspot(7, 0x13D, 0x35, 3, 0x90, "Right", 0, 2);
-    Mouse_SetHotspot(8, 0x5D, 0x31, 0xE0, 4, "Up", 0, 3);
-    Mouse_SetHotspot(9, 0x5D, 0xC5, 0xE0, 3, "Down", 0, 4);
-    Mouse_SetHotspot(10, 0, 0x32, 0x2C, 0xD, cb ? "Build" : "", 1, 0);
-    Mouse_SetHotspot(11, 0x2D, 0x32, 0x2C, 0xD, "Destroy", 1, 0);
+    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, cb ? Lang_Text("Invention up ") : Lang_Text("No effect"), 1, 0);
+    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, cb ? Lang_Text("Invention down") : Lang_Text("No effect"), 1, 0);
+    Mouse_SetHotspot(5, 0xC, 0x42, 0x4D, 0x3B, cb ? Lang_Text("Invention Info") : Lang_Text("No effect"), 1, 0);
+    Mouse_SetHotspot(6, 0x59, 0x35, 4, 0x90, Lang_Text("Left"), 0, 1);
+    Mouse_SetHotspot(7, 0x13D, 0x35, 3, 0x90, Lang_Text("Right"), 0, 2);
+    Mouse_SetHotspot(8, 0x5D, 0x31, 0xE0, 4, Lang_Text("Up"), 0, 3);
+    Mouse_SetHotspot(9, 0x5D, 0xC5, 0xE0, 3, Lang_Text("Down"), 0, 4);
+    Mouse_SetHotspot(10, 0, 0x32, 0x2C, 0xD, cb ? Lang_Text("Build") : "", 1, 0);
+    Mouse_SetHotspot(11, 0x2D, 0x32, 0x2C, 0xD, Lang_Text("Destroy"), 1, 0);
 }
 
 // 2ef2:1441 (the Ghidra fragment at 1472 is its second half)
 void Surface_SetupInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = 4;
-    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, "See surface", 1, 0);
-    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, "See surface", 1, 0);
-    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, "Invention up", 1, 0);
-    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, "Invention down", 1, 0);
+    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, Lang_Text("See surface"), 1, 0);
+    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, Lang_Text("See surface"), 1, 0);
+    Mouse_SetHotspot(3, 0, 0x40, 0xB, 0x20, Lang_Text("Invention up"), 1, 0);
+    Mouse_SetHotspot(4, 0, 0x61, 0xB, 0x20, Lang_Text("Invention down"), 1, 0);
 }
 
 // 2ef2:151b
 void Surface_SetupSimpleInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = 2;
-    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, "See surface", 1, 0);
-    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, "See surface", 1, 0);
+    Mouse_SetHotspot(1, 0x5A, 0x31, 0xE6, 0x97, Lang_Text("See surface"), 1, 0);
+    Mouse_SetHotspot(2, 0xC, 0x42, 0x4D, 0x3B, Lang_Text("See surface"), 1, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,25 +291,25 @@ void Surface_DrawBuildingInfo(void)
     Gfx_DrawTextF9(pstr_get(tmp, sizeof tmp, &bt->Name), 0x75, 0x3B, 0x12);
 
     if (ds.Surface_Mode == 3) {
-        SDL_snprintf(tmp, sizeof tmp, "Cost       : %d", (int)bt->Cost);
+        SDL_snprintf(tmp, sizeof tmp, "%s%d", Lang_Text("Cost       : "), (int)bt->Cost);
         Gfx_DrawTextFC(tmp, 0x62, 0x46, 0x14);
         for (int16_t i = 1; i <= 3; i++)
             Gfx_DrawTextFC("", 0x62, (int16_t)(i * 9 + 0x46), 0x15);
 
         if (cat == 2 || cat == 9)
-            SDL_strlcpy(s, "Production : mine", sizeof s);
+            SDL_strlcpy(s, Lang_Text("Production : mine"), sizeof s);
         else
-            SDL_snprintf(s, sizeof s, "Production : %d kwh", bt->Production);
+            SDL_snprintf(s, sizeof s, "%s%d kwh", Lang_Text("Production : "), bt->Production);
         int16_t row = rows[0];
         if (row > 0)
             Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
 
-        SDL_snprintf(s, sizeof s, "Workers    : %d", bt->Workers);
+        SDL_snprintf(s, sizeof s, "%s%d", Lang_Text("Workers    : "), bt->Workers);
         row = rows[1];
         if (row > 0)
             Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
 
-        SDL_snprintf(s, sizeof s, "Energy     : %d kwh", (int)bt->Energy);
+        SDL_snprintf(s, sizeof s, "%s%d kwh", Lang_Text("Energy     : "), (int)bt->Energy);
         row = rows[2];
         if (row > 0)
             Gfx_DrawTextFC(s, 0x62, (int16_t)(row * 9 + 0x46), 0x15);
@@ -316,7 +317,7 @@ void Surface_DrawBuildingInfo(void)
 
     if (ds.Surface_Mode == 4) {
         const TBuilding *b = bldg(ds.Surface_SelBuilding);
-        info_line("Status     : ", b->Flag != 0 ? "Active" : "Passive", "", 0);
+        info_line(Lang_Text("Status     : "), Lang_Text(b->Flag != 0 ? "Active" : "Passive"), "", 0);
 
         int16_t row = rows[0];
         if (row > 0) {
@@ -328,26 +329,26 @@ void Surface_DrawBuildingInfo(void)
             SDL_snprintf(s, sizeof s, "%d kwh", (int)v);
             if (cat == 2) {
                 const TBody *body = ds.Game_CurBody;
-                SDL_snprintf(s, sizeof s, "%d t/ptp", body->Deposits[0] / 10);
+                SDL_snprintf(s, sizeof s, "%d%s", body->Deposits[0] / 10, Lang_Text(" t/ptp"));
                 if (body->Deposits[0] < 10)
-                    SDL_strlcpy(s, "NONE", sizeof s);
+                    SDL_strlcpy(s, Lang_Text("NONE"), sizeof s);
             }
             if (b->Flag == 0)
-                SDL_strlcpy(s, "NONE", sizeof s);
-            info_line("Production : ", s, "", row);
+                SDL_strlcpy(s, Lang_Text("NONE"), sizeof s);
+            info_line(Lang_Text("Production : "), s, "", row);
         }
 
         row = rows[1];
         if (row > 0) {
             SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->W9);
             SDL_snprintf(tmp, sizeof tmp, "/%d", bt->Workers);
-            info_line("Workers    : ", s, tmp, row);
+            info_line(Lang_Text("Workers    : "), s, tmp, row);
         }
 
         row = rows[2];
         if (row > 0) {
             SDL_snprintf(s, sizeof s, "%u", b->Flag == 0 ? 0u : (uint16_t)b->WB);
-            info_line("Energy     : ", s, " kwh", row);
+            info_line(Lang_Text("Energy     : "), s, " kwh", row);
         }
 
         row = rows[2];
@@ -358,7 +359,7 @@ void Surface_DrawBuildingInfo(void)
         if (row < 0)
             row = 0;
         SDL_snprintf(s, sizeof s, "%d", b->Flag == 0 ? 0 : b->BD);
-        info_line("Working    : ", s, "%", (int16_t)(row + 1));
+        info_line(Lang_Text("Working    : "), s, "%", (int16_t)(row + 1));
 
         if (config.detoxin_rate && b->Kind == 5) {
             SDL_snprintf(s, sizeof s, "%d", SDL_min(Surface_DerrickRate(), 999));

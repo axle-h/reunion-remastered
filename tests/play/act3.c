@@ -138,7 +138,7 @@ void act3_m03_phoenix(void)
     if (planet_on_map("Phoenix", "Phoenix 3"))
         return;
     galleon_to("Phoenix", nullptr, nullptr);
-    pol_wait_for("M3: Phoenix explored", event_seen, "explored Phoenix system", 10 * POL_DAY);
+    pol_wait_for("M3: Phoenix explored", event_seen, "ships explored Phoenix", 10 * POL_DAY);
 }
 
 void act3_m04_kalls(void)
@@ -389,6 +389,14 @@ void act3_m10_course(void)
 // S-K: the star map zoomed on Phoenix 5 lists the Kalls' fleet 2
 // there (allied forces are listed, planetinfo.c SetupSystemViewHotspots)
 // once their alliance timer moved it (sim.c:1516-1521).
+// A group slot's caption names the Kalls' fleet 2: "Kall Fleet 2", or in
+// the French and Italian games "Kall 2" (which reads back as "The Kalls 2").
+static bool kall_fleet_2(const char *c)
+{
+    size_t n = SDL_strlen(c);
+    return SDL_strcasestr(c, "Kall") && n > 2 && SDL_strcmp(c + n - 2, " 2") == 0;
+}
+
 static bool kall_fleet_at_phoenix_5(void *unused)
 {
     (void)unused;
@@ -405,8 +413,7 @@ static bool kall_fleet_at_phoenix_5(void *unused)
                   && ui_find_hotspot("Phoenix 3", 1) == 0;
     bool there = false;
     for (int j = 1; j <= 18 && zoomed; j++) {
-        const char *c = ui_hotspot_caption(j);
-        if (SDL_strcasestr(c, "Kall") && SDL_strstr(c, "Fleet 2"))
+        if (kall_fleet_2(ui_hotspot_caption(j)))
             there = true;
     }
     if (ui_toolbar_has("ZOOM OUT")) {
@@ -579,10 +586,10 @@ void act3_m15_explorer(void)
         return;
     if (!planet_on_map("Mirach", "Mirach 2")) {
         galleon_to("Mirach", nullptr, nullptr);
-        pol_wait_for("M15: Mirach explored", event_seen, "explored Mirach system", 10 * POL_DAY);
+        pol_wait_for("M15: Mirach explored", event_seen, "ships explored Mirach", 10 * POL_DAY);
     }
     galleon_to(nullptr, "Mirach 2", nullptr);
-    pol_wait_for("M15: Mirach 2's moons", event_seen, "explored Mirach 2's moons", 5 * POL_DAY);
+    pol_wait_for("M15: Mirach 2's moons", event_seen, "explored Mirach 2", 5 * POL_DAY);
     galleon_to(nullptr, "Mirach 2", MIRACH_2_MOON_1);
     ui_ship_info();
     if (!ui_wait_arrival("Galleon 1", TRIP_HOURS) || !ui_dock("Galleon 1"))
@@ -649,16 +656,25 @@ static bool spy_1_ready(void *unused)
     return goal_m14_spy_1();
 }
 
+// The box of M17's intel: the other games word it differently (the French
+// reads back as "Your satellite found Morgrul sur Mirach system planet
+// Mirach 3"), but it names the planet last.
+static bool mirach_3_intel(void *unused)
+{
+    (void)unused;
+    return pol_seen_about("satellite found", "Mirach 3", 0);
+}
+
 void act3_m17_spy_on_mirach(void)
 {
     // The spy satellite's intel on Mirach 3 reaches 40 in days: " Your
     // satellite found The Morgruls colony at | Mirach 3" (sim.c:682-689)
     // opens GROUND WAR there.
-    if (pol_seen("colony at") < 0) {
+    if (!mirach_3_intel(nullptr)) {
         pol_poll_for("M17: Spy 1", spy_1_ready, nullptr, 20 * POL_DAY, 24);
         pol_do(spy_to_mirach_3, nullptr);
     }
-    pol_wait_for("M17: Mirach 3's intel", event_seen, "Morgruls colony at", 20 * POL_DAY);
+    pol_wait_for("M17: Mirach 3's intel", mirach_3_intel, nullptr, 20 * POL_DAY);
 }
 
 // --- M18: Mirach 3 -----------------------------------------------------------------

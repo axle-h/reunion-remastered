@@ -5,6 +5,7 @@
 #include "game/dseg.h"
 #include "game/groups.h"
 #include "game/mouse.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui.h"
 #include "play/ui_message.h"
@@ -160,14 +161,16 @@ static char body_name[32];
 
 const char *ui_body_name(void)
 {
-    char line[40];
+    char line[48];
     body_name[0] = 0;
     if (ui_screen() != 8)
         return body_name;
-    read_text(0x5E, 0x35, 0x23, line);
-    const char *p = SDL_strstr(line, "NAME:");
+    // "YOUR PLANET'S NAME:  New Earth" from 5Eh; the Italian line, "NOME DEL
+    // TUO PIANETA : New Earth", from 4Ch.
+    read_text(0x4C, 0x35, 0x27, line);
+    const char *p = SDL_strchr(line, ':');
     if (p) {
-        SDL_strlcpy(body_name, p + 5, sizeof body_name);
+        SDL_strlcpy(body_name, p + 1, sizeof body_name);
         trim(body_name);
     }
     return body_name;
@@ -278,10 +281,12 @@ static const char *const kind_names[25] = {
     "Builder Plant", "Vehicle Plant", "Medicine Plant", "Miner station",
 };
 
+// `name` as read off the screen: the French Ioncannon building has the name
+// of the Ion cannon product, and reads as that.
 static int kind_index(const char *name)
 {
     for (int k = 0; k < 25; k++)
-        if (SDL_strcasecmp(kind_names[k], name) == 0)
+        if (lang_reads_as(name, kind_names[k]))
             return k + 1;
     return 0;
 }

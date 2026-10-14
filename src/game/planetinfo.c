@@ -7,6 +7,7 @@
 #include "game/colonystats.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/rawtext.h"
@@ -166,9 +167,9 @@ void PlanetInfo_SetupPlanetInfoHotspots(void)
 {
     if (ds.PlanetInfo_AlienMode == 0) {
         ds.Mouse_HotspotCount = 3;
-        Mouse_SetHotspot(1, 0, 0x31, 0x39, 0x2F, "SEE OWNER INFO", 1, 0);
-        Mouse_SetHotspot(2, 0, 0x61, 0x39, 0x2F, "SHIPS", 1, 0);
-        Mouse_SetHotspot(3, 0, 0x91, 0x60, 0x37, "SEE SURFACE", 1, 0);
+        Mouse_SetHotspot(1, 0, 0x31, 0x39, 0x2F, Lang_Text("SEE OWNER INFO"), 1, 0);
+        Mouse_SetHotspot(2, 0, 0x61, 0x39, 0x2F, Lang_Text("SHIPS"), 1, 0);
+        Mouse_SetHotspot(3, 0, 0x91, 0x60, 0x37, Lang_Text("SEE SURFACE"), 1, 0);
         // Port addition (game/colonystats.h): the POP row.
         if (ColonyStats_Available()) {
             ds.Mouse_HotspotCount = 4;
@@ -176,7 +177,7 @@ void PlanetInfo_SetupPlanetInfoHotspots(void)
         }
     } else {
         ds.Mouse_HotspotCount = 1;
-        Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, "SEE PLANET INFO", 1, 0);
+        Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, Lang_Text("SEE PLANET INFO"), 1, 0);
     }
 }
 
@@ -205,24 +206,21 @@ static void cat60(char text[TEXT60], const char *s)
     SDL_strlcat(text, s, TEXT60);
 }
 
-// 357b:0359
-void PlanetInfo_DrawPlanetInfoText(void)
+// The name line: "YOUR PLANET'S NAME:  New Earth".
+static void draw_name_line(const TBody *b)
 {
-    const TBody *b = ds.Game_CurBody;
-    char text[TEXT60] = "", name[256], desc[TEXT60] = "";
-    char lines[9][LINE40];
-
+    char text[TEXT60] = "", name[256];
     uint8_t owner = b->Owner;
     // The original leaves the string undefined for owners above 14h; harmless.
     if (owner == 0) {
         set60(text, "  ");
     } else if (owner == 1) {
-        set60(text, "YOUR ");
+        set60(text, Lang_Text("YOUR "));
     } else if ((int8_t)owner > 1 && (int8_t)owner < 0x15) {
         if (b->InfoLevel < 0x1E) {
             set60(text, "");
         } else if (b->InfoLevel < 0x28) {
-            set60(text, "ALIEN ");
+            set60(text, Lang_Text("ALIEN "));
         } else {
             // Races[owner].Name; owner can exceed the 12 races only in damaged data.
             set60(text, pstr_get(name, sizeof name, race_bytes(owner)));
@@ -231,29 +229,67 @@ void PlanetInfo_DrawPlanetInfoText(void)
     }
     if (cur_moon() == 0) {
         PlanetInfo_GetBodyName(name, sizeof name, ds.Game_CurSystem, cur_planet(), 0);
-        cat60(text, "PLANET'S NAME:  ");
+        cat60(text, Lang_Text("PLANET'S NAME:  "));
     } else {
         PlanetInfo_GetBodyFullName(name, sizeof name, ds.Game_CurSystem, cur_planet(), cur_moon());
-        cat60(text, "MOON'S NAME: ");
+        cat60(text, Lang_Text("MOON'S NAME: "));
     }
     cat60(text, name);
     Gfx_DrawTextF9(text, 0x5E, 0x35, 0x23);
+}
+
+// The Italian build's name line: "NOME DEL TUO PIANETA : New Earth",
+// from 4Ch, 27h wide.
+static void draw_italian_name_line(const TBody *b)
+{
+    const char *kind = cur_moon() == 0 ? "PIANETA" : "LUNA";
+    char text[TEXT60] = "", name[256], line[TEXT60];
+    uint8_t owner = b->Owner;
+    if (owner == 0) {
+        set60(text, kind);
+    } else if (owner == 1) {
+        SDL_snprintf(text, TEXT60, "TUO %s", kind);
+    } else if ((int8_t)owner > 1 && (int8_t)owner < 0x15 && b->InfoLevel >= 0x1E) {
+        if (b->InfoLevel < 0x28)
+            SDL_snprintf(text, TEXT60, "%s ALIENO", kind);
+        else
+            SDL_snprintf(text, TEXT60, "%s %s", kind, pstr_get(name, sizeof name, race_bytes(owner)));
+    }
+    if (cur_moon() == 0)
+        PlanetInfo_GetBodyName(name, sizeof name, ds.Game_CurSystem, cur_planet(), 0);
+    else
+        PlanetInfo_GetBodyFullName(name, sizeof name, ds.Game_CurSystem, cur_planet(), cur_moon());
+    SDL_snprintf(line, TEXT60, "%s%s : %s", cur_moon() == 0 ? "NOME DEL " : "NOME DELLA ", text, name);
+    Gfx_DrawTextF9(line, 0x4C, 0x35, 0x27);
+}
+
+// 357b:0359
+void PlanetInfo_DrawPlanetInfoText(void)
+{
+    const TBody *b = ds.Game_CurBody;
+    char text[TEXT60] = "", desc[TEXT60] = "";
+    char lines[9][LINE40];
+
+    if (Lang_Get() == LANGUAGE_ITALIAN)
+        draw_italian_name_line(b);
+    else
+        draw_name_line(b);
 
     // Population and attitude.
     if (b->Population == 0)
-        set60(text, "No");
+        set60(text, Lang_TextAt(0x357b04bf, "No"));
     else
         SDL_snprintf(text, TEXT60, "%d", (int)b->Population);
     if (b->Surveyed != 0 && colonisable(b) && b->InfoLevel > 0x1D
         && (b->Owner == 0 || (b->Owner == 1 && b->Colony == 0 && b->Miner == 0)))
-        set60(text, "Empty planet, ready for colonysation");
+        set60(text, Lang_Text("Empty planet, ready for colonysation"));
     if ((int8_t)b->Owner > 1) {
         if (b->InfoLevel < 0x1E)
-            set60(text, "No");
+            set60(text, Lang_TextAt(0x357b0552, "No"));
         if (b->InfoLevel > 0x1D && b->InfoLevel < 0x28)
-            set60(text, "Unknown");
+            set60(text, Lang_Text("Unknown"));
         if (b->InfoLevel > 0x27)
-            cat60(text, " alien");
+            cat60(text, Lang_Text(" alien"));
     }
     if (b->Owner == 1 && b->Population > 0) {
         static const char *const mood[7] = {" revolting men",
@@ -265,7 +301,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
                                             " loyal people"};
         int step = scale_step(b->Attitude);
         if (step >= 0)
-            cat60(text, mood[step]);
+            cat60(text, Lang_Text(mood[step]));
     }
     Gfx_DrawTextF9(text, 0x61, 0x45, 0x24);
 
@@ -274,9 +310,9 @@ void PlanetInfo_DrawPlanetInfoText(void)
         static const char *const tech[8] = {"None",   "Very low",       "Low",        "Normal",
                                             "High",   "Difficult",      "Very difficult", "Oppressing"};
         if (b->TechLevel < 8)
-            set60(text, tech[b->TechLevel]);
+            set60(text, Lang_Text(tech[b->TechLevel]));
     } else {
-        set60(text, "No");
+        set60(text, Lang_TextAt(0x357b080f, "No"));
     }
     Gfx_DrawTextF9(text, 0x61, 0x55, 0x23);
 
@@ -286,40 +322,40 @@ void PlanetInfo_DrawPlanetInfoText(void)
                                            "Enhanced", "High-tech",       "Super-tech"};
         int step = scale_step(b->Resistance);
         if (step >= 0)
-            set60(text, res[step]);
+            set60(text, step == 0 ? Lang_TextAt(0x357b0854, "No") : Lang_Text(res[step]));
     }
     if ((int8_t)b->Owner > 1 && b->InfoLevel > 0x1D && b->InfoLevel < 0x28)
-        set60(text, "Unknown");
+        set60(text, Lang_Text("Unknown"));
     if ((int8_t)b->Owner > 1 && b->InfoLevel < 0x1E)
-        set60(text, "No");
+        set60(text, Lang_TextAt(0x357b0943, "No"));
     Gfx_DrawTextF9(text, 0x61, 0x65, 0x23);
 
     // Surface type and what the body is used for.
     if (b->InfoLevel < 6) {
-        set60(text, "Unknown");
+        set60(text, Lang_Text("Unknown"));
     } else {
         static const char *const surf[11] = {"No data", "Earth-like", "Gaseous", "Icy",
                                              "Watery",  "Tropical",   "Desert",  "Swampy",
                                              "Rocky",   "Too hot",    "No atmosphere"};
         if (b->SurfaceType < 11)
-            set60(text, surf[b->SurfaceType]);
+            set60(text, Lang_Text(surf[b->SurfaceType]));
     }
     if (b->InfoLevel > 0x13) {
         if (b->Surveyed == 0 || !colonisable(b))
-            set60(desc, "not accomodable");
+            set60(desc, Lang_Text("not accomodable"));
         else
-            set60(desc, "life supporting");
+            set60(desc, Lang_Text("life supporting"));
     }
     if (b->InfoLevel > 0x1D && b->InfoLevel < 0x28 && (int8_t)b->Owner > 1)
-        set60(desc, "enemy movement");
+        set60(desc, Lang_Text("enemy movement"));
     if (b->Surveyed != 0 && colonisable(b) && b->InfoLevel > 0x27) {
         if (b->Owner == 1) {
             if (b->Colony != 0)
-                set60(desc, "colony");
+                set60(desc, Lang_Text("colony"));
             if (b->Colony == 0 && b->Miner > 0)
-                set60(desc, "under colonization");
+                set60(desc, Lang_Text("under colonization"));
         } else if ((int8_t)b->Owner > 1 && (int8_t)b->Owner < 0x15 && b->Colony != 0) {
-            set60(desc, "Alien colony");
+            set60(desc, Lang_Text("Alien colony"));
         }
     }
     if (desc[0] != '\0') {
@@ -334,9 +370,9 @@ void PlanetInfo_DrawPlanetInfoText(void)
         if (b->InfoLevel < 10)
             Gfx_DrawTextF9("???", 0xA0, y, 3);
         else if (b->Deposits[k - 1] < 10 || b->_03 == 0)
-            Gfx_DrawTextF9("NO ", 0xA0, y, 3);
+            Gfx_DrawTextF9(Lang_Text("NO "), 0xA0, y, 3);
         else
-            Gfx_DrawTextF9("YES", 0xA0, y, 3);
+            Gfx_DrawTextF9(Lang_Text("YES"), 0xA0, y, 3);
     }
 
     SDL_snprintf(text, TEXT60, "%6u", b->Diameter);
@@ -350,7 +386,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
 
     // The list of things on the body, up to eight lines.
     int16_t n = 0;
-#define LINE(lit) SDL_strlcpy(lines[n], lit, LINE40)
+#define LINE(lit) SDL_strlcpy(lines[n], Lang_Text(lit), LINE40)
     if (b->Owner == 0 && (int8_t)b->Satellite > 0) {
         n = 1;
         if (b->Satellite == 1)
@@ -365,23 +401,24 @@ void PlanetInfo_DrawPlanetInfoText(void)
         }
         if (Surface_CountBuildings(0x14, ds.Game_CurSystem, cur_planet(), cur_moon(), true) > 0) {
             n++;
-            LINE("Energy Shield");
+            SDL_strlcpy(lines[n], Lang_TextAt(0x357b0daf, "Energy Shield"), LINE40);
         }
         if (ds.Game_CurSystem == 1 && ds.Game_CurPlanet[0] == 5 && ds.Game_CurMoon[0] == 0
             && ds.Research_Products[0x17].State == 5 && ds.Research_Products[0x17].Stock > 0) {
             n++;
-            SDL_snprintf(lines[n], LINE40, "%d Space Station", ds.Research_Products[0x17].Stock);
+            SDL_snprintf(lines[n], LINE40, "%d%s", ds.Research_Products[0x17].Stock,
+                         Lang_Text(" Space Station"));
         }
         if (b->_0A != 0) {
             n++;
             if (b->Colony == 0)
                 LINE("Miner Station");
             else
-                SDL_snprintf(lines[n], LINE40, "%d Miner Droid", b->_0A);
+                SDL_snprintf(lines[n], LINE40, "%d%s", b->_0A, Lang_Text(" Miner Droid"));
         }
         if (b->_0B != 0 && b->Colony != 0) {
             n++;
-            SDL_snprintf(lines[n], LINE40, "%d Solar Sat", b->_0B);
+            SDL_snprintf(lines[n], LINE40, "%d%s", b->_0B, Lang_Text(" Solar Sat"));
         }
         if ((int8_t)b->Satellite > 0) {
             n++;
@@ -403,7 +440,7 @@ void PlanetInfo_DrawPlanetInfoText(void)
         if (b->InfoLevel > 0x28
             && Surface_CountBuildings(0x14, ds.Game_CurSystem, cur_planet(), cur_moon(), true) > 0) {
             n++;
-            LINE("Energy Shield");
+            SDL_strlcpy(lines[n], Lang_TextAt(0x357b0ffd, "Energy Shield"), LINE40);
         }
         if ((int8_t)b->Satellite > 0) {
             n++;
@@ -642,7 +679,8 @@ void PlanetInfo_GetBodyFullName(char *dst, size_t cap, int16_t sys, int16_t plan
 void PlanetInfo_GetBodyLongName(char *dst, size_t cap, int16_t sys, int16_t planet, int16_t moon)
 {
     char prefix[256];
-    body_name(dst, cap, system_prefix(prefix, sys, " system,planet "), sys, planet, moon, ",moon ");
+    body_name(dst, cap, system_prefix(prefix, sys, Lang_Text(" system,planet ")), sys, planet,
+              moon, Lang_Text(",moon "));
 }
 
 // 357b:355e: "<system> system <planet>[ <moon>]".
@@ -650,7 +688,8 @@ void PlanetInfo_GetBodyLocationName(char *dst, size_t cap, int16_t sys, int16_t 
                                     int16_t moon)
 {
     char prefix[256];
-    body_name(dst, cap, system_prefix(prefix, sys, " system "), sys, planet, moon, " ");
+    body_name(dst, cap, system_prefix(prefix, sys, Lang_TextAt(0x357b3577, " system ")), sys, planet,
+              moon, " ");
 }
 
 // ---------------------------------------------------------------------------
@@ -1007,8 +1046,9 @@ void PlanetInfo_SetupSystemViewHotspots(void)
                 if (rf->System == ds.Game_CurSystem && rf->Body == cur_planet() && rf->Active == 1
                     && rf->Mission > 1 && j < 0x13) {
                     char fleet[256];
-                    SDL_snprintf(fleet, sizeof fleet, "%s Fleet %d",
-                                 pstr_get(name, sizeof name, &ds.Names_Races[r - 1]), f);
+                    SDL_snprintf(fleet, sizeof fleet, "%s%s%d",
+                                 pstr_get(name, sizeof name, Lang_Slot(&ds.Names_Races[r - 1])),
+                                 Lang_Text(" Fleet "), f);
                     Mouse_SetHotspot(j, (int16_t)(((j - 1) % 2) * 0x20 + 0x101),
                                      (uint8_t)(((j - 1) / 2) * 0x10 + 0x32), 0x20, 0x10, fleet, 0,
                                      0);

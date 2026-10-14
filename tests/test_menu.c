@@ -1,6 +1,6 @@
 // menu: the port menu's model driven by key events, without a window:
 // sections and rows, changes to the config, requests to the game, the
-// fixes' rows, and the System section's Restart / Quit.
+// languages, the fixes' rows, and the System section's Restart / Quit.
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
@@ -24,6 +24,13 @@ static void changed(MenuChange c)
 static bool game_running(void)
 {
     return running;
+}
+
+static unsigned langs;
+
+static unsigned languages(void)
+{
+    return langs;
 }
 
 static void press(SDL_Keycode key)
@@ -64,6 +71,7 @@ int main(void)
         .add_ore = 10000,
         .fixes = fixes,
         .fix_count = 2,
+        .languages = languages,
     };
     menu_set_hooks(&hooks);
     config_reset();
@@ -122,7 +130,7 @@ int main(void)
     go_to(SEC_GAME);
     press(SDLK_RETURN);
     CHECK(config.skip_intro);
-    CHECK(menu_row_count() == 3 && row_is(1, "[x] Colony stats") && row_is(2, "[x] Detoxin rate"));
+    CHECK(menu_row_count() == 4 && row_is(1, "[x] Colony stats") && row_is(2, "[x] Detoxin rate"));
     press(SDLK_DOWN);
     press(SDLK_RETURN);
     CHECK(!config.colony_stats && row_is(1, "[ ] Colony stats"));
@@ -133,6 +141,29 @@ int main(void)
     CHECK(!config.detoxin_rate && row_is(2, "[ ] Detoxin rate"));
     press(SDLK_RETURN);
     CHECK(config.detoxin_rate);
+
+    // Language: only the game's own (English) until the data has more;
+    // then it steps through those, both ways. One the data lacks shows the
+    // one the game falls back on.
+    press(SDLK_DOWN);
+    CHECK(row_is(3, "Language <English>"));
+    press(SDLK_RIGHT);
+    CHECK(config.language == LANGUAGE_ENGLISH);
+    langs = IN_ENGLISH | IN_GERMAN | IN_ITALIAN;
+    press(SDLK_RIGHT);
+    CHECK(config.language == LANGUAGE_GERMAN && row_is(3, "Language <German>"));
+    press(SDLK_RIGHT);
+    CHECK(config.language == LANGUAGE_ITALIAN);
+    press(SDLK_RIGHT);
+    CHECK(config.language == LANGUAGE_ENGLISH);
+    press(SDLK_LEFT);
+    CHECK(config.language == LANGUAGE_ITALIAN);
+    langs = IN_GERMAN | IN_FRENCH;
+    CHECK(row_is(3, "Language <German>"));
+    press(SDLK_RIGHT);
+    CHECK(config.language == LANGUAGE_FRENCH);
+    langs = 0;
+    config.language = LANGUAGE_ENGLISH;
 
     // Fixes: a row per fix, all on; one off, then all on again.
     go_to(SEC_FIXES);

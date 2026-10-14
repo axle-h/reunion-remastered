@@ -1,8 +1,11 @@
 // VICTORY.PRG: the end sequence after the game is won. Main block
-// 1000:0161. Keys are ignored.
+// 1000:0161. Keys are ignored. Each of the CD's languages has its own
+// VICTORY.PRG; the French and Italian one plays the English script, the
+// German one leaves out TX5.
 #include <SDL3/SDL.h>
 
 #include "cutscene/cs.h"
+#include "platform/gamedata.h"
 
 // DS:0002: frames played of ANIM1 (the file has 19).
 static const uint8_t frame_counts[2] = { 0, 16 };
@@ -80,7 +83,8 @@ static void run(void)
     cs_pic(70, 5, 1, 5, "EARTH");
     cs_pic(70, 5, 1, 6, "END");
     cs_pic(70, 5, 1, 8, "TX4");
-    cs_pic(70, 5, 32, 8, "TX5");
+    if (gamedata_language() != LANGUAGE_GERMAN)  // the German folder's TX5 is the English one
+        cs_pic(70, 5, 32, 8, "TX5");
     cs_wait_pos(50, 8);
     cs_fade_out(70, cs.pal, 0, 255);
 

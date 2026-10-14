@@ -8,6 +8,7 @@
 #include "game/command.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/sound.h"
@@ -236,7 +237,7 @@ void GrWar_SetupBattleHotspots(void)
     h->Y = 0xA8;
     h->W = 0x40;
     h->H = 0x10;
-    pstr_set(&h->Caption, 0x12, "Move");
+    pstr_set(&h->Caption, 0x12, Lang_TextAt(0x1537057d, "Move"));
     h->Repeat_ = true;
     h->_1A = 0;
 
@@ -245,7 +246,7 @@ void GrWar_SetupBattleHotspots(void)
     h->Y = 0xB8;
     h->W = 0x40;
     h->H = 0x10;
-    pstr_set(&h->Caption, 0x12, "Attack");
+    pstr_set(&h->Caption, 0x12, Lang_Text("Attack"));
     h->Repeat_ = true;
     h->_1A = 0;
 
@@ -298,19 +299,19 @@ void GrWar_DrawSelectedUnitInfo(void)
     // s is a string[50].
     pstr_get(s, sizeof s, &ds.Names_GroundUnits[u->type - 1]);
     if (u->type == 5 && (ds.Sim_PlayerAttacks ^ ds.GrWar_SelectedOwn) != 0)
-        SDL_strlcpy(s, "Colony", sizeof s);
+        SDL_strlcpy(s, Lang_Text("Colony"), sizeof s);
     Gfx_DrawTextFC(s, 5, 0x88, 8);
     if (u->type < 5) {
-        SDL_snprintf(tmp, sizeof tmp, "Pcs:%d", u->count);
+        SDL_snprintf(tmp, sizeof tmp, "%s%d", Lang_Text("Pcs:"), u->count);
         Gfx_DrawTextF9(tmp, 5, 0x92, 9);
-        SDL_snprintf(tmp, sizeof tmp, "Str:%d", (int)strength);
+        SDL_snprintf(tmp, sizeof tmp, "%s%d", Lang_Text("Str:"), (int)strength);
         Gfx_DrawTextF9(tmp, 5, 0x9C, 9);
     } else {
         int16_t dmg = (int16_t)(100 - u->hp);
         SDL_snprintf(s, sizeof s, "%d%%", dmg);
         if (dmg == 0)
-            SDL_strlcpy(s, "none", sizeof s);
-        SDL_snprintf(tmp, sizeof tmp, "Dmg:%s", s);
+            SDL_strlcpy(s, Lang_Text("none"), sizeof s);
+        SDL_snprintf(tmp, sizeof tmp, "%s%s", Lang_Text("Dmg:"), s);
         Gfx_DrawTextF9(tmp, 5, 0x92, 9);
         Gfx_DrawTextF9("", 5, 0x9C, 9);
     }

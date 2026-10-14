@@ -5,6 +5,7 @@
 #include "game/dseg.h"
 #include "game/mouse.h"
 #include "game/textfile.h"
+#include "play/lang.h"
 #include "play/play.h"
 #include "play/ui.h"
 
@@ -79,15 +80,34 @@ static void log_menu(const char *what, const TalkMenu *m)
         play_log("  %s row %d: \"%s\"", what, m->row[k], m->text[k]);
 }
 
-// Line `line` of TEXT\<name><num><ext>, as the game reads it.
+// TEXT\<name><num><ext>.
+static void text_file_name(const char *name, const PString *num, const char *ext, char *out,
+                           size_t size)
+{
+    SDL_snprintf(out, size, "%s%.*s%s", name, num->len, num->s, ext);
+}
+
+// Line `line` of TEXT\<name><num><ext>, as the game reads it, in English
+// (lang.h).
 static void text_file_line(const char *name, const PString *num, const char *ext, int line,
                            char out[256])
 {
-    char file[64];
-    SDL_snprintf(file, sizeof file, "%s%.*s%s", name, num->len, num->s, ext);
-    out[0] = '\0';
+    char file[64], text[256] = "";
+    text_file_name(name, num, ext, file, sizeof file);
     if (line > 0)
-        TextFile_ReadTextLine(file, (int16_t)line, out, 256);
+        TextFile_ReadTextLine(file, (int16_t)line, text, sizeof text);
+    lang_line(file, line, text, out, 256);
+}
+
+// A question as the game holds it, a line of TEXT\<name><num><ext>, in
+// English, as drawn (drawn_text).
+static void question_text(const char *q, const char *name, const PString *num, const char *ext,
+                          char *out, size_t size)
+{
+    char file[64], english[256];
+    text_file_name(name, num, ext, file, sizeof file);
+    lang_line_of(file, q, english, sizeof english);
+    drawn_text(english, 3, out, size);
 }
 
 // --- Alien talk (screen 34): alientalk.c, main_program.c screen_alien_talk ---
@@ -115,7 +135,8 @@ bool ui_talk_menu(TalkMenu *m)
     int row = 1;
     for (int k = 0; k < ds.Alien_CurMenu[0] && k < TALK_QUESTIONS_MAX; k++) {
         const char *q = (const char *)ds.AlienTalk_QuestionBuf + k * 0x100;
-        drawn_text(q, 3, m->text[k], TALK_TEXT_MAX);
+        question_text(q, "kerdes", (const PString *)&ds.AlienTalk_RaceStr, ".at", m->text[k],
+                      TALK_TEXT_MAX);
         m->row[k] = row;
         row += text_lines(q);
         m->count++;
@@ -159,7 +180,8 @@ bool ui_pub_menu(TalkMenu *m)
         return false;
     int row = 1;
     for (int k = 0; k < ds.Pub_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
-        drawn_text(pub_line(k + 1), 3, m->text[k], TALK_TEXT_MAX);
+        question_text(pub_line(k + 1), "kerdes", (const PString *)&ds.Pub_PersonStr, ".loc",
+                      m->text[k], TALK_TEXT_MAX);
         m->row[k] = row;
         row += text_lines(pub_line(k + 1));
         m->count++;
@@ -400,7 +422,9 @@ bool ui_advisor_menu(TalkMenu *m)
         return false;
     for (int k = 0; k < ds.Advisor_CurMenu.Count && k < TALK_QUESTIONS_MAX; k++) {
         const char *p = (const char *)ds.Advisor_MenuLines + k * 0x3D;
-        drawn_text(p, 0, m->text[k], TALK_TEXT_MAX);
+        char english[256];
+        lang_line_of("rkerdes1.sp", p, english, sizeof english);
+        drawn_text(english, 0, m->text[k], TALK_TEXT_MAX);
         m->row[k] = k + 1;
         m->count++;
     }

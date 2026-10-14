@@ -4,14 +4,20 @@
 
 #include "platform/gamedata.h"
 
-static char *root;
+static char *root, *language_dir;
+
+static bool is_dir(const char *path)
+{
+    SDL_PathInfo info;
+    return path && SDL_GetPathInfo(path, &info) && info.type == SDL_PATHTYPE_DIRECTORY;
+}
 
 bool fs_init(const char *data_dir)
 {
     SDL_free(root);
     root = SDL_strdup(data_dir);
-    SDL_PathInfo info;
-    return root && SDL_GetPathInfo(root, &info) && info.type == SDL_PATHTYPE_DIRECTORY;
+    fs_set_language_dir(nullptr);
+    return is_dir(root);
 }
 
 const char *fs_root(void)
@@ -19,10 +25,23 @@ const char *fs_root(void)
     return root;
 }
 
+bool fs_set_language_dir(const char *dir)
+{
+    SDL_free(language_dir);
+    language_dir = dir ? SDL_strdup(dir) : nullptr;
+    return !dir || is_dir(language_dir);
+}
+
+const char *fs_language_dir(void)
+{
+    return language_dir;
+}
+
 void fs_shutdown(void)
 {
     SDL_free(root);
     root = nullptr;
+    fs_set_language_dir(nullptr);
 }
 
 struct match {
@@ -41,12 +60,9 @@ static SDL_EnumerationResult find_entry(void *userdata, const char *dirname, con
     return SDL_ENUM_CONTINUE;
 }
 
-char *fs_resolve(const char *dos_path)
+static char *resolve_in(const char *base, const char *dos_path)
 {
-    if (!root)
-        return nullptr;
-
-    char *path = SDL_strdup(root);
+    char *path = SDL_strdup(base);
     char *rest = SDL_strdup(dos_path);
     char *save = nullptr;
     for (char *part = SDL_strtok_r(rest, "\\/", &save); part && path;
@@ -76,6 +92,12 @@ char *fs_resolve(const char *dos_path)
     }
     SDL_free(rest);
     return path;
+}
+
+char *fs_resolve(const char *dos_path)
+{
+    char *path = language_dir ? resolve_in(language_dir, dos_path) : nullptr;
+    return path ? path : root ? resolve_in(root, dos_path) : nullptr;
 }
 
 uint8_t *fs_load(const char *dos_path, size_t *size)

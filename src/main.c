@@ -17,6 +17,7 @@
 #include "game/dseg.h"
 #include "game/fixes.h"
 #include "game/gfx.h"
+#include "game/lang.h"
 #include "game/main_program.h"
 #include "game/music.h"
 #include "game/options.h"
@@ -64,7 +65,7 @@ static int exit_code;
 }
 
 // Command line: [--cutscene=credits|intro|victory] [--replay=SCRIPT]
-// [--import=PATH] [DATA_DIR].
+// [--import=PATH] [--language=NAME] [DATA_DIR].
 // The port menu's Skip intro skips the credits and intro before the game, and
 // so does an autopilot script (its frame numbers count from the game's
 // start).
@@ -79,6 +80,9 @@ static const char *replay;
 // --import=PATH imports the player's copy at PATH into the player's folder
 // (platform/import.h), prints the result and exits: 0 if it was imported.
 static const char *import_path;
+// --language=english|german|french|italian sets the language as the port
+// menu does (scripted runs read no config file).
+static const char *language_arg;
 static const char *data_arg;
 
 // A replay that goes on this many frames past the script's last event
@@ -94,6 +98,8 @@ static void parse_args(int argc, char *argv[])
             replay = argv[i] + 9;
         else if (SDL_strncmp(argv[i], "--import=", 9) == 0)
             import_path = argv[i] + 9;
+        else if (SDL_strncmp(argv[i], "--language=", 11) == 0)
+            language_arg = argv[i] + 11;
         else if (!data_arg)
             data_arg = argv[i];
     }
@@ -105,6 +111,38 @@ static bool use_data(const char *dir)
     char *grafika = dir && fs_init(dir) ? fs_resolve("GRAFIKA") : nullptr;
     SDL_free(grafika);
     return grafika != nullptr;
+}
+
+// The folder of config.language in the game's root (an import's data/DEU,
+// platform/import.h), if the root's game is another language and has one.
+// Set at start and at every restart, so a change in the port menu applies
+// from the next restart.
+static void use_language(void)
+{
+    fs_set_language_dir(nullptr);
+    char *dir = config.language != gamedata_language()
+                    ? fs_resolve(gamedata_language_folder(config.language))
+                    : nullptr;
+    fs_set_language_dir(dir);
+    SDL_free(dir);
+}
+
+// The languages the port menu offers: the root's and its folders'.
+static unsigned data_languages(void)
+{
+    char *keep = fs_language_dir() ? SDL_strdup(fs_language_dir()) : nullptr;
+    fs_set_language_dir(nullptr);
+    Language own = gamedata_language();
+    unsigned in = 1u << own;
+    for (Language l = 0; l < LANGUAGE_COUNT; l++) {
+        char *dir = l != own ? fs_resolve(gamedata_language_folder(l)) : nullptr;
+        if (dir)
+            in |= 1u << l;
+        SDL_free(dir);
+    }
+    fs_set_language_dir(keep);
+    SDL_free(keep);
+    return in;
 }
 
 // The game data: DATA_DIR, else $REUNION_DATA, else the import in the
@@ -132,6 +170,15 @@ static bool find_data(void)
     return found;
 }
 
+// find_data and the language: what the game reads.
+static bool find_game(void)
+{
+    bool found = find_data();
+    if (found)
+        use_language();
+    return found;
+}
+
 // --import=PATH, without a window.
 static int import_only(void)
 {
@@ -152,10 +199,13 @@ static int import_only(void)
 }
 
 // 1000:01a1 up to Main's body: video memory, DS, the heap and the unit
-// initialisers, in the original order. Before them the port picks the font
-// sheet's layout for the edition of the data (game/gfx.h).
+// initialisers, in the original order. Before them the port picks the
+// language and the CD's or the floppy's font for the edition of the data
+// (game/gfx.h).
 static void boot(void)
 {
+    use_language();
+    Lang_Set(gamedata_language());
     gfx_set_cd_charset(gamedata_edition() == EDITION_CD);
     vid_clear();
     dseg_init();
@@ -192,6 +242,13 @@ static void setup_config(void)
         config_load(path);
         SDL_free(path);
     }
+    if (language_arg) {
+        Language l = gamedata_language_from_name(language_arg);
+        if (l < LANGUAGE_COUNT)
+            config.language = l;
+        else
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unknown language %s", language_arg);
+    }
     // Every fix gets a line in the file.
     for (int i = 0; i < Fixes_Count; i++)
         config_set_fix(Fixes_List[i].key, config_fix(Fixes_List[i].key));
@@ -211,6 +268,7 @@ static void setup_config(void)
         .add_ore = OPTIONS_ADD_ORE,
         .fixes = fixes,
         .fix_count = n,
+        .languages = data_languages,
     });
 }
 
@@ -255,14 +313,14 @@ int main(int argc, char *argv[])
     }
 
     // No game data: a player chooses their copy; scripted runs fail.
-    bool found = find_data();
+    bool found = find_game();
     if (!found && vid_visible() && !replay && !autopilot_active()) {
         if (!importscreen_run(false)) {
             vid_shutdown();
             SDL_Quit();
             return 0;
         }
-        found = find_data();
+        found = find_game();
     }
     if (!found) {
         const char *msg = "The game data of the DOS game was not found. Import your copy with "

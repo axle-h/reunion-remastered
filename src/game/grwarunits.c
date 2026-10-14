@@ -8,6 +8,7 @@
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
 #include "game/music.h"
@@ -264,7 +265,7 @@ void GrWarUnits_SetupUnitHotspots(void)
         h->Y = (uint8_t)(k / 4 * 0x17 + 0x38);
         h->W = remove ? 0x12 : 0x1E;
         h->H = 0x10;
-        pstr_set(&h->Caption, 0x12, remove ? "Remove unit" : "Add/sub ??");
+        pstr_set(&h->Caption, 0x12, Lang_Text(remove ? "Remove unit" : "Add/sub ??"));
         h->Repeat_ = remove;
         h->_1A = 0;
     }
@@ -312,7 +313,7 @@ void GrWarUnits_DrawUnitList(void)
         // Test the attackers' total, print the unassigned pool.
         if (ds.GrWarUnits_Totals[0][t - 1] > 0) {
             SDL_snprintf(s, sizeof s, "%d", (int)ds.GrWarUnits_Pool[t - 1]);
-            Gfx_DrawTextF9(names[t - 1], nx[t - 1], ny[t - 1], nw[t - 1]);
+            Gfx_DrawTextF9(Lang_Text(names[t - 1]), nx[t - 1], ny[t - 1], nw[t - 1]);
             Gfx_DrawTextF9(s, vx[t - 1], ny[t - 1], 5);
         }
     }

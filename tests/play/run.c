@@ -5,6 +5,9 @@
 #include <stdlib.h>
 
 #include "platform/fs.h"
+#include "platform/gamedata.h"
+#include "platform/import.h"
+#include "play/lang.h"
 
 static const PlayPlan *plan;
 static const char *stop_at;
@@ -56,12 +59,18 @@ static bool same_end(const char *what, const PlayResult *r, const PlayResult *ex
     return same;
 }
 
+// PLAY_LANGUAGE, or nullptr.
+static const char *language;
+
 static bool verify_with_reunion(const char *recording, const char *data_dir,
                                 const char *reunion_bin, const PlayResult *expect)
 {
-    char arg[1100];
+    char arg[1100], lang[64];
     SDL_snprintf(arg, sizeof arg, "--replay=%s", recording);
-    const char *args[] = {reunion_bin, arg, data_dir, nullptr};
+    SDL_snprintf(lang, sizeof lang, "--language=%s", language);
+    const char *with[] = {reunion_bin, arg, lang, data_dir, nullptr};
+    const char *without[] = {reunion_bin, arg, data_dir, nullptr};
+    const char **args = language ? with : without;
     SDL_Process *p = SDL_CreateProcess(args, true);
     if (!p) {
         printf("reunion --replay: %s\n", SDL_GetError());
@@ -113,11 +122,60 @@ static bool env_flag(const char *name, bool def)
     return v && *v ? *v != '0' : def;
 }
 
+// A copy of the game in a file (the CD's ISO) is imported into
+// <name>.import/ in the working directory, or taken from there if it was
+// already. The data directory, or nullptr.
+static char *game_data(const char *path, const char *name)
+{
+    SDL_PathInfo info;
+    if (!SDL_GetPathInfo(path, &info))
+        return nullptr;
+    if (info.type == SDL_PATHTYPE_DIRECTORY)
+        return SDL_strdup(path);
+    char *player = nullptr;
+    SDL_asprintf(&player, "%s.import/", name);
+    char *data = player ? import_data_dir(player, nullptr) : nullptr;
+    if (player && !data) {
+        SDL_CreateDirectory(player);
+        ImportReport r;
+        if (import_game(path, player, gamedata_files, gamedata_file_count, &r, nullptr))
+            data = import_data_dir(player, nullptr);
+        else
+            printf("importing %s: %s\n", path, r.error ? r.error : "files missing or different");
+        import_report_free(&r);
+    }
+    SDL_free(player);
+    return data;
+}
+
 int play_main(int argc, char *argv[], const PlayPlan *p)
 {
-    if (argc < 2 || !fs_init(argv[1])) {
+    language = SDL_getenv("PLAY_LANGUAGE");
+    if (!language || !*language)
+        language = nullptr;
+    char name[96];
+    SDL_snprintf(name, sizeof name, "%s%s%s", p->name, language ? "_" : "", language ? language : "");
+    char *data = argc >= 2 ? game_data(argv[1], name) : nullptr;
+    if (!data || !fs_init(data)) {
         printf("no game data, skipping\n");
+        SDL_free(data);
         return 77;
+    }
+    if (language) {
+        // As main.c with --language: the language's folder in the root.
+        Language l = gamedata_language_from_name(language);
+        char *dir = l < LANGUAGE_COUNT ? fs_resolve(gamedata_language_folder(l)) : nullptr;
+        if (!dir) {
+            printf("no %s game in %s, skipping\n", language, data);
+            SDL_free(data);
+            return 77;
+        }
+        fs_set_language_dir(dir);
+        SDL_free(dir);
+    }
+    if (!lang_init()) {
+        SDL_free(data);
+        return 1;
     }
     const char *audio = SDL_getenv("PLAY_AUDIO");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, audio && *audio ? audio : "dummy");
@@ -133,7 +191,7 @@ int play_main(int argc, char *argv[], const PlayPlan *p)
     if (env && *env)
         SDL_strlcpy(record, env, sizeof record);
     else
-        SDL_snprintf(record, sizeof record, "%s.txt", p->name);
+        SDL_snprintf(record, sizeof record, "%s.txt", name);
     stop_at = SDL_getenv("PLAY_STOP");
     if (stop_at && !*stop_at)
         stop_at = nullptr;
@@ -166,7 +224,8 @@ int play_main(int argc, char *argv[], const PlayPlan *p)
     if (r.tainted)
         printf("tainted by play_test_setup: not verified by replay\n");
     else if (ok && env_flag("PLAY_VERIFY", true))
-        ok = play_verify(record, argv[1], SDL_getenv("REUNION_BIN"), &r);
+        ok = play_verify(record, data, SDL_getenv("REUNION_BIN"), &r);
+    SDL_free(data);
     SDL_Quit();
     printf("%s\n", ok ? "PASSED" : "FAILED");
     return ok ? 0 : 1;

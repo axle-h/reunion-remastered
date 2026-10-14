@@ -5,6 +5,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/minmax.h"
 #include "game/mouse.h"
@@ -312,7 +313,7 @@ static void draw_time_remaining(const TGroup *g, int16_t y)
     if (divisor == 0)
         System_RunError(200, nullptr);
     int32_t q = dividend / divisor;
-    SDL_snprintf(s30, sizeof s30, "Time remaining:%d", (int)(q + g->Jump));
+    SDL_snprintf(s30, sizeof s30, "%s%d", Lang_Text("Time remaining:"), (int)(q + g->Jump));
     Gfx_DrawTextF9(s30, 0xCA, y, 0x12);
 }
 
@@ -332,7 +333,7 @@ void ShipInfo_DrawGroupInfo(void)
 
     if (g->Status == 7) {
         Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9("Base on: ", 0xCA, 0x46, 0x12);
+        Gfx_DrawTextF9(Lang_Text("Base on: "), 0xCA, 0x46, 0x12);
         pstr_get(system, sizeof system, &ds.Names_Systems[g->System - 1]);
         Gfx_DrawTextF9(system, 0x102, 0x46, 8);
         Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
@@ -341,7 +342,7 @@ void ShipInfo_DrawGroupInfo(void)
     }
     if (g->Status >= 4 && g->Status <= 6) {
         Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9("Destination:", 0xCA, 0x46, 0x12);
+        Gfx_DrawTextF9(Lang_Text("Destination:"), 0xCA, 0x46, 0x12);
         pstr_get(system, sizeof system, &ds.Names_SystemsShort[g->System - 1]);
         Gfx_DrawTextF9(system, 0x114, 0x46, 5);
         Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
@@ -350,7 +351,7 @@ void ShipInfo_DrawGroupInfo(void)
     }
     if (g->Status == 1 || g->Status == 2) {
         Gfx_DrawTextFC(name, 0xCA, 0x3C, 0x12);
-        Gfx_DrawTextF9("Currently on:", 0xCA, 0x46, 0x12);
+        Gfx_DrawTextF9(Lang_Text("Currently on:"), 0xCA, 0x46, 0x12);
         pstr_get(system, sizeof system, &ds.Names_SystemsShort[g->System - 1]);
         Gfx_DrawTextF9(system, 0x11A, 0x46, 5);
         Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
@@ -419,7 +420,7 @@ void ShipInfo_DrawGroupInfo(void)
     }
     if (g->Kind == 2 && total > 0) {
         SDL_snprintf(num, sizeof num, "%3d", total);
-        Gfx_DrawTextF9("Miner stat", 0xD0, y, 0xB);
+        Gfx_DrawTextF9(Lang_Text("Miner stat"), 0xD0, y, 0xB);
         Gfx_DrawTextF9(":", 0x112, y, 1);
         Gfx_DrawTextFC(num, 0x118, y, 4);
     }
@@ -438,7 +439,7 @@ void ShipInfo_DrawGroupFlightInfo(void)
     if (g->Moon != 0)
         PlanetInfo_GetBodyName(loc2, sizeof loc2, g->System, g->Planet, g->Moon);
     if (g->Status == 4 || g->Status == 5 || g->Status == 6) {
-        Gfx_DrawTextF9("Destination:", 0xCA, 0x46, 0x12);
+        Gfx_DrawTextF9(Lang_Text("Destination:"), 0xCA, 0x46, 0x12);
         Gfx_DrawTextF9(pstr_get(name, sizeof name, &ds.Names_SystemsShort[g->System - 1]), 0x114,
                        0x46, 5);
         Gfx_DrawTextF9(loc1, 0xD3, 0x4F, 0xF);
@@ -484,7 +485,7 @@ void ShipInfo_EraseSelectionMarkerBuffered(void)
 void ShipInfo_SetupShipInfoHotspots(void)
 {
     ds.Mouse_HotspotCount = (int16_t)(ds.Game_ShownGroupCount + 0x22);
-    Mouse_SetHotspot(1, 0, 0xBC, 200, 12, "Change mode", 1, 0);
+    Mouse_SetHotspot(1, 0, 0xBC, 200, 12, Lang_Text("Change mode"), 1, 0);
     Mouse_SetHotspot(2, 0, 0, 0, 0, "", 1, 0);
     for (int16_t i = 1; i <= 0x20; i++) {
         THotspot *h = Mouse_Hotspot((int16_t)(i + 2));

@@ -7,6 +7,7 @@
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/planetinfo.h"
@@ -127,5 +128,5 @@ void Droids_DrawDroidsScreen(void)
 void Droids_SetupDroidsHotspots(void)
 {
     ds.Mouse_HotspotCount = 1;
-    Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, "Back to surface", 1, 0);
+    Mouse_SetHotspot(1, 0, 0x31, 0x140, 0x97, Lang_Text("Back to surface"), 1, 0);
 }

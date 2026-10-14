@@ -14,12 +14,13 @@
 #include "game/colonize.h"
 #include "game/colonystats.h"
 #include "game/droids.h"
-#include "game/fixes.h"
 #include "game/dseg.h"
+#include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
 #include "game/groups.h"
 #include "game/intel.h"
+#include "game/lang.h"
 #include "game/message.h"
 #include "game/minmax.h"
 #include "game/planetinfo.h"
@@ -251,11 +252,13 @@ void Sim_ProcessPubTimers(void)
                     if (item < 10) {
                         ds.Game_HomeStock[item - 1] += amount;
                         pstr_get(name, sizeof name, &ds.Names_Ores[item - 1]);
-                        SDL_snprintf(t, sizeof t, "You got %d t of %s", (int)amount, name);
+                        SDL_snprintf(t, sizeof t, "%s%d%s%s", Lang_Text("You got "), (int)amount,
+                                     Lang_Text(" t of "), name);
                     } else {
                         product((int16_t)(item - 10))->Stock += (int16_t)amount;
                         pstr_get(name, sizeof name, &product((int16_t)(item - 10))->Name);
-                        SDL_snprintf(t, sizeof t, "You got %d pieces of %ss", (int)amount, name);
+                        SDL_snprintf(t, sizeof t, "%s%d%s%s%s", Lang_Text("You got "), (int)amount,
+                                     Lang_Text(" pieces of "), name, Lang_TextAt(0x1b8a03cf, "s"));
                     }
                     Message_ShowMessage(t);
                 }
@@ -312,7 +315,8 @@ void Sim_ProgressResearch(void)
             p->State = 5;
             ds.Game_CurResearch = 0;
             char name[256];
-            show3("The ", pstr_get(name, sizeof name, &p->Name), " is ready for production");
+            show3(Lang_Text("The "), pstr_get(name, sizeof name, &p->Name),
+                  Lang_Text(" is ready for production"));
             if (ds.Game_CurrentScreen == 3) {
                 Research_ResetSelectionFrame();
                 ds.Game_SelInvention = k;
@@ -446,14 +450,14 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         int16_t sick = b->_14 == 0 ? 2 : 1;
         if (b->_14 == 0 && medicine == 0) {
             if (System_Random(5) == 0)
-                show3("Because of disease your people need a medicine plant|  on ", name, end);
+                show3(Lang_Text("Because of disease your people need a medicine plant|  on "), name, end);
             target -= 10;
             if (target > 25)
                 target = 25;
         }
         if (lmul(sick, b->Population) > hospital) {
             if (System_Random(5) == 0)
-                show3(" Due to sanitary conditions you need a hospital |  on ", name, end);
+                show3(Lang_Text(" Due to sanitary conditions you need a hospital |  on "), name, end);
             target -= 10;
             b->Population -= 200;
             if (target > 25)
@@ -481,12 +485,12 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             target += 10;
         if (b->Population > 50000 && stadium == 0) {
             if (System_Random(5) == 0)
-                show3("  Your people ask for a stadium | on ", name, end);
+                show3(Lang_Text("  Your people ask for a stadium | on "), name, end);
             target -= 20;
         }
         if (b->Population > 70000 && university == 0) {
             if (System_Random(5) == 0)
-                show3("  Your people demand a University | on ", name, end);
+                show3(Lang_Text("  Your people demand a University | on "), name, end);
             target -= 20;
         }
         if (planet < 3 && kind_count(19) == 0) {
@@ -494,7 +498,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 uint16_t r = System_Random((uint16_t)ldiv32(b->Population, 4));
                 b->Population -= (uint16_t)(r + 500);
                 Intel_ScheduleIdea(0x1E, 0x32, 0x19);
-                show3(" Your people are dying because of radiation |  on ", name, end);
+                show3(Lang_Text(" Your people are dying because of radiation |  on "), name, end);
             }
             target -= 40;
         }
@@ -509,7 +513,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                     hit = i;
             }
             if (hit == -1) {
-                show3("  A meteorite hit your colony on | ", name, " |        but causes no harm.");
+                show3(Lang_Text("  A meteorite hit your colony on | "), name,
+                      Lang_Text(" |        but causes no harm."));
             } else {
                 Surface_DeleteBuilding(hit);
                 int16_t n = (int16_t)(Surface_CountBuildings(0x19, system, planet, moon, false)
@@ -523,14 +528,14 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 b->Population -= r;
                 Intel_ScheduleIdea(0x1C, 0xFA, 100);
                 b->Attitude -= 10;
-                show3("  One of your buildings has exploded |      due to meteorite impact| on ",
+                show3(Lang_Text("  One of your buildings has exploded |      due to meteorite impact| on "),
                       name, end);
             }
             target -= 30;
         }
         if (b->Population > food) {
             if (System_Random(3) == 0)
-                show3(" Your people are starving |  on ", name, end);
+                show3(Lang_Text(" Your people are starving |  on "), name, end);
             target -= 15;
             if (target > 25)
                 target = 25;
@@ -538,7 +543,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         }
         if (b->Population > living) {
             if (System_Random(3) == 0)
-                show3(" There isn't enough living space|  on ", name, end);
+                show3(Lang_Text(" There isn't enough living space|  on "), name, end);
             target -= 10;
             if (target > 25)
                 target = 25;
@@ -607,16 +612,16 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             if (b->Stores[6] == 5 && System_Random(3) < 2)
                 b->Stores[6] = 4;
             if (b->Stores[6] == 5) {
-                show3(" Your people have revolted  |  on ", name, end);
+                show3(Lang_Text(" Your people have revolted  |  on "), name, end);
                 Intel_DestroyBody(system, planet, moon);
             } else {
-                show3(" Your advisors report that| there are rebellious forces |  on ", name, end);
+                show3(Lang_Text(" Your advisors report that| there are rebellious forces |  on "), name, end);
             }
         } else {
             b->Stores[6] = 0;
         }
         if (b->Population < 1000) {
-            show3(" Your colony has been destroyed  |  on ", name, end);
+            show3(Lang_Text(" Your colony has been destroyed  |  on "), name, Lang_TextAt(0x1b8a174d, end));
             Intel_DestroyBody(system, planet, moon);
         }
         if (b->Colony != 0 && b->Owner == 1)
@@ -641,8 +646,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         b->InfoLevel = 60;
 
     if (b->InfoLevel - gain < 10 && b->InfoLevel >= 10 && (int8_t)b->Owner < 2) {
-        show3(end, name,
-              b->_03 != 0 ? " |    is ready for mining " : " |    is not suitable for mining ");
+        show3(end, name, Lang_Text(b->_03 != 0 ? " |    is ready for mining "
+                                               : " |    is not suitable for mining "));
         if (product(5)->State == 0 && ds.Game_IdeaTimer[4] == -1 && b->_03 != 0) {
             Intel_ScheduleIdea(5, 0x14, 0x28);
             Message_ShowMessageLine(2);
@@ -656,11 +661,11 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             // Galaxy::SurfaceColonisable[Surface::Tileset[SurfaceType]]
             uint16_t tileset = (uint16_t)ds.Surface_Tileset[(int8_t)b->SurfaceType - 1];
             if (b->Surveyed != 0 && ds.Galaxy_SurfaceColonisable[tileset - 1] != 0)
-                show3(end, name, " |    is a suitable place for living");
+                show3(end, name, Lang_Text(" |    is a suitable place for living"));
             else
-                show3(end, name, " |    is not suitable for living");
+                show3(end, name, Lang_Text(" |    is not suitable for living"));
         } else {
-            show3(" Your satellite reports alien activity on | ", name, end);
+            show3(Lang_Text(" Your satellite reports alien activity on | "), name, end);
             if (PlanetInfo_IsCurrentBody(system, planet, moon) && ds.Game_CurrentScreen == 8)
                 PlanetInfo_LoadPlanetFajPic(0xD, true);
         }
@@ -668,7 +673,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
     if (b->InfoLevel - gain < 40 && b->InfoLevel >= 40 && (int8_t)b->Owner > 1) {
         char who[256];
         pstr_get(who, sizeof who, &race((int8_t)b->Owner)->Name);
-        SDL_snprintf(t, sizeof t, " Your satellite found %s colony at | %s%s", who, name, end);
+        SDL_snprintf(t, sizeof t, "%s%s%s%s%s", Lang_Text(" Your satellite found "), who,
+                     Lang_Text(" colony at | "), name, end);
         Message_ShowMessage(t);
         if (PlanetInfo_IsCurrentBody(system, planet, moon) && ds.Game_CurrentScreen == 8)
             PlanetInfo_LoadPlanetFajPic((int8_t)b->Owner, true);
@@ -691,7 +697,7 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
                 Surface_AutoPlaceBuilding(1, system, planet, moon);
             }
         }
-        show3("  The building of a colony started  | on ", name, end);
+        show3(Lang_Text("  The building of a colony started  | on "), name, Lang_TextAt(0x1b8a1beb, end));
         b->Miner = 0;
         b->Colony = 1;
         b->Population += (uint16_t)(System_Random(3000) + 2000);
@@ -752,8 +758,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();
         char sys[256];
-        show3(" Your observatory found a new planet |          in ", system_name(sys, system),
-              " system");
+        show3(Lang_Text(" Your observatory found a new planet |          in "),
+              system_name(sys, system), Lang_TextAt(0x1b8a1e5b, " system"));
         Message_PromptPlanetName(system, planet);
         parent->discovered = 1;
     }
@@ -766,7 +772,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             TGroup *g = Groups_At(0, i);
             if (g->System == system && g->Status > 2) {
                 any = true;
-                who = g->Kind == 4 ? "satellite carrier" : "pilots";
+                who = g->Kind == 4 ? Lang_TextAt(0x1b8a1f0d, "satellite carrier")
+                                   : Lang_TextAt(0x1b8a1f22, "pilots");
             }
         }
         if (any) {
@@ -774,8 +781,9 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
             if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
                 PlanetInfo_SetupSystemViewHotspots();
             char sys[256];
-            SDL_snprintf(t, sizeof t, " Your %s found a new planet |        in %s system ", who,
-                         system_name(sys, system));
+            SDL_snprintf(t, sizeof t, "%s%s%s%s%s", Lang_TextAt(0x1b8a1f6e, " Your "), who,
+                         Lang_Text(" found a new planet |        in "), system_name(sys, system),
+                         Lang_TextAt(0x1b8a1f9c, " system "));
             Message_ShowMessage(t);
             Message_PromptPlanetName(system, planet);
             parent->discovered = 1;
@@ -787,8 +795,8 @@ static void Sim_ProcessBodyEvents(BodyEventsFrame *parent, int16_t system, int16
         if (ds.Game_CurrentScreen == 7 || ds.Game_CurrentScreen == 0x12)
             PlanetInfo_SetupSystemViewHotspots();
         char sys[256];
-        show3(" Your Psy-radar radar found a new planet |          in ", system_name(sys, system),
-              " system");
+        show3(Lang_Text(" Your Psy-radar radar found a new planet |          in "),
+              system_name(sys, system), Lang_TextAt(0x1b8a2048, " system"));
         Message_PromptPlanetName(system, planet);
         parent->discovered = 1;
     }
@@ -971,11 +979,13 @@ static bool is_selected_fleet(int16_t i)
 }
 
 // " Your pilots met with ..." + system + " |" + spaces + "They call themselves '" + race + "'"
-static void first_contact(int16_t r, const char *intro, const char *where, const char *callThem)
+// intro + where + bar + callThem + the race's name + quote.
+static void first_contact(int16_t r, const char *intro, const char *where, const char *bar,
+                          const char *callThem, const char *quote)
 {
     char name[256], t[256];
     pstr_get(name, sizeof name, &race(r)->Name);
-    SDL_snprintf(t, sizeof t, "%s%s |%s%s'", intro, where, callThem, name);
+    SDL_snprintf(t, sizeof t, "%s%s%s%s%s%s", intro, where, bar, callThem, name, quote);
     Intel_FirstContact(r, t);
 }
 
@@ -1043,8 +1053,8 @@ void Sim_ProcessTravellingGroups(void)
             // PSTR_NUL).
             pstr_get(name, sizeof name, &g->Name);
             PlanetInfo_GetBodyFullName(body, sizeof body, g->System, g->Planet, g->Moon);
-            SDL_snprintf(t, sizeof t, "%s arrived to %s %s", name, system_name(sys, g->System),
-                         body);
+            SDL_snprintf(t, sizeof t, "%s%s%s %s", name, Lang_Text(" arrived to "),
+                         system_name(sys, g->System), body);
             Message_AddMessageLogEntry(2, t, "message");
             g->Status = 2;
             arrived = true;
@@ -1052,9 +1062,9 @@ void Sim_ProcessTravellingGroups(void)
         if (g->Leg2 == 0) {
             if (g->Planet == 0) {
                 if (*system_status(g->System) == 0) {
-                    SDL_snprintf(t, sizeof t,
-                                 " Your ships explored %s system |    They found new planets",
-                                 system_name(sys, g->System));
+                    SDL_snprintf(t, sizeof t, "%s%s%s%s", Lang_Text(" Your ships explored "),
+                                 system_name(sys, g->System), Lang_TextAt(0x1b8a2d10, " system"),
+                                 Lang_TextAt(0x1b8a2d1a, " |    They found new planets"));
                     Message_ShowMessage(t);
                     if (g->System == 5)
                         Protect_ArmDateQuestion();
@@ -1084,8 +1094,11 @@ void Sim_ProcessTravellingGroups(void)
             if (*planet_status(g->System, g->Planet) == 0) {
                 *planet_status(g->System, g->Planet) = 1;
                 PlanetInfo_GetBodyName(body, sizeof body, g->System, g->Planet, 0);
-                SDL_snprintf(t, sizeof t, "Your %s explored %s's moons",
-                             g->Kind == 4 ? "satellite carrier" : "pilots", body);
+                SDL_snprintf(t, sizeof t, "%s%s%s%s%s", Lang_TextAt(0x1b8a2e8b, "Your "),
+                             g->Kind == 4 ? Lang_TextAt(0x1b8a2e5d, "satellite carrier")
+                                          : Lang_TextAt(0x1b8a2e72, "pilots"),
+                             Lang_TextAt(0x1b8a2ea0, " explored "), body,
+                             Lang_TextAt(0x1b8a2ece, "'s moons"));
                 Message_ShowMessage(t);
             }
         }
@@ -1096,8 +1109,11 @@ void Sim_ProcessTravellingGroups(void)
                 ds.Pub_People[9].State = 2;
             if (g->Planet != 0 && Groups_At(0, i)->Kind != 4 && (int8_t)bd->Owner >= 2
                 && race((int8_t)bd->Owner)->Status == 0)
-                first_contact((int8_t)bd->Owner, " Your pilots met with a new alien race in ",
-                              system_name(sys, g->System), "         They call themselves '");
+                first_contact((int8_t)bd->Owner,
+                              Lang_Text(" Your pilots met with a new alien race in "),
+                              system_name(sys, g->System), Lang_TextAt(0x1b8a3027, " |"),
+                              Lang_Text("         They call themselves '"),
+                              Lang_TextAt(0x1b8a3052, "'"));
             if (g->Planet != 0 && Groups_At(0, i)->Kind != 4) {
                 for (int16_t r = 2; r <= 12; r++) {
                     TRace *rc = race(r);
@@ -1108,9 +1124,11 @@ void Sim_ProcessTravellingGroups(void)
                         TRaceForce *fc = (TRaceForce *)((uint8_t *)rc + 0xC + f * 0x1B);
                         if (fc->Active == 1 && fc->System == g->System && fc->Body == g->Planet
                             && fc->Moon == g->Moon)
-                            first_contact(r, " Your pilots met with new alien race in ",
+                            first_contact(r, Lang_Text(" Your pilots met with new alien race in "),
                                           system_name(sys, g->System),
-                                          "         They call themselves '");
+                                          Lang_TextAt(0x1b8a314a, " |"),
+                                          Lang_Text("         They call themselves '"),
+                                          Lang_TextAt(0x1b8a316e, "'"));
                     }
                 }
             }
@@ -1210,9 +1228,10 @@ void Sim_CheckEnemyAttacks(void)
                 TGroup *pf = Groups_At(1, k);
                 if (fc->System == pf->System && fc->Body == pf->Planet && fc->Moon == pf->Moon) {
                     if (rc->Status == 0)
-                        first_contact(r,
-                                      "   New alien race's ships arrived |     at your colony in ",
-                                      system_name(sys, pf->System), " They call themselves '");
+                        first_contact(
+                            r, Lang_Text("   New alien race's ships arrived |     at your colony in "),
+                            system_name(sys, pf->System), Lang_TextAt(0x1b8a3698, " |"),
+                            Lang_Text(" They call themselves '"), Lang_TextAt(0x1b8a36bc, "'"));
                     else if (rc->Status == 2)
                         hostile = true;
                 }
@@ -1225,15 +1244,17 @@ void Sim_CheckEnemyAttacks(void)
                 if (fc->System == g->System && fc->Body == g->Planet && fc->Moon == g->Moon
                     && g->Status <= 2) {
                     if (rc->Status == 0)
-                        first_contact(r, " Your pilots met with new alien race in |   ", where,
-                                      "     They call themselves '");
+                        first_contact(r, Lang_Text(" Your pilots met with new alien race in |   "),
+                                      where, Lang_TextAt(0x1b8a3781, " |"),
+                                      Lang_Text("     They call themselves '"),
+                                      Lang_TextAt(0x1b8a37a5, "'"));
                     else if (rc->Status == 2)
                         hostile = true;
                 }
             }
             if (hostile)
-                show3("            ATTENTION!         |     Enemy fleet approaching   | ", where,
-                      " ");
+                show3(Lang_Text("            ATTENTION!         |     Enemy fleet approaching   | "),
+                      where, Lang_TextAt(0x1b8a37ef, " "));
         }
 
         // (2841:0893: the original halts here after wrong page answers.)
@@ -1271,8 +1292,10 @@ void Sim_CheckEnemyAttacks(void)
             }
             if (!defended) {
                 if (ds.SpWar_GroundBattle != 0) {
-                    SDL_snprintf(t, sizeof t, "| Your colony is under attack by %s |  at %s |",
-                                 pstr_get(name, sizeof name, &rc->Name), where);
+                    SDL_snprintf(t, sizeof t, "%s%s%s%s%s",
+                                 Lang_TextAt(0x1b8a3a76, "| Your colony is under attack by "),
+                                 pstr_get(name, sizeof name, &rc->Name), Lang_Text(" |  at "), where,
+                                 Lang_TextAt(0x1b8a3aa4, " |"));
                     Message_ShowMessage(t);
                     ds.Game_CurrentScreen = 0x1D;
                     ds.Game_ScreenSwitch = 1;
@@ -1280,13 +1303,16 @@ void Sim_CheckEnemyAttacks(void)
             } else {
                 if (ds.SpWar_GroundBattle == 0) {
                     PlanetInfo_GetBodyLongName(body, sizeof body, fc->System, fc->Body, 0);
-                    SDL_snprintf(t, sizeof t,
-                                 " Your ships around %s |        is under attack by %s ", body,
-                                 pstr_get(name, sizeof name, &rc->Name));
+                    SDL_snprintf(t, sizeof t, "%s%s%s%s%s%s", Lang_Text(" Your ships around "), body,
+                                 Lang_TextAt(0x1b8a3a3b, " |"),
+                                 Lang_TextAt(0x1b8a3a45, "        is under attack by "),
+                                 pstr_get(name, sizeof name, &rc->Name), Lang_TextAt(0x1b8a3a5f, " "));
                     Message_ShowMessage(t);
                 } else {
-                    SDL_snprintf(t, sizeof t, "| Your colony is under attack by %s |  at %s |",
-                                 pstr_get(name, sizeof name, &rc->Name), where);
+                    SDL_snprintf(t, sizeof t, "%s%s%s%s%s",
+                                 Lang_TextAt(0x1b8a3acd, "| Your colony is under attack by "),
+                                 pstr_get(name, sizeof name, &rc->Name), Lang_Text(" |  at "), where,
+                                 Lang_TextAt(0x1b8a3afb, " |"));
                     Message_ShowMessage(t);
                 }
                 ds.Game_CurrentScreen = 0x1D;
@@ -1347,7 +1373,7 @@ void Sim_GrowStaffExperience(void)
         ds.Game_CurrentScreen = -1;
         ds.Game_ScreenSwitch = 1;
     }
-    Message_ShowMessage("| Your advisor has returned from the university |");
+    Message_ShowMessage(Lang_Text("| Your advisor has returned from the university |"));
     if (ds.Game_CurrentScreen == 3) {
         Research_DrawInventionInfo();
         Research_DrawDeveloperSkills();

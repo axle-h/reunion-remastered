@@ -8,6 +8,7 @@
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
+#include "game/lang.h"
 #include "game/mouse.h"
 #include "game/music.h"
 #include "game/options.h"
@@ -215,8 +216,9 @@ void SaveLoad_ReadSlotNames(void)
         FILE *f = open_slot(n, false);
         e[0] = f != nullptr;
         if (!f) {
-            static const uint8_t empty[] = "\x14" "Empty---------------";
-            memcpy(e + 1, empty, 21);
+            const char *empty = Lang_Text("Empty---------------");
+            e[1] = 0x14;
+            memcpy(e + 2, empty, 20);
         } else {
             if (fread(e + 1, 1, 0x14, f) != 0x14)
                 memset(e + 1, 0, 0x14); // original: I/O error 100
@@ -383,11 +385,11 @@ static void DiskScreenInit(void)
 static void SetupDiskHotspots(void)
 {
     ds.Mouse_HotspotCount = 5;
-    Mouse_SetHotspot(1, 0x111, 0x9B, 0x10, 0x0D, "Music 1", 1, 0);
-    Mouse_SetHotspot(2, 0x122, 0x9B, 0x10, 0x0D, "Music 2", 1, 0);
-    Mouse_SetHotspot(3, 0x111, 0xA9, 0x22, 0x0D, "Stop music", 1, 0);
-    Mouse_SetHotspot(4, 0x111, 0xB7, 0x22, 0x0D, "Effects on/off", 1, 0);
-    Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, "Select slot", 0, 0);
+    Mouse_SetHotspot(1, 0x111, 0x9B, 0x10, 0x0D, Lang_Text("Music 1"), 1, 0);
+    Mouse_SetHotspot(2, 0x122, 0x9B, 0x10, 0x0D, Lang_Text("Music 2"), 1, 0);
+    Mouse_SetHotspot(3, 0x111, 0xA9, 0x22, 0x0D, Lang_Text("Stop music"), 1, 0);
+    Mouse_SetHotspot(4, 0x111, 0xB7, 0x22, 0x0D, Lang_Text("Effects on/off"), 1, 0);
+    Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, Lang_Text("Select slot"), 0, 0);
 }
 
 // 1a3e:0008

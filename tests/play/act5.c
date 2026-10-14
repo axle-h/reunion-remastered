@@ -152,14 +152,17 @@ static void fly(void *arg)
 }
 
 // The group is in orbit or docked at planet `planet` of `system` (its
-// location line ends "<system> system <planet>": "Earth" alone would also
-// match "New Earth").
+// location line ends "<system> system <planet>", in the French and Italian
+// games "<system> <planet>": "Earth" alone would also match "New Earth").
 static bool group_at(const char *group, const char *system, const char *planet)
 {
-    char body[64];
+    char body[64], bare[64];
     SDL_snprintf(body, sizeof body, "%s system %s", system, planet);
+    SDL_snprintf(bare, sizeof bare, "%s %s", system, planet);
     ui_ship_info();
-    return ui_group_status(group) != SHIP_FLYING && pol_ends_with(pol_where(group), body);
+    const char *where = pol_where(group);
+    return ui_group_status(group) != SHIP_FLYING
+           && (pol_ends_with(where, body) || pol_ends_with(where, bare));
 }
 
 // The group's location line names `system`.

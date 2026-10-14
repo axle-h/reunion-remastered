@@ -5,6 +5,7 @@
 #include "game/fixes.h"
 #include "game/gfx.h"
 #include "game/groups.h"
+#include "game/lang.h"
 #include "game/le.h"
 #include "game/mouse.h"
 #include "game/system.h"
@@ -115,7 +116,7 @@ void Cargo_CargoScreen(void)
             }
             Cargo_FlashCargoRow(ds.Cargo_Row);
         } else if (Surface_CountBuildings(0xC, g->System, g->Planet, g->Moon, false) < 1) {
-            Message_ShowMessageNoLog(" You need a spaceport to transfer items ");
+            Message_ShowMessageNoLog(Lang_Text(" You need a spaceport to transfer items "));
         } else {
             ds.Cargo_Row -= 6;
             TGroup *gl = group_at(list, sel);
@@ -161,7 +162,7 @@ void Cargo_CargoScreen(void)
             }
             Cargo_FlashCargoRow(ds.Cargo_Row);
         } else if (Surface_CountBuildings(0xC, g->System, g->Planet, g->Moon, false) < 1) {
-            Message_ShowMessageNoLog(" You need a spaceport to transfer items ");
+            Message_ShowMessageNoLog(Lang_Text(" You need a spaceport to transfer items "));
         } else {
             ds.Cargo_Row -= 6;
             int16_t idx = (int16_t)ds.Cargo_ItemList[ds.Cargo_Row - 1];
@@ -238,10 +239,10 @@ void Cargo_SetupCargoHotspots(void)
         int16_t n = (int16_t)(ds.Cargo_ItemCount + 6);
         for (int16_t i = 1; i <= n; i++)
             Mouse_SetHotspot(i, 0x44, (uint8_t)(i * 8 + 0x35), 0x10, 7,
-                             "Transfer to planet", 0, 0);
+                             Lang_Text("Transfer to planet"), 0, 0);
         for (int16_t i = 1; i <= n; i++)
             Mouse_SetHotspot((int16_t)(i + 0x13), 0xEB, (uint8_t)(i * 8 + 0x35), 0x10, 7,
-                             "Transfer to ship", 0, 0);
+                             Lang_Text("Transfer to ship"), 0, 0);
     }
 }
 
@@ -309,8 +310,9 @@ void Cargo_DrawCargoAmounts(void)
         SDL_snprintf(s, sizeof s, "%6d", g->Items[ds.Cargo_ItemList[i - 1] - 1]);
         Gfx_DrawTextF9(s, 0x10E, (int16_t)(i * 8 + 0x65), 6);
     }
-    SDL_snprintf(s, sizeof s, "Space: %6d/%d", (int)ds.Cargo_ShipUsed, (int)ds.Cargo_ShipCap);
+    SDL_snprintf(s, sizeof s, "%s%6d/%d", Lang_Text("Space: "), (int)ds.Cargo_ShipUsed,
+                 (int)ds.Cargo_ShipCap);
     Gfx_DrawTextF9(s, 5, 0xC1, 0x19);
-    SDL_snprintf(s, sizeof s, "Storage space on planet: %d", (int)ds.Cargo_PlanetCap);
+    SDL_snprintf(s, sizeof s, "%s%d", Lang_Text("Storage space on planet: "), (int)ds.Cargo_PlanetCap);
     Gfx_DrawTextF9(s, 0x80, 0xC1, 0x1F);
 }
