@@ -86,6 +86,14 @@ static const LangText port_texts[] = {
      {" Dieser Spielstand ist von einer neueren Version! ",
       " Cette sauvegarde vient d'une version plus r\202cente! ",
       " Questo salvataggio \212 di una versione pi\227 recente! "}},
+    // Autosave (game/autosave.h). The name with a date fits the slot's 19.
+    {"Autosave", {"Autosave", "Auto", "Auto"}},
+    {" The autosave can only be loaded! ",
+     {" Diese Sicherung kann nur geladen werden! ",
+      " Cette sauvegarde ne peut qu'\210tre charg\202e! ",
+      " Questo salvataggio si pu\225 solo caricare! "}},
+    {"Game saved", {"Spiel gesichert", "Partie sauvegard\202e", "Partita salvata"}},
+    {"Can't save now", {"Nicht speicherbar", "Pas de sauvegarde", "Non salvabile ora"}},
 };
 
 // printf formats where a translation changes the order of the pieces.

@@ -276,7 +276,8 @@ static void setup_config(void)
                                        Improvements_List[i].help, Improvements_NeedsPortSaves(i)};
     static MenuKey keys[KEY_ACTION_COUNT];
     for (int i = 0; i < KEY_ACTION_COUNT; i++)
-        keys[i] = (MenuKey){KeyPlay_Actions[i].label, KeyPlay_Keys((KeyAction)i)};
+        keys[i] = (MenuKey){KeyPlay_Actions[i].label, KeyPlay_Keys((KeyAction)i),
+                            KeyPlay_Help((KeyAction)i)};
     menu_set_hooks(&(MenuHooks){
         .game_running = Options_GameRunning,
         .changed = menu_changed,

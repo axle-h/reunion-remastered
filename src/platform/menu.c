@@ -253,7 +253,8 @@ static void build_rows(void)
         static const char help_keys[] =
             "Keyboard play (Improvements). Change the keys in reunion.ini, [keys].";
         for (int i = 0; i < hooks.key_count && row_count < MAX_ROWS; i++) {
-            r = add(ROW_NOTE, R_KEY, hooks.keys[i].label, help_keys);
+            r = add(ROW_NOTE, R_KEY, hooks.keys[i].label,
+                    hooks.keys[i].help ? hooks.keys[i].help : help_keys);
             SDL_strlcpy(r->value, hooks.keys[i].keys, sizeof r->value);
         }
         break;

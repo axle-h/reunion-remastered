@@ -22,6 +22,9 @@ const SwitchInfo Improvements_List[] = {
     {"no_building_limit", "No building limit",
      "More than 1,000 buildings in the game. Saves then won't load in DOS.",
      &improvements.no_building_limit},
+    {"autosave", "Autosave",
+     "Saved before battles and talks, weekly and by F11 (Keys).",
+     &improvements.autosave},
 };
 
 const int Improvements_Count = (int)SDL_arraysize(Improvements_List);

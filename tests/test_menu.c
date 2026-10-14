@@ -69,7 +69,7 @@ int main(void)
         {"more_stations", "More Miner stations", "help", false},
         {"trade_routes", "Trade routes", "help", true},
     };
-    static const MenuKey keys[] = {{"Next", "Tab"}, {"Click", "Return, Keypad Enter"}};
+    static const MenuKey keys[] = {{"Next", "Tab", nullptr}, {"Click", "Return, Keypad Enter", nullptr}};
     MenuHooks hooks = {
         .game_running = game_running,
         .changed = changed,

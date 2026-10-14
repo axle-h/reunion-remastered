@@ -87,13 +87,20 @@ Improvements change the game's design where it falls short
   changes them. The mouse works alongside.
 - No building limit: the game holds more than the original's 1,000
   buildings across all colonies.
+- Autosave: one save of its own, `save/reunion.auto`, besides the 12
+  slots. It is written as a battle or an alien talk starts, holding the
+  game as it was at the start of that hour, so loading it leads to the same
+  battle or talk again; also once a week of game time, and when you press
+  F11 (not in battles, talks and other screens where the clock stops). The
+  disk screen lists it under the slots, to load only.
 
 Each can be switched off in the port menu (Improvements); the Fixes
 section's "All off (original)" turns them off too. Scripted runs play
 without them. Saves stay in the DOS game's format except while Trade
 routes or No building limit is on, a route is set up or the game holds
 more than 1,000 buildings: those are written as `save/reunion.<n>`, which
-the DOS game can't load (the port menu says so).
+the DOS game can't load (the port menu says so). The autosave is always
+in that format.
 
 On the planet info screen of one of your colonies, clicking the POP row
 shows its stats: housing, food and health capacity, the disease timer, how

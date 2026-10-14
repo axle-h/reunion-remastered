@@ -1,10 +1,10 @@
 #include "game/saveload.h"
 
 #include <SDL3/SDL.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "game/anim.h"
+#include "game/autosave.h"
 #include "game/blit.h"
 #include "game/gfx.h"
 #include "game/gfxpath.h"
@@ -27,6 +27,18 @@ enum { SLOT_SIZE = 0x16, SLOT_COUNT = 12 };
 static uint8_t *slot_entry(int16_t n)
 {
     return ds.SaveLoad_SlotTable + (n - 1) * SLOT_SIZE;
+}
+
+// Port improvement (game/autosave.h): the disk screen's rows, the
+// autosave the 13th, and where the first is drawn.
+static int16_t slot_rows(void)
+{
+    return improvements.autosave ? AUTOSAVE_SLOT : SLOT_COUNT;
+}
+
+static int16_t slot_y(int16_t n)
+{
+    return (int16_t)((n - 1) * 9 + (improvements.autosave ? AUTOSAVE_ROWS_Y : 0x40));
 }
 
 // --- Files -------------------------------------------------------------------
@@ -59,20 +71,25 @@ static const char *player_dir(void)
 }
 
 // A slot's file: save\spidysav.<slot> in the DOS format, save/reunion.<slot>
-// in the port's, in the player's directory. False without a directory.
+// in the port's, in the player's directory; the autosave's is
+// save/reunion.auto, in the port's only. False without a directory.
 static bool slot_path(char *path, size_t size, int16_t slot, bool port)
 {
     const char *dir = player_dir();
-    if (!dir)
+    if (!dir || (slot == AUTOSAVE_SLOT && !port))
         return false;
-    SDL_snprintf(path, size, "%s%s.%d", dir, port ? "reunion" : "spidysav", slot);
+    if (slot == AUTOSAVE_SLOT)
+        SDL_snprintf(path, size, "%sreunion.auto", dir);
+    else
+        SDL_snprintf(path, size, "%s%s.%d", dir, port ? "reunion" : "spidysav", slot);
     return true;
 }
 
-static FILE *open_slot(int16_t slot, bool port, bool write)
+static SDL_IOStream *open_slot(int16_t slot, bool port, bool write)
 {
     char path[1024];
-    return slot_path(path, sizeof path, slot, port) ? fopen(path, write ? "wb" : "rb") : nullptr;
+    return slot_path(path, sizeof path, slot, port) ? SDL_IOFromFile(path, write ? "wb" : "rb")
+                                                    : nullptr;
 }
 
 // What each slot's file is (SaveLoad_ReadSlotNames).
@@ -82,7 +99,7 @@ typedef enum : uint8_t {
     SLOT_NEWER,  // the port's format, of a version this port doesn't know
 } SlotFormat;
 
-static SlotFormat slot_format[SLOT_COUNT + 1];
+static SlotFormat slot_format[AUTOSAVE_SLOT + 1];
 
 // The port's format: a header, then the DOS blocks with the building table
 // cut to its count, then the routes.
@@ -147,12 +164,12 @@ static const SaveBlock blocks[] = {
 #undef P
 
 // 1a3e:0240 Block (nested in SaveLoadGame): one BlockWrite/BlockRead + CheckIO.
-static bool block(FILE *f, void *buf, size_t size, bool save)
+static bool block(SDL_IOStream *f, void *buf, size_t size, bool save)
 {
-    return (save ? fwrite(buf, 1, size, f) : fread(buf, 1, size, f)) == size;
+    return (save ? SDL_WriteIO(f, buf, size) : SDL_ReadIO(f, buf, size)) == size;
 }
 
-static bool word(FILE *f, uint16_t *w, bool save)
+static bool word(SDL_IOStream *f, uint16_t *w, bool save)
 {
     uint8_t b[2] = {(uint8_t)*w, (uint8_t)(*w >> 8)};
     bool ok = block(f, b, 2, save);
@@ -162,7 +179,7 @@ static bool word(FILE *f, uint16_t *w, bool save)
 
 // The port's format has its records after the blocks: the routes'
 // (game/routes.h) as their count and size, then the records.
-static bool port_records(FILE *f, bool save)
+static bool port_records(SDL_IOStream *f, bool save)
 {
     uint16_t count = ROUTE_SLOTS, size = sizeof(Route);
     if (!word(f, &count, save) || !word(f, &size, save) || count > ROUTE_SLOTS
@@ -177,7 +194,7 @@ static bool port_records(FILE *f, bool save)
 // `name`), then the blocks. The port's format (port) starts with its magic
 // and version, has only the buildings in use of the building table, and
 // ends with its records.
-static bool transfer(FILE *f, uint8_t *name, bool save, bool port)
+static bool transfer(SDL_IOStream *f, uint8_t *name, bool save, bool port)
 {
     bool ok = true;
     if (port) {
@@ -232,11 +249,11 @@ bool SaveLoad_Transfer(bool save)
     if (!save && (!*slot_entry(slot) || slot_format[slot] == SLOT_NEWER))
         return false;
     bool port = save ? SaveLoad_PortFormat() : slot_format[slot] == SLOT_PORT;
-    FILE *f = open_slot(slot, port, save);
+    SDL_IOStream *f = open_slot(slot, port, save);
     if (!f)
         return false;
     bool ok = transfer(f, slot_entry(slot) + 1, save, port);
-    fclose(f);
+    ok = SDL_CloseIO(f) && ok;
     if (ok && save) {
         // A slot has one file: the other format's goes.
         char other[1024];
@@ -249,12 +266,37 @@ bool SaveLoad_Transfer(bool save)
 
 bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save)
 {
-    FILE *f = fopen(path, save ? "wb" : "rb");
+    SDL_IOStream *f = SDL_IOFromFile(path, save ? "wb" : "rb");
     if (!f)
         return false;
     bool ok = transfer(f, name, save, false);
-    fclose(f);
-    return ok;
+    return SDL_CloseIO(f) && ok;
+}
+
+void *SaveLoad_SaveToMemory(const uint8_t name[0x14], size_t *size)
+{
+    SDL_IOStream *f = SDL_IOFromDynamicMem();
+    if (!f)
+        return nullptr;
+    uint8_t header[0x14];
+    memcpy(header, name, sizeof header);
+    void *data = nullptr;
+    *size = 0;
+    if (transfer(f, header, true, true)) {
+        *size = (size_t)SDL_GetIOSize(f);
+        // The stream's memory becomes the caller's.
+        SDL_PropertiesID props = SDL_GetIOProperties(f);
+        data = SDL_GetPointerProperty(props, SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER, nullptr);
+        SDL_SetPointerProperty(props, SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER, nullptr);
+    }
+    SDL_CloseIO(f);
+    return data;
+}
+
+bool SaveLoad_WriteAutosave(const void *data, size_t size)
+{
+    char path[1024];
+    return slot_path(path, sizeof path, AUTOSAVE_SLOT, true) && SDL_SaveFile(path, data, size);
 }
 
 // 1a3e:029c
@@ -264,6 +306,8 @@ void SaveLoad_SaveLoadGame(bool save)
         return;
     if (!SaveLoad_Transfer(save))
         return; // original: run-time error 100
+    if (!save)
+        Autosave_Reset();  // port improvement (game/autosave.h)
     Gfx_DrawGameDate();
     Gfx_DrawCredits();
 }
@@ -297,13 +341,14 @@ void SaveLoad_LoadInit(void)
 // 1a3e:0c40
 void SaveLoad_ReadSlotNames(void)
 {
-    // Allocated afresh on every call, as in the original.
-    ds.SaveLoad_SlotTable = game_alloc(0x108);
-    for (int16_t n = 1; n <= SLOT_COUNT; n++) {
+    // Allocated afresh on every call, as in the original (0x108 bytes, 12
+    // slots; one more for the autosave's row).
+    ds.SaveLoad_SlotTable = game_alloc((size_t)AUTOSAVE_SLOT * SLOT_SIZE);
+    for (int16_t n = 1; n <= slot_rows(); n++) {
         uint8_t *e = slot_entry(n);
         // Port addition: a save in the port's format, else the DOS one.
         slot_format[n] = SLOT_DOS;
-        FILE *f = open_slot(n, true, false);
+        SDL_IOStream *f = open_slot(n, true, false);
         if (f) {
             uint8_t magic[sizeof PORT_MAGIC];
             uint16_t version = 0;
@@ -311,7 +356,7 @@ void SaveLoad_ReadSlotNames(void)
                 && word(f, &version, false)) {
                 slot_format[n] = version > PORT_VERSION ? SLOT_NEWER : SLOT_PORT;
             } else {
-                fclose(f);
+                SDL_CloseIO(f);
                 f = nullptr;
             }
         }
@@ -319,13 +364,19 @@ void SaveLoad_ReadSlotNames(void)
             f = open_slot(n, false, false);
         e[0] = f != nullptr;
         if (!f) {
-            const char *empty = Lang_Text("Empty---------------");
+            // The autosave's row before there is one: its name, dashed.
+            char empty[21] = {};
+            SDL_strlcpy(empty, Lang_Text("Empty---------------"), sizeof empty);
+            if (n == AUTOSAVE_SLOT) {
+                size_t len = SDL_min(SDL_strlcpy(empty, Lang_Text("Autosave"), sizeof empty), 20);
+                memset(empty + len, '-', 20 - len);
+            }
             e[1] = 0x14;
             memcpy(e + 2, empty, 20);
         } else {
-            if (fread(e + 1, 1, 0x14, f) != 0x14)
+            if (SDL_ReadIO(f, e + 1, 0x14) != 0x14)
                 memset(e + 1, 0, 0x14); // original: I/O error 100
-            fclose(f);
+            SDL_CloseIO(f);
         }
     }
     ds.SaveLoad_SelectedSlot = 1;
@@ -341,13 +392,13 @@ static uint8_t *screen_at(uint16_t off)
 // 1a3e:0d39
 static void DrawSlotNames(void)
 {
-    for (int16_t n = 1; n <= SLOT_COUNT; n++) {
+    for (int16_t n = 1; n <= slot_rows(); n++) {
         char name[256];
         pstr_get(name, sizeof name, slot_entry(n) + 1);
         if (n == ds.SaveLoad_SelectedSlot)
-            Gfx_DrawTextB3(name, 0x10, (n - 1) * 9 + 0x40, 0x13);
+            Gfx_DrawTextB3(name, 0x10, slot_y(n), 0x13);
         else
-            Gfx_DrawTextB0(name, 0x10, (n - 1) * 9 + 0x40, 0x13);
+            Gfx_DrawTextB0(name, 0x10, slot_y(n), 0x13);
     }
 }
 
@@ -492,7 +543,7 @@ static void SetupDiskHotspots(void)
     Mouse_SetHotspot(2, 0x122, 0x9B, 0x10, 0x0D, Lang_Text("Music 2"), 1, 0);
     Mouse_SetHotspot(3, 0x111, 0xA9, 0x22, 0x0D, Lang_Text("Stop music"), 1, 0);
     Mouse_SetHotspot(4, 0x111, 0xB7, 0x22, 0x0D, Lang_Text("Effects on/off"), 1, 0);
-    Mouse_SetHotspot(5, 0x0B, 0x40, 0x82, 0x6C, Lang_Text("Select slot"), 0, 0);
+    Mouse_SetHotspot(5, 0x0B, slot_y(1), 0x82, (int16_t)(slot_rows() * 9), Lang_Text("Select slot"), 0, 0);
 }
 
 // 1a3e:0008
@@ -514,7 +565,10 @@ void SaveLoad_DiskScreen(void)
         ds.Game_CurrentScreen = 1;
         ds.GfxPath_PageFlagB = 1;
     }
-    if (ds.Game_MenuCommand == 0x30) {
+    if (ds.Game_MenuCommand == 0x30 && ds.SaveLoad_SelectedSlot == AUTOSAVE_SLOT) {
+        // Port improvement (game/autosave.h): the autosave's row only loads.
+        Message_ShowMessageNoLog(Lang_Text(" The autosave can only be loaded! "));
+    } else if (ds.Game_MenuCommand == 0x30) {
         int16_t sel = ds.SaveLoad_SelectedSlot;
         uint8_t *name = slot_entry(sel) + 1;
         if (*slot_entry(sel) == 0) {
@@ -524,7 +578,7 @@ void SaveLoad_DiskScreen(void)
             name[0] = (uint8_t)len;
             memcpy(name + 1, tmp, (size_t)len);
         }
-        TextFile_InputLine(name, 0x10, (sel - 1) * 9 + 0x40, 0x13, true);
+        TextFile_InputLine(name, 0x10, slot_y(sel), 0x13, true);
         if (ds.TextFile_InputEscaped == 0)
             SaveLoad_SaveGame();
         ds.Game_ScreenSwitch = true;
@@ -567,16 +621,22 @@ void SaveLoad_DiskScreen(void)
         DrawOptionButtons();
     }
     if (hit == 0x19) {
-        int16_t slot = (int16_t)((ds.Mouse_ClickY - 0x40) / 9 + 1);
+        int16_t slot = (int16_t)((ds.Mouse_ClickY - slot_y(1)) / 9 + 1);
         if (slot < 1)
             slot = 1;
-        if (slot > 12)
-            slot = 12;
+        if (slot > slot_rows())
+            slot = slot_rows();
         if (ds.SaveLoad_SelectedSlot != slot) {
             ds.SaveLoad_SelectedSlot = slot;
             DrawSlotNames();
         }
     }
+}
+
+void SaveLoad_SlotArea(int16_t *y, int16_t *rows)
+{
+    *y = slot_y(1);
+    *rows = slot_rows();
 }
 
 // 1a3e:14b5

@@ -30,7 +30,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
 | Bugs of the original | A bug that changes play gets a switch in `src/game/fixes.h` (all on by default); a harmless one is kept and described where the code reproduces it | With every fix off the port plays like the original, which the golden hashes check |
 | Improvements | Changes to the game's design are switches in `src/game/improvements.h` (port menu, Improvements; `[improvements]` in `reunion.ini`), on by default. The Fixes section's "All off (original)" turns them off too | Scripted runs (autopilot, `--replay`, the tests) play with every improvement off, so the golden hashes, the playthrough and the DOS-save tests still prove the original's behaviour; a test of one switches it on |
-| Saves | The DOS format unless an improvement needs more: then `save/reunion.<n>`, the DOS blocks plus the port's records behind a magic and a version (`src/game/saveload.h`) | The DOS game never opens that name, where another layout under `spidysav.<n>` would load as garbage; a slot has one file, and the disk screen lists both |
+| Saves | The DOS format unless an improvement needs more: then `save/reunion.<n>`, the DOS blocks plus the port's records behind a magic and a version (`src/game/saveload.h`) | The DOS game never opens that name, where another layout under `spidysav.<n>` would load as garbage; a slot has one file, and the disk screen lists both. The autosave is `save/reunion.auto`, always in the port's format, outside the 12 slots |
 
 ## Source
 
@@ -76,7 +76,9 @@ The port is complete and the game can be won in it.
   Keyboard play, every screen played with keys that drive the mouse
   (`src/game/keyplay.h`), remappable in `[keys]`; No building limit, the
   building table leaves the game data block past 1,000 and grows up to
-  32,766 (`Game_ReserveBuildings`).
+  32,766 (`Game_ReserveBuildings`); Autosave, one rolling save beside the
+  12 slots, written as a battle or alien talk starts (the hour's start),
+  weekly and by F11 (`src/game/autosave.h`).
 - **Bugs of the original:** 18 are fixed behind switches
   (`src/game/fixes.h`): those that can make the game unwinnable or break
   the economy, and those that unbalance colonies and battles or lose
@@ -86,7 +88,7 @@ The port is complete and the game can be won in it.
   the 34 bugs found in the port while playing it, 33 are fixed and one
   turned out to be the original's behaviour; their write-ups are in git
   history (`docs/port-bugs.md`, deleted 2026-10-12).
-- **Tests:** all 94 ctest tests pass on the release build, the full
+- **Tests:** all 96 ctest tests pass on the release build, the full
   playthrough (`test_play_game`, and `_german`, `_french`, `_italian` from
   the CD's ISO), the golden proof and the two DOS saves
   (`golden_load_DOS_1`, `_2`: loaded, saved back byte for byte, played on)
@@ -109,16 +111,78 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-#### 1.1 Smaller candidates
+#### 1.1 Next: two smaller improvements
 
-Each needs a short spec before work starts.
+Specified 2026-10-14; to be done in this order, each its own switch and
+commit. Each one: a field in `Improvements` and an entry in
+`Improvements_List` (test_options checks), its own test with the switch
+on, the port's new texts in German, French and Italian too (`lang.c`,
+as the routes' are), and with the switch off the original's behaviour,
+which the golden hashes prove (scripted runs play with it off). When
+done: the walkthrough's matching section and "Where we stand".
 
-| Idea | Why |
-|---|---|
-| Autosave before every battle and alien conversation, into a slot of its own | The walkthrough's standing order is to save before each, as results are random. The original has 12 slots; the autosave must not take one of the player's |
-| A storage-full message, once per body and ore | Production stops without a word when a store is full (Storage, docs/walkthrough.md); players find out by noticing the numbers stand still. Trade routes (`src/game/routes.h`) leave ore aboard silently when New Earth is full, so it covers them too |
-| Saving anywhere | |
-| Universities that count | A University only matters for population (the 80k cap, the mood above 70k); it has no effect on courses and a second one does nothing (docs/walkthrough.md). E.g. each extra University cuts course time; needs a design |
+**1. A storage-full message** (`storage_full_message`). Production stops
+without a word when a store is full (Storage, docs/walkthrough.md);
+players find out by noticing the numbers stand still. One log entry,
+"Storage is full on <body>" (`Message_AddMessageLogEntry`, as the
+routes' entries), no box.
+
+- *State,* in memory only (not saved): per body (system, planet, moon) a
+  full bit per ore and an armed flag.
+- *Checked* where production is skipped for a full store: ores 2–6 in
+  `Sim_MineBody` (every hour, whether or not the 30% roll of a body
+  without a colony comes up), ore 1 (Detoxin) in the Derrick step of
+  `Sim_UpdateBuildings`; New Earth's `Game_HomeStock` as each other
+  body's `Stores`. Only ores the body produces: ores 2–6 with droids and
+  a deposit, ore 1 with a finished, powered Derrick there. The check must
+  not change when `System_Random` is called (the original skips the roll
+  when the store is full).
+- *Rule,* for each ore checked: at or over the cap, if its bit is clear,
+  set it, and if the body is armed, log the entry and disarm it. Under
+  the cap, if its bit is set, clear it and arm the body. So the first
+  full ore warns; while it or others stay full nothing more is said;
+  bringing any full ore below its cap (moving ore away, or more storage)
+  re-arms, and the next ore to fill warns again for the body.
+- *Seeded* after a new game and after every load from the loaded state:
+  a bit for every produced ore already at its cap, and armed only if
+  none is, so a load doesn't flood the log with warnings the player
+  already had.
+- Trade routes need nothing of their own: ore left aboard because New
+  Earth is full shows up as New Earth's own warning when its production
+  of that ore stops.
+- *Test:* a body filling up warns once; a second ore filling says
+  nothing; one ore drained and refilled warns again; a load with full
+  stores is quiet; the random stream is unchanged.
+
+**2. Universities that count** (`university_courses`). Today a University
+only matters for population (the 80k cap, the mood above 70k); courses
+need none and a second one does nothing (docs/walkthrough.md).
+
+- *A course needs a University:* at least one finished, powered
+  University at any colony, counted when the advisor is asked (or beside
+  `Sim_UniversityCount`, which keeps its own meaning for the population
+  rules). Without one the advisor refuses with a new answer, translated.
+- *One staff member away per University:* with N such Universities, up
+  to N staff can be on a course at once (at most 4, one per kind) in
+  place of the original's one. Course length, price and results are the
+  original's.
+- *State:* one course per staff kind (timer, course, price) in place of
+  the single `Advisor_Training*` set. The DOS fields hold one course; the
+  others are port records, and a save holding more than one running
+  course is in the port's format (as routes are, `game/saveload.h`).
+- *Reads:* every place that asks "who is away" goes through one accessor:
+  the advisor's "someone is already away" answer (now: as many away as
+  there are Universities), `Sim_GrowStaffExperience` (steps each course),
+  the Command centre's staff drawing (`fixes.away_staff_hidden`), the
+  research stop for an absent developer, the developer checks in
+  `Sim_ProcessStoryTimers`, and `Hire_HireScreen` (a replaced commander's
+  course ends).
+- Courses already running carry on if Universities are lost or lose
+  power; only a new course checks.
+- *Test:* no course without a powered University; two Universities let
+  two staff go together and refuse a third; each returns with the
+  original's results; a save with two courses round-trips in the port's
+  format and one with one course stays in the DOS format.
 
 ### 2. Checks against the DOS game
 

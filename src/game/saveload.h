@@ -22,13 +22,23 @@
 // slot in one format deletes its file in the other. The disk screen lists
 // both and loads either, whatever the switches say; a version newer than
 // the port knows is listed but refused.
+//
+// The autosave (game/autosave.h) is save/reunion.auto, always in the port's
+// format. While the switch is on the disk screen lists it as a 13th row
+// under the 12 slots, which move up to make room; it only loads.
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "game/dseg.h"
 
 enum : uint32_t { SAVELOAD_FILE_SIZE = 41670 };
+
+enum : int16_t {
+    AUTOSAVE_SLOT = 13,      // the disk screen's row of the autosave
+    AUTOSAVE_ROWS_Y = 0x3A,  // the first row's y with it (the original's 0x40)
+};
 
 // Port addition (test hook): directory for the player's saves, with or without
 // a trailing slash. nullptr restores the default (the player's folder).
@@ -43,6 +53,14 @@ bool SaveLoad_Transfer(bool save);
 bool SaveLoad_TransferFile(const char *path, uint8_t name[0x14], bool save);
 // Port addition: a save now is written in the port's format.
 bool SaveLoad_PortFormat(void);
+// Port improvement (game/autosave.h): the game as a save in the port's
+// format named `name` (string[19]), in memory the caller frees with
+// SDL_free; nullptr on failure.
+void *SaveLoad_SaveToMemory(const uint8_t name[0x14], size_t *size);
+// Writes such a save as the autosave's file.
+bool SaveLoad_WriteAutosave(const void *data, size_t size);
+// The disk screen's slot rows: the first's y and how many (keyboard play).
+void SaveLoad_SlotArea(int16_t *y, int16_t *rows);
 
 // 1a3e:0008
 void SaveLoad_DiskScreen(void);

@@ -10,6 +10,7 @@
 #include "game/advisor.h"
 #include "game/alientalk.h"
 #include "game/anim.h"
+#include "game/autosave.h"
 #include "game/baseeff.h"
 #include "game/cargo.h"
 #include "game/colonize.h"
@@ -298,6 +299,7 @@ static void startup(void)
     ds.TextFile_InputActive = 0;
     SaveLoad_LoadInit();
     Routes_Reset();  // port improvement (game/routes.h)
+    Autosave_Reset();  // port improvement (game/autosave.h)
     if (ds.Game_StartChoice == 2) {
         ds.Game_PrevScreen = 1;
         ds.Game_CurrentScreen = 12;
@@ -313,6 +315,7 @@ static void startup(void)
 // phase A the other way round.
 static void advance_hour(bool held)
 {
+    Autosave_HourStart();  // port improvement (game/autosave.h)
     Sim_AdvanceHour();
     Sim_ProcessStoryTimers();
     Sim_ProgressResearch();
@@ -449,6 +452,7 @@ static bool wait_for_event(void)
         // bigger cheat once) here when Cheat_Requested is set, which nothing
         // does, so the port leaves it out.
         Options_Frame();  // port addition: the port menu's changes, frozen cheats
+        Autosave_Frame();  // port improvement (game/autosave.h): the quick save
         if (!wait_retrace())
             return false;
         Game_EventWaitFrames++;  // port addition
@@ -1966,6 +1970,7 @@ void Game_Main(void)
                 Gfx_ShowGrafikaPic(pstr_get(name, sizeof name, &info->Name));
             ds.Game_HotspotHit = 0;
             ds.Game_ScreenSwitch = 0;
+            Autosave_ScreenEntered(ds.Game_CurrentScreen);  // port improvement
         }
         dispatch();
         if (ds.Game_ScreenEntered)

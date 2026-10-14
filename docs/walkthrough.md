@@ -34,6 +34,9 @@ Standing orders for the whole game:
   ground battle there ends the game.
 - Equip every warship and vehicle fully, since weapons are averaged per slot.
 - Save before every battle and every alien conversation. Results are random.
+  In the port, the Autosave improvement does this: it saves the start of
+  the hour each one begins in, and the disk screen loads it from its last
+  row.
 
 ### 1. Economy (2927-08 to ~2928-03)
 

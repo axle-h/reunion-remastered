@@ -21,6 +21,9 @@
 //   while the main loop waits for a click; in a box or a wait the key goes
 //   to the game, which takes any key as a click.
 //
+// The quick-save key (game/autosave.h) works whenever the autosave
+// improvement is on, keyboard play or not.
+//
 // The keys are remappable: [keys] in reunion.ini, an action = SDL key
 // names with Shift+ / Ctrl+ / Alt+ in front, two keys apart by a comma (so
 // ',' and ';' can't be bound). While text is typed (a name) every key goes
@@ -56,6 +59,8 @@ typedef enum : int {
     KEY_COMMANDERS,
     KEY_INFO_BUY,
     KEY_MESSAGES,
+    // Improvement autosave (game/autosave.h): with or without keyboard play.
+    KEY_QUICK_SAVE,
     KEY_ACTION_COUNT,
 } KeyAction;
 
@@ -81,6 +86,8 @@ typedef enum : int {
 void KeyPlay_Init(void);
 // The keys of action a as the config has them (the defaults if it doesn't).
 const char *KeyPlay_Keys(KeyAction a);
+// The port menu's help for action a, nullptr for keyboard play's own.
+const char *KeyPlay_Help(KeyAction a);
 // Every retrace (Mouse's retrace hook): finishes clicks and shortcuts and
 // draws the focus frame.
 void KeyPlay_Frame(void);

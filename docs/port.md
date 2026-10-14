@@ -191,7 +191,9 @@ the original in a few places, each commented in the code:
   byte for byte the original's. The route editor is the port's own screen
   39, with toolbar commands past the original's 77
   (`src/game/portcmd.h`). Keyboard play (`src/game/keyplay.h`) changes no
-  screen: an input hook turns keys into the mouse the game reads.
+  screen: an input hook turns keys into the mouse the game reads. The
+  autosave (`src/game/autosave.h`) is a file of the port's format beside
+  the 12 slots, a 13th row on the disk screen.
 - **Importing the game data** (`src/platform/import.h`): the player's copy
   (a folder, a ZIP or an ISO image, `src/platform/source.h`) is checked
   against the list of files the port loads (`src/platform/gamedata.h`)

@@ -35,6 +35,9 @@ typedef struct Improvements {
     // (Game_BuildingLimit, game/main_program.h): the table leaves the game
     // data block for a heap array as it grows.
     bool no_building_limit;
+    // One rolling autosave outside the 12 slots, written as a battle or an
+    // alien talk starts, weekly and by the quick-save key (game/autosave.h).
+    bool autosave;
 } Improvements;
 
 extern Improvements improvements;

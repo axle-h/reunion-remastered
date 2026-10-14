@@ -2,10 +2,12 @@
 
 #include <SDL3/SDL.h>
 
+#include "game/autosave.h"
 #include "game/dseg.h"
 #include "game/improvements.h"
 #include "game/main_program.h"
 #include "game/mouse.h"
+#include "game/saveload.h"
 #include "platform/config.h"
 #include "platform/input.h"
 #include "platform/timing.h"
@@ -42,6 +44,7 @@ const KeyActionInfo KeyPlay_Actions[KEY_ACTION_COUNT] = {
     [KEY_COMMANDERS] = {"commanders", "Commanders", "F8"},
     [KEY_INFO_BUY] = {"info_buy", "Info-buy", "F9"},
     [KEY_MESSAGES] = {"messages", "Messages", "F10"},
+    [KEY_QUICK_SAVE] = {"quick_save", "Quick save", "F11"},
 };
 
 enum : int {
@@ -151,6 +154,12 @@ const char *KeyPlay_Keys(KeyAction a)
     return s ? s : KeyPlay_Actions[a].defaults;
 }
 
+const char *KeyPlay_Help(KeyAction a)
+{
+    return a == KEY_QUICK_SAVE ? "Autosave (Improvements): saves now. Change in reunion.ini, [keys]."
+                               : nullptr;
+}
+
 // The action key e is bound to, or -1. Shift+Click is a Shift+click.
 static int action_of(const SDL_KeyboardEvent *e)
 {
@@ -240,9 +249,12 @@ static void screen_targets(bool skip[67])
         if (ds.Shop_ListMode && !ds.Shop_QtyEdit)
             grid_for(skip, 2, 0xE, 0x39, 1, 13, 0x62, 9);
         break;
-    case 12:  // the save slots
-        grid_for(skip, 5, 0x0B, 0x40, 1, 12, 0x82, 9);
+    case 12: {  // the save slots
+        int16_t y, rows;
+        SaveLoad_SlotArea(&y, &rows);
+        grid_for(skip, 5, 0x0B, y, 1, rows, 0x82, 9);
         break;
+    }
     case 16:  // icons past the groups shown
         for (int16_t j = (int16_t)(3 + ds.Game_ShownGroupCount); j <= 34; j++)
             skip[j] = true;
@@ -390,6 +402,7 @@ static bool focus_shown;
 static int busy_frames;
 static uint64_t last_wait_frames;
 static int idle_frames;  // retraces the main loop has waited for a click in a row
+static bool game_begun;  // the main loop has waited since KeyPlay_Start (past the title)
 
 typedef struct Button {
     bool held;          // by a key
@@ -779,10 +792,18 @@ static bool started;
 
 static bool on_key(const SDL_KeyboardEvent *e)
 {
-    if (!improvements.keyboard_play || !started || ds.TextFile_InputActive)
+    if (!started || ds.TextFile_InputActive)
         return false;
     int a = action_of(e);
-    if (a < 0)
+    if (a == KEY_QUICK_SAVE) {
+        if (!improvements.autosave)
+            return false;
+        // Only once the game has begun; in a box or a wait it is refused.
+        if (e->down && !e->repeat && game_begun)
+            Autosave_QuickSaveKey(idle_frames > 0);
+        return true;
+    }
+    if (!improvements.keyboard_play || a < 0)
         return false;
     if (!e->down) {
         if (a == KEY_CLICK || a == KEY_CLOCK)
@@ -863,6 +884,7 @@ void KeyPlay_Start(void)
 {
     KeyPlay_Reset();
     started = true;
+    game_begun = false;
 }
 
 void KeyPlay_Stop(void)
@@ -886,6 +908,7 @@ void KeyPlay_Reset(void)
 void KeyPlay_Frame(void)
 {
     if (Game_EventWaitFrames != last_wait_frames) {
+        game_begun = true;
         idle_frames++;
         busy_frames = 0;
     } else {

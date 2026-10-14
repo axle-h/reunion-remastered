@@ -31,10 +31,11 @@ typedef struct MenuSwitch {
     bool port_saves;
 } MenuSwitch;
 
-// A key of keyboard play (game/keyplay.h), as the Keys section lists it.
+// A key of game/keyplay.h, as the Keys section lists it.
 typedef struct MenuKey {
     const char *label;  // at most 20 characters
     const char *keys;   // as in reunion.ini
+    const char *help;   // nullptr: keyboard play's
 } MenuKey;
 
 typedef struct MenuHooks {
