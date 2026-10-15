@@ -96,6 +96,11 @@ target_link_libraries(reunion_core PUBLIC SDL3::SDL3 miniz PRIVATE ${REUNION_XMP
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(reunion_core PUBLIC -Wall -Wextra -Wpedantic)
 endif()
+# ds_initial (src/game/dsinit.c) is packed, so some of its pointers to DS
+# fields are unaligned; macOS's chained fixups can't relocate those.
+if(APPLE)
+    target_link_options(reunion_core PUBLIC LINKER:-no_fixup_chains)
+endif()
 
 add_executable(reunion src/main.c)
 target_link_libraries(reunion PRIVATE reunion_core)

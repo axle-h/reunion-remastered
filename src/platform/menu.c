@@ -83,7 +83,7 @@ typedef struct Row {
 } Row;
 
 static MenuHooks hooks;
-static bool open;
+static bool shown;
 static Section section;
 static int focus = -1;  // row, or -1: the section list
 static int scroll[SECTIONS];
@@ -334,7 +334,7 @@ static void change_size(int dir)
 
 static void close_menu(void)
 {
-    open = false;
+    shown = false;
 }
 
 // dir: -1 / +1 for a choice's previous / next value, 0 to activate.
@@ -469,7 +469,7 @@ static void set_section(int s, bool keep_focus_on_rows)
 
 void menu_open(void)
 {
-    open = true;
+    shown = true;
     status[0] = '\0';
     focus = -1;
     build_rows();
@@ -477,7 +477,7 @@ void menu_open(void)
 
 bool menu_is_open(void)
 {
-    return open;
+    return shown;
 }
 
 static void key(SDL_Keycode k, SDL_Keymod mod)
@@ -708,9 +708,9 @@ void menu_run(void)
     menu_open();
     SDL_ShowCursor();
     vid_set_overlay(menu_draw);
-    while (open) {
+    while (shown) {
         SDL_Event e;
-        while (open && SDL_PollEvent(&e))
+        while (shown && SDL_PollEvent(&e))
             menu_handle_event(&e);
         vid_present();
         SDL_Delay(15);

@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-14 ninja-build \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxtst-dev \
             libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
             libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev \
             libpipewire-0.3-dev libdbus-1-dev libudev-dev
@@ -40,7 +40,7 @@ jobs:
           CC: gcc-14
         run: |
           cmake --preset release $CMAKE_ARGS
-          cmake --build --preset release
+          cmake --build --preset release -- -k 0
       - name: Package
         run: |
           mkdir -p dist/reunion
@@ -72,7 +72,7 @@ jobs:
       - name: Build
         run: |
           cmake --preset release $CMAKE_ARGS -DCMAKE_EXE_LINKER_FLAGS=-static
-          cmake --build --preset release
+          cmake --build --preset release -- -k 0
       - name: Package
         run: |
           mkdir -p dist/reunion
@@ -97,7 +97,7 @@ jobs:
         run: |
           export CC="$(brew --prefix llvm)/bin/clang"
           cmake --preset release $CMAKE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-          cmake --build --preset release
+          cmake --build --preset release -- -k 0
       - name: Package
         run: |
           mkdir -p dist/reunion
