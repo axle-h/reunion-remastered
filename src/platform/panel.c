@@ -9,9 +9,11 @@ static float scale = 1, origin_x, origin_y;
 
 static void layout(SDL_Renderer *r)
 {
+    // The whole output: while the game's logical presentation is on (when
+    // mouse events come) the current size is only its letterboxed part.
     int w = PANEL_VW, h = PANEL_VH;
     if (r)
-        SDL_GetCurrentRenderOutputSize(r, &w, &h);
+        SDL_GetRenderOutputSize(r, &w, &h);
     float s = SDL_min((float)w / PANEL_VW, (float)h / PANEL_VH);
     scale = s >= 1 ? SDL_floorf(s) : s;  // whole pixels keep the font sharp
     origin_x = SDL_floorf((w / scale - PANEL_VW) / 2);
