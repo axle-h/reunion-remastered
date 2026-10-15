@@ -9,6 +9,9 @@
 /play_*.txt
 /golden-saves-*/
 
+# Python bytecode
+__pycache__/
+
 # Editors / OS
 .vscode/
 .idea/
