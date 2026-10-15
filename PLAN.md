@@ -103,20 +103,13 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(done; the port's saves in the original are left, see 2 below).
+(done; the port's saves in the original are left, see 1 below).
 
 ## Remaining work
 
 In rough priority order.
 
-### 1. Improvements
-
-Changes to the game's design rather than its bugs: quality of life first,
-then mechanics that don't do what the game seems to mean. Each one is a
-switch in `src/game/improvements.h` (see Decisions), with its own test with
-it on.
-
-### 2. The port's saves in the original
+### 1. The port's saves in the original
 
 A manual check (Alex). The DOS saves load in the port
 (`golden_load_DOS_*`); the other way round is untested. Load a port save
@@ -124,7 +117,7 @@ A manual check (Alex). The DOS saves load in the port
 hand and play on. A save holds only data records (no pointers), so a
 difference would be a value the original never writes.
 
-### 3. Publication
+### 2. Publication
 
 Last, once the work above is done. The repository is to go public.
 Decided (2026-10-12): release builds ship without the art and carry the
