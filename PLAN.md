@@ -24,7 +24,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Build | CMake (≥ 3.25) with presets | Uses system SDL3/libxmp if found, otherwise fetches them with `FetchContent` |
 | VCS | git | `vendor/` (the game data) is git-ignored |
 | Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
-| Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since |
+| Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since. A new game's first 50 hours match the original under DOSBox-X (`tools/dosbox/side_by_side.py`); a whole game there is out of reach, as input means stepping DOSBox-X's debugger a frame at a time |
 | Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The first launch imports the player's copy (README, "Running") |
 | Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
@@ -54,7 +54,8 @@ The port is complete and the game can be won in it.
 - **Matches the original:** every unit matched the original routine for
   routine under the differential tests before they were retired. Since
   then, golden state hashes (`tests/golden/`, every fix on and every fix
-  off) catch any change in behaviour.
+  off) catch any change in behaviour. A new game's first 50 hours match
+  the original run in DOSBox-X, state and screen.
 - **Playable start to finish:** the playthrough fixture wins a new game
   with seed 12345 using only clicks, keys and what is on screen (Halt(10),
   2930-03-06). Its recording replays to the same end in the plain binary.
@@ -102,7 +103,7 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(mostly done, see 2 below).
+(done; the port's saves in the original are left, see 2 below).
 
 ## Remaining work
 
@@ -115,19 +116,13 @@ then mechanics that don't do what the game seems to mean. Each one is a
 switch in `src/game/improvements.h` (see Decisions), with its own test with
 it on.
 
-### 2. Checks against the DOS game
+### 2. The port's saves in the original
 
-Both need DOSBox-X driven by a script, too much work for now.
-
-- **The port's saves in the original.** The DOS saves load in the port
-  (`golden_load_DOS_*`); the other way round is untested. Load a port save
-  (e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
-  hand and play on. A save holds only data records (no pointers), so a
-  difference would be a value the original never writes.
-- **Whole-game side-by-side.** The differential tests compared single
-  routines, and `test_sim` has spot checks against a DOSBox-X memory dump.
-  Nothing has compared a longer run (timing per game hour, a battle) with
-  the original from the same save.
+A manual check (Alex). The DOS saves load in the port
+(`golden_load_DOS_*`); the other way round is untested. Load a port save
+(e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
+hand and play on. A save holds only data records (no pointers), so a
+difference would be a value the original never writes.
 
 ### 3. Publication
 

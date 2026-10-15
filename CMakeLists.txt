@@ -114,6 +114,10 @@ if(BUILD_TESTING)
     target_include_directories(reunion_play PUBLIC tests)
     target_link_libraries(reunion_play PUBLIC reunion_core)
 
+    # The port's side of the DOSBox-X comparison (tools/dosbox/side_by_side.py).
+    add_executable(dosside EXCLUDE_FROM_ALL tools/dosbox/dosside.c)
+    target_link_libraries(dosside PRIVATE reunion_play)
+
     file(GLOB REUNION_TESTS CONFIGURE_DEPENDS tests/test_*.c)
     foreach(src IN LISTS REUNION_TESTS)
         get_filename_component(name "${src}" NAME_WE)

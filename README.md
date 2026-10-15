@@ -137,6 +137,9 @@ ended (docs/playthrough.md).
 (deterministic per seed). `tools/soak.sh` runs many seeds of that on the
 `trap` preset (UBSan, trapping) and reports crashes and hangs with gdb
 backtraces.
+`tools/dosbox/side_by_side.py` plays the start of a new game in the port
+and in the original under DOSBox-X (its debugger driven through tmux) and
+compares the two states every few game hours.
 
 ## Documentation
 
