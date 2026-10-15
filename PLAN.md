@@ -103,23 +103,14 @@ Milestones from the original plan: Ghidra database named (done; the
 Ghidra project and the Python asset tools were retired 2026-10-12), assets
 viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
-(done; the port's saves in the original are left, see 1 below).
+(done; a port save loads in the original under dosbox-staging,
+2026-10-15).
 
 ## Remaining work
 
-In rough priority order.
+### Publication
 
-### 1. The port's saves in the original
-
-A manual check (Alex). The DOS saves load in the port
-(`golden_load_DOS_*`); the other way round is untested. Load a port save
-(e.g. `tests/golden/saves/X01_rigel1.sav` as `SPIDYSAV.3`) in DOSBox-X by
-hand and play on. A save holds only data records (no pointers), so a
-difference would be a value the original never writes.
-
-### 2. Publication
-
-Last, once the work above is done. The repository is to go public.
+The repository is to go public.
 Decided (2026-10-12): release builds ship without the art and carry the
 data taken from the executables (`src/game/dsinit.c`, the game's typed
 constants and texts; the cut-scene tables; the AdLib player's image in
