@@ -97,7 +97,7 @@ has them and their harness (`tests/diff/`).
 
 ## Start-up and leaving the game
 
-`src/main.c` finds the game data (README, "Running"), showing the import
+`src/main.c` finds the game data (development.md, "The game data"), showing the import
 screen when there is none, and plays the cut-scenes. Each boot then picks
 the language's folder (`fs_set_language_dir`), the language of the
 program's own texts (`Lang_Set`, `src/game/lang.h`) and the CD's or the
@@ -221,5 +221,5 @@ the original in a few places, each commented in the code:
   Derricks (the original shows `--`, as droids mine no Detoxin), and a
   Derrick's info adds their Total. Golden runs switch it off too.
 - **Headless runs**: autopilot scripts, `--replay` and soak runs
-  (`src/platform/autopilot.h`, README), and the playthrough fixture
+  (`src/platform/autopilot.h`, development.md), and the playthrough fixture
   (docs/playthrough.md).

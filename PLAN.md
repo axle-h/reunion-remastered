@@ -8,7 +8,7 @@ in C23 on top of SDL3, built with CMake. The port loads the original game data
 from the user's own copy; we never ship the assets.
 
 This file is the only plan: what is done and what is left. Reference
-material is in `docs/` (see the README).
+material is in `docs/` (docs/development.md lists it).
 
 Keep it lean. When you finish an item, delete it here (git history keeps
 it), move any lasting choice into Decisions, and update "Where we stand" in
@@ -25,7 +25,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | VCS | git | `vendor/` (the game data) is git-ignored |
 | Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
 | Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since. A new game's first 50 hours match the original under DOSBox-X (`tools/dosbox/side_by_side.py`); a whole game there is out of reach, as input means stepping DOSBox-X's debugger a frame at a time |
-| Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The first launch imports the player's copy (README, "Running") |
+| Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The DOS game's saves in `tests/golden/saves/` stay as it wrote them, stale bytes included (`DOS_2.sav` holds a few KB of a cut-scene's frames). The first launch imports the player's copy (README, "Importing your copy") |
 | Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
 | Bugs of the original | A bug that changes play gets a switch in `src/game/fixes.h` (all on by default); a harmless one is kept and described where the code reproduces it | With every fix off the port plays like the original, which the golden hashes check |
@@ -105,22 +105,3 @@ viewable (done, `tools/`), title screen (done), every screen playable (done),
 full game playable start to finish (done), verified against the original
 (done; a port save loads in the original under dosbox-staging,
 2026-10-15).
-
-## Remaining work
-
-### Publication
-
-The repository is to go public.
-Decided (2026-10-12): release builds ship without the art and carry the
-data taken from the executables (`src/game/dsinit.c`, the game's typed
-constants and texts; the cut-scene tables; the AdLib player's image in
-`src/game/adlib.c`). The player supplies the rest (the import, README).
-Until it is published the repository stays private.
-
-- **A last scan for copyrighted content.** Nothing of the game beyond what
-  the Decisions allow: no pictures, animations, modules, samples or other
-  files of the player's copy, no raw decompiler dumps, nothing of them in
-  `tests/`, `tools/` or the git history.
-- **The README for players only:** what the port is, getting and running
-  it, importing their copy, the port menu and `reunion.ini`. Developer
-  material (building from source, tests, the docs) moves out of it.
