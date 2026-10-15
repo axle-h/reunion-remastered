@@ -1,0 +1,129 @@
+# Builds the release preset on Linux, Windows and macOS and publishes the
+# binaries as a GitHub release of the pushed tag (v1.0, ...). The game data
+# isn't part of the build: the player imports their copy (README).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and release
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  # Build SDL3 and libxmp from source, linked statically, whatever the runner has.
+  CMAKE_ARGS: -DBUILD_TESTING=OFF -DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 ninja-build \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev \
+            libpipewire-0.3-dev libdbus-1-dev libudev-dev
+      - name: Build
+        env:
+          CC: gcc-14
+        run: |
+          cmake --preset release $CMAKE_ARGS
+          cmake --build --preset release
+      - name: Package
+        run: |
+          mkdir -p dist/reunion
+          cp build/release/reunion README.md dist/reunion/
+          strip dist/reunion/reunion
+          tar -C dist -czf reunion-$TAG-linux-x86_64.tar.gz reunion
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: reunion-*.tar.gz
+
+  windows:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - name: Build
+        run: |
+          cmake --preset release $CMAKE_ARGS -DCMAKE_EXE_LINKER_FLAGS=-static
+          cmake --build --preset release
+      - name: Package
+        run: |
+          mkdir -p dist/reunion
+          cp build/release/reunion.exe README.md dist/reunion/
+          strip dist/reunion/reunion.exe
+          (cd dist && zip -r ../reunion-$TAG-windows-x86_64.zip reunion)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: reunion-*.zip
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Install build dependencies
+        # The code needs Clang 19+ (C23 constexpr); Apple's clang is older.
+        run: brew install llvm ninja
+      - name: Build
+        run: |
+          export CC="$(brew --prefix llvm)/bin/clang"
+          cmake --preset release $CMAKE_ARGS -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build --preset release
+      - name: Package
+        run: |
+          mkdir -p dist/reunion
+          cp build/release/reunion README.md dist/reunion/
+          strip dist/reunion/reunion
+          (cd dist && zip -r ../reunion-$TAG-macos-arm64.zip reunion)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: reunion-*.zip
+
+  release:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Unzip and run reunion. On the first start it asks for your copy of the DOS game (see the README)."
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* -R "$GITHUB_REPOSITORY" --title "Reunion $TAG" --notes "$notes"
+          fi

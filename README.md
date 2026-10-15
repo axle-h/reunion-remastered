@@ -10,9 +10,13 @@ game, which it imports the first time it starts.
 
 ## Getting it
 
-Download the build for your system from the releases page, or build it
-yourself (see "Building from source" at the end). The program is
-`reunion` (`reunion.exe` on Windows).
+Download the build for your system from the
+[releases page](https://github.com/axle-h/reunion-remastered/releases)
+(Linux x86-64, Windows x86-64, macOS on Apple silicon), or build it
+yourself (see "Building from source" at the end). Unpack it and run
+`reunion` (`reunion.exe` on Windows). macOS blocks unsigned programs
+downloaded from the internet: allow it in System Settings, Privacy &
+Security, or run `xattr -d com.apple.quarantine reunion` once.
 
 You also need a copy of the DOS game. The port takes either of these:
 

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(reunion
-    VERSION 0.1.0
+    VERSION 1.0.0
     DESCRIPTION "Native port of Reunion (Amnesty Design, 1994)"
     LANGUAGES C)
 
@@ -99,6 +99,8 @@ endif()
 
 add_executable(reunion src/main.c)
 target_link_libraries(reunion PRIVATE reunion_core)
+# On Windows a GUI program, without a console window.
+set_target_properties(reunion PROPERTIES WIN32_EXECUTABLE ON)
 if(REUNION_EMBED_DATA_DIR)
     target_compile_definitions(reunion PRIVATE REUNION_DEFAULT_DATA_DIR="${REUNION_DATA_DIR}")
 endif()
