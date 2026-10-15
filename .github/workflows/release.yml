@@ -1,6 +1,10 @@
 # Builds the release preset on Linux, Windows and macOS and publishes the
-# binaries as a GitHub release of the pushed tag (v1.0, ...). The game data
-# isn't part of the build: the player imports their copy (README).
+# binaries as a GitHub release of the pushed tag (v1.0, ...), and the web
+# preset to GitHub Pages. The game data isn't part of the build: the player
+# imports their copy (README).
+#
+# Pages needs, once, in the repository's settings: Pages, Source "GitHub
+# Actions"; Environments, github-pages, a deployment tag rule for v*.
 name: Release
 
 on:
@@ -108,6 +112,43 @@ jobs:
         with:
           name: macos
           path: reunion-*.zip
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.12
+      - name: Install build dependencies
+        run: sudo apt-get install -y ninja-build
+      - name: Build
+        run: |
+          cmake --preset web $CMAKE_ARGS
+          cmake --build --preset web -- -k 0
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/web/reunion.js build/web/reunion.wasm dist/
+          cp build/web/reunion.html dist/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  pages:
+    needs: web
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
 
   release:
     needs: [linux, windows, macos]

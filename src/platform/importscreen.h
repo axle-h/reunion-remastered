@@ -6,6 +6,9 @@
 // It offers "Choose ZIP or ISO...", "Choose folder..." (SDL's file dialogs:
 // on Linux they need xdg-desktop-portal or zenity) and Quit, or Back from
 // the menu; a file or folder dropped onto the window is imported as well.
+// On the web the page's file picker takes the dialogs' place, the import
+// runs on the screen's thread (there are no others) and only files can be
+// dropped.
 // It shows the edition found, or every problem with the copy.
 #pragma once
 

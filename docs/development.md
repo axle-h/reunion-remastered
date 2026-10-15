@@ -6,13 +6,37 @@ a developer needs beyond that.
 ## Presets
 
 ```sh
-cmake --preset debug          # or: release, asan, trap
+cmake --preset debug          # or: release, asan, trap, web
 cmake --build --preset debug
 build/debug/reunion
 ```
 
 The release preset is the build to hand out: unlike the others it has no
 `REUNION_DATA_DIR` built in, so it uses only the player's imported copy.
+
+## The web build
+
+The web preset builds the page with Emscripten (`build/web/reunion.html`,
+`.js` and `.wasm`); the release workflow puts it on GitHub Pages. It needs
+[emsdk](https://emscripten.org/docs/getting_started/downloads.html) 6.0.12
+activated in the shell:
+
+```sh
+source ~/emsdk/emsdk_env.sh
+cmake --preset web
+cmake --build --preset web
+python3 -m http.server -d build/web 8000   # http://localhost:8000/reunion.html
+```
+
+It is the same program: Asyncify lets its waiting loops return to the
+browser between frames (`timing_wait_retrace`), and `src/platform/web/`
+holds the page and its JavaScript (`src/platform/web.h`). Like the
+release preset it has no game data built in. The player's folder is kept
+in the browser's IndexedDB.
+
+`node tools/web/replay.mjs [RECORDING...]` replays playthrough recordings
+in the web build, headless in Chromium and Firefox (the setup is in its
+header).
 
 ## The game data
 

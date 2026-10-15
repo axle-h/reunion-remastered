@@ -18,6 +18,10 @@ yourself (see "Building from source" at the end). Unpack it and run
 downloaded from the internet: allow it in System Settings, Privacy &
 Security, or run `xattr -d com.apple.quarantine reunion` once.
 
+Or play it in the browser, at
+[axle-h.github.io/reunion-remastered](https://axle-h.github.io/reunion-remastered/)
+(see "In the browser" below).
+
 You also need a copy of the DOS game. The port takes either of these:
 
 - the English floppy release
@@ -48,6 +52,17 @@ reunion --import=PATH
 
 To import another copy later, use the port menu (System, Import game
 data).
+
+### In the browser
+
+The page plays the same game. Click it to start; leaving the game (Exit to
+DOS, or Quit in the port menu) comes back to that screen. The import
+works as above, with the browser's file picker; only a ZIP or an ISO can
+be dropped onto the page. The imported game, your saves and the settings
+are kept in the browser's storage for the site, so clearing the site's
+data deletes them. F5 stays with the game (keyboard play's ship info):
+reload the page with Ctrl+R. F12 is the browser's, so there are no
+screenshots, and Esc leaves full screen.
 
 ## Playing
 

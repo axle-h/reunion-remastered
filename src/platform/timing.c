@@ -7,6 +7,19 @@
 #include "platform/input.h"
 #include "platform/menu.h"
 #include "platform/video.h"
+#include "platform/web.h"
+
+#ifdef __EMSCRIPTEN__
+// web_wait_frame's limit when the browser gives no animation frames: over a
+// 60 Hz frame, under the 4 retraces that resync the clock.
+enum : int { WEB_FALLBACK_MS = 40 };
+
+// The time of the frame being drawn: the game runs the retraces up to it,
+// so each frame gets an even share, however long the game takes.
+static uint64_t frame_ns;
+// Unpaced scripted runs return to the browser every this many retraces.
+enum : uint64_t { WEB_SCRIPT_YIELD = 61 };
+#endif
 
 // VGA mode 13h: 25.175 MHz / (800 * 449) = 70.086 Hz.
 static const double RETRACE_NS = 1e9 * 800.0 * 449.0 / 25175000.0;
@@ -101,18 +114,35 @@ bool timing_wait_retrace(void)
     if (autopilot_active()) {
         mix_one_retrace();
         frames++;  // headless script: no pacing
+#ifdef __EMSCRIPTEN__
+        // ...but the page must not freeze: back to the browser now and then.
+        if (frames % WEB_SCRIPT_YIELD == 0)
+            web_wait_frame(0);
+#endif
         return true;
     }
 
+#ifdef __EMSCRIPTEN__
+    uint64_t now = frame_ns;
+#else
     uint64_t now = SDL_GetTicksNS();
+#endif
     if (next_ns == 0 || now > next_ns + (uint64_t)(RETRACE_NS * 4)) {
         // First frame, or we fell far behind (e.g. a window drag): resync
         // instead of rushing to catch up.
         next_ns = now;
     }
     next_ns += (uint64_t)RETRACE_NS;
+#ifdef __EMSCRIPTEN__
+    // The browser shows a frame at its own rate (usually 60 Hz): the game
+    // runs retraces until its clock is ahead of real time, then waits for
+    // the next animation frame, which shows the last one.
+    if (next_ns > now)
+        frame_ns = (uint64_t)(web_wait_frame(WEB_FALLBACK_MS) * 1e6);
+#else
     if (next_ns > now)
         SDL_DelayPrecise(next_ns - now);
+#endif
     frames++;
     return !input_quit_requested();
 }

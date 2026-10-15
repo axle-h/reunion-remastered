@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reunion</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  /* SDL fills the page with the canvas (SDL_WINDOW_FILL_DOCUMENT) and
+     letterboxes the game in it; CSS must not scale it. */
+  #canvas { display: block; outline: none; }
+  #status { position: fixed; inset: 0; display: grid; place-items: center;
+            color: #ccc; font: 16px system-ui, sans-serif; pointer-events: none; }
+  #play { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 1.5rem; cursor: pointer;
+          background: rgb(0 0 0 / 70%); color: #d8d8e0; user-select: none;
+          font-family: system-ui, sans-serif; }
+  #play .title { font-size: clamp(2rem, 8vw, 5rem); font-weight: 700; letter-spacing: 0.3em;
+                 text-transform: uppercase; color: #fff; }
+  #play .go { font-size: 1.1rem; padding: 0.7em 1.8em; border: 1px solid #8890a8;
+              border-radius: 4px; }
+  #play:hover .go { background: rgb(255 255 255 / 10%); }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="status">Loading…</div>
+<script>
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    setStatus: text => { document.getElementById('status').textContent = text; },
+    onRuntimeInitialized: () => {
+      document.getElementById('status').textContent = '';
+      document.getElementById('canvas').focus();
+    },
+  };
+  // The browser's own shortcuts the game has no use for: reload (Ctrl+R,
+  // Ctrl+Shift+R, Ctrl+F5) and the developer tools. SDL would swallow them.
+  addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if ((mod && e.code === 'KeyR') || (e.ctrlKey && e.code === 'F5') || e.code === 'F12'
+        || (mod && e.shiftKey && ['KeyI', 'KeyJ', 'KeyC'].includes(e.code)))
+      e.stopImmediatePropagation();
+  }, true);
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

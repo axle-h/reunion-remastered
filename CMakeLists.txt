@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(reunion
-    VERSION 1.0.0
+    VERSION 1.1.0
     DESCRIPTION "Native port of Reunion (Amnesty Design, 1994)"
     LANGUAGES C)
 
@@ -11,7 +11,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Original game data, used by the tests and, unless REUNION_EMBED_DATA_DIR is
-# off (the release preset), by the game when it has no other copy.
+# off (the release preset) or for the web, by the game when it has no other
+# copy.
 set(REUNION_DATA_DIR "${CMAKE_SOURCE_DIR}/vendor/Reunion_DOS_EN" CACHE PATH
     "Directory holding the original DOS game data")
 option(REUNION_EMBED_DATA_DIR "Compile REUNION_DATA_DIR into the game as its last fallback" ON)
@@ -32,6 +33,10 @@ FetchContent_Declare(SDL3
     GIT_SHALLOW TRUE
     FIND_PACKAGE_ARGS 3.4 CONFIG)
 FetchContent_MakeAvailable(SDL3)
+if(EMSCRIPTEN AND TARGET SDL3-static)
+    # EM_ASM needs the GNU dialect; our global C_EXTENSIONS OFF breaks it.
+    set_target_properties(SDL3-static PROPERTIES C_EXTENSIONS ON)
+endif()
 
 # Module player for the ProTracker music (ANIM\*.SPD).
 set(BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -106,7 +111,19 @@ add_executable(reunion src/main.c)
 target_link_libraries(reunion PRIVATE reunion_core)
 # On Windows a GUI program, without a console window.
 set_target_properties(reunion PROPERTIES WIN32_EXECUTABLE ON)
-if(REUNION_EMBED_DATA_DIR)
+if(EMSCRIPTEN)
+    # The game's waiting loops stay as they are: Asyncify lets
+    # timing_wait_retrace() return to the browser and resume (platform/timing.c).
+    set_target_properties(reunion PROPERTIES SUFFIX ".html")
+    target_link_options(reunion PRIVATE
+        -sASYNCIFY -sASYNCIFY_STACK_SIZE=262144 -sSTACK_SIZE=1048576
+        -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=67108864 -lidbfs.js
+        "--js-library=${CMAKE_SOURCE_DIR}/src/platform/web/library.js"
+        "--shell-file=${CMAKE_SOURCE_DIR}/src/platform/web/shell.html")
+    set_property(TARGET reunion APPEND PROPERTY LINK_DEPENDS
+        "${CMAKE_SOURCE_DIR}/src/platform/web/library.js"
+        "${CMAKE_SOURCE_DIR}/src/platform/web/shell.html")
+elseif(REUNION_EMBED_DATA_DIR)
     target_compile_definitions(reunion PRIVATE REUNION_DEFAULT_DATA_DIR="${REUNION_DATA_DIR}")
 endif()
 

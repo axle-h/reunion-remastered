@@ -111,11 +111,23 @@ const char *__lsan_default_suppressions(void)
 
 bool vid_init(const char *title)
 {
-    if (!SDL_CreateWindowAndRenderer(title, config.window_width, config.window_height,
-                                     SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE;
+#ifdef __EMSCRIPTEN__
+    flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#endif
+    if (!SDL_CreateWindowAndRenderer(title, config.window_width, config.window_height, flags,
+                                     &window, &renderer)) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Window: %s", SDL_GetError());
         return false;
     }
+#ifdef __EMSCRIPTEN__
+    // The canvas fills the page at the display's pixel density and follows
+    // its size; the renderer letterboxes 4:3 and input maps back through it
+    // (CSS scaling of the canvas would leave SDL's mouse mapping behind).
+    // Set after the renderer: SDL recreates the window for it, and fails to
+    // undo fill-document mode when it does.
+    SDL_SetWindowFillDocument(window, true);
+#endif
 
     // No display vsync: the game is paced at the VGA's 70.086 Hz by
     // timing.c, and a 60 Hz display's vsync would slow it down by 14%.
@@ -124,6 +136,10 @@ bool vid_init(const char *title)
     SDL_HideCursor();
     if (!make_texture())
         return false;
+#ifdef __EMSCRIPTEN__
+    // Browsers allow full screen only from a click or a key.
+    config.display = CONFIG_WINDOWED;
+#endif
     if (config.display != CONFIG_WINDOWED)
         vid_apply_display();
     return true;
@@ -226,6 +242,11 @@ void vid_apply_display(void)
 {
     if (!window)
         return;
+#ifdef __EMSCRIPTEN__
+    // The page fills the browser's window, or the screen (Desktop).
+    SDL_SetWindowFullscreen(window, config.display != CONFIG_WINDOWED);
+    return;
+#endif
     if (config.display == CONFIG_WINDOWED) {
         SDL_SetWindowFullscreen(window, false);
         SDL_SetWindowSize(window, config.window_width, config.window_height);
@@ -257,6 +278,11 @@ void vid_toggle_fullscreen(void)
 
 void vid_window_event(const SDL_Event *e)
 {
+#ifdef __EMSCRIPTEN__
+    // The browser leaves full screen by itself, on Esc.
+    if (e->type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN)
+        config.display = CONFIG_WINDOWED;
+#endif
     // A window resized by hand keeps its size.
     if (e->type == SDL_EVENT_WINDOW_RESIZED && config.display == CONFIG_WINDOWED && window
         && !(SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {

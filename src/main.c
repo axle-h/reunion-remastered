@@ -37,6 +37,7 @@
 #include "platform/playerdir.h"
 #include "platform/timing.h"
 #include "platform/video.h"
+#include "platform/web.h"
 
 // Exit codes of REUNION.PRG that start.exe acts on (cutscene/cutscene.h).
 enum : int {
@@ -308,54 +309,11 @@ static bool start_replay(void)
     return true;
 }
 
-int main(int argc, char *argv[])
+// start.exe's cut-scenes before the game: CREDITS.PRG and INTRO.PRG, or the
+// one --cutscene names. False if the game is not to follow (--cutscene, or
+// the window was closed).
+static bool play_cutscenes(void)
 {
-    parse_args(argc, argv);
-    if (import_path)
-        return import_only();
-    setup_config();
-    // Headless unless SDL_VIDEO_DRIVER says otherwise (the replay is then
-    // shown fast-forward).
-    if (replay)
-        SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "offscreen,dummy", SDL_HINT_DEFAULT);
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init: %s", SDL_GetError());
-        return 1;
-    }
-    if (!vid_init("Reunion")) {
-        SDL_Quit();
-        return 1;
-    }
-    input_init();
-    if (replay && !start_replay()) {
-        vid_shutdown();
-        SDL_Quit();
-        return 1;
-    }
-
-    // No game data: a player chooses their copy; scripted runs fail.
-    bool found = find_game();
-    if (!found && vid_visible() && !replay && !autopilot_active()) {
-        if (!importscreen_run(false)) {
-            vid_shutdown();
-            SDL_Quit();
-            return 0;
-        }
-        found = find_game();
-    }
-    if (!found) {
-        const char *msg = "The game data of the DOS game was not found. Import your copy with "
-                          "--import=PATH (a folder, a ZIP or the CD's ISO), or pass the folder "
-                          "holding GRAFIKA, GRWAR, PICS, ... as the first argument or in "
-                          "REUNION_DATA.";
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
-        vid_shutdown();
-        SDL_Quit();
-        return 1;
-    }
-
-    // start.exe: CREDITS.PRG and INTRO.PRG, then the game (the cut-scenes
-    // return false if the window was closed).
     bool play_game = true;
     Cutscene cutscene;
     skip_intro |= autopilot_active();
@@ -372,10 +330,18 @@ int main(int argc, char *argv[])
     }
     if (input_restart_requested())
         input_reset();
+    return play_game;
+}
 
+// start.exe: the cut-scenes, then the game until the player leaves. Returns
+// the exit status.
+static int play(void)
+{
+    if (!play_cutscenes())
+        return 0;
     int result = 0;
     uint64_t replay_start = timing_frames();
-    while (play_game) {
+    for (;;) {
         system_exit_handler = on_halt;
         timing_set_quit_handler(on_quit);
         timing_set_restart_handler(on_restart);
@@ -429,6 +395,83 @@ int main(int argc, char *argv[])
     system_exit_handler = nullptr;
     timing_set_quit_handler(nullptr);
     timing_set_restart_handler(nullptr);
+    return result;
+}
+
+#ifdef __EMSCRIPTEN__
+// A page has no window to close: it starts with the click-to-play screen,
+// and leaving the game (Exit to DOS, the port menu's Quit, the end of
+// VICTORY) or the import screen goes back to it. The click also lets the
+// browser play sound from the first cut-scene.
+[[noreturn]] static void play_in_page(void)
+{
+    for (;;) {
+        web_click_to_play();
+        input_reset();
+        if (find_game() || (importscreen_run(false) && find_game()))
+            play();
+        input_reset();
+        audio_shutdown();
+    }
+}
+#endif
+
+int main(int argc, char *argv[])
+{
+    parse_args(argc, argv);
+    if (import_path)
+        return import_only();
+#ifdef __EMSCRIPTEN__
+    // Scripted runs leave the player's files alone.
+    if (!replay && !autopilot_init())
+        web_open_storage();
+#endif
+    setup_config();
+    // Headless unless SDL_VIDEO_DRIVER says otherwise (the replay is then
+    // shown fast-forward).
+    if (replay)
+        SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "offscreen,dummy", SDL_HINT_DEFAULT);
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init: %s", SDL_GetError());
+        return 1;
+    }
+    if (!vid_init("Reunion")) {
+        SDL_Quit();
+        return 1;
+    }
+    input_init();
+    if (replay && !start_replay()) {
+        vid_shutdown();
+        SDL_Quit();
+        return 1;
+    }
+
+#ifdef __EMSCRIPTEN__
+    if (!replay && !autopilot_active())
+        play_in_page();
+#endif
+    // No game data: a player chooses their copy; scripted runs fail.
+    bool found = find_game();
+    if (!found && vid_visible() && !replay && !autopilot_active()) {
+        if (!importscreen_run(false)) {
+            vid_shutdown();
+            SDL_Quit();
+            return 0;
+        }
+        found = find_game();
+    }
+    if (!found) {
+        const char *msg = "The game data of the DOS game was not found. Import your copy with "
+                          "--import=PATH (a folder, a ZIP or the CD's ISO), or pass the folder "
+                          "holding GRAFIKA, GRWAR, PICS, ... as the first argument or in "
+                          "REUNION_DATA.";
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
+        vid_shutdown();
+        SDL_Quit();
+        return 1;
+    }
+
+    int result = play();
     config_save();  // the window's size
     audio_shutdown();
     fs_shutdown();

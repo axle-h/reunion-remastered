@@ -170,6 +170,7 @@ void input_pump(void)
                     push_key(*p);
             break;
         case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             vid_window_event(&e);
             break;
         default:

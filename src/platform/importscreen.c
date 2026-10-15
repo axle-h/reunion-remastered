@@ -8,6 +8,7 @@
 #include "platform/panel.h"
 #include "platform/playerdir.h"
 #include "platform/video.h"
+#include "platform/web.h"
 
 // Layout, in the panel's 320x240 space (platform/panel.h).
 enum : int {
@@ -209,6 +210,14 @@ static void start_import(const char *path)
 
 static void open_dialog(Button b)
 {
+#ifdef __EMSCRIPTEN__
+    // The page's file picker, which copies the files chosen into its memory.
+    char *path = web_choose_import(b == B_FOLDER);
+    if (path)
+        start_import(path);
+    SDL_free(path);
+    return;
+#endif
     SDL_LockMutex(dialog_lock);
     bool busy = dialog_open;
     dialog_open = true;
@@ -346,6 +355,7 @@ static void handle(const SDL_Event *e)
             press((Button)b);
         break;
     case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
         vid_window_event(e);
         break;
     default:
@@ -414,7 +424,11 @@ static void draw(SDL_Renderer *r)
     } else if (status) {
         panel_color(r, 255, 160, 140, 255);
     } else {
+#ifdef __EMSCRIPTEN__
+        msg = "Or drop the ZIP or ISO onto this page.";
+#else
         msg = "Or drop the folder or file onto this window.";
+#endif
         panel_color(r, 140, 150, 180, 255);
     }
     panel_wrap(r, TEXT_X, STATUS_Y, COLS, LINE, PANEL_Y + PANEL_H - 1, msg);

@@ -209,11 +209,21 @@ static void build_rows(void)
         r->enabled = config.effects;
         break;
     case SEC_VIDEO: {
+#ifdef __EMSCRIPTEN__
+        // The page or the whole screen (Window or Desktop); the browser sets
+        // the size.
+        static const char *const names[] = {"Page", "", "Full screen"};
+        static const char help[] = "Alt+Enter toggles. Esc leaves full screen.";
+        constexpr bool sizes = false;
+#else
         static const char *const names[] = {"Window", "Full screen", "Desktop"};
-        r = add(ROW_CHOICE, R_DISPLAY, "Display",
-                "Full screen changes the display's mode; Desktop keeps it. Alt+Enter toggles.");
+        static const char help[] =
+            "Full screen changes the display's mode; Desktop keeps it. Alt+Enter toggles.";
+        constexpr bool sizes = true;
+#endif
+        r = add(ROW_CHOICE, R_DISPLAY, "Display", help);
         SDL_strlcpy(r->value, names[config.display], sizeof r->value);
-        if (config.display != CONFIG_DESKTOP) {
+        if (sizes && config.display != CONFIG_DESKTOP) {
             r = add(ROW_CHOICE, R_SIZE, "Size", nullptr);
             size_text(r->value, sizeof r->value);
         }
@@ -376,7 +386,11 @@ static void act(const Row *r, int dir)
         apply_volumes();
         break;
     case R_DISPLAY:
+#ifdef __EMSCRIPTEN__
+        config.display = config.display == CONFIG_WINDOWED ? CONFIG_DESKTOP : CONFIG_WINDOWED;
+#else
         config.display = step(config.display, dir ? dir : 1, CONFIG_WINDOWED, CONFIG_DESKTOP, true);
+#endif
         vid_apply_display();
         break;
     case R_SIZE:
@@ -615,6 +629,7 @@ void menu_handle_event(const SDL_Event *e)
         mouse(e);
         break;
     case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
         vid_window_event(e);
         break;
     default:

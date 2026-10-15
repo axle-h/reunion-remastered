@@ -12,6 +12,9 @@
 # Python bytecode
 __pycache__/
 
+# tools/web's Playwright
+node_modules/
+
 # Editors / OS
 .vscode/
 .idea/

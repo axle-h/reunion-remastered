@@ -67,7 +67,8 @@ void vid_toggle_fullscreen(void);
 // Applies config.display and the window or full-screen size.
 void vid_apply_display(void);
 // Window events from the event loops: a window resized by hand keeps its
-// size in config.window_width / _height.
+// size in config.window_width / _height; on the web, leaving full screen
+// sets config.display.
 void vid_window_event(const SDL_Event *e);
 // Window sizes for the port menu: 320x240 times 2, 3, ... up to what fits
 // the display (at least one). Returns the count.

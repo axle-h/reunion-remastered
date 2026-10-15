@@ -26,6 +26,7 @@ a line. Don't leave "done" notes, finished checklists or write-ups behind.
 | Memory | Native C | The real-mode memory model (`mem[]`, far pointers, the Borland heap, EMS) let ported code match the original byte for byte; once every unit matched it was replaced by C globals, typed pointers and C allocations, and the Borland run time went with it (docs/port.md) |
 | Verification | Golden state hashes and the playthrough | Differential tests under Unicorn checked every unit against the original until the move to native memory (tag `last-real-mode`); golden hashes of the layout-independent state (fixes on and off) and the playthrough's proof guard behaviour since. A new game's first 50 hours match the original under DOSBox-X (`tools/dosbox/side_by_side.py`); a whole game there is out of reach, as input means stepping DOSBox-X's debugger a frame at a time |
 | Distribution | The binary without the art; the player brings their copy | Data taken from the executables stays compiled in (typed constants, texts, price tables, cut-scene tables, the AdLib player). Pictures, animations, modules, samples and anything else that can be read from the player's copy is never bundled. The DOS game's saves in `tests/golden/saves/` stay as it wrote them, stale bytes included (`DOS_2.sav` holds a few KB of a cut-scene's frames). The first launch imports the player's copy (README, "Importing your copy") |
+| Web | Emscripten with Asyncify, on GitHub Pages | The game's own waiting loops stay as they are: Asyncify unwinds to the browser at each retrace and resumes, where a main-loop callback would mean rewriting every one. The page shows a frame at the display's rate and runs the retraces due by then (70 Hz game time on a 60 Hz display); longjmp works through it. The player's folder lives in IndexedDB |
 | Player's folder | One `SDL_GetPrefPath("Reunion", "Reunion")` folder for everything | `reunion.ini`, `save/`, `screenshots/` and the imported game in `data/` |
 | Editions | English floppy and the CD's four languages; strict | The port is the floppy's `REUNION.PRG` with the CD's font (docs/versions.md). An import accepts only files whose checksums are known. The CD's import takes all four games, the English one whole and each other language's own files next to it, and the language is a setting (port menu, `reunion.ini`, `--language`): one import, no re-import to switch, about 82 MB. `DATA_DIR`/`REUNION_DATA` still point anywhere without checks. The other languages' program texts come from the builds in the CD's install archives, compiled in by `tools/cd_texts.py` (building needs no copy of the game; the tests that use the ISO need it) |
 | Bugs of the original | A bug that changes play gets a switch in `src/game/fixes.h` (all on by default); a harmless one is kept and described where the code reproduces it | With every fix off the port plays like the original, which the golden hashes check |
@@ -65,6 +66,10 @@ The port is complete and the game can be won in it.
   music, display, skip intro, colony stats, language, improvement and fix
   switches, import, restart, quit), `reunion.ini`, screenshots, headless autopilot,
   `--replay` and soak runs.
+- **In the browser:** the web build (docs/development.md) plays the
+  same game, recordings included (`tools/web/replay.mjs`), in Chromium
+  and Firefox. Safari and touch screens are untested; a hidden tab
+  nearly stops the game, as browsers slow its timers to once a second.
 - **Ships without the game data:** release builds have none built in. The
   first start imports the player's copy (a folder, a ZIP or the CD's ISO;
   the floppy release, and the CD with its four languages) into the

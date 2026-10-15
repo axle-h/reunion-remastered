@@ -39,12 +39,20 @@
       "displayName": "Release (no built-in data directory: the game imports the player's copy)",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "REUNION_EMBED_DATA_DIR": "OFF" }
+    },
+    {
+      "name": "web",
+      "displayName": "Web page, with Emscripten (needs EMSDK set, by emsdk_env.sh)",
+      "inherits": "base",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "BUILD_TESTING": "OFF" }
     }
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
     { "name": "asan", "configurePreset": "asan" },
     { "name": "trap", "configurePreset": "trap" },
-    { "name": "release", "configurePreset": "release" }
+    { "name": "release", "configurePreset": "release" },
+    { "name": "web", "configurePreset": "web" }
   ]
 }
